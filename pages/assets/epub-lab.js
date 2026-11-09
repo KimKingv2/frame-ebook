@@ -132,6 +132,7 @@
       'body { line-height: ' + line + ' !important; }',
       'body p, body li, body blockquote, body dd, body dt { line-height: ' + line + ' !important; }',
       'body, body *:not(img):not(svg):not(video):not(canvas):not(iframe) { color: ' + theme.foreground + ' !important; }',
+      'body *:not(img):not(svg):not(video):not(canvas):not(iframe) { background-color: transparent !important; }',
       'img, svg, video, canvas { max-width: 100%; }'
     ].join('\n');
   }
@@ -147,15 +148,30 @@
   }
   function applyAppearance() {
     var theme = THEMES[appearance.theme];
-    el('reader-viewport').style.backgroundColor = theme.background;
-    if (view && view.renderer) {
+    var viewport = el('reader-viewport');
+    viewport.dataset.theme = appearance.theme;
+    viewport.style.backgroundColor = theme.background;
+    viewport.style.color = theme.foreground;
+
+    if (view) {
+      view.style.setProperty('--frame-reader-page-background', theme.background);
+      view.style.setProperty('--frame-reader-page-foreground', theme.foreground);
+    }
+
+    if (view && view.renderer && !view.isFixedLayout) {
+      // Foliate margin controls top/bottom page breathing room; gap controls
+      // the left/right page edges and spread gutter. Re-render after both
+      // attributes change so the paginator recomputes its geometry.
+      var horizontalGap = { '24': '4%', '40': '7%', '60': '10%' }[appearance.margin] || '7%';
       view.renderer.setAttribute('margin', appearance.margin);
-      if (!view.isFixedLayout) {
-        try {
-          view.renderer.getContents().forEach(function (item) {
-            applyDocumentAppearance(item.doc);
-          });
-        } catch (e) {}
+      view.renderer.setAttribute('gap', horizontalGap);
+      try {
+        view.renderer.getContents().forEach(function (item) {
+          applyDocumentAppearance(item.doc);
+        });
+      } catch (e) {}
+      if (typeof view.renderer.render === 'function') {
+        view.renderer.render();
       }
     }
     updateThemeButtons();
