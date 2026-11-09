@@ -105,7 +105,7 @@
       ['Blob / FileReader', !!window.Blob && !!window.FileReader],
       ['IndexedDB', !!window.indexedDB],
       ['Web Crypto', !!(window.crypto && window.crypto.subtle)],
-      ['觸控事件', ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)],
+      ['Touch Events API（能力探測）', ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)],
       ['CSS Flexbox', !!(window.CSS && window.CSS.supports && window.CSS.supports('display', 'flex'))],
       ['CSS Grid', !!(window.CSS && window.CSS.supports && window.CSS.supports('display', 'grid'))]
     ];
