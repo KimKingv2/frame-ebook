@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.2 EPUB Lab + visual bookshelf preview**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
+> Current status: **V0.3 Reading Room**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
 
 ## Product scope
 
@@ -25,7 +25,7 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 ## Current routes
 
 - `/` — visual home and bookshelf layout preview.
-- `/epub-lab/` — real EPUB parsing, navigation and local progress prototype.
+- `/epub-lab/` — EPUB parsing, navigation, local progress and reading appearance prototype.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
 
@@ -38,20 +38,18 @@ Planned cover lookup order:
 2. A sibling `cover.jpg` (or supported cover image) in the book's private folder.
 3. A generated fallback cover based on book metadata.
 
-The actual cover and metadata list will come from the private library after OpenList integration. No private book covers should be committed to this public repository.
+## V0.3 Reading Room
 
-## V0.2 EPUB Lab
+The EPUB Lab adds local reading appearance controls:
+- Font scale: 90% to 130%.
+- Line spacing: 1.45 to 2.0.
+- Page margin: narrow, standard or wide.
+- Paper themes: paper white, warm sepia and night reading.
+- Appearance preferences persist in this browser's localStorage.
 
-The EPUB Lab uses a pinned Foliate.js EPUB parser and renderer snapshot, with JSZip used as a compatibility-oriented archive loader for this small prototype.
+The controls are applied to reflowable EPUB content. Fixed-layout EPUBs retain their original page design. Settings are local to one browser and are not synchronized between devices.
 
-It supports:
-- Open the included sample EPUB.
-- Select a local EPUB file on desktop/mobile. The file is read in the browser and is not uploaded.
-- Chapter navigation via the EPUB table of contents.
-- Previous/next page controls.
-- Save and restore an EPUB CFI in this browser's localStorage.
-
-**Important:** this prototype reads the entire EPUB archive into browser memory. It is only for parser and browser compatibility validation. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating the storage server's CORS and Range behavior.
+**Prototype limitation:** JSZip currently reads the whole EPUB archive into browser memory. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating CORS and Range behavior.
 
 The saved CFI is currently local to one browser. Cross-device synchronization requires the future authenticated Worker + D1 service and is not implemented yet.
 
