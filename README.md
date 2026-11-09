@@ -45,7 +45,7 @@ The EPUB Lab adds local reading appearance controls:
 - Line spacing: 1.45 to 2.0.
 - Page margin: narrow, standard or wide.
 - Paper themes: paper white, warm sepia and night reading, synchronized across the EPUB document and Foliate page background.
-- Page margin controls both outer top/bottom breathing room and horizontal page/spread gap, followed by an explicit paginator re-layout.
+- Page margin controls outer top/bottom breathing room (8, 16 or 24 px) and horizontal page/spread gap, followed by an explicit paginator re-layout. The default is 16 px.
 - Appearance preferences persist in this browser's localStorage.
 
 The controls are applied to reflowable EPUB content. Fixed-layout EPUBs retain their original page design. Settings are local to one browser and are not synchronized between devices.
