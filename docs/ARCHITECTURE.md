@@ -54,7 +54,7 @@ For reflowable EPUB chapters, the adapter injects a small per-document style she
 
 - Font scale: 90–130%.
 - Line spacing: 1.45–2.0.
-- Paginator top/bottom page margin: 8, 16 or 24 CSS pixels (16 px by default).
+- Paginator top/bottom page margin: 8, 16 or 24 CSS pixels (16 px by default). The adapter must pass a unit-bearing CSS length such as `16px` to Foliate's `margin` attribute; a unitless value invalidates its grid track sizing.
 - Paper white, warm sepia and night themes.
 
 Settings are validated against a fixed allow-list and stored locally under `frame-reader-appearance-v1`. Fixed-layout EPUBs keep their authored layout rather than having text styling forced on them.
