@@ -151,9 +151,6 @@
     if (view && view.renderer) {
       view.renderer.setAttribute('margin', appearance.margin);
       if (!view.isFixedLayout) {
-        view.addEventListener('load', function onSectionLoad(event) {
-          applyDocumentAppearance(event.detail && event.detail.doc);
-        });
         try {
           view.renderer.getContents().forEach(function (item) {
             applyDocumentAppearance(item.doc);
@@ -193,6 +190,9 @@
     view.style.display = 'block';
     view.style.width = '100%';
     view.style.height = '100%';
+    view.addEventListener('load', function (event) {
+      if (!view.isFixedLayout) applyDocumentAppearance(event.detail && event.detail.doc);
+    });
     view.addEventListener('relocate', function (event) {
       var detail = event.detail || {};
       updateLocation(detail);
