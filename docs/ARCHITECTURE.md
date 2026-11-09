@@ -38,9 +38,9 @@ Animation should remain decorative and lightweight: short entrance transitions, 
 
 Foliate.js supports EPUB, MOBI, KF8/AZW3 and CBZ. Its API is not stable, so the current source is pinned to an exact commit. See `docs/THIRD-PARTY.md`.
 
-## EPUB Lab (V0.2)
+## EPUB Lab (V0.3)
 
-The first real EPUB prototype is at `/epub-lab/`.
+The Reading Room prototype is at `/epub-lab/`.
 
 - Foliate.js source snapshot: `78914aef4466eb960965702401634c2cb348e9b1` (MIT).
 - JSZip 3.10.2 loads the small test archive for this compatibility experiment.
@@ -48,12 +48,23 @@ The first real EPUB prototype is at `/epub-lab/`.
 - The view saves the current EPUB CFI to localStorage and restores it when the same book is reopened.
 - A tiny original two-chapter Traditional Chinese EPUB is included for repeatable tests.
 
-This loader is deliberately not the final storage strategy: JSZip loads the complete archive into memory. The OpenList production path must use HTTP Range / partial archive reads and must never put a long-lived OpenList admin token in browser JavaScript.
+### Reading appearance
+
+For reflowable EPUB chapters, the adapter injects a small per-document style sheet when Foliate emits a chapter load event. User settings include:
+
+- Font scale: 90–130%.
+- Line spacing: 1.45–2.0.
+- Paginator page margin: 24, 40 or 60 CSS pixels.
+- Paper white, warm sepia and night themes.
+
+Settings are validated against a fixed allow-list and stored locally under `frame-reader-appearance-v1`. Fixed-layout EPUBs keep their authored layout rather than having text styling forced on them.
+
+This is a prototype appearance layer. EPUB authors may use deeply nested styles or fixed pixel sizes that need more testing. A future settings layer should prefer stable engine APIs where available.
 
 ### Device test order
 
-1. Mac Chrome and Safari: load the bundled demo, turn pages, jump chapters, reload and confirm location restore.
-2. Android Chrome and iOS/iPadOS Safari: verify EPUB loading, controls, portrait/landscape layout and file selection.
+1. Mac Chrome and Safari: load the bundled demo, change each appearance setting, turn pages, jump chapters, reload and confirm location and appearance restore.
+2. Android Chrome and iOS/iPadOS Safari: verify EPUB loading, appearance controls, portrait/landscape layout and local file selection.
 3. A larger, image-heavy EPUB: measure load time and memory behavior on desktop, tablet and phone.
 4. Only after the browser reader is stable, implement OpenList metadata lookup and Range-backed reading.
 
