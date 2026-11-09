@@ -51,7 +51,7 @@ The controls are applied to reflowable EPUB content. Fixed-layout EPUBs retain t
 
 **Prototype limitation:** JSZip currently reads the whole EPUB archive into browser memory. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating CORS and Range behavior.
 
-The saved CFI is currently local to one browser. Cross-device synchronization requires the future authenticated Worker + D1 service and is not implemented yet.
+The bundled two-chapter test EPUB has passed a live desktop-browser smoke test for visible content, next/previous navigation, chapter navigation and CFI restoration after reload. Phone and tablet testing remains pending. The saved CFI and appearance preferences are currently local to one browser. Cross-device synchronization requires the future authenticated Worker + D1 service and is not implemented yet.
 
 ## Local preview
 
