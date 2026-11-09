@@ -3,68 +3,76 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library with a Kindle-friendly web reader.
 
-> Current status: **V0.1 foundation / Kindle browser compatibility test**. This is not yet a production ebook reader and does not connect to OpenList.
+> Current status: **V0.2 EPUB Lab**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
 
 ## Goals
 
-- Read EPUB, MOBI, AZW3/KF8 and PDF in desktop and mobile browsers.
-- Offer a dedicated, deliberately lightweight reader mode for older Kindle browsers.
-- Support illustrated books and manga, including single-page, spread and vertical-scroll layouts where the source format permits.
-- Keep book files in the user's private storage (initially OpenList), not in this public repository.
-- Synchronize reading positions, bookmarks and annotations across supported web clients.
+- Read EPUB first, then add MOBI, AZW3/KF8 and PDF.
+- Support illustrated EPUBs and manga, with single-page, spread and vertical-scroll layouts where the source format permits.
+- Provide separate Desktop, Mobile and Kindle reading profiles.
+- Keep book files in private storage (planned: OpenList), not in this public repository.
+- Synchronize reading position, bookmarks and notes across supported web clients.
 
-## V0.1 contents
+## Current routes
 
-- `/` — project landing page.
-- `/kindle-test/` — old-browser feature probe and simple page-turning demo.
-- `/health.json` — same-origin HTTPS/XHR test endpoint.
-- No book files, OpenList credentials, user accounts or tracking code.
+- `/` — project home.
+- `/kindle-test/` — Paperwhite 10 browser capability probe.
+- `/epub-lab/` — real EPUB parsing, navigation and local progress prototype.
+- `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
+- `/health.json` — same-origin connectivity endpoint.
 
-The Kindle test intentionally uses conservative HTML/CSS and ES5 JavaScript. It checks browser APIs without requiring a modern framework. The ES-module probe is isolated so that a browser which does not understand `type="module"` can still run the rest of the test.
+## V0.2 EPUB Lab
+
+The EPUB Lab uses a pinned Foliate.js EPUB parser and renderer snapshot, with JSZip used as a compatibility-oriented archive loader for this small prototype.
+
+It supports:
+- Open the included sample EPUB.
+- Select a local EPUB file on desktop/mobile. The file is read in the browser and is not uploaded.
+- Chapter navigation via the EPUB table of contents.
+- Previous/next page controls.
+- Save and restore an EPUB CFI in this browser's localStorage.
+
+**Important:** this prototype reads the entire EPUB archive into browser memory. It is only for parser and Kindle compatibility validation. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating the storage server's CORS and Range behavior.
+
+The saved CFI is currently local to one browser. Cross-device synchronization requires the future authenticated Worker + D1 service and is not implemented yet.
 
 ## Local preview
 
-No build step is required. From the project root:
+No build step is required.
 
 ```sh
 python3 -m http.server 8080 --directory pages
 ```
 
-Open `http://localhost:8080/` on a computer. The Kindle test is at `http://localhost:8080/kindle-test/`.
+Open `http://localhost:8080/`, then visit `/epub-lab/`.
 
-For a realistic Kindle test, deploy over HTTPS. A local HTTP server is not a substitute for the deployed Cloudflare Pages URL.
+## Cloudflare Pages
 
-## Cloudflare Pages deployment
+Connect `KimKingv2/frame-ebook` to Cloudflare Pages:
 
-This repository is intended to connect directly to Cloudflare Pages:
+| Setting | Value |
+|---|---|
+| Production branch | `main` |
+| Framework preset | None |
+| Build command | Empty |
+| Build output directory | `pages` |
 
-1. In Cloudflare Dashboard, open **Workers & Pages** and create a Pages project.
-2. Choose **Connect to Git** and select `KimKingv2/frame-ebook`.
-3. Set production branch to `main`.
-4. Choose **None** as the framework preset.
-5. Leave the build command empty.
-6. Set the build output directory to `pages`.
-7. Deploy.
-
-Future pushes to `main` will trigger production deployments; other branches can be used for previews.
-
-### Important for the first Kindle test
-
-Keep this compatibility-test deployment public until the browser test is complete. Do not put a real library, OpenList token, or private file behind this test project. Cloudflare Access and modern identity-provider login flows need a separate compatibility test on the Paperwhite 10 before they are used in the Kindle path.
-
-## Architecture direction
-
-- **Desktop/mobile reader:** a modern browser application. `foliate-js` is a candidate for EPUB/MOBI/KF8 and fixed-layout books; PDF.js is the PDF candidate. These are not bundled in V0.1.
-- **Kindle reader:** separate lightweight page/profile. Do not assume the full desktop engine or modern JavaScript module support works on the Paperwhite 10.
-- **Storage:** OpenList remains the private file source. The public GitHub repository contains application code only.
-- **Sync:** Cloudflare Worker/Pages Functions + D1 are candidates for web-client reading state. Kindle compatibility, authentication and network behavior must be validated before finalizing the API.
+New commits to `main` should trigger automatic deployment.
 
 ## Security and privacy
 
-- Never commit OpenList tokens, account credentials, private books, personal metadata exports or `.env` files.
-- V0.1 sends no diagnostic data to a server. It makes one same-origin GET request to `/health.json` solely to verify HTTPS/XHR connectivity.
-- Do not enable public directory listing or expose OpenList paths without an authenticated, short-lived access design.
+- Never commit OpenList tokens, credentials, private books, private metadata exports or `.env` files.
+- The included sample EPUB is original demonstration content.
+- Local EPUB file selection stays in the browser and is not transmitted.
+- Do not connect a public reader directly to OpenList using a long-lived administrator token. A future Worker should provide authenticated, short-lived, narrowly scoped file access.
+- See [PRIVACY.md](PRIVACY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Third-party software
+
+- Foliate.js — MIT, source snapshot pinned to `78914aef4466eb960965702401634c2cb348e9b1`.
+- JSZip 3.10.2 — MIT option selected from its dual MIT/GPLv3 license.
+- Notices are included under `pages/vendor/` and `docs/THIRD-PARTY.md`.
 
 ## License
 
-The original project files are licensed under MIT. Third-party dependencies will retain their own licenses and notices when introduced.
+Original FRAME Reader project files are MIT-licensed. Third-party components retain their respective licenses and notices.

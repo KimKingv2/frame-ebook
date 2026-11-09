@@ -10,21 +10,40 @@ FRAME Reader is one library with three presentation profiles:
 
 The Kindle profile is a separate compatibility target, not a responsive shrink of the desktop UI.
 
-## Format strategy (candidates, not yet integrated)
+## Format strategy
 
 | Format | Candidate | Notes |
 |---|---|---|
-| EPUB | foliate-js | Reflowable and fixed-layout books; test CFI/progress persistence. |
-| MOBI | foliate-js | Legacy Mobipocket parsing. |
-| AZW3 / KF8 | foliate-js | KF8 parsing; complex books may be expensive to decode. |
+| EPUB | Foliate.js parser/renderer | Reflowable and fixed-layout books; CFI progress. |
+| MOBI | Foliate.js | Legacy Mobipocket parsing; add after EPUB validation. |
+| AZW3 / KF8 | Foliate.js | KF8 parsing; complex books may be expensive to decode. |
 | PDF | PDF.js | Mature rendering core; optimize page loading for mobile. |
-| Manga | Format-aware fixed-layout/image handling | Test reading direction, spreads, embedded images and pagination separately. |
+| Manga | Fixed-layout EPUB / CBZ | Test reading direction, spreads, images and pagination separately. |
 
-foliate-js is modular and supports EPUB, MOBI, KF8/AZW3 and CBZ, but its API is not stable. Pin an exact commit and retain its license notice when integrating it. It uses native ES modules, so do not assume it works in the Kindle 10 browser.
+Foliate.js supports EPUB, MOBI, KF8/AZW3 and CBZ. Its API is not stable, so the current source is pinned to an exact commit. See `docs/THIRD-PARTY.md`.
+
+## EPUB Lab (V0.2)
+
+The first real EPUB prototype is at `/epub-lab/`.
+
+- Foliate.js source snapshot: `78914aef4466eb960965702401634c2cb348e9b1` (MIT).
+- JSZip 3.10.2 loads the small test archive for this compatibility experiment.
+- The adapter supplies Foliate's EPUB loader interface (`loadText`, `loadBlob`, `getSize`).
+- The view saves the current EPUB CFI to localStorage and restores it when the same book is reopened.
+- A tiny original two-chapter Traditional Chinese EPUB is included for repeatable tests.
+
+This loader is deliberately not the final storage strategy: JSZip loads the complete archive into memory. The OpenList production path must use HTTP Range / partial archive reads and must never put a long-lived OpenList admin token in browser JavaScript.
+
+### Device test order
+
+1. Mac Chrome: load the bundled demo, turn pages, jump chapters, reload and confirm location restore.
+2. Paperwhite 10: load the same-origin bundled demo and test next/previous, chapter select and reload.
+3. A larger, image-heavy EPUB: measure load time and memory behavior on Mac and Kindle separately.
+4. Only after parser compatibility is known, implement OpenList metadata lookup and Range-backed reading.
 
 ## Kindle compatibility principle
 
-The first test uses ES5 JavaScript, conservative CSS and ordinary click buttons. It probes:
+The initial Kindle test uses conservative CSS and ordinary click buttons. It probes:
 
 - JavaScript and DOM event handling
 - Cookies, localStorage and sessionStorage
@@ -35,7 +54,9 @@ The first test uses ES5 JavaScript, conservative CSS and ordinary click buttons.
 - Flexbox, Grid and touch events
 - Same-origin HTTPS/XHR request to /health.json
 
-A successful feature probe does not prove that a large ebook engine will run. Test a small EPUB chapter-loading prototype on the actual device before choosing a parsing strategy.
+Paperwhite 10 real-device testing confirmed finger taps work on the previous/next controls even though Touch Events API detection is false. Prefer click controls as the baseline; swipe gestures remain optional.
+
+A successful capability probe does not prove the entire EPUB engine will run. The EPUB Lab now tests the actual parser and paginator on the device.
 
 ## Sync data model (future)
 

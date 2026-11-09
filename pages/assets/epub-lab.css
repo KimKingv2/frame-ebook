@@ -1,0 +1,55 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #111018; color: #f0edf7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.app-shell { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 26px; }
+.topbar { height: 68px; border-bottom: 1px solid #302b3c; display: flex; align-items: center; justify-content: space-between; }
+.brand { color: #f0edf7; text-decoration: none; letter-spacing: 2px; font-size: 13px; }
+.brand b { color: #bca9f7; }
+.lab-tag, .eyebrow, .book-kicker, .footer { color: #938aa1; font-size: 10px; letter-spacing: 1.5px; }
+.intro { padding: 35px 0 23px; max-width: 720px; }
+.eyebrow { color: #bca9f7; }
+.intro h1 { margin: 10px 0; font-size: 36px; font-weight: 600; letter-spacing: -1px; }
+.intro h1 em { color: #bca9f7; font-style: normal; }
+.intro p:last-child { max-width: 700px; color: #aaa3b6; font-size: 13px; line-height: 1.8; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px; border: 1px solid #302b3c; border-radius: 11px; background: #191622; }
+button, .file-button { min-height: 42px; padding: 0 15px; border: 1px solid #574a6c; border-radius: 7px; color: #e8e1f5; background: #211c2d; font-size: 12px; cursor: pointer; }
+button:disabled { opacity: .38; cursor: default; }
+.primary-button { border-color: #7153ca; background: #7153ca; color: #fff; }
+.file-button { display: inline-flex; align-items: center; }
+#epub-file { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.engine-status { margin-left: auto; color: #a79bb8; font-size: 10px; }
+.book-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 22px 2px 13px; }
+.book-kicker { margin: 0 0 5px; }
+.book-heading h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.book-author { margin: 5px 0 0; color: #aaa3b6; font-size: 11px; }
+.book-progress { text-align: right; white-space: nowrap; }
+.book-progress strong { display: block; color: #c7b5fb; font-size: 20px; }
+.book-progress span { color: #92899e; font-size: 10px; }
+.reader-frame { padding: 8px; border: 1px solid #393345; border-radius: 12px; background: #1a1722; }
+.reader-viewport { position: relative; width: 100%; height: 62vh; min-height: 350px; max-height: 780px; overflow: hidden; background: #fbfaf6; color: #24212a; border-radius: 5px; }
+.reader-viewport foliate-view { display: block; width: 100%; height: 100%; min-height: 350px; background: #fbfaf6; color: #24212a; }
+.reader-placeholder { position: absolute; top: 50%; left: 0; width: 100%; padding: 20px; transform: translateY(-50%); text-align: center; color: #645b6d; }
+.placeholder-mark { width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 12px; line-height: 44px; background: #7458c5; color: #fff; font-size: 23px; font-weight: bold; }
+.reader-placeholder h3 { margin: 0 0 8px; font-size: 17px; }
+.reader-placeholder p { font-size: 12px; }
+.reader-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0 4px; }
+.toc-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; color: #aaa3b6; font-size: 11px; }
+.toc-wrap select { max-width: 330px; min-width: 120px; min-height: 40px; padding: 0 10px; border: 1px solid #514763; border-radius: 6px; background: #1b1724; color: #eee8f8; font-size: 11px; }
+.reader-status { min-height: 24px; color: #a99eb7; font-size: 11px; line-height: 1.7; }
+.notice { margin: 17px 0 25px; padding: 14px 16px; border-left: 3px solid #7b61c9; background: #191622; color: #b0a8ba; font-size: 11px; line-height: 1.8; }
+.notice strong { color: #d6caef; }
+.notice p { margin: 4px 0 0; }
+.footer { display: flex; justify-content: space-between; gap: 10px; padding: 17px 0 22px; border-top: 1px solid #302b3c; font-size: 9px; }
+.footer a { color: #bba8f3; text-decoration: none; }
+@media (max-width: 640px) {
+  .app-shell { padding: 0 13px; }
+  .intro { padding-top: 26px; }
+  .intro h1 { font-size: 30px; }
+  .engine-status { width: 100%; margin-left: 0; }
+  .book-heading { align-items: start; }
+  .book-heading h2 { font-size: 15px; }
+  .reader-viewport { height: 60vh; min-height: 300px; }
+  .reader-controls { flex-wrap: wrap; }
+  .toc-wrap { order: 3; width: 100%; justify-content: center; }
+  .toc-wrap select { flex: 1; max-width: none; }
+  .footer { display: block; line-height: 1.9; }
+}

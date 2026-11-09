@@ -29,13 +29,16 @@ Send the visible feature list and firmware version. Note blank areas, error page
 - If localStorage is unavailable or unreliable, server-side progress storage becomes essential, but authentication must first be validated.
 - A successful test does not validate EPUB parsing, book access, Cloudflare Access or cross-device synchronization.
 
-
 ## Observed device result — 2026-11-09
 
 Paperwhite 10 real-device test reported:
 
 - The page loads and the previous/next page buttons respond to finger taps.
-- The browser capability panel reports the other tested items as available.
+- The other browser capabilities shown on the test page were reported as available.
 - Touch Events API is reported as not detected.
 
-Interpretation: the practical tap-to-click path works. The missing Touch Events API flag is not a blocker for the Kindle UI because basic page navigation has been verified on the device. Prefer ordinary click targets for Kindle navigation and treat advanced swipe gestures as optional until separately tested.
+Interpretation: the practical tap-to-click path works. The missing Touch Events API flag is not a blocker for the Kindle UI because basic page navigation has been verified. Prefer ordinary click targets for Kindle navigation and treat advanced swipe gestures as optional until separately tested.
+
+## EPUB Lab follow-up
+
+Open `/epub-lab/` on the Paperwhite 10 and load the included same-origin test EPUB. Test chapter navigation, previous/next controls and reload position restore. This isolates EPUB parser/paginator compatibility from OpenList, CORS, authentication and large-file streaming. Record any visible error and the Kindle firmware version.
