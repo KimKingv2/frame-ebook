@@ -10,10 +10,14 @@ Status:
 - Table of contents navigation: not yet confirmed.
 - Reload and restore EPUB CFI: not yet confirmed.
 - User-selected local EPUB file: not yet confirmed separately.
-- Kindle Paperwhite 10 EPUB rendering: pending.
 
-## Next device test
+## Next device checks
 
-Open `https://frame-ebook.pages.dev/epub-lab/` on Paperwhite 10 and test the bundled sample EPUB first. Verify opening, previous/next page, chapter selection and reload/restore. Record the visible result and any error message.
+On desktop, phone and tablet browsers, verify:
+1. The bundled EPUB opens and renders without layout overflow.
+2. Previous/next controls and table-of-contents navigation work.
+3. Reloading restores the last CFI in the same browser.
+4. A locally selected EPUB opens without being uploaded.
+5. Portrait/landscape changes and different screen widths keep the reading controls usable.
 
-Do not connect OpenList until the same-origin EPUB test is stable on Mac and Kindle.
+Do not connect OpenList until the same-origin EPUB test is stable across the primary browsers and device sizes.
