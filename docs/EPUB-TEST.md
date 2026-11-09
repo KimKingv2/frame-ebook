@@ -4,33 +4,30 @@
 
 User report: the Mac browser can open an EPUB in the V0.2 EPUB Lab.
 
-Status:
-- EPUB file opens and renders on Mac: **PASS (user-tested)**.
-- Previous/next page navigation: not yet confirmed.
-- Table of contents navigation: not yet confirmed.
-- Reload and restore EPUB CFI: not yet confirmed.
-- User-selected local EPUB file: not yet confirmed separately.
+## 2026-11-09 — Live desktop browser smoke test (V0.3)
 
-## V0.3 Reading Room checks
+After adding the missing Foliate first-navigation initialization:
 
-New controls:
-- Font scale 90–130%.
-- Line spacing 1.45–2.0.
-- Page margin 24 / 40 / 60 CSS px.
-- Paper, sepia and night themes.
-- Appearance settings restore from localStorage on reload.
+- Bundled EPUB parsing and reader initialization: **PASS**.
+- Actual chapter text visible in the reading viewport: **PASS**.
+- Next-page navigation: **PASS**; progress changed from 0% to approximately 48%.
+- Previous-page navigation: **PASS**; returned to the prior location.
+- Table of contents jump to Chapter 2: **PASS**; progress reached 100%.
+- Reload and automatic bundled-book reopen: **PASS**; Chapter 2 and 100% progress restored.
+- Appearance controls (font scale, line height, margins, paper/sepia/night themes): **PASS**.
+- Appearance preferences persisted after reload: **PASS**.
 
-Implementation note: appearance styles are injected into reflowable EPUB content when each section emits a load event. Fixed-layout EPUBs are intentionally not restyled.
+The test also exposed an integration requirement: Foliate's `view.open(book)` parses and prepares the renderer but does not display the first section by itself. The adapter must call `view.init({ showTextStart: true })`, or pass a saved CFI through `view.init({ lastLocation, showTextStart: true })`, to navigate to the initial reading location.
 
-## Next device checks
+## Remaining device checks
 
-On desktop, phone and tablet browsers, verify:
-1. The bundled EPUB opens and renders without layout overflow.
-2. Font size, line spacing, margin and all three themes visibly affect the text/page.
-3. Appearance settings survive reload in the same browser.
-4. Previous/next controls and table-of-contents navigation work.
-5. Reloading restores the last CFI in the same browser.
-6. A locally selected EPUB opens without being uploaded.
-7. Portrait/landscape changes and different screen widths keep the reading controls usable.
+The test above is a live desktop-browser smoke test, not a substitute for testing actual phones and tablets. On desktop, phone and tablet browsers, verify:
 
-Do not connect OpenList until the same-origin EPUB test is stable across the primary browsers and device sizes.
+1. Bundled and user-selected EPUB files open without layout overflow.
+2. Font size, line spacing, page margin and all three themes visibly affect reflowable text.
+3. Appearance settings and CFI reading position survive reload in the same browser.
+4. Previous/next controls and chapter navigation work.
+5. Portrait/landscape changes and different screen widths keep controls usable.
+6. Larger, image-heavy books remain responsive and do not exhaust browser memory.
+
+Do not connect OpenList until the core reader is stable across the primary browsers and device sizes.
