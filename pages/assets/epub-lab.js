@@ -1,5 +1,6 @@
-/* FRAME Reader EPUB Lab — Foliate.js adapter.
+/* FRAME Reader Reading Room — Foliate.js adapter.
  * The archive is loaded fully into memory by JSZip for this small prototype.
+ * Reading appearance settings are local to this browser.
  */
 (function () {
   'use strict';
@@ -7,6 +8,18 @@
   var currentStorageKey = null;
   var restoreCfi = null;
   var restoring = false;
+  var APPEARANCE_KEY = 'frame-reader-appearance-v1';
+  var THEMES = {
+    paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
+    sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
+    night: { background: '#191821', foreground: '#e5dfed', colorScheme: 'dark' }
+  };
+  var appearance = {
+    fontScale: '1',
+    lineHeight: '1.65',
+    margin: '40',
+    theme: 'paper'
+  };
   var el = function (id) { return document.getElementById(id); };
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
   var safeGet = function (key) { try { return localStorage.getItem(key); } catch (e) { return null; } };
@@ -80,6 +93,81 @@
       }
     };
   }
+  function loadAppearance() {
+    var saved = safeGet(APPEARANCE_KEY);
+    if (saved) {
+      try {
+        var value = JSON.parse(saved);
+        if (value && typeof value === 'object') {
+          if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
+          if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
+          if (['24', '40', '60'].indexOf(String(value.margin)) !== -1) appearance.margin = String(value.margin);
+          if (Object.prototype.hasOwnProperty.call(THEMES, value.theme)) appearance.theme = value.theme;
+        }
+      } catch (e) {}
+    }
+    el('font-scale').value = appearance.fontScale;
+    el('line-height').value = appearance.lineHeight;
+    el('page-margin').value = appearance.margin;
+    updateThemeButtons();
+  }
+  function saveAppearance() {
+    var ok = safeSet(APPEARANCE_KEY, JSON.stringify(appearance));
+    setText('appearance-status', ok
+      ? '外觀設定已保存在這台設備；其他設備尚未同步。'
+      : '瀏覽器未允許本機儲存，這次設定不會保留。');
+  }
+  function updateThemeButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
+      button.setAttribute('aria-pressed', button.getAttribute('data-theme') === appearance.theme ? 'true' : 'false');
+    });
+  }
+  function documentStyleText() {
+    var theme = THEMES[appearance.theme];
+    var scale = Number(appearance.fontScale);
+    var line = Number(appearance.lineHeight);
+    return [
+      ':root { color-scheme: ' + theme.colorScheme + ' !important; font-size: ' + Math.round(scale * 100) + '% !important; background-color: ' + theme.background + ' !important; color: ' + theme.foreground + ' !important; }',
+      'html, body { background-color: ' + theme.background + ' !important; color: ' + theme.foreground + ' !important; }',
+      'body { line-height: ' + line + ' !important; }',
+      'body p, body li, body blockquote, body dd, body dt { line-height: ' + line + ' !important; }',
+      'body, body *:not(img):not(svg):not(video):not(canvas):not(iframe) { color: ' + theme.foreground + ' !important; }',
+      'img, svg, video, canvas { max-width: 100%; }'
+    ].join('\n');
+  }
+  function applyDocumentAppearance(doc) {
+    if (!doc || !doc.documentElement || !doc.head) return;
+    var style = doc.getElementById('frame-reader-user-appearance');
+    if (!style) {
+      style = doc.createElement('style');
+      style.id = 'frame-reader-user-appearance';
+      doc.head.appendChild(style);
+    }
+    style.textContent = documentStyleText();
+  }
+  function applyAppearance() {
+    var theme = THEMES[appearance.theme];
+    el('reader-viewport').style.backgroundColor = theme.background;
+    if (view && view.renderer) {
+      view.renderer.setAttribute('margin', appearance.margin);
+      if (!view.isFixedLayout) {
+        view.addEventListener('load', function onSectionLoad(event) {
+          applyDocumentAppearance(event.detail && event.detail.doc);
+        });
+        try {
+          view.renderer.getContents().forEach(function (item) {
+            applyDocumentAppearance(item.doc);
+          });
+        } catch (e) {}
+      }
+    }
+    updateThemeButtons();
+  }
+  function setAppearance(name, value) {
+    appearance[name] = String(value);
+    saveAppearance();
+    applyAppearance();
+  }
   async function openEpub(source, name) {
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
     setText('reader-status', '正在讀取 EPUB 封裝與目錄……');
@@ -121,6 +209,7 @@
     });
     viewport.appendChild(view);
     await view.open(parsedBook);
+    applyAppearance();
     el('prev-page').disabled = false;
     el('next-page').disabled = false;
     setText('reader-status', 'EPUB 已載入。可使用翻頁按鈕或章節目錄。');
@@ -135,7 +224,7 @@
         setText('reader-status', '舊閱讀位置無法恢復，已從書籍開頭開始。');
       }
     }
-    setText('engine-status', '引擎已載入');
+    setText('engine-status', view.isFixedLayout ? '固定版面 EPUB 已載入' : 'EPUB 閱讀引擎已就緒');
   }
   async function loadDemo() {
     try {
@@ -161,6 +250,14 @@
     var missing = features.filter(function (item) { return !item[1]; }).map(function (item) { return item[0]; });
     return missing.length ? '相容性提示：未檢出 ' + missing.join('、') : '閱讀引擎基礎 API 已檢出';
   }
+
+  loadAppearance();
+  el('font-scale').addEventListener('change', function (event) { setAppearance('fontScale', event.target.value); });
+  el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
+  el('page-margin').addEventListener('change', function (event) { setAppearance('margin', event.target.value); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
+    button.addEventListener('click', function () { setAppearance('theme', button.getAttribute('data-theme')); });
+  });
   el('load-demo').addEventListener('click', loadDemo);
   el('epub-file').addEventListener('change', function (event) {
     var file = event.target.files && event.target.files[0];
@@ -184,7 +281,7 @@
   });
   setText('engine-status', featureSummary());
   import('/vendor/foliate-js/view.js').then(function () {
-    setText('engine-status', featureSummary() + ' · Foliate view ready');
+    setText('engine-status', featureSummary() + ' · Foliate ready');
     loadDemo();
   }).catch(function (error) {
     setText('engine-status', '閱讀引擎無法載入');
