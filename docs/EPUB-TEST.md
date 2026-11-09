@@ -44,3 +44,26 @@ Fix applied:
 - Call the paginator's public `render()` after changing those attributes so its internal layout geometry is recalculated immediately.
 
 Retest required: cycle paper → sepia → night → paper, then narrow → standard → wide → narrow. Confirm the page background changes on every switch and the text block / page margins visibly expand and contract without losing the current CFI.
+
+
+## 2026-11-09 — Theme and page-margin regression test
+
+User reported intermittent theme-color mismatch and a page-margin control that did not visibly work.
+
+The fix was verified on the live desktop deployment:
+
+- Switched paper → sepia → night → paper.
+- The EPUB reading surface and its exported paginator filter surface followed the selected theme; text remained readable.
+- No leftover colored patches or visible flicker were reported.
+- Switched page margin standard (40) → narrow (24) → wide (60) → narrow (24).
+- Narrow visibly expanded the content area; wide visibly reduced it; returning to narrow reproduced the earlier layout.
+- Reading location remained at 48%, Chapter 1/2, through all appearance changes.
+
+Implementation:
+- Theme colors are propagated to Foliate's exported `filter` parts via CSS custom properties, in addition to styling the EPUB chapter document.
+- Non-media EPUB child backgrounds are transparent under the selected paper theme, avoiding author-defined background blocks that conflict with the reader theme.
+- Page margin updates both Foliate's vertical `margin` and horizontal `gap`, then explicitly calls the paginator's `render()` to recalculate layout.
+
+The surrounding FRAME Reader application chrome intentionally remains dark violet. The selected paper theme applies to the EPUB reading surface and paginator page surface, not the entire website shell.
+
+This was a live desktop-browser regression test. Phone and tablet browser verification remains pending.
