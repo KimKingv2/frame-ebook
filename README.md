@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.2 EPUB Lab**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
+> Current status: **V0.2 EPUB Lab + visual bookshelf preview**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
 
 ## Product scope
 
@@ -12,7 +12,7 @@ The web reader is designed for:
 - **Tablet:** comfortable touch reading, flexible layouts and two-page spreads where appropriate.
 - **Mobile:** responsive single-column reading and one-hand controls.
 
-Kindle is outside the online reader's support scope. If it is used later, treat it as a separate offline-reading workflow rather than maintaining a Kindle-browser compatibility layer.
+Kindle is outside the online reader's support scope. If used later, treat it as a separate offline-reading workflow rather than maintaining a Kindle-browser compatibility layer.
 
 ## Goals
 
@@ -24,10 +24,21 @@ Kindle is outside the online reader's support scope. If it is used later, treat 
 
 ## Current routes
 
-- `/` — project home.
+- `/` — visual home and bookshelf layout preview.
 - `/epub-lab/` — real EPUB parsing, navigation and local progress prototype.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
+
+## Bookshelf and covers
+
+The homepage currently uses original SVG artwork to preview the visual bookshelf. Only the bundled test EPUB is a real book in this repository; the other cover cards are explicitly marked as design previews.
+
+Planned cover lookup order:
+1. Embedded EPUB cover image.
+2. A sibling `cover.jpg` (or supported cover image) in the book's private folder.
+3. A generated fallback cover based on book metadata.
+
+The actual cover and metadata list will come from the private library after OpenList integration. No private book covers should be committed to this public repository.
 
 ## V0.2 EPUB Lab
 
@@ -35,7 +46,7 @@ The EPUB Lab uses a pinned Foliate.js EPUB parser and renderer snapshot, with JS
 
 It supports:
 - Open the included sample EPUB.
-- Select a local EPUB file on desktop. The file is read in the browser and is not uploaded.
+- Select a local EPUB file on desktop/mobile. The file is read in the browser and is not uploaded.
 - Chapter navigation via the EPUB table of contents.
 - Previous/next page controls.
 - Save and restore an EPUB CFI in this browser's localStorage.
