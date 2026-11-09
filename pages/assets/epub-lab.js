@@ -194,36 +194,39 @@
       if (!view.isFixedLayout) applyDocumentAppearance(event.detail && event.detail.doc);
     });
     view.addEventListener('relocate', function (event) {
-      var detail = event.detail || {};
-      updateLocation(detail);
-      if (restoring && restoreCfi) {
-        var target = restoreCfi;
-        restoring = false;
-        restoreCfi = null;
-        view.goTo(target).then(function () {
-          setText('reader-status', '已恢復這本書上次的閱讀位置。此位置目前只存在本機。');
-        }).catch(function () {
-          setText('reader-status', '已找到舊閱讀位置，但恢復失敗，先從目前章節繼續閱讀。');
-        });
-      }
+      updateLocation(event.detail || {});
     });
     viewport.appendChild(view);
     await view.open(parsedBook);
+
+    // Foliate separates parsing/opening from its first navigation.
+    // Calling init() is required before the first section can be rendered.
+    var locationMessage = 'EPUB 已載入。可使用翻頁按鈕或章節目錄。';
+    try {
+      if (restoreCfi) {
+        await view.init({ lastLocation: restoreCfi, showTextStart: true });
+        locationMessage = '已恢復這本書上次的閱讀位置。此位置目前只存在本機。';
+      } else {
+        await view.init({ showTextStart: true });
+      }
+    } catch (navigationError) {
+      if (restoreCfi) {
+        try {
+          await view.goToTextStart();
+          locationMessage = '舊閱讀位置無法恢復，已從正文開頭開始。';
+        } catch (fallbackError) {
+          throw fallbackError;
+        }
+      } else {
+        throw navigationError;
+      }
+    }
+    restoring = false;
+    restoreCfi = null;
     applyAppearance();
     el('prev-page').disabled = false;
     el('next-page').disabled = false;
-    setText('reader-status', 'EPUB 已載入。可使用翻頁按鈕或章節目錄。');
-    if (restoreCfi) {
-      var target = restoreCfi;
-      restoring = false;
-      restoreCfi = null;
-      try {
-        await view.goTo(target);
-        setText('reader-status', '已恢復這本書上次的閱讀位置。此位置目前只存在本機。');
-      } catch (e) {
-        setText('reader-status', '舊閱讀位置無法恢復，已從書籍開頭開始。');
-      }
-    }
+    setText('reader-status', locationMessage);
     setText('engine-status', view.isFixedLayout ? '固定版面 EPUB 已載入' : 'EPUB 閱讀引擎已就緒');
   }
   async function loadDemo() {
