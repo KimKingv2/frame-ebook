@@ -31,3 +31,16 @@ The test above is a live desktop-browser smoke test, not a substitute for testin
 6. Larger, image-heavy books remain responsive and do not exhaust browser memory.
 
 Do not connect OpenList until the core reader is stable across the primary browsers and device sizes.
+
+
+## 2026-11-09 — Appearance controls follow-up
+
+User reported intermittent mismatch between the selected paper theme and some visible page backgrounds, plus no obvious effect from the page-margin control.
+
+Fix applied:
+- Expose the Foliate paginator's exported `filter` parts to the active page theme using inherited CSS custom properties. This keeps the paginator's outer page background in step with the selected theme, not just the EPUB document body.
+- Force non-media EPUB element backgrounds to remain transparent so authored block backgrounds do not randomly leave white or colored patches in paper/sepia/night mode.
+- Apply both paginator `margin` (top/bottom) and `gap` (left/right and spread gutter) from the page-margin control.
+- Call the paginator's public `render()` after changing those attributes so its internal layout geometry is recalculated immediately.
+
+Retest required: cycle paper → sepia → night → paper, then narrow → standard → wide → narrow. Confirm the page background changes on every switch and the text block / page margins visibly expand and contract without losing the current CFI.
