@@ -12,6 +12,20 @@ All three profiles use the same book identity and reading-state model. Layout an
 
 Kindle is outside the online reader's support scope. Any future Kindle use should remain a separate offline-reading workflow; no Kindle-browser compatibility layer is planned.
 
+## Visual system and bookshelf
+
+The visual direction is an editorial reading room: deep ink backgrounds, muted violet light, warm paper surfaces and restrained motion. The homepage cover cards are SVG design previews, not records from the private library.
+
+When OpenList is connected, each book record should expose a stable identifier, title, author, format, file path, and optional cover source. Resolve the display cover in this order:
+
+1. Embedded EPUB cover image when available.
+2. A sibling `cover.jpg` (or another explicitly supported image format) in the book folder.
+3. A generated fallback cover using available title/author metadata.
+
+Cover previews in the public repository must remain original artwork. Never copy private book covers or metadata exports into this repository.
+
+Animation should remain decorative and lightweight: short entrance transitions, subtle cover movement and hover feedback. Honor `prefers-reduced-motion`, and avoid making navigation depend on animation.
+
 ## Format strategy
 
 | Format | Candidate | Notes |
