@@ -12,11 +12,10 @@ a { color: inherit; }
 .eyebrow { color: #b49cf4; margin: 0 0 22px; }
 h1 { margin: 0; font-size: 54px; line-height: 1.17; letter-spacing: -1.8px; font-weight: 600; }
 h1 em { color: #b49cf4; font-style: normal; }
-.intro { max-width: 510px; margin: 22px 0 29px; color: #b9b2c5; font-size: 15px; line-height: 1.9; }
+.intro { max-width: 540px; margin: 22px 0 29px; color: #b9b2c5; font-size: 15px; line-height: 1.9; }
 .primary-link { display: inline-block; padding: 13px 18px; border-radius: 9px; color: #fff; background: #7253cd; text-decoration: none; font-size: 13px; }
 .primary-link span { padding-left: 12px; }
 .action-links { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.secondary-link { display: inline-block; padding: 12px 16px; border: 1px solid #514763; border-radius: 9px; color: #c9bedf; text-decoration: none; font-size: 13px; }
 .device-grid { display: flex; gap: 14px; padding-bottom: 60px; }
 .device-card { flex: 1; min-width: 0; padding: 21px; border: 1px solid #332d40; border-radius: 13px; background: #191622; }
 .device-icon { color: #b49cf4; font-size: 25px; }
