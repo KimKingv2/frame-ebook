@@ -44,7 +44,8 @@ The EPUB Lab adds local reading appearance controls:
 - Font scale: 90% to 130%.
 - Line spacing: 1.45 to 2.0.
 - Page margin: narrow, standard or wide.
-- Paper themes: paper white, warm sepia and night reading.
+- Paper themes: paper white, warm sepia and night reading, synchronized across the EPUB document and Foliate page background.
+- Page margin controls both outer top/bottom breathing room and horizontal page/spread gap, followed by an explicit paginator re-layout.
 - Appearance preferences persist in this browser's localStorage.
 
 The controls are applied to reflowable EPUB content. Fixed-layout EPUBs retain their original page design. Settings are local to one browser and are not synchronized between devices.
