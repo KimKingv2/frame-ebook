@@ -17,7 +17,7 @@
   var appearance = {
     fontScale: '1',
     lineHeight: '1.65',
-    margin: '40',
+    margin: '16',
     theme: 'paper'
   };
   var el = function (id) { return document.getElementById(id); };
@@ -101,7 +101,7 @@
         if (value && typeof value === 'object') {
           if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
           if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
-          if (['24', '40', '60'].indexOf(String(value.margin)) !== -1) appearance.margin = String(value.margin);
+          if (['8', '16', '24'].indexOf(String(value.margin)) !== -1) appearance.margin = String(value.margin);
           if (Object.prototype.hasOwnProperty.call(THEMES, value.theme)) appearance.theme = value.theme;
         }
       } catch (e) {}
@@ -162,7 +162,7 @@
       // Foliate margin controls top/bottom page breathing room; gap controls
       // the left/right page edges and spread gutter. Re-render after both
       // attributes change so the paginator recomputes its geometry.
-      var horizontalGap = { '24': '4%', '40': '7%', '60': '10%' }[appearance.margin] || '7%';
+      var horizontalGap = { '8': '4%', '16': '7%', '24': '10%' }[appearance.margin] || '7%';
       view.renderer.setAttribute('margin', appearance.margin);
       view.renderer.setAttribute('gap', horizontalGap);
       try {
