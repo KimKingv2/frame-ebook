@@ -67,3 +67,16 @@ Implementation:
 The surrounding FRAME Reader application chrome intentionally remains dark violet. The selected paper theme applies to the EPUB reading surface and paginator page surface, not the entire website shell.
 
 This was a live desktop-browser regression test. Phone and tablet browser verification remains pending.
+
+
+## 2026-11-09 — Reduce vertical page margins
+
+User reported that the top and bottom page margins felt too large.
+
+Adjustment:
+- Reduce Foliate's paginator `margin` options from 24 / 40 / 60 px to 8 / 16 / 24 px.
+- Change the default from 40 px to 16 px.
+- Keep the horizontal `gap` scale unchanged (4% / 7% / 10%), so this adjustment specifically tightens top/bottom whitespace without making the page columns wider.
+- Old saved margin values are rejected by the allow-list and fall back to the new 16 px default.
+
+Live verification pending: confirm the new default is active and the narrow / standard / wide settings produce visibly tighter top and bottom spacing while page navigation remains functional.
