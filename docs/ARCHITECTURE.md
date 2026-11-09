@@ -2,13 +2,15 @@
 
 ## Product shape
 
-FRAME Reader is one library with three presentation profiles:
+FRAME Reader is one responsive library with three presentation profiles:
 
-1. Desktop: full library management and reading controls.
-2. Mobile: touch-first reading and synchronized state.
-3. Kindle: low-JavaScript, low-animation, low-bandwidth reading surface for the Paperwhite 10 browser.
+1. Desktop: full library management, reading controls, search and annotations.
+2. Tablet: touch-first reading, portrait/landscape layouts and optional two-page spreads.
+3. Mobile: compact typography, one-hand controls and single-column reading.
 
-The Kindle profile is a separate compatibility target, not a responsive shrink of the desktop UI.
+All three profiles use the same book identity and reading-state model. Layout and pagination can adapt to the viewport without splitting the library into separate products.
+
+Kindle is outside the online reader's support scope. Any future Kindle use should remain a separate offline-reading workflow; no Kindle-browser compatibility layer is planned.
 
 ## Format strategy
 
@@ -36,27 +38,12 @@ This loader is deliberately not the final storage strategy: JSZip loads the comp
 
 ### Device test order
 
-1. Mac Chrome: load the bundled demo, turn pages, jump chapters, reload and confirm location restore.
-2. Paperwhite 10: load the same-origin bundled demo and test next/previous, chapter select and reload.
-3. A larger, image-heavy EPUB: measure load time and memory behavior on Mac and Kindle separately.
-4. Only after parser compatibility is known, implement OpenList metadata lookup and Range-backed reading.
+1. Mac Chrome and Safari: load the bundled demo, turn pages, jump chapters, reload and confirm location restore.
+2. Android Chrome and iOS/iPadOS Safari: verify EPUB loading, controls, portrait/landscape layout and file selection.
+3. A larger, image-heavy EPUB: measure load time and memory behavior on desktop, tablet and phone.
+4. Only after the browser reader is stable, implement OpenList metadata lookup and Range-backed reading.
 
-## Kindle compatibility principle
-
-The initial Kindle test uses conservative CSS and ordinary click buttons. It probes:
-
-- JavaScript and DOM event handling
-- Cookies, localStorage and sessionStorage
-- XMLHttpRequest and fetch
-- Promise, ArrayBuffer, Blob and FileReader
-- IndexedDB and Web Crypto
-- ES modules
-- Flexbox, Grid and touch events
-- Same-origin HTTPS/XHR request to /health.json
-
-Paperwhite 10 real-device testing confirmed finger taps work on the previous/next controls even though Touch Events API detection is false. Prefer click controls as the baseline; swipe gestures remain optional.
-
-A successful capability probe does not prove the entire EPUB engine will run. The EPUB Lab now tests the actual parser and paginator on the device.
+The current browser prototype is only a compatibility baseline. Test the actual parser, paginator and local-file flow on each target browser; feature detection alone is not sufficient.
 
 ## Sync data model (future)
 
@@ -74,4 +61,4 @@ Use server timestamps and conflict resolution based on the latest valid update. 
 
 ## Authentication boundary
 
-Never expose a long-lived OpenList administrator token in browser JavaScript. A future Worker should authenticate the reader and issue narrowly scoped, short-lived access to one file or range request. Cloudflare Access compatibility on Paperwhite 10 is not yet proven; keep the public compatibility probe free of private data.
+Never expose a long-lived OpenList administrator token in browser JavaScript. A future Worker should authenticate the reader and issue narrowly scoped, short-lived access to one file or range request. Validate the sign-in flow on desktop, tablet and mobile before enabling private-library access.
