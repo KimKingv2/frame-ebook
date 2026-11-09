@@ -1,5 +1,5 @@
 /* FRAME Reader EPUB Lab — Foliate.js adapter.
- * The archive is loaded fully into memory by JSZip for this compatibility POC.
+ * The archive is loaded fully into memory by JSZip for this small prototype.
  */
 (function () {
   'use strict';
@@ -188,7 +188,7 @@
     loadDemo();
   }).catch(function (error) {
     setText('engine-status', '閱讀引擎無法載入');
-    setText('reader-status', 'Kindle／瀏覽器相容性錯誤：' + (error && error.message ? error.message : String(error)));
+    setText('reader-status', '瀏覽器相容性錯誤：' + (error && error.message ? error.message : String(error)));
     console.error(error);
   });
 }());
