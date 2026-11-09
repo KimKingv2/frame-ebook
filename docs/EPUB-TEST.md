@@ -80,3 +80,15 @@ Adjustment:
 - Old saved margin values are rejected by the allow-list and fall back to the new 16 px default.
 
 Live verification pending: confirm the new default is active and the narrow / standard / wide settings produce visibly tighter top and bottom spacing while page navigation remains functional.
+
+
+## 2026-11-09 — Fix vertical margin unit regression
+
+The follow-up browser check and user report showed that only horizontal spacing changed. Root cause: Foliate's paginator takes `margin` as a CSS length and assigns it directly to the CSS custom property `--_margin`, which is used by `grid-template-rows: minmax(var(--_margin), 1fr)`. The adapter supplied a unitless number (for example, `16`), making the grid track definition invalid. The horizontal `gap` remained functional because it already included a percentage unit.
+
+Fix:
+- Pass the vertical paginator margin with an explicit `px` suffix (for example, `16px`).
+- Keep the page-margin options at 8 / 16 / 24 px and horizontal gap at 4% / 7% / 10%.
+- Force a paginator re-layout after the unit-bearing margin and gap are updated.
+
+The earlier live check only confirmed the control options and navigation presence; it did not validate vertical whitespace. Re-run a visual vertical-spacing regression check after deployment.
