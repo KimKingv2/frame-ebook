@@ -45,7 +45,7 @@ The Reading Room prototype is at `/epub-lab/`.
 - Foliate.js source snapshot: `78914aef4466eb960965702401634c2cb348e9b1` (MIT).
 - JSZip 3.10.2 loads the small test archive for this compatibility experiment.
 - The adapter supplies Foliate's EPUB loader interface (`loadText`, `loadBlob`, `getSize`).
-- The view saves the current EPUB CFI to localStorage and restores it when the same book is reopened.
+- The view saves the current EPUB CFI to localStorage and restores it when the same book is reopened. After `view.open(book)`, the adapter must call `view.init({ showTextStart: true })` or initialize with a saved CFI; opening alone does not navigate to the first visible section.
 - A tiny original two-chapter Traditional Chinese EPUB is included for repeatable tests.
 
 ### Reading appearance
