@@ -1,22 +1,30 @@
 # FRAME Reader
 
 **Your Personal Digital Library**  
-A private, multi-device ebook library with a Kindle-friendly web reader.
+A private, multi-device ebook library for desktop, tablet and mobile.
 
 > Current status: **V0.2 EPUB Lab**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
+
+## Product scope
+
+The web reader is designed for:
+- **Desktop:** full library management, reading controls, search and annotations.
+- **Tablet:** comfortable touch reading, flexible layouts and two-page spreads where appropriate.
+- **Mobile:** responsive single-column reading and one-hand controls.
+
+Kindle is outside the online reader's support scope. If it is used later, treat it as a separate offline-reading workflow rather than maintaining a Kindle-browser compatibility layer.
 
 ## Goals
 
 - Read EPUB first, then add MOBI, AZW3/KF8 and PDF.
 - Support illustrated EPUBs and manga, with single-page, spread and vertical-scroll layouts where the source format permits.
-- Provide separate Desktop, Mobile and Kindle reading profiles.
+- Provide responsive reading experiences for desktop, tablet and phone.
 - Keep book files in private storage (planned: OpenList), not in this public repository.
 - Synchronize reading position, bookmarks and notes across supported web clients.
 
 ## Current routes
 
 - `/` — project home.
-- `/kindle-test/` — Paperwhite 10 browser capability probe.
 - `/epub-lab/` — real EPUB parsing, navigation and local progress prototype.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
@@ -27,12 +35,12 @@ The EPUB Lab uses a pinned Foliate.js EPUB parser and renderer snapshot, with JS
 
 It supports:
 - Open the included sample EPUB.
-- Select a local EPUB file on desktop/mobile. The file is read in the browser and is not uploaded.
+- Select a local EPUB file on desktop. The file is read in the browser and is not uploaded.
 - Chapter navigation via the EPUB table of contents.
 - Previous/next page controls.
 - Save and restore an EPUB CFI in this browser's localStorage.
 
-**Important:** this prototype reads the entire EPUB archive into browser memory. It is only for parser and Kindle compatibility validation. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating the storage server's CORS and Range behavior.
+**Important:** this prototype reads the entire EPUB archive into browser memory. It is only for parser and browser compatibility validation. The production OpenList reader should use HTTP Range / partial reads for larger books, after validating the storage server's CORS and Range behavior.
 
 The saved CFI is currently local to one browser. Cross-device synchronization requires the future authenticated Worker + D1 service and is not implemented yet.
 
