@@ -159,11 +159,12 @@
     }
 
     if (view && view.renderer && !view.isFixedLayout) {
-      // Foliate margin controls top/bottom page breathing room; gap controls
-      // the left/right page edges and spread gutter. Re-render after both
-      // attributes change so the paginator recomputes its geometry.
+      // Foliate's margin attribute must be a CSS length (for example, '16px'),
+      // not a unitless number. It controls the top/bottom page breathing room;
+      // gap controls left/right page edges and the spread gutter. Re-render
+      // after both attributes change so the paginator recomputes its geometry.
       var horizontalGap = { '8': '4%', '16': '7%', '24': '10%' }[appearance.margin] || '7%';
-      view.renderer.setAttribute('margin', appearance.margin);
+      view.renderer.setAttribute('margin', appearance.margin + 'px');
       view.renderer.setAttribute('gap', horizontalGap);
       try {
         view.renderer.getContents().forEach(function (item) {
