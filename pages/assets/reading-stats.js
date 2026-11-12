@@ -217,7 +217,8 @@ function renderSummary(summary,range,allData) {
   $("period-time-note").textContent=state.period==="week"?"本週累積閱讀時間":state.period==="year"?"今年累積閱讀時間":state.period==="all"?"所有已記錄的閱讀時間":"本月累積閱讀時間";
   $("reading-days").innerHTML=days+'<span>天</span>';
   $("daily-average").innerHTML=naturalAverage+'<span>分鐘</span>';
-  $("books-opened").innerHTML=String(summary.topBooks.length)+'<span>本</span>';
+  const openedCount=Number.isFinite(Number(summary.booksOpened))?Number(summary.booksOpened):summary.topBooks.length;
+  $("books-opened").innerHTML=String(openedCount)+'<span>本</span>';
   const allStreak=streakInfo(allData.daySeconds);
   $("current-streak").textContent=allStreak.current;
   $("best-streak").textContent=allStreak.best;
@@ -264,7 +265,7 @@ async function refresh() {
         (remote.allDays||[]).forEach(day=>remoteAllDays[day.dayKey]=Number(day.seconds)||0);
         const remoteSessions=(remote.topBooks||[]).map(book=>({bookId:book.bookId,bookTitle:book.title,seconds:book.seconds,dayKey:range.to,startedAt:Date.now(),format:""}));
         const remoteSummary=localSummary(remoteSessions);
-        summary={totalSeconds:Number(remote.totalSeconds)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:remote.recentEvents||[]};
+        summary={totalSeconds:Number(remote.totalSeconds)||0,booksOpened:Number(remote.booksOpened)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:remote.recentEvents||[]};
         state.remote=true;
         allDataForRender={daySeconds:Object.keys(remoteAllDays).length?remoteAllDays:allData.daySeconds};
       }catch(_){state.remote=false;summary=selectedData(allData,range);}
