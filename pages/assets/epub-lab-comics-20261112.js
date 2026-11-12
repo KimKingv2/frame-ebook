@@ -541,6 +541,19 @@
     return missing.length ? '相容性提示：未檢出 ' + missing.join('、') : '閱讀引擎基礎 API 已檢出';
   }
 
+  window.addEventListener('frame-reader-reading-time', function (event) {
+    var detail = event.detail || {};
+    var seconds = Math.max(0, Number(detail.seconds) || 0);
+    var hours = Math.floor(seconds / 3600);
+    var minutes = Math.floor((seconds % 3600) / 60);
+    var remainder = seconds % 60;
+    var label = hours
+      ? String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0')
+      : String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+    setText('reading-live-duration', label);
+    setText('reading-live-label', detail.stopped ? '本次閱讀已暫停' : '正在記錄本次閱讀');
+  });
+
   loadAppearance();
   el('font-scale').addEventListener('change', function (event) { setAppearance('fontScale', event.target.value); });
   el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
