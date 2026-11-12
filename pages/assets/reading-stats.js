@@ -253,6 +253,7 @@ async function refresh() {
     const allData=await fetchLocalData();
     const range=periodRange(state.period);
     let summary=selectedData(allData,range);
+    let allDataForRender=allData;
     if(state.authenticated){
       try{
         const remote=await fetchCloudStats(range);
@@ -265,12 +266,12 @@ async function refresh() {
         const remoteSummary=localSummary(remoteSessions);
         summary={totalSeconds:Number(remote.totalSeconds)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:remote.recentEvents||[]};
         state.remote=true;
-        const allDataForRender={daySeconds:Object.keys(remoteAllDays).length?remoteAllDays:allData.daySeconds};
+        allDataForRender={daySeconds:Object.keys(remoteAllDays).length?remoteAllDays:allData.daySeconds};
       }catch(_){state.remote=false;summary=selectedData(allData,range);}
     } else state.remote=false;
     const rangeLabel=state.period==="week"?"本週":state.period==="month"?"本月":state.period==="year"?"今年":"累計";
     $("period-label").textContent=rangeLabel+" · "+range.from+" 至 "+range.to+(state.remote?" · 雲端合併":" · 本機紀錄");
-    renderSummary(summary,range,(state.authenticated&&state.remote&&typeof allDataForRender!=="undefined")?allDataForRender:allData);
+    renderSummary(summary,range,allDataForRender);
     $("cloud-sync-status").textContent=state.authenticated
       ? (state.remote?"雲端閱讀統計已同步，包含這個帳戶的其他裝置紀錄。":"已登入，雲端統計暫不可用，先顯示本機資料。")
       : "目前在這台設備記錄。登入雲端後，可以把閱讀紀錄同步到 D1。";
