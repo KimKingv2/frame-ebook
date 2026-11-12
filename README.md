@@ -47,6 +47,8 @@ The EPUB Lab adds local reading appearance controls:
 - Page margin: narrow, standard or wide.
 - Paper themes: paper white, warm sepia and night reading, synchronized across the EPUB document and Foliate page background.
 - Independent page-margin controls: top/bottom spacing (8, 16 or 24 px) and left/right spacing (4%, 7% or 10%). Changing one never changes the other. The vertical value is passed to Foliate with an explicit CSS `px` unit, then the paginator is re-laid out.
+- Reading modes: paginated page turns or continuous vertical scrolling.
+- Paginated layout: single page or double-page preference. The paginator automatically falls back to a single page in portrait orientation. Fixed-layout EPUBs preserve their native spread behavior.
 - Appearance preferences persist in this browser's localStorage.
 
 The controls are applied to reflowable EPUB content. Fixed-layout EPUBs retain their original page design. Settings are local to one browser and are not synchronized between devices.
