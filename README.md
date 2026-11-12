@@ -43,6 +43,7 @@ Planned cover lookup order:
 The EPUB Lab adds local reading appearance controls:
 - Font scale: 90% to 130%.
 - Line spacing: 1.45 to 2.0.
+- Typography: original / serif / sans font family, original / regular / medium weight, compact / standard / loose paragraph spacing, and original / left / justified alignment.
 - Page margin: narrow, standard or wide.
 - Paper themes: paper white, warm sepia and night reading, synchronized across the EPUB document and Foliate page background.
 - Independent page-margin controls: top/bottom spacing (8, 16 or 24 px) and left/right spacing (4%, 7% or 10%). Changing one never changes the other. The vertical value is passed to Foliate with an explicit CSS `px` unit, then the paginator is re-laid out.
