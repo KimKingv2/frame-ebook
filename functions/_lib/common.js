@@ -143,7 +143,8 @@ export function joinPath(parent, name) {
 export function getOpenListConfig(env) {
   const base = String(env.OPENLIST_BASE_URL || "").trim().replace(/\/+$/, "");
   const token = String(env.OPENLIST_TOKEN || "").trim();
-  const rootPath = normalizePath(env.OPENLIST_ROOT_PATH || "/");
+  const rootSetting = String(env.OPENLIST_ROOT_PATH || "").trim();
+  const rootPath = rootSetting ? normalizePath(rootSetting) : null;
   if (!base || !token || !rootPath) return null;
   let url;
   try {
