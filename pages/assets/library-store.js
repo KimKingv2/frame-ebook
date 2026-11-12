@@ -285,6 +285,7 @@ async function recordReadingEvent(event) {
     bookId: String(event.bookId),
     bookTitle: String(event.bookTitle || "未命名書籍").slice(0, 240),
     format: String(event.format || "").toUpperCase().slice(0, 8),
+    localHour: Math.max(0, Math.min(23, Number(event.localHour) || 0)),
     seconds,
     startedAt: Number(event.startedAt) || Date.now() - seconds * 1000,
     endedAt: Number(event.endedAt) || Date.now(),
