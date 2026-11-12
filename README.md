@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.4 Comic Reading Room**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
+> Current status: **V0.5 Local Bookshelf**. The browser now has a functional IndexedDB bookshelf for locally imported EPUB and CBZ books. OpenList, authenticated private-library access and cross-device sync are not connected yet.
 
 ## Product scope
 
@@ -24,14 +24,14 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 
 ## Current routes
 
-- `/` — visual home and bookshelf layout preview.
-- `/epub-lab/` — EPUB parsing, navigation, local progress and reading appearance prototype.
+- `/` — local bookshelf with import, search, sort, recent reading, book details and grid/list views.
+- `/epub-lab/` — EPUB / CBZ Reading Room with per-book progress and appearance settings.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
 
 ## Bookshelf and covers
 
-The homepage currently uses original SVG artwork to preview the visual bookshelf. Only the bundled test EPUB is a real book in this repository; the other cover cards are explicitly marked as design previews.
+The homepage is now a functional local bookshelf. Imported book files, extracted covers, Metadata and progress are stored in this browser's IndexedDB. Only the small bundled test EPUB and the original synthetic comic demo are used as public test fixtures; private books are not committed to the repository.
 
 Planned cover lookup order:
 1. Embedded EPUB cover image.
@@ -114,3 +114,27 @@ For fixed-layout books (including CBZ):
 Reflowable EPUBs continue using their own typography and pagination controls. The comic controls are enabled only for fixed-layout books. Right-to-left navigation controls are not exposed; the source book's native progression metadata remains untouched.
 
 The comic demo is a synthetic four-page fixture. Real-world CBZ archives with large page counts, unusual image formats, very tall pages and physical phone/tablet browsers still need broader compatibility testing. EPUB loading in this prototype still uses JSZip and reads the archive into browser memory; production OpenList integration must use partial HTTP Range reads.
+
+
+## V0.5 Local Bookshelf
+
+The homepage is a working local library rather than a static design preview.
+
+- Import multiple EPUB and CBZ files from the browser.
+- Extract EPUB title, author, language, identifier, spine item count and embedded cover image from the OPF package metadata.
+- Extract CBZ page count and a cover candidate from the archive directory.
+- Store the original archive Blob, cover Blob, book metadata and reading progress in IndexedDB.
+- Search by title, author, filename or format; sort by recent reading, recently added, title or progress.
+- Switch between cover-grid and compact-list layouts; recently opened books appear in a separate resume section.
+- Edit a book's display title and author, inspect format / file size / page count / reading progress, or remove it from this browser's library.
+- The Reading Room accepts a book ID in its URL, retrieves the original Blob from IndexedDB, and restores the book after a reload.
+- EPUB CFI and CBZ page index are saved against the local book ID. Appearance preferences are stored independently per book in localStorage.
+
+All of this is local to the current browser profile and origin. The original archive is not uploaded to GitHub, Cloudflare or another server. Clearing this site's browser storage, using a different browser profile or changing devices will not carry the local library over. OpenList access, authenticated Worker requests and D1 sync remain future work.
+
+### Current limitations
+
+- IndexedDB capacity depends on the browser and available device storage. Very large archives may fail to import when quota is insufficient.
+- EPUB metadata extraction currently uses the vendored JSZip parser. Very large EPUB files can temporarily require additional browser memory.
+- CBZ indexing reads the ZIP central directory and one cover image for shelf display; the Reading Room retains its lazy page-image loading behavior.
+- The current test coverage is a synthetic two-chapter EPUB and four-page CBZ demo. Test large personal libraries, unusually large CBZ archives and physical phone/tablet browsers before treating this as production-ready.
