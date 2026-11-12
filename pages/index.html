@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
-  <meta name="description" content="FRAME Reader，為電腦、平板與手機打造的私人電子書閱讀空間。">
-  <title>FRAME Reader · Your Personal Library</title>
+  <meta name="description" content="FRAME Reader，本機私人電子書書架與閱讀空間。">
+  <title>FRAME Reader · My Library</title>
   <link rel="preload" as="image" href="/assets/covers/frame-sample.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
   <div class="ambient ambient-two" aria-hidden="true"></div>
-  <main class="shell">
+  <main class="shell library-shell">
     <header class="topbar">
       <a class="brand" href="/" aria-label="FRAME Reader 首頁">
         <span class="brand-mark">F</span>
@@ -21,96 +21,129 @@
       </a>
       <nav class="main-nav" aria-label="主要導覽">
         <a class="active" href="#library">我的書架</a>
-        <a href="/epub-lab/">閱讀實驗室</a>
+        <a href="/epub-lab/">閱讀室</a>
       </nav>
-      <span class="edition"><span class="edition-dot"></span> PRIVATE EDITION</span>
+      <span class="edition"><span class="edition-dot"></span> LOCAL EDITION · 0.5</span>
     </header>
 
-    <section class="hero">
+    <section class="hero library-hero">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="eyebrow-line"></span> A QUIETER WAY TO READ</p>
-        <h1>讓閱讀，<br><em>回到自己的節奏。</em></h1>
-        <p class="hero-text">把散落各處的書，收進一個安靜、漂亮又隨手可用的閱讀空間。電腦、平板與手機，從同一座書架繼續。</p>
+        <p class="eyebrow"><span class="eyebrow-line"></span> YOUR PRIVATE READING ROOM</p>
+        <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
+        <p class="hero-text">EPUB 與 CBZ 收進同一座書架。封面、閱讀位置與每本書的閱讀外觀都會保存在目前這台設備，不必每次重新尋找。</p>
         <div class="hero-actions">
-          <a class="primary-link" href="/epub-lab/">開始閱讀 <span aria-hidden="true">↗</span></a>
-          <a class="text-link" href="#library">探索書架 <span aria-hidden="true">↓</span></a>
+          <button id="import-button" class="primary-link library-import-button" type="button">匯入電子書 <span aria-hidden="true">＋</span></button>
+          <a class="text-link" href="/epub-lab/">前往閱讀室 <span aria-hidden="true">↗</span></a>
+          <input id="library-files" type="file" accept=".epub,.cbz,application/epub+zip,application/vnd.comicbook+zip" multiple>
         </div>
-        <div class="device-caption"><span>DESKTOP</span><i></i><span>TABLET</span><i></i><span>MOBILE</span></div>
+        <div class="device-caption"><span>EPUB</span><i></i><span>CBZ</span><i></i><span>LOCAL STORAGE</span></div>
       </div>
-
-      <div class="hero-art" aria-label="FRAME Reader 示範書封面">
+      <div class="hero-art" aria-label="FRAME Reader 私人書庫示意">
         <div class="orbit orbit-a"></div>
         <div class="orbit orbit-b"></div>
         <div class="hero-glow"></div>
         <div class="hero-cover">
-          <img src="/assets/covers/frame-sample.svg" alt="FRAME Reader 示範封面：閱讀的新節奏">
+          <img src="/assets/covers/frame-sample.svg" alt="FRAME Reader 示範封面">
         </div>
         <div class="cover-shadow"></div>
-        <div class="floating-note note-top"><span class="note-icon">✦</span><span>YOUR NEXT<br><b>CHAPTER</b></span></div>
-        <div class="floating-note note-bottom"><span class="note-pulse"></span><span>一處收藏<br><b>隨處閱讀</b></span></div>
+        <div class="floating-note note-top"><span class="note-icon">✦</span><span>YOUR OWN<br><b>LIBRARY</b></span></div>
+        <div class="floating-note note-bottom"><span class="note-pulse"></span><span>一座書架<br><b>隨時續讀</b></span></div>
       </div>
     </section>
 
-    <section class="shelf-section" id="library">
-      <div class="section-heading">
+    <section class="library-stats" aria-label="書庫統計">
+      <article><span>BOOKS IN LIBRARY</span><strong id="book-count">00</strong><small>已收藏書籍</small></article>
+      <article><span>IN PROGRESS</span><strong id="started-count">00</strong><small>正在閱讀</small></article>
+      <article><span>EPUB</span><strong id="epub-count">00</strong><small>文字與固定版面</small></article>
+      <article><span>COMICS</span><strong id="comic-count">00</strong><small>CBZ 漫畫與圖像書</small></article>
+    </section>
+
+    <section id="recent-section" class="recent-section" hidden>
+      <div class="section-heading library-section-heading">
+        <div><p class="section-kicker">PICK UP WHERE YOU LEFT OFF</p><h2>最近閱讀<span class="heading-period">.</span></h2></div>
+        <span class="section-subtitle">從上次停下的地方接著讀</span>
+      </div>
+      <div id="recent-grid" class="book-grid recent-grid"></div>
+    </section>
+
+    <section class="shelf-section library-shelf" id="library">
+      <div class="section-heading library-section-heading">
         <div>
-          <p class="section-kicker">CURATED FOR YOU</p>
-          <h2>你的書架<span class="heading-period">.</span></h2>
-          <p class="section-subtitle">每一本書，都值得一個好看的位置。</p>
+          <p class="section-kicker">YOUR PERSONAL COLLECTION</p>
+          <h2>我的書架<span class="heading-period">.</span></h2>
+          <p class="section-subtitle">每一本書，都有自己的封面與閱讀記憶。</p>
         </div>
-        <div class="shelf-count"><strong>01</strong><span>DEMO BOOK</span></div>
+        <div class="shelf-count"><strong id="shelf-count-label">00 BOOKS</strong><span>ON THIS DEVICE</span></div>
       </div>
 
-      <div class="library-notice">
-        <span class="notice-symbol">✧</span>
-        <p><strong>私人書庫尚未連接</strong><span>目前先展示封面排版樣式。接入 OpenList 後，這裡會自動載入你的實際書籍封面與閱讀進度。</span></p>
-        <span class="notice-tag">PREVIEW</span>
+      <div class="library-toolbar">
+        <label class="library-search" for="search-books"><span aria-hidden="true">⌕</span><input id="search-books" type="search" placeholder="搜尋書名、作者或檔案名稱" autocomplete="off"></label>
+        <div class="library-toolbar-actions">
+          <label class="library-sort" for="sort-books"><span>排序</span><select id="sort-books">
+            <option value="recent">最近閱讀</option>
+            <option value="added">最近加入</option>
+            <option value="title">書名 A-Z</option>
+            <option value="progress">閱讀進度</option>
+          </select></label>
+          <div class="library-view-toggle" role="group" aria-label="書架檢視方式">
+            <button id="view-grid" type="button" aria-pressed="true" title="封面網格">▦</button>
+            <button id="view-list" type="button" aria-pressed="false" title="列表">☷</button>
+          </div>
+        </div>
       </div>
 
-      <div class="book-grid">
-        <a class="book-card book-card-ready" href="/epub-lab/">
-          <div class="cover-frame">
-            <img src="/assets/covers/frame-sample.svg" alt="FRAME Reader 示範書封面">
-            <span class="cover-badge">可立即試讀</span>
-            <span class="cover-open" aria-hidden="true">↗</span>
-          </div>
-          <div class="book-meta"><div><h3>FRAME Reader 測試小書</h3><p>內建 EPUB · 繁體中文</p></div><span class="book-kind">EPUB</span></div>
-        </a>
-
-        <article class="book-card book-card-preview">
-          <div class="cover-frame">
-            <img src="/assets/covers/fiction-preview.svg" alt="小說封面設計示意：月色以北">
-            <span class="preview-label">封面示意</span>
-          </div>
-          <div class="book-meta"><div><h3>月色以北</h3><p>小說類 · 封面樣式預覽</p></div><span class="book-kind">DEMO</span></div>
-        </article>
-
-        <article class="book-card book-card-preview">
-          <div class="cover-frame">
-            <img src="/assets/covers/essay-preview.svg" alt="散文封面設計示意：日常的秩序感">
-            <span class="preview-label">封面示意</span>
-          </div>
-          <div class="book-meta"><div><h3>日常的秩序感</h3><p>人文設計 · 封面樣式預覽</p></div><span class="book-kind">DEMO</span></div>
-        </article>
-
-        <article class="book-card book-card-preview">
-          <div class="cover-frame">
-            <img src="/assets/covers/nature-preview.svg" alt="自然主題封面設計示意：植物與時間">
-            <span class="preview-label">封面示意</span>
-          </div>
-          <div class="book-meta"><div><h3>植物與時間</h3><p>自然生活 · 封面樣式預覽</p></div><span class="book-kind">DEMO</span></div>
-        </article>
+      <div id="book-grid" class="book-grid library-book-grid" hidden></div>
+      <div id="library-empty" class="library-empty" hidden>
+        <div class="empty-mark">F</div>
+        <h3>書架還在等第一本書。</h3>
+        <p>匯入 EPUB 或 CBZ，FRAME Reader 會自動讀取書名、作者與封面，並替每本書保存獨立閱讀進度。</p>
+        <div class="empty-actions">
+          <button class="primary-link library-import-button" type="button" onclick="document.getElementById('library-files').click()">匯入我的書籍 <span aria-hidden="true">＋</span></button>
+          <button id="load-sample" class="text-link" type="button">先看看內建示範書</button>
+        </div>
       </div>
-
-      <div class="shelf-footnote"><span class="footnote-mark">✳</span> 正式書架預計優先讀取 EPUB 內嵌封面，其次讀取書籍資料夾中的 <code>cover.jpg</code>，沒有封面時再使用自動生成的預設封面。</div>
+      <div id="search-empty" class="search-empty" hidden>沒有找到符合條件的書籍，試試其他關鍵字。</div>
+      <p id="result-count" class="result-count"></p>
+      <p id="library-status" class="library-status" role="status" aria-live="polite">正在開啟本機書庫……</p>
     </section>
 
-    <section class="bottom-banner">
-      <div><p class="section-kicker">ONE LIBRARY · ALL YOUR SCREENS</p><h2>下一頁，在哪個裝置都接得上。</h2></div>
-      <a href="/epub-lab/" aria-label="前往 EPUB 閱讀實驗室">進入閱讀空間 <span aria-hidden="true">↗</span></a>
+    <section class="library-privacy">
+      <span class="privacy-mark">⌂</span>
+      <div><strong>你的書，只留在你的設備。</strong><p>目前使用瀏覽器 IndexedDB 保存原始檔案、封面、Metadata 與閱讀進度。沒有上傳到 GitHub、Cloudflare 或第三方伺服器。清除網站資料或更換瀏覽器會移除這份本機書庫；雲端同步將在後續版本另行加入。</p></div>
+      <span class="privacy-tag">LOCAL ONLY</span>
     </section>
 
-    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>DESKTOP · TABLET · MOBILE</span></footer>
+    <section class="bottom-banner library-bottom-banner">
+      <div><p class="section-kicker">ONE BOOK · YOUR OWN RHYTHM</p><h2>翻到下一頁，繼續自己的故事。</h2></div>
+      <a href="/epub-lab/">進入閱讀空間 <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>LOCAL LIBRARY · EPUB · CBZ</span></footer>
   </main>
+
+  <dialog id="book-dialog" class="book-dialog">
+    <form id="detail-form" method="dialog">
+      <div class="dialog-heading"><div><p class="section-kicker">BOOK DETAILS</p><h2>書籍資訊</h2></div><button id="detail-cancel" class="dialog-close" type="button" aria-label="關閉">×</button></div>
+      <label class="dialog-field">書名<input id="detail-title" required maxlength="240"></label>
+      <label class="dialog-field">作者<input id="detail-author" maxlength="240" placeholder="作者未提供"></label>
+      <div class="dialog-metadata">
+        <div><span>格式</span><strong id="detail-format"></strong></div>
+        <div><span>內容</span><strong id="detail-pages"></strong></div>
+        <div><span>檔案大小</span><strong id="detail-size"></strong></div>
+        <div><span>加入日期</span><strong id="detail-added"></strong></div>
+        <div><span>閱讀進度</span><strong id="detail-progress"></strong></div>
+      </div>
+      <div class="dialog-file-name" id="detail-file"></div>
+      <div class="dialog-actions">
+        <button id="detail-delete" type="button" class="dialog-danger">從本機書架移除</button>
+        <span></span>
+        <button id="detail-open" type="button" class="dialog-secondary">開啟閱讀</button>
+        <button type="submit" class="primary-link">儲存資訊</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/vendor/jszip/jszip.min.js"></script>
+  <script type="module" src="/assets/library.js"></script>
 </body>
 </html>
