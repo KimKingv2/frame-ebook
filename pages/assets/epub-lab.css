@@ -123,3 +123,12 @@ button:disabled { opacity: .38; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+.reader-top-actions { display:flex; align-items:center; gap:18px; }
+.back-shelf-link { color:#bba9df; text-decoration:none; font-size:10px; transition:color .2s ease; }
+.back-shelf-link:hover { color:#fff; }
+@media (max-width:520px) {
+  .reader-top-actions { gap:10px; }
+  .back-shelf-link { font-size:9px; }
+}
