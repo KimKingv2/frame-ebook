@@ -4,7 +4,7 @@ import {
 } from "/assets/library-store.js";
 
 const $ = id => document.getElementById(id);
-const state = { period:"month", calendarDate:new Date(), goalMinutes:30, localEvents:[], activeEvents:[], remote:false, authenticated:false, remoteStats:null };
+const state = { period:"month", calendarDate:new Date(), goalMinutes:30, localEvents:[], activeEvents:[], remote:false, authenticated:false, databaseConfigured:false, remoteStats:null };
 const DAY_MS = 86400000;
 
 function dateKey(date) {
@@ -292,7 +292,7 @@ async function refresh() {
     renderSummary(summary,range,allDataForRender);
     $("cloud-sync-status").textContent=state.authenticated
       ? (state.remote?"雲端閱讀統計已同步，包含這個帳戶的其他裝置紀錄。":"已登入，雲端統計暫不可用，先顯示本機資料。")
-      : "目前在這台設備記錄。登入雲端後，可以把閱讀紀錄同步到 D1。";
+      : (state.databaseConfigured?"目前在這台設備記錄。完成登入後，可以把閱讀紀錄同步到 D1。":"目前只使用本機統計。Cloudflare D1 尚未綁定，雲端登入與跨裝置同步尚未啟用。");
   }catch(error){
     $("cloud-sync-status").textContent="讀取統計失敗："+(error.message||String(error));
   }
@@ -303,7 +303,8 @@ async function checkSession() {
     if(!response.ok)return;
     const data=await response.json();
     state.authenticated=!!data.authenticated;
-    $("cloud-login-form").hidden=state.authenticated;
+    state.databaseConfigured=!!data.databaseConfigured;
+    $("cloud-login-form").hidden=state.authenticated||!state.databaseConfigured;
     $("cloud-account-actions").hidden=!state.authenticated;
     if(state.authenticated){
       $("cloud-account-label").textContent=data.openListConfigured?"雲端閱讀統計已連線":"統計已登入，OpenList 尚未設定";
