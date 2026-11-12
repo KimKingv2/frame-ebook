@@ -17,7 +17,8 @@
   var appearance = {
     fontScale: '1',
     lineHeight: '1.65',
-    margin: '16',
+    verticalMargin: '16',
+    horizontalMargin: '7',
     theme: 'paper'
   };
   var el = function (id) { return document.getElementById(id); };
@@ -101,14 +102,21 @@
         if (value && typeof value === 'object') {
           if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
           if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
-          if (['8', '16', '24'].indexOf(String(value.margin)) !== -1) appearance.margin = String(value.margin);
+          if (['8', '16', '24'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
+          if (['4', '7', '10'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
+          // Migrate the previous combined control and preserve its selected scale.
+          if (!value.verticalMargin && !value.horizontalMargin && ['8', '16', '24'].indexOf(String(value.margin)) !== -1) {
+            appearance.verticalMargin = String(value.margin);
+            appearance.horizontalMargin = ({ '8': '4', '16': '7', '24': '10' })[String(value.margin)];
+          }
           if (Object.prototype.hasOwnProperty.call(THEMES, value.theme)) appearance.theme = value.theme;
         }
       } catch (e) {}
     }
     el('font-scale').value = appearance.fontScale;
     el('line-height').value = appearance.lineHeight;
-    el('page-margin').value = appearance.margin;
+    el('vertical-margin').value = appearance.verticalMargin;
+    el('horizontal-margin').value = appearance.horizontalMargin;
     updateThemeButtons();
   }
   function saveAppearance() {
@@ -159,13 +167,10 @@
     }
 
     if (view && view.renderer && !view.isFixedLayout) {
-      // Foliate's margin attribute must be a CSS length (for example, '16px'),
-      // not a unitless number. It controls the top/bottom page breathing room;
-      // gap controls left/right page edges and the spread gutter. Re-render
-      // after both attributes change so the paginator recomputes its geometry.
-      var horizontalGap = { '8': '4%', '16': '7%', '24': '10%' }[appearance.margin] || '7%';
-      view.renderer.setAttribute('margin', appearance.margin + 'px');
-      view.renderer.setAttribute('gap', horizontalGap);
+      // Keep the two axes independent. Foliate expects a CSS length for
+      // vertical margin and a percentage for horizontal page gap.
+      view.renderer.setAttribute('margin', appearance.verticalMargin + 'px');
+      view.renderer.setAttribute('gap', appearance.horizontalMargin + '%');
       try {
         view.renderer.getContents().forEach(function (item) {
           applyDocumentAppearance(item.doc);
@@ -274,7 +279,8 @@
   loadAppearance();
   el('font-scale').addEventListener('change', function (event) { setAppearance('fontScale', event.target.value); });
   el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
-  el('page-margin').addEventListener('change', function (event) { setAppearance('margin', event.target.value); });
+  el('vertical-margin').addEventListener('change', function (event) { setAppearance('verticalMargin', event.target.value); });
+  el('horizontal-margin').addEventListener('change', function (event) { setAppearance('horizontalMargin', event.target.value); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
     button.addEventListener('click', function () { setAppearance('theme', button.getAttribute('data-theme')); });
   });
