@@ -46,7 +46,7 @@ async function hmac(payload, secret) {
 function safeEqual(left, right) {
   const a = new TextEncoder().encode(String(left || ""));
   const b = new TextEncoder().encode(String(right || ""));
-  let difference = a.length ^ b.length;
+  let difference = a.length === b.length ? 0 : 1;
   const length = Math.max(a.length, b.length);
   for (let index = 0; index < length; index++) {
     difference |= (a[index] || 0) ^ (b[index] || 0);
