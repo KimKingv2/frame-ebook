@@ -47,6 +47,35 @@
               <option value="2">特寬</option>
             </select>
           </label>
+          <label class="setting-control" for="font-family"><span>字體</span>
+            <select id="font-family">
+              <option value="original" selected>原書字體</option>
+              <option value="serif">明體</option>
+              <option value="sans">黑體</option>
+            </select>
+          </label>
+          <label class="setting-control" for="font-weight"><span>字重</span>
+            <select id="font-weight">
+              <option value="original" selected>原書設定</option>
+              <option value="normal">標準（400）</option>
+              <option value="medium">稍厚（500）</option>
+            </select>
+          </label>
+          <label class="setting-control" for="paragraph-spacing"><span>段落間距</span>
+            <select id="paragraph-spacing">
+              <option value="original" selected>原書設定</option>
+              <option value="compact">緊湊</option>
+              <option value="standard">舒適</option>
+              <option value="loose">寬鬆</option>
+            </select>
+          </label>
+          <label class="setting-control" for="text-align"><span>文字對齊</span>
+            <select id="text-align">
+              <option value="original" selected>原書設定</option>
+              <option value="left">靠左對齊</option>
+              <option value="justify">左右對齊</option>
+            </select>
+          </label>
           <label class="setting-control" for="vertical-margin"><span>上下留白</span>
             <select id="vertical-margin">
               <option value="8">窄（8 px）</option>
@@ -114,6 +143,6 @@
   </div>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
-  <script type="module" src="/assets/epub-lab-layout-20261112.js"></script>
+  <script type="module" src="/assets/epub-lab-typography-20261112.js"></script>
 </body>
 </html>
