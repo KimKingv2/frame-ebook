@@ -47,11 +47,18 @@
               <option value="2">特寬</option>
             </select>
           </label>
-          <label class="setting-control" for="page-margin"><span>頁面留白</span>
-            <select id="page-margin">
+          <label class="setting-control" for="vertical-margin"><span>上下留白</span>
+            <select id="vertical-margin">
               <option value="8">窄（8 px）</option>
               <option value="16" selected>標準（16 px）</option>
               <option value="24">寬（24 px）</option>
+            </select>
+          </label>
+          <label class="setting-control" for="horizontal-margin"><span>左右留白</span>
+            <select id="horizontal-margin">
+              <option value="4">窄（4%）</option>
+              <option value="7" selected>標準（7%）</option>
+              <option value="10">寬（10%）</option>
             </select>
           </label>
           <div class="theme-control" role="group" aria-label="閱讀主題">
@@ -107,6 +114,6 @@
   </div>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
-  <script type="module" src="/assets/epub-lab-marginfix-20261109.js"></script>
+  <script type="module" src="/assets/epub-lab-layout-20261112.js"></script>
 </body>
 </html>
