@@ -74,6 +74,37 @@ This is a prototype appearance layer. EPUB authors may use deeply nested styles 
 
 The current browser prototype is only a compatibility baseline. Test the actual parser, paginator and local-file flow on each target browser; feature detection alone is not sufficient.
 
+## Local library store (V0.5)
+
+The homepage at \`/\` is backed by \`pages/assets/library-store.js\`, a same-origin IndexedDB store named \`frame-reader-library\`.
+
+Each local book record uses a browser-generated stable \`id\` and stores:
+
+- The original EPUB / CBZ \`Blob\` (or structured-cloned \`File\`).
+- Original filename, byte size, last-modified timestamp and format.
+- Display title, author, language, optional EPUB identifier and item/page count.
+- Optional extracted cover image \`Blob\`.
+- Added / updated / last-opened timestamps.
+- Progress object: percentage, human-readable section/page label, EPUB CFI when available, and fixed-layout image index.
+- Reserved manual title / author flags so user corrections are not overwritten by future metadata refreshes.
+
+Import is local-only. The browser parses the archive to obtain its metadata and cover, then writes the original archive and extracted cover into IndexedDB. No API request uploads book content. If the browser storage quota is exceeded, the user receives an explicit error and the import is not presented as successful.
+
+EPUB metadata is read from the OPF package metadata and manifest. The current implementation extracts the declared cover image (with format-specific fallbacks), title, creator, language, identifier and spine count. CBZ indexing enumerates supported image entries, sorts naturally, counts pages and selects a cover/front image candidate or the first image.
+
+The Reading Room opens a shelf book by ID using \`/epub-lab/?book=<id>\`. It fetches the Blob from IndexedDB and passes it to the existing Foliate adapter. The same book ID scopes CFI / image-index persistence and the per-book appearance key (\`frame-reader-appearance-v1:<id>\`). A book opened from a direct local-file picker is first imported into the same store. The active book ID remains in the address bar so browser reload can reopen it.
+
+The bookshelf supports title / author / filename search, recent / added / title / progress sorting, cover grid / list layout, recently opened books, metadata editing and local removal. Removing a book deletes only the browser's stored copy; it does not touch the original file on disk.
+
+### Local storage boundaries
+
+- IndexedDB is scoped to this browser origin and profile. Another browser, device, private window or cleared site data does not share the library.
+- Browser quota is implementation- and device-dependent. Large archives can fail to import; do not assume unlimited local capacity.
+- The EPUB metadata adapter currently uses JSZip, which may require extra memory while inspecting large EPUB archives.
+- CBZ shelf indexing reads the archive directory and a cover image; the reader's existing image loading remains lazy.
+- No OpenList API key, user credential or private book metadata is embedded in frontend source.
+- OpenList path mapping, authenticated Worker access and D1 synchronization are intentionally deferred to a later version.
+
 ## Sync data model (future)
 
 A reading-state record should be keyed by stable book_id and include:
@@ -103,4 +134,4 @@ The fixed-layout renderer has two distinct presentation paths:
 
 The UI does not provide a right-to-left override. It leaves the source book's original progression metadata intact. Comic background surfaces (wood desk, linen and slate) are rendered with CSS gradients and texture layers, so no remote images or third-party background assets are required. The background remains outside the page content; it must not tint or reduce contrast in the actual comic artwork.
 
-The four-page demo is generated in the browser from original SVG panels and packed into a temporary CBZ Blob. It exercises CBZ parsing, cover handling, single/double spreads, image fit and the continuous page strip without storing a sample comic archive in the public repository.
+The four-page demo is generated in the browser from original SVG panels and packed into a CBZ Blob. When the user chooses the demo, it is imported into the local IndexedDB bookshelf like any other book. No sample comic archive is committed to the public repository.
