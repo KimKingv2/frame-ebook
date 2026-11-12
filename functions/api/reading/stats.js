@@ -20,7 +20,7 @@ export async function onRequestGet({ request, env }) {
   }
 
   try {
-    const [daysResult, allDaysResult, booksResult, bandsResult, recentResult] = await Promise.all([
+    const [daysResult, allDaysResult, booksResult, booksCountResult, bandsResult, recentResult] = await Promise.all([
       db.prepare(
         "SELECT day_key AS dayKey, SUM(seconds) AS seconds " +
         "FROM reading_events WHERE day_key BETWEEN ? AND ? GROUP BY day_key ORDER BY day_key"
@@ -33,6 +33,9 @@ export async function onRequestGet({ request, env }) {
         "SELECT book_id AS bookId, MAX(book_title) AS title, SUM(seconds) AS seconds " +
         "FROM reading_events WHERE day_key BETWEEN ? AND ? GROUP BY book_id ORDER BY seconds DESC LIMIT 10"
       ).bind(from, to).all(),
+      db.prepare(
+        "SELECT COUNT(DISTINCT book_id) AS booksOpened FROM reading_events WHERE day_key BETWEEN ? AND ?"
+      ).bind(from, to).first(),
       db.prepare(
         "SELECT " +
         "SUM(CASE WHEN local_hour >= 6 AND local_hour < 11 THEN seconds ELSE 0 END) AS morning, " +
@@ -53,6 +56,7 @@ export async function onRequestGet({ request, env }) {
       from,
       to,
       totalSeconds,
+      booksOpened: Number(booksCountResult && booksCountResult.booksOpened) || 0,
       days,
       allDays: allDaysResult.results || [],
       topBooks: booksResult.results || [],
