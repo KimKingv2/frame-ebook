@@ -135,7 +135,7 @@ $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath)
 $("cloud-root").addEventListener("click",()=>loadDirectory(state.rootPath));
 $("cloud-up").addEventListener("click",()=>{
   if(state.currentPath===state.rootPath)return;
-  const trimmed=state.currentPath.replace(/\\/+$/,"");
+  const trimmed=state.currentPath;
   const slash=trimmed.lastIndexOf("/");
   const parent=slash<=0?"/":trimmed.slice(0,slash);
   loadDirectory(parent==="/"&&state.rootPath!=="/"?state.rootPath:parent);
