@@ -191,3 +191,30 @@ Verified on the live desktop browser at `https://frame-ebook.pages.dev/epub-lab/
 - Final view settings restored to paginated + double-page preference.
 
 The demo verifies reflowable EPUB behavior on a desktop browser. Portrait-device fallback is implemented by Foliate's own container query; a physical phone/tablet test and a fixed-layout/CBZ manga test remain outstanding.
+
+
+## 2026-11-12 — V0.5 IndexedDB bookshelf and book-scoped state
+
+The homepage was changed from a static cover preview into a functional local bookshelf. The local store is same-origin IndexedDB; book content is not uploaded.
+
+Live desktop-browser checks:
+
+- Homepage loaded with the V0.5 library header, four book counters, search, four sorting modes, grid/list controls and a local-only privacy notice.
+- The built-in sample EPUB was imported into IndexedDB. It appeared on the shelf with extracted title, author, cover and EPUB format.
+- Opening the shelf card navigated to /epub-lab/?book=BOOK_ID. The Reading Room retrieved the book Blob from IndexedDB and displayed its metadata and table of contents.
+- Returning to the shelf showed the last-read progress. The detail dialog opened and closed. Grid → list → grid switching worked.
+- Reloading the Reading Room with the same book ID reopened the EPUB from IndexedDB and preserved the 48% / Chapter 1 of 2 progress.
+- The original CBZ demo was updated to import itself into the same local bookshelf. The browser showed FRAME Reader Comic Demo and the CBZ engine-ready state.
+- CBZ progress moved from 25% / Chapter 1 of 4 to 50% / Chapter 2 of 4. Reloading /epub-lab/?book=BOOK_ID reopened the CBZ and restored the 50% position.
+- The generated demo CBZ contains four original SVG page images. The shelf metadata parser counts image entries and extracts a cover candidate.
+- Reader appearance preferences use a per-book key (frame-reader-appearance-v1:BOOK_ID). The appearance object is reset to defaults before a new book is loaded, preventing a new book from inheriting the previous book's in-memory choices.
+
+Test limitations / not yet verified:
+
+- The CBZ details dialog's displayed 4-page value was not independently confirmed in the browser.
+- One browser run confirmed the EPUB card and another confirmed the CBZ card. A complete test with both books imported into the same browser library and visible together was not conclusively completed.
+- The full visual sequence of changing an EPUB to a non-default theme and backdrop, opening a different book, and reopening the EPUB to confirm its previous custom settings was not completed end to end.
+- One automation run could not inspect the theme/backdrop button data attributes, even though the repository HTML includes data-theme, data-backdrop and aria-pressed attributes. Treat that selector-based inspection as inconclusive rather than a confirmed UI defect.
+- Physical iPhone / iPad / Android device testing, large personal archives, IndexedDB quota handling and browser storage eviction remain pending.
+
+The successful runs confirm local EPUB import, shelf persistence, reopening by stable book ID, CBZ reading progress persistence after reload and the core bookshelf controls on a desktop browser. This remains a local prototype, not a cloud-synced or OpenList-backed production library.
