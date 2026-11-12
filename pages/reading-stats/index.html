@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#12101a">
+  <title>閱讀時光 · FRAME Reader</title>
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/reading-stats.css">
+</head>
+<body>
+  <main class="shell stats-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="FRAME Reader 首頁">
+        <span class="brand-mark">F</span>
+        <span class="brand-name">FRAME <b>READER</b><small>READING INSIGHTS</small></span>
+      </a>
+      <nav class="main-nav" aria-label="主要導覽">
+        <a href="/">我的書架</a>
+        <a class="active" href="/reading-stats/">閱讀時光</a>
+        <a href="/cloud/">雲端書庫</a>
+      </nav>
+      <span class="edition"><span class="edition-dot"></span> PRIVATE READING DATA</span>
+    </header>
+
+    <section class="stats-hero">
+      <div>
+        <p class="eyebrow"><span class="eyebrow-line"></span> YOUR READING, IN YOUR RHYTHM</p>
+        <h1>把讀過的時間，<br><em>變成看得見的日常。</em></h1>
+        <p>閱讀不是競賽。記下每一次專注，看看自己如何一頁一頁累積。</p>
+      </div>
+      <div class="stats-hero-mark"><span>F</span><small>READ · REFLECT · REPEAT</small></div>
+    </section>
+
+    <section class="stats-period-bar">
+      <div class="period-tabs" role="group" aria-label="統計期間">
+        <button type="button" data-period="week" aria-pressed="false">本週</button>
+        <button type="button" data-period="month" aria-pressed="true">本月</button>
+        <button type="button" data-period="year" aria-pressed="false">今年</button>
+        <button type="button" data-period="all" aria-pressed="false">累計</button>
+      </div>
+      <div class="period-meta">
+        <span id="period-label">本月閱讀紀錄</span>
+        <button type="button" id="export-json" class="quiet-button">匯出 JSON</button>
+        <button type="button" id="export-csv" class="quiet-button">匯出 CSV</button>
+      </div>
+    </section>
+
+    <section class="stats-overview" aria-label="閱讀總覽">
+      <article class="stat-card stat-card-featured">
+        <span class="stat-eyebrow">TOTAL READING TIME</span>
+        <strong id="period-time" class="stat-time">0<span>小時</span> 0<span>分鐘</span></strong>
+        <small id="period-time-note">本月累積閱讀時間</small>
+        <div class="stat-mini-bars" id="overview-bars" aria-hidden="true"></div>
+      </article>
+      <article class="stat-card">
+        <span class="stat-eyebrow">READING DAYS</span>
+        <strong id="reading-days">0<span>天</span></strong>
+        <small>每日累積滿 1 分鐘</small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-eyebrow">DAILY AVERAGE</span>
+        <strong id="daily-average">0<span>分鐘</span></strong>
+        <small>以自然日計算</small>
+      </article>
+      <article class="stat-card">
+        <span class="stat-eyebrow">BOOKS OPENED</span>
+        <strong id="books-opened">0<span>本</span></strong>
+        <small>本期間有閱讀紀錄</small>
+      </article>
+    </section>
+
+    <section class="stats-main-grid">
+      <article class="stats-panel goal-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">DAILY READING GOAL</p><h2>今天的閱讀目標</h2></div>
+          <span class="panel-icon">✦</span>
+        </div>
+        <div class="goal-content">
+          <div class="goal-ring" id="goal-ring" style="--goal-progress:0">
+            <div><strong id="goal-percent">0%</strong><span>今日完成</span></div>
+          </div>
+          <div class="goal-copy">
+            <strong id="today-time">0 分鐘</strong>
+            <span id="goal-target-label">每日目標 30 分鐘</span>
+            <label for="goal-select">調整每日目標</label>
+            <select id="goal-select">
+              <option value="10">10 分鐘</option>
+              <option value="15">15 分鐘</option>
+              <option value="20">20 分鐘</option>
+              <option value="30" selected>30 分鐘</option>
+              <option value="45">45 分鐘</option>
+              <option value="60">60 分鐘</option>
+              <option value="90">90 分鐘</option>
+              <option value="120">120 分鐘</option>
+            </select>
+          </div>
+        </div>
+        <div class="goal-foot"><span id="goal-foot-text">每天一點點，慢慢累積。</span><span id="goal-days-count">0 天達標</span></div>
+      </article>
+
+      <article class="stats-panel streak-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">YOUR READING RHYTHM</p><h2>閱讀習慣</h2></div>
+          <span class="panel-icon">⌁</span>
+        </div>
+        <div class="streak-metrics">
+          <div><strong id="current-streak">0</strong><span>目前連續閱讀（天）</span></div>
+          <div><strong id="best-streak">0</strong><span>最長連續閱讀（天）</span></div>
+          <div><strong id="all-reading-days">0</strong><span>累計閱讀日（天）</span></div>
+        </div>
+        <p class="streak-note" id="streak-note">每一天閱讀滿 1 分鐘，就會留下足跡。</p>
+      </article>
+    </section>
+
+    <section class="stats-panel calendar-panel">
+      <div class="panel-heading calendar-heading">
+        <div><p class="section-kicker">READING CALENDAR</p><h2>閱讀日曆</h2><p>顏色越深，當天讀得越久。</p></div>
+        <div class="calendar-month-control"><button type="button" id="calendar-prev" aria-label="上一個月">‹</button><strong id="calendar-month-label"></strong><button type="button" id="calendar-next" aria-label="下一個月">›</button></div>
+      </div>
+      <div class="calendar-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      <div id="reading-calendar" class="reading-calendar" aria-label="每日閱讀時間日曆"></div>
+      <div class="calendar-legend"><span>少</span><i class="level-0"></i><i class="level-1"></i><i class="level-2"></i><i class="level-3"></i><i class="level-4"></i><span>多</span><small id="calendar-total"></small></div>
+    </section>
+
+    <section class="stats-main-grid detail-grid">
+      <article class="stats-panel chart-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">READING TREND</p><h2>閱讀時長趨勢</h2></div>
+          <span class="subtle-label" id="trend-unit">每日</span>
+        </div>
+        <div id="reading-chart" class="reading-chart" role="img" aria-label="閱讀時長柱狀圖"></div>
+      </article>
+      <article class="stats-panel top-books-panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">MOST READ</p><h2>常讀書籍</h2></div>
+        </div>
+        <div id="top-books" class="top-books-list"><p class="empty-inline">目前還沒有閱讀紀錄。</p></div>
+      </article>
+    </section>
+
+    <section class="stats-main-grid">
+      <article class="stats-panel time-of-day-panel">
+        <div class="panel-heading"><div><p class="section-kicker">WHEN YOU READ</p><h2>偏好的閱讀時段</h2></div></div>
+        <div id="time-of-day" class="time-of-day"></div>
+      </article>
+      <article class="stats-panel recent-session-panel">
+        <div class="panel-heading"><div><p class="section-kicker">RECENT SESSIONS</p><h2>最近閱讀</h2></div></div>
+        <div id="recent-sessions" class="recent-sessions"><p class="empty-inline">完成第一次閱讀後，這裡就會留下紀錄。</p></div>
+      </article>
+    </section>
+
+    <section class="cloud-sync-panel">
+      <div class="cloud-sync-copy">
+        <span class="cloud-sync-icon">☁</span>
+        <div><strong>跨裝置統計同步</strong><p id="cloud-sync-status">目前在這台設備記錄。登入雲端後，可以把閱讀紀錄同步到 D1。</p></div>
+      </div>
+      <form id="cloud-login-form" class="cloud-login-form">
+        <label for="cloud-password">私人閱讀密碼</label>
+        <input type="password" id="cloud-password" autocomplete="current-password" placeholder="輸入 Cloudflare 設定的密碼">
+        <button type="submit" class="primary-link">登入並同步</button>
+      </form>
+      <div id="cloud-account-actions" class="cloud-account-actions" hidden>
+        <span id="cloud-account-label">雲端統計已連線</span>
+        <button type="button" id="cloud-sync-now" class="quiet-button">立即同步</button>
+        <button type="button" id="cloud-logout" class="quiet-button">登出</button>
+      </div>
+    </section>
+
+    <p class="stats-privacy-note">閱讀時間只在閱讀室位於前景且視窗有焦點時累積；連續 5 分鐘沒有操作會暫停計時。每日閱讀日以累積滿 1 分鐘計算。未登入雲端時，資料只保存在這個瀏覽器。</p>
+
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>PRIVATE READING INSIGHTS</span><span>YOUR DATA · YOUR DEVICE</span></footer>
+  </main>
+  <script type="module" src="/assets/reading-stats.js"></script>
+</body>
+</html>
