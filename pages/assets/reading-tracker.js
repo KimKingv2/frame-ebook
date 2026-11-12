@@ -39,6 +39,7 @@ async function persistInterval(startAt, endAt) {
         bookId: activeBook.id,
         bookTitle: activeBook.title,
         format: activeBook.format,
+        localHour: new Date(cursor).getHours(),
         seconds: Math.min(30, seconds),
         startedAt: cursor,
         endedAt: Math.min(segmentEnd, cursor + 30000)
@@ -64,8 +65,8 @@ async function syncPending(force = false) {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ events: pending.map(({ id, dayKey, bookId, bookTitle, format, seconds, startedAt, endedAt }) => ({
-        id, dayKey, bookId, bookTitle, format, seconds, startedAt, endedAt
+      body: JSON.stringify({ events: pending.map(({ id, dayKey, bookId, bookTitle, format, localHour, seconds, startedAt, endedAt }) => ({
+        id, dayKey, bookId, bookTitle, format, localHour, seconds, startedAt, endedAt
       })) })
     });
     if (response.status === 401 || response.status === 404 || response.status === 503) {
