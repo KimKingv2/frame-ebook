@@ -132,3 +132,13 @@ button:disabled { opacity: .38; cursor: default; }
   .reader-top-actions { gap:10px; }
   .back-shelf-link { font-size:9px; }
 }
+
+
+.reading-session-indicator { display:flex; align-items:center; gap:8px; min-height:28px; margin:-2px 0 18px; color:#94899f; font-size:9px; }
+.reading-session-indicator .record-dot { width:6px; height:6px; border-radius:50%; background:#9c83ce; box-shadow:0 0 10px rgba(167,139,224,.55); }
+.reading-session-indicator strong { margin-left:3px; color:#d4c4ef; font:400 11px Georgia,serif; letter-spacing:.5px; }
+.reading-session-indicator small { margin-left:auto; color:#756c80; font-size:8px; }
+@media (max-width:520px) {
+  .reading-session-indicator { flex-wrap:wrap; }
+  .reading-session-indicator small { width:100%; margin-left:14px; }
+}
