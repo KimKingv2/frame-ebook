@@ -18,12 +18,13 @@
       <section class="intro">
         <p class="eyebrow">YOUR PRIVATE READING ROOM</p>
         <h1>把一本 EPUB，<em>真正打開。</em></h1>
-        <p>先用內建測試書驗證解析、章節、翻頁與閱讀位置保存。你在此選取的本機 EPUB 只會在目前瀏覽器中讀取，不會上傳。</p>
+        <p>先用內建測試書驗證解析、章節、翻頁與閱讀位置保存。本機 EPUB / CBZ 只會在目前瀏覽器中讀取，不會上傳。</p>
       </section>
       <section class="toolbar" aria-label="書籍操作">
-        <button id="load-demo" type="button" class="primary-button">載入內建測試書</button>
-        <label class="file-button" for="epub-file">選擇本機 EPUB</label>
-        <input id="epub-file" type="file" accept=".epub,application/epub+zip">
+        <button id="load-demo" type="button" class="primary-button">載入 EPUB 測試書</button>
+        <button id="load-comic-demo" type="button">載入漫畫示範</button>
+        <label class="file-button" for="epub-file">選擇 EPUB / CBZ</label>
+        <input id="epub-file" type="file" accept=".epub,.cbz,application/epub+zip,application/vnd.comicbook+zip">
         <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
       </section>
 
@@ -113,12 +114,44 @@
             </div>
             <p id="reading-mode-note" class="layout-note">雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。</p>
           </section>
+          <section class="appearance-group comic-group" aria-label="漫畫與圖像閱讀">
+            <div class="appearance-group-heading"><span>漫畫與圖像</span><small>COMIC READING</small></div>
+            <div class="setting-grid setting-grid--two">
+              <label class="setting-control" for="comic-reading-mode"><span>閱讀模式</span>
+                <select id="comic-reading-mode">
+                  <option value="paginated" selected>分頁翻頁</option>
+                  <option value="scrolled">直式長卷</option>
+                </select>
+              </label>
+              <label class="setting-control" for="comic-page-layout"><span>頁面編排</span>
+                <select id="comic-page-layout">
+                  <option value="1">單頁</option>
+                  <option value="2" selected>雙頁優先</option>
+                </select>
+              </label>
+              <label class="setting-control" for="comic-image-fit"><span>圖片縮放</span>
+                <select id="comic-image-fit">
+                  <option value="fit-page" selected>適合整頁</option>
+                  <option value="fit-width">適合寬度</option>
+                </select>
+              </label>
+            </div>
+            <p id="comic-mode-note" class="layout-note">圖像閱讀設定會在載入 CBZ 或固定版面 EPUB 後啟用。</p>
+          </section>
           <div class="theme-control" role="group" aria-label="閱讀主題">
             <span>紙張主題</span>
             <div class="theme-buttons">
               <button type="button" class="theme-button" data-theme="paper" aria-pressed="true"><i class="swatch swatch-paper"></i>紙白</button>
               <button type="button" class="theme-button" data-theme="sepia" aria-pressed="false"><i class="swatch swatch-sepia"></i>暖紙</button>
               <button type="button" class="theme-button" data-theme="night" aria-pressed="false"><i class="swatch swatch-night"></i>夜讀</button>
+            </div>
+          </div>
+          <div class="theme-control backdrop-control" role="group" aria-label="閱讀背景">
+            <span>閱讀背景</span>
+            <div class="theme-buttons">
+              <button type="button" class="theme-button" data-backdrop="wood" aria-pressed="true">木質桌面</button>
+              <button type="button" class="theme-button" data-backdrop="linen" aria-pressed="false">亞麻暖灰</button>
+              <button type="button" class="theme-button" data-backdrop="slate" aria-pressed="false">深色石板</button>
             </div>
           </div>
         </div>
@@ -141,7 +174,7 @@
           <div id="reader-placeholder" class="reader-placeholder">
             <div class="placeholder-mark">F</div>
             <h3>準備好開始閱讀</h3>
-            <p>載入測試 EPUB 後，內容會顯示在這裡。</p>
+            <p>載入 EPUB 或 CBZ 後，內容會顯示在這裡。</p>
           </div>
         </div>
       </section>
@@ -156,7 +189,7 @@
       <p id="reader-status" class="reader-status" role="status">尚未載入 EPUB。</p>
       <section class="notice">
         <strong>原型限制</strong>
-        <p>目前使用 JSZip 將整本 EPUB 載入瀏覽器記憶體，只適合小型測試書。正式 OpenList 版本會改為 HTTP Range 分段讀取，並在桌面、平板與手機瀏覽器分別驗證容量與效能。</p>
+        目前 EPUB 原型使用 JSZip 讀取封裝；CBZ 使用 Zip.js 按頁載入，長卷模式只預載接近可視區的圖片。正式 OpenList 版本仍需改為 HTTP Range 分段讀取，並在桌面、平板與手機瀏覽器分別驗證容量與效能。
       </section>
     </main>
     <footer class="footer">
