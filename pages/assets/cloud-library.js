@@ -1,7 +1,7 @@
 import { importBookFile } from "/assets/library-store.js";
 
 const $ = id => document.getElementById(id);
-const state = { authenticated:false, rootPath:"/", currentPath:"/", items:[], query:"", busy:new Set() };
+const state = { authenticated:false, rootPath:"/", currentPath:"/", items:[], query:"", busy:new Set(), page:1, perPage:80, total:0 };
 
 function formatBytes(bytes) {
   const value=Number(bytes)||0;
@@ -32,7 +32,11 @@ async function checkSession() {
       $("cloud-login-panel").hidden=true;
       $("cloud-browser").hidden=false;
       $("cloud-connection-status").textContent=data.openListConfigured?"OpenList 已設定":"OpenList 尚未設定";
-      await loadDirectory(state.currentPath);
+      await loadDirectory(state.currentPath,1);
+      try {
+        const tracker = await import("/assets/reading-tracker.js");
+        await tracker.syncPending(true);
+      } catch (_) {}
     }else{
       $("cloud-login-panel").hidden=false;
       $("cloud-browser").hidden=true;
@@ -63,22 +67,31 @@ async function logout() {
   $("cloud-login-panel").hidden=false;
   $("cloud-browser").hidden=true;
 }
-async function loadDirectory(path=state.currentPath) {
+async function loadDirectory(path=state.currentPath,page=1) {
+  state.page=Math.max(1,Number(page)||1);
   $("cloud-browser-status").textContent="正在讀取 OpenList 目錄……";
   $("cloud-refresh").disabled=true;
   try{
-    const url="/api/cloud/books?path="+encodeURIComponent(path);
+    const url="/api/cloud/books?path="+encodeURIComponent(path)+"&page="+state.page+"&per_page="+state.perPage;
     const response=await fetch(url,{credentials:"same-origin"});
     const data=await response.json();
     if(!response.ok)throw new Error(data.error||"OpenList 目錄讀取失敗。");
     state.currentPath=data.path||path;
     state.items=Array.isArray(data.items)?data.items:[];
+    state.total=Number(data.total)||0;
+    state.page=Number(data.page)||state.page;
     $("cloud-breadcrumb").textContent=breadcrumb(state.currentPath);
-    $("cloud-item-count").textContent=(data.total??state.items.length)+" 個項目";
+    $("cloud-item-count").textContent="顯示 "+state.items.length+" / "+state.total+" 個項目";
+    $("cloud-page-label").textContent="第 "+state.page+" 頁 · 共 "+Math.max(1,Math.ceil(state.total/state.perPage))+" 頁";
+    $("cloud-prev-page").disabled=state.page<=1;
+    $("cloud-next-page").disabled=state.page*state.perPage>=state.total;
     renderItems();
     $("cloud-browser-status").textContent="已連接私人 OpenList。書籍內容只會在你選擇加入本機書架時下載。";
   }catch(error){
     $("cloud-items").replaceChildren();
+    $("cloud-page-label").textContent="目錄尚未載入";
+    $("cloud-prev-page").disabled=true;
+    $("cloud-next-page").disabled=true;
     $("cloud-browser-status").textContent=error.message||String(error);
   }finally{$("cloud-refresh").disabled=false;}
 }
@@ -131,7 +144,9 @@ async function importCloudFile(item) {
   }
 }
 $("cloud-login-form").addEventListener("submit",login);
-$("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath));
+$("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
+$("cloud-prev-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page-1));
+$("cloud-next-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page+1));
 $("cloud-root").addEventListener("click",()=>loadDirectory(state.rootPath));
 $("cloud-up").addEventListener("click",()=>{
   if(state.currentPath===state.rootPath)return;
