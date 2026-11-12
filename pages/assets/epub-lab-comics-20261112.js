@@ -494,8 +494,10 @@
       });
       var blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
       var file = new File([blob], 'FRAME Reader Comic Demo.cbz', { type: 'application/vnd.comicbook+zip' });
-      await openEpub(file, file.name);
-      setText('reader-status', '原創漫畫示範已載入。可切換單頁、雙頁與直式長卷。');
+      var store = await libraryStorePromise;
+      var record = await store.importBookFile(file);
+      await openEpub(file, file.name, record.id);
+      setText('reader-status', '原創漫畫示範已加入本機書架。可切換單頁、雙頁與直式長卷。');
     } catch (error) {
       setText('engine-status', '漫畫示範載入失敗');
       setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
@@ -573,6 +575,10 @@
   });
   el('toc-select').addEventListener('change', function (event) {
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
+  });
+  window.addEventListener('pagehide', function () { flushLibraryProgress(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) flushLibraryProgress();
   });
   setText('engine-status', featureSummary());
   import('/vendor/foliate-js/view.js').then(async function () {
