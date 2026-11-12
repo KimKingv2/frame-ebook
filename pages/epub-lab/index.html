@@ -84,6 +84,18 @@
           <section class="appearance-group layout-group" aria-label="頁面佈局">
             <div class="appearance-group-heading"><span>頁面佈局</span><small>PAGE LAYOUT</small></div>
             <div class="setting-grid setting-grid--two">
+              <label class="setting-control" for="reading-mode"><span>閱讀模式</span>
+                <select id="reading-mode">
+                  <option value="paginated" selected>分頁翻頁</option>
+                  <option value="scrolled">連續捲動</option>
+                </select>
+              </label>
+              <label class="setting-control" for="page-layout"><span>分頁版面</span>
+                <select id="page-layout">
+                  <option value="1">單頁</option>
+                  <option value="2" selected>雙頁優先</option>
+                </select>
+              </label>
               <label class="setting-control" for="vertical-margin"><span>上下留白</span>
                 <select id="vertical-margin">
                   <option value="8">窄（8 px）</option>
@@ -99,6 +111,7 @@
                 </select>
               </label>
             </div>
+            <p id="reading-mode-note" class="layout-note">雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。</p>
           </section>
           <div class="theme-control" role="group" aria-label="閱讀主題">
             <span>紙張主題</span>
@@ -153,6 +166,6 @@
   </div>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
-  <script type="module" src="/assets/epub-lab-typography-20261112.js"></script>
+  <script type="module" src="/assets/epub-lab-reading-modes-20261112.js"></script>
 </body>
 </html>
