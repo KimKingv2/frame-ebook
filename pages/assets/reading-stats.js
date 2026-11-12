@@ -15,6 +15,10 @@ function parseDay(key) {
   const [y,m,d]=String(key).split("-").map(Number);
   return new Date(y,m-1,d);
 }
+function dayOrdinal(key) {
+  const [y,m,d]=String(key).split("-").map(Number);
+  return Math.floor(Date.UTC(y,m-1,d)/DAY_MS);
+}
 function startOfWeek(date) {
   const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
   const day=(d.getDay()+6)%7;
@@ -96,15 +100,15 @@ function streakInfo(daySeconds) {
   let best=0,run=0,previous=null;
   for(const key of active){
     const d=parseDay(key);
-    if(previous && d.getTime()-previous.getTime()===DAY_MS)run++;
+    if(previous && dayOrdinal(key)-previous===1)run++;
     else run=1;
     best=Math.max(best,run);
-    previous=d;
+    previous=dayOrdinal(key);
   }
   return {current,best,total:active.length};
 }
 function periodDays(range) {
-  return Math.max(1,Math.floor((range.end.getTime()-range.start.getTime())/DAY_MS)+1);
+  return Math.max(1,dayOrdinal(dateKey(range.end))-dayOrdinal(dateKey(range.start))+1);
 }
 function renderBars(container,items,unit) {
   container.replaceChildren();
@@ -127,7 +131,7 @@ function buildTrend(summary,range) {
   if(state.period==="week"||state.period==="month"){
     const total=state.period==="week"?7:periodDays(range);
     for(let i=0;i<total;i++){
-      const d=new Date(range.start.getTime()+i*DAY_MS),key=dateKey(d);
+      const d=new Date(range.start.getFullYear(),range.start.getMonth(),range.start.getDate()+i),key=dateKey(d);
       items.push({label:state.period==="week"?["一","二","三","四","五","六","日"][i]:String(d.getDate()),seconds:summary.daySeconds[key]||0});
     }
   } else if(state.period==="year"){
@@ -224,7 +228,7 @@ function renderSummary(summary,range,allData) {
   const total=summary.totalSeconds,days=countReadingDays(summary.daySeconds);
   const dayKeys=Object.keys(allData.daySeconds||{}).sort();
   const averageStart=state.period==="all"&&dayKeys.length?parseDay(dayKeys[0]):range.start;
-  const averageDays=Math.max(1,Math.floor((range.end.getTime()-averageStart.getTime())/DAY_MS)+1);
+  const averageDays=Math.max(1,dayOrdinal(dateKey(range.end))-dayOrdinal(dateKey(averageStart))+1);
   const naturalAverage=Math.round(total/(state.period==="all"?averageDays:periodDays(range))/60);
   $("period-time").innerHTML=Math.floor(total/3600)+'<span>小時</span> '+Math.floor((total%3600)/60)+'<span>分鐘</span>';
   $("period-time-note").textContent=state.period==="week"?"本週累積閱讀時間":state.period==="year"?"今年累積閱讀時間":state.period==="all"?"所有已記錄的閱讀時間":"本月累積閱讀時間";
