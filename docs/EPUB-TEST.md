@@ -218,3 +218,34 @@ Test limitations / not yet verified:
 - Physical iPhone / iPad / Android device testing, large personal archives, IndexedDB quota handling and browser storage eviction remain pending.
 
 The successful runs confirm local EPUB import, shelf persistence, reopening by stable book ID, CBZ reading progress persistence after reload and the core bookshelf controls on a desktop browser. This remains a local prototype, not a cloud-synced or OpenList-backed production library.
+
+
+## 2026-11-12 — V0.6 reading insights and Pages Functions deployment check
+
+Implemented:
+
+- Added a 15-second foreground reading timer. It requires a visible tab and focused window; user activity refreshes a five-minute idle deadline. Hidden tabs, blurred windows and idle sessions pause the timer.
+- Added short IndexedDB reading events, local-hour data, day-boundary splitting, and event IDs for idempotent cloud retries.
+- Added an insights dashboard with week / month / year / all-time periods, total duration, natural-day average, 60-second reading-day threshold, current and longest streak, a configurable daily target, calendar heatmap, trend chart, top books, time-of-day bands, recent sessions and local JSON / CSV export.
+- Consecutive 15-second event rows are merged into reading sessions for display. All-time daily average starts at the first day with reading data; streak date arithmetic uses calendar-day ordinals so daylight-saving transitions do not break a consecutive streak.
+- Added Pages Functions for password login / session / logout, OpenList directory listing, a protected file proxy with Range forwarding, D1 reading-event ingestion and D1 reading-stat queries.
+- Added D1 SQL migration 0001_reading_events.sql and the Cloudflare setup guide.
+- The cloud browser imports a selected OpenList EPUB / CBZ into the browser's local IndexedDB. It does not currently stream the book directly from OpenList into Foliate.
+
+Static checks:
+
+- JavaScript syntax parsing passed for library-store.js, reading-tracker.js, reading-stats.js, cloud-library.js, the Reading Room adapter, and every Pages Function module.
+- Cloudflare Pages static routes /reading-stats/ and /cloud/ were retrievable after deployment.
+- GET /api/auth/session returned a JSON session status with authenticated=false, openListConfigured=false and databaseConfigured=false. This confirms that the Pages Function route is deployed, and also confirms the D1 / OpenList bindings are not configured yet.
+- Unauthenticated GET requests to /api/reading/stats and /api/cloud/books returned HTTP 401, as intended.
+
+Not yet verified / blocked on configuration:
+
+- D1 has not been created or bound to the Pages project in Cloudflare.
+- The migration has not been applied to a remote D1 database.
+- FRAME_READER_ACCESS_PASSWORD, FRAME_READER_SESSION_SECRET, OPENLIST_BASE_URL, OPENLIST_TOKEN and OPENLIST_ROOT_PATH have not been configured as Pages variables / secrets.
+- Therefore, successful private login, live OpenList directory browsing, protected Range download, D1 write / read, and cross-device aggregation have not yet been tested.
+- The reading timer and stats UI have static syntax checks and the routes have been fetched, but an interactive end-to-end reading-duration test has not been completed in this run.
+- Direct Range-backed loading into Foliate, large-file memory use, and physical phone / tablet verification remain future work.
+
+Use docs/CLOUDFLARE-SETUP.md for the exact D1 binding, migration and Pages secret names. Do not put any password or token in Git.
