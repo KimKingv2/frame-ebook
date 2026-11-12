@@ -92,3 +92,23 @@ Fix:
 - Force a paginator re-layout after the unit-bearing margin and gap are updated.
 
 The earlier live check only confirmed the control options and navigation presence; it did not validate vertical whitespace. Re-run a visual vertical-spacing regression check after deployment.
+
+
+## 2026-11-12 — Split page margins into independent axes
+
+User requested separate numerical controls for page height and width spacing.
+
+Changes:
+- Replace the combined page-margin selector with two independent selectors:
+  - Top/bottom (`verticalMargin`): 8 / 16 / 24 px, default 16 px.
+  - Left/right (`horizontalMargin`): 4 / 7 / 10%, default 7%.
+- Apply them directly to Foliate as `margin: <value>px` and `gap: <value>%`.
+- Persist both values independently in localStorage.
+- Migrate old combined `margin` preferences to both axes once, preserving the previous narrow / standard / wide selection.
+- Update the mobile settings layout so the additional control remains readable.
+
+Regression checks required:
+1. Change top/bottom spacing while holding left/right at 7%; verify only vertical whitespace changes.
+2. Change left/right spacing while holding top/bottom at 16px; verify only horizontal spacing changes.
+3. Reload and confirm both values restore independently.
+4. Confirm themes, font size, line height, page navigation and TOC navigation still work.
