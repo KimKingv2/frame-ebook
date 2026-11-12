@@ -1,7 +1,7 @@
 import { importBookFile } from "/assets/library-store.js";
 
 const $ = id => document.getElementById(id);
-const state = { authenticated:false, rootPath:"/", currentPath:"/", items:[], query:"", busy:new Set(), page:1, perPage:80, total:0 };
+const state = { authenticated:false, databaseConfigured:false, rootPath:"/", currentPath:"/", items:[], query:"", busy:new Set(), page:1, perPage:80, total:0 };
 
 function formatBytes(bytes) {
   const value=Number(bytes)||0;
@@ -26,6 +26,7 @@ async function checkSession() {
     const response=await fetch("/api/auth/session",{credentials:"same-origin"});
     const data=await response.json();
     state.authenticated=!!(response.ok&&data.authenticated);
+    state.databaseConfigured=!!data.databaseConfigured;
     if(state.authenticated){
       state.rootPath=data.rootPath||"/";
       state.currentPath=state.rootPath;
@@ -40,6 +41,11 @@ async function checkSession() {
     }else{
       $("cloud-login-panel").hidden=false;
       $("cloud-browser").hidden=true;
+      const loginButton=$("cloud-login-form").querySelector("button");
+      loginButton.disabled=!state.databaseConfigured;
+      $("cloud-login-error").textContent=state.databaseConfigured
+        ? ""
+        : "Cloudflare D1 尚未綁定，請先完成專案設定再登入。詳見 docs/CLOUDFLARE-SETUP.md。";
     }
   }catch(error){
     $("cloud-browser-status").textContent="無法確認登入狀態："+(error.message||String(error));
