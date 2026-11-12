@@ -153,3 +153,23 @@ Verified on the live desktop browser at `https://frame-ebook.pages.dev/epub-lab/
 - No reader error message was observed.
 
 The live test confirms control interaction and local persistence. Device-specific typography appearance still requires separate checks on mobile browsers and with books using different publisher styles.
+
+
+## 2026-11-12 — Reading modes and page layout
+
+Implementation based on the documented layout patterns in Readest and Thorium Reader, using the already vendored Foliate paginator rather than introducing a second reading engine.
+
+- Add a mode selector: paginated or continuous scroll.
+- Add a paginated layout selector: single page or double-page preference.
+- Double-page preference applies on sufficiently wide landscape layouts; Foliate's own portrait container query automatically reduces it to one page in portrait.
+- Apply modes through Foliate's public paginator attributes: `flow="scrolled"` for continuous scroll and `max-column-count="1|2"` for page columns. The current reading anchor is retained by calling the paginator's normal re-layout path.
+- Persist both values in the existing local appearance object.
+- Fixed-layout EPUBs retain the native fixed-layout renderer, spread arrangement and book progression direction. Mode and column selectors are disabled for fixed-layout books.
+
+Live regression required:
+1. Switch paginated → scrolled → paginated and verify the visible reading location remains stable.
+2. Verify single-page and double-page behavior at landscape desktop and portrait viewport widths.
+3. Verify switching to scrolled and back retains the selected page-column preference.
+4. Reload and verify mode and page layout persist.
+5. Verify page navigation and TOC navigation in both flows.
+6. Confirm fixed-layout books do not expose unsupported flow / column overrides.
