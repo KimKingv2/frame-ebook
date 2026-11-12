@@ -282,7 +282,7 @@ async function refresh() {
         (remote.allDays||[]).forEach(day=>remoteAllDays[day.dayKey]=Number(day.seconds)||0);
         const remoteSessions=(remote.topBooks||[]).map(book=>({bookId:book.bookId,bookTitle:book.title,seconds:book.seconds,dayKey:range.to,startedAt:Date.now(),format:""}));
         const remoteSummary=localSummary(remoteSessions);
-        summary={totalSeconds:Number(remote.totalSeconds)||0,booksOpened:Number(remote.booksOpened)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:remote.recentEvents||[]};
+        summary={totalSeconds:Number(remote.totalSeconds)||0,booksOpened:Number(remote.booksOpened)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:mergeSessions(remote.recentEvents||[])};
         state.remote=true;
         allDataForRender={daySeconds:Object.keys(remoteAllDays).length?remoteAllDays:allData.daySeconds};
       }catch(_){state.remote=false;summary=selectedData(allData,range);}
