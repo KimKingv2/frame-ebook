@@ -1,0 +1,80 @@
+# FRAME Reader V0.6 — Cloudflare setup
+
+V0.6 is deployed with the local reading tracker and reading insights page. The authenticated cloud API is present in the repository, but it deliberately stays unavailable until the D1 database, binding and server-side variables below are configured.
+
+## 1. Create the D1 database
+
+Create a D1 database named `frame-reader-db` in Cloudflare Dashboard > Storage & Databases > D1, or use Wrangler:
+
+```sh
+npx wrangler login
+npx wrangler d1 create frame-reader-db
+```
+
+Apply the schema from the repository root:
+
+```sh
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
+```
+
+This migration creates `reading_events` (deduplicated reading-time segments) and `auth_attempts` (login rate limiting). The migration is safe to apply to a newly created database. Do not run it against an unrelated existing database without reviewing the SQL first.
+
+## 2. Bind D1 to the Pages project
+
+In Cloudflare Dashboard:
+
+1. Open Workers & Pages and select the `frame-ebook` Pages project.
+2. Go to **Settings → Bindings → Add → D1 database bindings**.
+3. Set the variable name to `FRAME_READER_DB`.
+4. Select the `frame-reader-db` database.
+5. Save and redeploy the Pages project so the binding is available to Functions.
+
+The Functions code accepts either `FRAME_READER_DB` or `DB`, but use `FRAME_READER_DB` for this project.
+
+## 3. Add server-side variables and secrets
+
+Under the Pages project's **Settings → Variables and Secrets**, add these to the Production environment. Add them to Preview only when you also intend to test private access on preview deployments.
+
+| Name | Type | Value |
+|---|---|---|
+| `OPENLIST_BASE_URL` | Variable | OpenList origin only, for example `https://openlist.example.com` (no API path) |
+| `OPENLIST_ROOT_PATH` | Variable | Exact folder path that contains the private ebook library; use the narrowest suitable directory, not the whole drive |
+| `OPENLIST_TOKEN` | Secret | OpenList API token |
+| `FRAME_READER_ACCESS_PASSWORD` | Secret | A new private FRAME Reader login password; this is not the OpenList password |
+| `FRAME_READER_SESSION_SECRET` | Secret | A long, random signing secret used for the HttpOnly session cookie |
+
+`OPENLIST_ROOT_PATH` is mandatory. The cloud browser refuses paths outside this directory. Do not set it to `/` unless you intentionally want the entire OpenList drive to be browsable.
+
+Generate a session secret locally, for example:
+
+```sh
+openssl rand -hex 32
+```
+
+Paste the generated output only into Cloudflare's Secret field. Do not put any secret in Git, frontend JavaScript, chat messages or URL query strings.
+
+## 4. Verify the configuration
+
+After saving the binding and variables, trigger a new deployment. Then check:
+
+- `https://frame-ebook.pages.dev/api/auth/session` should report `databaseConfigured: true` and `openListConfigured: true` (it will still report `authenticated: false` before login).
+- Open `https://frame-ebook.pages.dev/cloud/`, sign in with `FRAME_READER_ACCESS_PASSWORD`, then browse the configured OpenList root.
+- Open `https://frame-ebook.pages.dev/reading-stats/`, sign in to enable D1 statistics sync. Locally stored reading events are uploaded with unique event IDs; duplicate retries are ignored by D1.
+- Read a book for at least one minute, then revisit the stats page and check the daily total. A reading day is counted at 60 seconds.
+
+## 5. What V0.6 does and does not do
+
+- The Pages Functions hold the OpenList token and proxy the API calls. The token and OpenList `raw_url` are not returned to the browser.
+- The file proxy forwards valid HTTP Range headers, but the current cloud shelf still downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Direct Range-backed streaming into Foliate is a later optimization.
+- The bookshelf file itself remains in OpenList. Adding it to the local shelf copies it into this browser's IndexedDB; removing the local copy does not delete the cloud original.
+- Reading duration is tracked locally first. Once authenticated, pending events are sent to D1. Reading statistics aggregate across devices that use the same private account after they sync.
+- Daily reading goal settings are currently per browser, and JSON / CSV export currently contains the local browser's raw event details.
+- The current private login is intended for a single personal library owner, not a multi-user public service. The password is verified at the edge, the session cookie is HttpOnly / Secure, and login attempts are rate-limited in D1.
+
+## References
+
+- Cloudflare Pages Functions must live in a `/functions` directory at the root of the Pages project, not inside the static output directory: https://developers.cloudflare.com/pages/functions/get-started/
+- Cloudflare Pages D1 binding setup and redeployment: https://developers.cloudflare.com/pages/functions/bindings/
+- D1 create / execute commands: https://developers.cloudflare.com/d1/wrangler-commands/
+- OpenList FS list / get APIs and the Authorization header: https://openlistteam.github.io/docs/guide/api/fs.html
+
