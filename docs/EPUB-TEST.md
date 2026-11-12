@@ -112,3 +112,27 @@ Regression checks required:
 2. Change left/right spacing while holding top/bottom at 16px; verify only horizontal spacing changes.
 3. Reload and confirm both values restore independently.
 4. Confirm themes, font size, line height, page navigation and TOC navigation still work.
+
+
+## 2026-11-12 — Typography controls design
+
+Add four independent reading typography controls for reflowable EPUB chapters:
+
+- Font family: original book font, serif (明體), or sans-serif (黑體).
+- Font weight: original book styling, regular 400, or medium 500. This affects body text only, leaving headings' authored emphasis intact.
+- Paragraph spacing: original book spacing, compact (0.4em), standard (0.8em), or loose (1.2em).
+- Text alignment: original book styling, left aligned, or justified.
+
+Design rules:
+- Every control defaults to the EPUB author's original style to avoid unexpectedly restyling books on first load.
+- Each value is independently persisted in the existing local appearance object.
+- Settings are validated against fixed allow-lists before being applied.
+- The controls use the existing dark-violet select styling and responsive two-column mobile layout.
+- Fixed-layout EPUBs remain untouched.
+
+Regression checks required:
+1. Verify each setting independently changes the rendered body text without changing the other settings.
+2. Verify choosing 原書設定 restores publisher / book styling for each category.
+3. Reload and verify settings persist.
+4. Verify headings retain their authored bold emphasis when body font weight changes.
+5. Verify theme, font scale, line height, both margin controls, TOC and page navigation remain functional.
