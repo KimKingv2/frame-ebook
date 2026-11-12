@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.3 Reading Room**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
+> Current status: **V0.4 Comic Reading Room**. This is an engineering prototype, not yet a production ebook library. OpenList and cloud sync are not connected yet.
 
 ## Product scope
 
@@ -97,3 +97,20 @@ New commits to `main` should trigger automatic deployment.
 ## License
 
 Original FRAME Reader project files are MIT-licensed. Third-party components retain their respective licenses and notices.
+
+
+## V0.4 Comic Reading Room
+
+The Reading Room now accepts local EPUB and CBZ files. CBZ archives are parsed through Foliate.js' comic-book adapter and Zip.js; individual comic pages are loaded as they approach the visible area rather than eagerly opening every page image.
+
+For fixed-layout books (including CBZ):
+- **Reading flow:** paginated pages or continuous vertical Webtoon-style scrolling.
+- **Page composition:** single-page mode or automatic double-page spreads. Double-page preference becomes a single page in portrait orientation; wide desktop/tablet layouts can show a spread.
+- **Image scale:** fit page or fit width in paginated mode. Continuous mode always fits the page width.
+- **Reading progress:** the current image-page index is stored locally in this browser.
+- **Reading surface:** CSS-rendered wood desk, warm linen and dark slate backdrops, with page shadows. The page artwork itself is not recolored by the surface texture.
+- A four-page original comic demo is generated locally in the browser for repeatable layout testing; it is not uploaded.
+
+Reflowable EPUBs continue using their own typography and pagination controls. The comic controls are enabled only for fixed-layout books. Right-to-left navigation controls are not exposed; the source book's native progression metadata remains untouched.
+
+The comic demo is a synthetic four-page fixture. Real-world CBZ archives with large page counts, unusual image formats, very tall pages and physical phone/tablet browsers still need broader compatibility testing. EPUB loading in this prototype still uses JSZip and reads the archive into browser memory; production OpenList integration must use partial HTTP Range reads.
