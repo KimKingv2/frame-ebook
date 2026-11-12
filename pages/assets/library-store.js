@@ -38,6 +38,14 @@ function requestResult(request) {
   });
 }
 
+function transactionDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("本機書庫交易失敗。"));
+    tx.onabort = () => reject(tx.error || new Error("本機書庫交易已中止。"));
+  });
+}
+
 async function readAll() {
   const db = await openDatabase();
   const tx = db.transaction(STORE_NAME, "readonly");
@@ -54,8 +62,10 @@ async function getBook(id) {
 async function writeRecord(record) {
   const db = await openDatabase();
   const tx = db.transaction(STORE_NAME, "readwrite");
+  const completed = transactionDone(tx);
   const request = tx.objectStore(STORE_NAME).put(record);
   await requestResult(request);
+  await completed;
   return record;
 }
 
@@ -194,8 +204,8 @@ async function importBookFile(file) {
   const record = {
     id: existing ? existing.id : makeId(),
     fileName: file.name,
-    title: metadata.title || basename(file.name),
-    author: metadata.author || "",
+    title: existing && existing.manualTitle ? existing.title : (metadata.title || basename(file.name)),
+    author: existing && existing.manualAuthor ? existing.author : (metadata.author || ""),
     language: metadata.language || "",
     identifier: metadata.identifier || "",
     format: extension.toUpperCase(),
@@ -233,7 +243,9 @@ async function updateBook(id, patch) {
 async function deleteBook(id) {
   const db = await openDatabase();
   const tx = db.transaction(STORE_NAME, "readwrite");
+  const completed = transactionDone(tx);
   await requestResult(tx.objectStore(STORE_NAME).delete(String(id)));
+  await completed;
   return true;
 }
 
