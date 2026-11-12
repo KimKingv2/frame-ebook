@@ -173,3 +173,21 @@ Live regression required:
 4. Reload and verify mode and page layout persist.
 5. Verify page navigation and TOC navigation in both flows.
 6. Confirm fixed-layout books do not expose unsupported flow / column overrides.
+
+
+## 2026-11-12 — Reading mode and page layout live regression test
+
+Verified on the live desktop browser at `https://frame-ebook.pages.dev/epub-lab/` with the bundled two-chapter demo EPUB.
+
+- Reading mode control exposed paginated page turns and continuous vertical scrolling.
+- Page layout control exposed single page and double-page preference.
+- Double-page preference reported that portrait orientation falls back to single page.
+- Switched to single page, then back to double-page preference; the selected preference updated correctly.
+- Switched from paginated to scrolled flow; the text remained visible and the viewport became vertically scrollable.
+- Used the next-page control in scroll mode; reading progress advanced from the opening page to approximately 48% / Chapter 2 of 2.
+- Switched back to paginated mode; content and progress remained visible.
+- Reloaded, reopened the bundled EPUB, and confirmed reading mode, page layout, margins and typography selections persisted. Saved reading location restored when the EPUB was reopened.
+- TOC navigation to Chapter 2 succeeded without a blank page or UI error.
+- Final view settings restored to paginated + double-page preference.
+
+The demo verifies reflowable EPUB behavior on a desktop browser. Portrait-device fallback is implemented by Foliate's own container query; a physical phone/tablet test and a fixed-layout/CBZ manga test remain outstanding.
