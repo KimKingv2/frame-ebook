@@ -157,6 +157,12 @@
     };
   }
   function loadAppearance() {
+    Object.assign(appearance, {
+      fontScale: '1', lineHeight: '1.65', verticalMargin: '16', horizontalMargin: '7',
+      fontFamily: 'original', fontWeight: 'original', paragraphSpacing: 'original', textAlign: 'original',
+      readingMode: 'paginated', pageLayout: '2', comicReadingMode: 'paginated',
+      comicPageLayout: '2', comicImageFit: 'fit-page', backdrop: 'wood', theme: 'paper'
+    });
     var saved = safeGet(currentAppearanceKey || APPEARANCE_KEY);
     if (saved) {
       try {
@@ -397,7 +403,7 @@
     currentStorageKey = view.isFixedLayout ? null : 'frame-reader-epub-cfi:' + String(identifier);
     currentIndexStorageKey = view.isFixedLayout
       ? 'frame-reader-fixed-index:' + String(identifier)
-      : 'frame-reader-fixed-index:' + String(identifier);
+      : null;
     restoreCfi = currentStorageKey ? safeGet(currentStorageKey) : null;
     var storedIndex = currentIndexStorageKey ? Number(safeGet(currentIndexStorageKey)) : NaN;
     var savedProgress = libraryRecord && libraryRecord.progress ? libraryRecord.progress : {};
