@@ -42,7 +42,7 @@ function formatShort(seconds) {
   return h ? h+"小時"+(m?m+"分":"") : m+"分鐘";
 }
 function localSummary(events) {
-  const daySeconds={},bookSeconds={},bookTitles={},timeBands=[0,0,0,0],sessions=[];
+  const daySeconds={},bookSeconds={},bookTitles={},timeBands=[0,0,0,0],rawSessions=[];
   let totalSeconds=0;
   for(const event of events){
     const seconds=Math.max(0,Number(event.seconds)||0);
@@ -53,27 +53,34 @@ function localSummary(events) {
     const hour=new Date(Number(event.startedAt)||Date.now()).getHours();
     const band=hour>=6&&hour<11?0:hour>=11&&hour<17?1:hour>=17&&hour<23?2:3;
     timeBands[band]+=seconds;
-    sessions.push(event);
+    rawSessions.push(event);
   }
-  sessions.sort((a,b)=>(b.endedAt||0)-(a.endedAt||0));
+  const sessions=mergeSessions(rawSessions).sort((a,b)=>(b.endedAt||0)-(a.endedAt||0));
   const topBooks=Object.keys(bookSeconds).map(id=>({bookId:id,title:bookTitles[id],seconds:bookSeconds[id]})).sort((a,b)=>b.seconds-a.seconds);
-  return {totalSeconds,daySeconds,bookSeconds,topBooks,timeBands,sessions};
+  return {totalSeconds,daySeconds,bookSeconds,topBooks,timeBands,sessions,events:rawSessions};
+}
+function mergeSessions(events) {
+  const ordered=events.slice().sort((a,b)=>(Number(a.startedAt)||0)-(Number(b.startedAt)||0));
+  const sessions=[];
+  for(const event of ordered){
+    const start=Number(event.startedAt)||0;
+    const end=Number(event.endedAt)||start;
+    const previous=sessions[sessions.length-1];
+    if(previous&&previous.bookId===event.bookId&&previous.dayKey===event.dayKey&&start-(Number(previous.endedAt)||0)<=45000){
+      previous.seconds+=(Number(event.seconds)||0);
+      previous.endedAt=Math.max(Number(previous.endedAt)||0,end);
+      previous.startedAt=Math.min(Number(previous.startedAt)||start,start);
+      if(event.bookTitle)previous.bookTitle=event.bookTitle;
+    }else{
+      sessions.push(Object.assign({},event,{seconds:Number(event.seconds)||0}));
+    }
+  }
+  return sessions;
 }
 function selectedData(summary,range) {
-  const keys=Object.keys(summary.daySeconds).filter(key=>key>=range.from&&key<=range.to);
-  const daySeconds={};
-  for(const key of keys)daySeconds[key]=summary.daySeconds[key];
-  const totalSeconds=Object.values(daySeconds).reduce((sum,value)=>sum+value,0);
-  const bookSeconds={},bookTitles={},timeBands=[0,0,0,0],sessions=summary.sessions.filter(item=>item.dayKey>=range.from&&item.dayKey<=range.to);
-  for(const item of sessions){
-    bookSeconds[item.bookId]=(bookSeconds[item.bookId]||0)+(Number(item.seconds)||0);
-    bookTitles[item.bookId]=item.bookTitle||"未命名書籍";
-    const hour=new Date(Number(item.startedAt)||Date.now()).getHours();
-    const band=hour>=6&&hour<11?0:hour>=11&&hour<17?1:hour>=17&&hour<23?2:3;
-    timeBands[band]+=Number(item.seconds)||0;
-  }
-  const topBooks=Object.keys(bookSeconds).map(id=>({bookId:id,title:bookTitles[id],seconds:bookSeconds[id]})).sort((a,b)=>b.seconds-a.seconds);
-  return {totalSeconds,daySeconds,bookSeconds,topBooks,timeBands,sessions};
+  const sourceEvents=summary.events||summary.sessions||[];
+  const events=sourceEvents.filter(item=>item.dayKey>=range.from&&item.dayKey<=range.to);
+  return localSummary(events);
 }
 function countReadingDays(daySeconds) {
   return Object.keys(daySeconds).filter(key=>daySeconds[key]>=60).length;
@@ -212,7 +219,11 @@ function renderGoal(todaySeconds,goalDays) {
   $("goal-days-count").textContent=goalDays+" 天達標";
 }
 function renderSummary(summary,range,allData) {
-  const total=summary.totalSeconds,days=countReadingDays(summary.daySeconds),naturalAverage=Math.round(total/periodDays(range)/60);
+  const total=summary.totalSeconds,days=countReadingDays(summary.daySeconds);
+  const dayKeys=Object.keys(allData.daySeconds||{}).sort();
+  const averageStart=state.period==="all"&&dayKeys.length?parseDay(dayKeys[0]):range.start;
+  const averageDays=Math.max(1,Math.floor((range.end.getTime()-averageStart.getTime())/DAY_MS)+1);
+  const naturalAverage=Math.round(total/(state.period==="all"?averageDays:periodDays(range))/60);
   $("period-time").innerHTML=Math.floor(total/3600)+'<span>小時</span> '+Math.floor((total%3600)/60)+'<span>分鐘</span>';
   $("period-time-note").textContent=state.period==="week"?"本週累積閱讀時間":state.period==="year"?"今年累積閱讀時間":state.period==="all"?"所有已記錄的閱讀時間":"本月累積閱讀時間";
   $("reading-days").innerHTML=days+'<span>天</span>';
@@ -271,7 +282,7 @@ async function refresh() {
       }catch(_){state.remote=false;summary=selectedData(allData,range);}
     } else state.remote=false;
     const rangeLabel=state.period==="week"?"本週":state.period==="month"?"本月":state.period==="year"?"今年":"累計";
-    $("period-label").textContent=rangeLabel+" · "+range.from+" 至 "+range.to+(state.remote?" · 雲端合併":" · 本機紀錄");
+    $("period-label").textContent=state.period==="all"?(rangeLabel+" · "+(state.remote?"雲端合併":"本機紀錄")):(rangeLabel+" · "+range.from+" 至 "+range.to+(state.remote?" · 雲端合併":" · 本機紀錄"));
     renderSummary(summary,range,allDataForRender);
     $("cloud-sync-status").textContent=state.authenticated
       ? (state.remote?"雲端閱讀統計已同步，包含這個帳戶的其他裝置紀錄。":"已登入，雲端統計暫不可用，先顯示本機資料。")
