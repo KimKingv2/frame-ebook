@@ -19,6 +19,10 @@
     lineHeight: '1.65',
     verticalMargin: '16',
     horizontalMargin: '7',
+    fontFamily: 'original',
+    fontWeight: 'original',
+    paragraphSpacing: 'original',
+    textAlign: 'original',
     theme: 'paper'
   };
   var el = function (id) { return document.getElementById(id); };
@@ -104,6 +108,10 @@
           if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
           if (['8', '16', '24'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
           if (['4', '7', '10'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
+          if (['original', 'serif', 'sans'].indexOf(String(value.fontFamily)) !== -1) appearance.fontFamily = String(value.fontFamily);
+          if (['original', 'normal', 'medium'].indexOf(String(value.fontWeight)) !== -1) appearance.fontWeight = String(value.fontWeight);
+          if (['original', 'compact', 'standard', 'loose'].indexOf(String(value.paragraphSpacing)) !== -1) appearance.paragraphSpacing = String(value.paragraphSpacing);
+          if (['original', 'left', 'justify'].indexOf(String(value.textAlign)) !== -1) appearance.textAlign = String(value.textAlign);
           // Migrate the previous combined control and preserve its selected scale.
           if (!value.verticalMargin && !value.horizontalMargin && ['8', '16', '24'].indexOf(String(value.margin)) !== -1) {
             appearance.verticalMargin = String(value.margin);
@@ -117,6 +125,10 @@
     el('line-height').value = appearance.lineHeight;
     el('vertical-margin').value = appearance.verticalMargin;
     el('horizontal-margin').value = appearance.horizontalMargin;
+    el('font-family').value = appearance.fontFamily;
+    el('font-weight').value = appearance.fontWeight;
+    el('paragraph-spacing').value = appearance.paragraphSpacing;
+    el('text-align').value = appearance.textAlign;
     updateThemeButtons();
   }
   function saveAppearance() {
@@ -134,7 +146,7 @@
     var theme = THEMES[appearance.theme];
     var scale = Number(appearance.fontScale);
     var line = Number(appearance.lineHeight);
-    return [
+    var rules = [
       ':root { color-scheme: ' + theme.colorScheme + ' !important; font-size: ' + Math.round(scale * 100) + '% !important; background-color: ' + theme.background + ' !important; color: ' + theme.foreground + ' !important; }',
       'html, body { background-color: ' + theme.background + ' !important; color: ' + theme.foreground + ' !important; }',
       'body { line-height: ' + line + ' !important; }',
@@ -142,7 +154,36 @@
       'body, body *:not(img):not(svg):not(video):not(canvas):not(iframe) { color: ' + theme.foreground + ' !important; }',
       'body *:not(img):not(svg):not(video):not(canvas):not(iframe) { background-color: transparent !important; }',
       'img, svg, video, canvas { max-width: 100%; }'
-    ].join('\n');
+    ];
+
+    var fontFamilies = {
+      serif: 'ui-serif, "Songti TC", "Songti SC", "Noto Serif CJK TC", "PMingLiU", serif',
+      sans: '-apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans CJK TC", sans-serif'
+    };
+    if (fontFamilies[appearance.fontFamily]) {
+      rules.push('body, body p, body h1, body h2, body h3, body h4, body h5, body h6, body li, body blockquote, body dd, body dt { font-family: ' + fontFamilies[appearance.fontFamily] + ' !important; }');
+    }
+
+    if (appearance.fontWeight !== 'original') {
+      var weight = appearance.fontWeight === 'medium' ? '500' : '400';
+      rules.push('body p, body li, body blockquote, body dd, body dt { font-weight: ' + weight + ' !important; }');
+    }
+
+    var paragraphSpacing = {
+      compact: '0.4em',
+      standard: '0.8em',
+      loose: '1.2em'
+    };
+    if (paragraphSpacing[appearance.paragraphSpacing]) {
+      rules.push('body p { margin-block-end: ' + paragraphSpacing[appearance.paragraphSpacing] + ' !important; }');
+    }
+
+    if (appearance.textAlign !== 'original') {
+      var alignment = appearance.textAlign === 'justify' ? 'justify' : 'left';
+      rules.push('body p, body li, body blockquote, body dd, body dt { text-align: ' + alignment + ' !important; }');
+    }
+
+    return rules.join('\n');
   }
   function applyDocumentAppearance(doc) {
     if (!doc || !doc.documentElement || !doc.head) return;
@@ -281,6 +322,10 @@
   el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
   el('vertical-margin').addEventListener('change', function (event) { setAppearance('verticalMargin', event.target.value); });
   el('horizontal-margin').addEventListener('change', function (event) { setAppearance('horizontalMargin', event.target.value); });
+  el('font-family').addEventListener('change', function (event) { setAppearance('fontFamily', event.target.value); });
+  el('font-weight').addEventListener('change', function (event) { setAppearance('fontWeight', event.target.value); });
+  el('paragraph-spacing').addEventListener('change', function (event) { setAppearance('paragraphSpacing', event.target.value); });
+  el('text-align').addEventListener('change', function (event) { setAppearance('textAlign', event.target.value); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
     button.addEventListener('click', function () { setAppearance('theme', button.getAttribute('data-theme')); });
   });
