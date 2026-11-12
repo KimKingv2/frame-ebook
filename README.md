@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.5 Local Bookshelf**. The browser now has a functional IndexedDB bookshelf for locally imported EPUB and CBZ books. OpenList, authenticated private-library access and cross-device sync are not connected yet.
+> Current status: **V0.6 Reading Insights + Cloud Library scaffold**. Local reading-time tracking and the reading insights dashboard are deployed. Pages Functions for private OpenList access and D1 sync are in the repository; Cloudflare D1 bindings and private environment variables still need to be configured before cloud login, OpenList browsing and cross-device aggregation become active.
 
 ## Product scope
 
@@ -25,7 +25,9 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 ## Current routes
 
 - `/` — local bookshelf with import, search, sort, recent reading, book details and grid/list views.
-- `/epub-lab/` — EPUB / CBZ Reading Room with per-book progress and appearance settings.
+- `/epub-lab/` — EPUB / CBZ Reading Room with per-book progress, appearance settings and foreground reading-time tracking.
+- `/reading-stats/` — daily goal, reading duration, active days, streaks, calendar, trends, top books, time-of-day preferences and local JSON / CSV export.
+- `/cloud/` — private OpenList directory browser; requires Pages Functions, D1 and server-side credentials to be configured.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
 
@@ -130,7 +132,7 @@ The homepage is a working local library rather than a static design preview.
 - The Reading Room accepts a book ID in its URL, retrieves the original Blob from IndexedDB, and restores the book after a reload.
 - EPUB CFI and CBZ page index are saved against the local book ID. Appearance preferences are stored independently per book in localStorage.
 
-All of this is local to the current browser profile and origin. The original archive is not uploaded to GitHub, Cloudflare or another server. Clearing this site's browser storage, using a different browser profile or changing devices will not carry the local library over. OpenList access, authenticated Worker requests and D1 sync remain future work.
+The bookshelf and reading history work locally in the current browser profile and origin. The original archive is not uploaded to GitHub or Cloudflare. Clearing this site's browser storage, using a different browser profile or changing devices will not carry the local library and unsynced reading events over. V0.6 adds the authenticated Pages Functions and D1/OpenList integration scaffold; the remote side remains inactive until Cloudflare is configured as described in docs/CLOUDFLARE-SETUP.md.
 
 ### Current limitations
 
@@ -138,3 +140,30 @@ All of this is local to the current browser profile and origin. The original arc
 - EPUB metadata extraction currently uses the vendored JSZip parser. Very large EPUB files can temporarily require additional browser memory.
 - CBZ indexing reads the ZIP central directory and one cover image for shelf display; the Reading Room retains its lazy page-image loading behavior.
 - The current test coverage is a synthetic two-chapter EPUB and four-page CBZ demo. Test large personal libraries, unusually large CBZ archives and physical phone/tablet browsers before treating this as production-ready.
+
+
+## V0.6 Reading Insights and Cloud Library
+
+### Reading habits and statistics
+
+The Reading Room starts a local foreground timer for the active book. It counts only while the reader tab is visible and the browser window has focus. Pointer, key, touch and scroll activity refresh a five-minute idle timeout; the timer pauses while the tab is hidden, the window is unfocused or the reader remains idle.
+
+- A heartbeat writes short reading-time segments to IndexedDB. The event ID makes retries safe when uploading to D1.
+- Reading days count after at least 60 seconds, following the public WeChat Reading data definition.
+- The insights page includes weekly / monthly / yearly / all-time views, total time, natural-day average, reading days, current and longest streak, daily target, monthly calendar, reading trends, most-read books, time-of-day distribution and recent reading sessions.
+- Session cards combine adjacent short heartbeat records for the same book and local day.
+- Daily goals are currently stored per browser. Local JSON / CSV exports include local event details; cloud-account export of all remote devices is not included yet.
+
+### Cloud architecture
+
+- The root-level functions directory is the Cloudflare Pages Functions source directory. It is separate from the static pages output directory.
+- /api/auth/* provides password-based private login and a signed HttpOnly, Secure, SameSite=Lax session cookie.
+- /api/cloud/books lists EPUB / CBZ files and folders below the mandatory OPENLIST_ROOT_PATH.
+- /api/cloud/file proxies an authenticated OpenList download and forwards valid HTTP Range requests. The OpenList token and raw download URL remain server-side.
+- /api/reading/events stores unique short reading-time events in D1; duplicate retries do not double-count.
+- /api/reading/stats returns D1 daily totals, streak calendar source data, most-read books, time-of-day totals and recent events.
+- migrations/0001_reading_events.sql creates the D1 tables for reading events and login rate limiting.
+
+The current cloud shelf imports a selected OpenList file through the protected proxy into this browser's IndexedDB. It does not yet mount a remote book directly into Foliate; very large books still download fully into browser storage before opening. The backend proxy is Range-capable so a later reader-loader integration can stream partial requests.
+
+See docs/CLOUDFLARE-SETUP.md before enabling cloud features. Do not paste passwords or API tokens into chat or commit them to Git.
