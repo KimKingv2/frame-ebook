@@ -3,7 +3,7 @@
  * Nothing in this module uploads book content to a remote service.
  */
 const DB_NAME = "frame-reader-library";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "books";
 let databasePromise;
 
@@ -22,6 +22,16 @@ function openDatabase() {
         store.createIndex("addedAt", "addedAt", { unique: false });
         store.createIndex("lastOpenedAt", "lastOpenedAt", { unique: false });
         store.createIndex("title", "title", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("reading_events")) {
+        const events = db.createObjectStore("reading_events", { keyPath: "id" });
+        events.createIndex("dayKey", "dayKey", { unique: false });
+        events.createIndex("bookId", "bookId", { unique: false });
+        events.createIndex("endedAt", "endedAt", { unique: false });
+        events.createIndex("synced", "synced", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("reading_settings")) {
+        db.createObjectStore("reading_settings", { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -255,4 +265,87 @@ async function listBooks() {
     (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
 }
 
-export { openDatabase, importBookFile, getBook, updateBook, deleteBook, listBooks };
+
+
+function localDayKey(timestamp) {
+  const date = new Date(Number(timestamp) || Date.now());
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+async function recordReadingEvent(event) {
+  if (!event || !event.id || !event.dayKey || !event.bookId) throw new Error("閱讀事件缺少必要識別資訊。");
+  const seconds = Math.max(0, Math.min(30, Math.round(Number(event.seconds) || 0)));
+  if (!seconds) return false;
+  const record = {
+    id: String(event.id),
+    dayKey: String(event.dayKey),
+    bookId: String(event.bookId),
+    bookTitle: String(event.bookTitle || "未命名書籍").slice(0, 240),
+    format: String(event.format || "").toUpperCase().slice(0, 8),
+    seconds,
+    startedAt: Number(event.startedAt) || Date.now() - seconds * 1000,
+    endedAt: Number(event.endedAt) || Date.now(),
+    synced: false
+  };
+  const db = await openDatabase();
+  const tx = db.transaction("reading_events", "readwrite");
+  const completed = transactionDone(tx);
+  tx.objectStore("reading_events").put(record);
+  await completed;
+  return record;
+}
+
+async function getReadingEvents(fromDay, toDay) {
+  const db = await openDatabase();
+  const tx = db.transaction("reading_events", "readonly");
+  const index = tx.objectStore("reading_events").index("dayKey");
+  const range = IDBKeyRange.bound(String(fromDay), String(toDay));
+  return requestResult(index.getAll(range));
+}
+
+async function getPendingReadingEvents(limit = 100) {
+  const db = await openDatabase();
+  const tx = db.transaction("reading_events", "readonly");
+  const store = tx.objectStore("reading_events");
+  const index = store.index("synced");
+  const rows = await requestResult(index.getAll(false, Math.max(1, Math.min(500, Number(limit) || 100))));
+  return rows;
+}
+
+async function markReadingEventsSynced(ids) {
+  const list = Array.isArray(ids) ? ids.map(String) : [];
+  if (!list.length) return 0;
+  const db = await openDatabase();
+  const tx = db.transaction("reading_events", "readwrite");
+  const completed = transactionDone(tx);
+  const store = tx.objectStore("reading_events");
+  for (const id of list) {
+    const request = store.get(id);
+    request.onsuccess = () => {
+      if (request.result) store.put(Object.assign({}, request.result, { synced: true }));
+    };
+  }
+  await completed;
+  return list.length;
+}
+
+async function getReadingSetting(key, fallback = null) {
+  const db = await openDatabase();
+  const tx = db.transaction("reading_settings", "readonly");
+  const row = await requestResult(tx.objectStore("reading_settings").get(String(key)));
+  return row ? row.value : fallback;
+}
+
+async function setReadingSetting(key, value) {
+  const db = await openDatabase();
+  const tx = db.transaction("reading_settings", "readwrite");
+  const completed = transactionDone(tx);
+  tx.objectStore("reading_settings").put({ key: String(key), value });
+  await completed;
+  return value;
+}
+
+export { openDatabase, importBookFile, getBook, updateBook, deleteBook, listBooks, localDayKey, recordReadingEvent, getReadingEvents, getPendingReadingEvents, markReadingEventsSynced, getReadingSetting, setReadingSetting };
