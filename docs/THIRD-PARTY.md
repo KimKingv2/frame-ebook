@@ -6,7 +6,8 @@
 - License: MIT
 - Upstream source commit: `78914aef4466eb960965702401634c2cb348e9b1`
 - Original license text: `pages/vendor/foliate-js/LICENSE`
-- EPUB Lab files: `view.js`, `epub.js`, `epubcfi.js`, `progress.js`, `overlayer.js`, `text-walker.js`, `paginator.js`, `fixed-layout.js`.
+- EPUB Lab files: `view.js`, `epub.js`, `epubcfi.js`, `progress.js`, `overlayer.js`, `text-walker.js`, `paginator.js`, `fixed-layout.js`, `comic-book.js`, and `vendor/zip.js`.
+- Zip.js: BSD-3-Clause; license text is included at `pages/vendor/foliate-js/vendor/ZIPJS-LICENSE.txt`. The upstream bundle is pinned through the Foliate.js source snapshot listed above.
 
 ## JSZip
 
