@@ -136,3 +136,20 @@ Regression checks required:
 3. Reload and verify settings persist.
 4. Verify headings retain their authored bold emphasis when body font weight changes.
 5. Verify theme, font scale, line height, both margin controls, TOC and page navigation remain functional.
+
+
+## 2026-11-12 — Typography controls live regression test
+
+Verified on the live desktop browser at `https://frame-ebook.pages.dev/epub-lab/` with the bundled two-chapter demo EPUB.
+
+- Font family: original / serif / sans options were present and selectable.
+- Font weight: original / 400 / 500 options were present and selectable.
+- Paragraph spacing: original / compact / standard / loose options were present and selectable.
+- Text alignment: original / left / justified options were present and selectable.
+- Independent top/bottom and left/right margin controls remained available.
+- Applied a non-default value to each typography control; all selections remained active and the book text stayed visible and readable.
+- Reloaded the page; each typography value persisted independently.
+- Reset all four typography controls to the original-book setting after the test.
+- No reader error message was observed.
+
+The live test confirms control interaction and local persistence. Device-specific typography appearance still requires separate checks on mobile browsers and with books using different publisher styles.
