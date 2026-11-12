@@ -50,10 +50,11 @@ async function login(event) {
     const response=await fetch("/api/auth/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("cloud-password").value})});
     const data=await response.json();
     if(!response.ok)throw new Error(data.error||"登入失敗。");
+    $("cloud-login-error").textContent="";
     $("cloud-password").value="";
     await checkSession();
   }catch(error){
-    $("cloud-browser-status").textContent=error.message||String(error);
+    $("cloud-login-error").textContent=error.message||String(error);
   }finally{button.disabled=false;}
 }
 async function logout() {
@@ -132,6 +133,13 @@ async function importCloudFile(item) {
 $("cloud-login-form").addEventListener("submit",login);
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath));
 $("cloud-root").addEventListener("click",()=>loadDirectory(state.rootPath));
+$("cloud-up").addEventListener("click",()=>{
+  if(state.currentPath===state.rootPath)return;
+  const trimmed=state.currentPath.replace(/\\/+$/,"");
+  const slash=trimmed.lastIndexOf("/");
+  const parent=slash<=0?"/":trimmed.slice(0,slash);
+  loadDirectory(parent==="/"&&state.rootPath!=="/"?state.rootPath:parent);
+});
 $("cloud-logout").addEventListener("click",logout);
 $("cloud-search").addEventListener("input",event=>{state.query=event.target.value||"";renderItems();});
 checkSession();
