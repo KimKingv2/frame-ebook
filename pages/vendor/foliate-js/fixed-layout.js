@@ -304,9 +304,10 @@ export class FixedLayout extends HTMLElement {
     get index() {
         if (this.#flow === 'scrolled') return this.#scrollIndex
         const spread = this.#spreads[this.#index]
-        const section = spread?.center ?? (this.#side === 'left'
+        if (!spread) return -1
+        const section = spread.center ?? (this.#side === 'left'
             ? spread.left ?? spread.right : spread.right ?? spread.left)
-        return this.book.sections.indexOf(section)
+        return section ? this.book.sections.indexOf(section) : -1
     }
     #reportLocation(reason, index = this.index, fraction = 0) {
         const size = this.book?.sections?.[index]?.size ?? 1
