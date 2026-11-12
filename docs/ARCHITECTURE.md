@@ -91,3 +91,16 @@ Use server timestamps and conflict resolution based on the latest valid update. 
 ## Authentication boundary
 
 Never expose a long-lived OpenList administrator token in browser JavaScript. A future Worker should authenticate the reader and issue narrowly scoped, short-lived access to one file or range request. Validate the sign-in flow on desktop, tablet and mobile before enabling private-library access.
+
+
+### Fixed-layout and comic reading
+
+The Reading Room supports CBZ alongside fixed-layout EPUB. CBZ parsing uses the pinned Foliate.js makeBook() entry point, the comic archive adapter and Zip.js. The archive directory is read first; page image blobs are resolved lazily as the reader approaches them.
+
+The fixed-layout renderer has two distinct presentation paths:
+- Paginated mode uses the native spread map. Single-page preference disables spreads; double-page preference pairs pages and lets portrait screens fall back to one page. Image scaling can fit the full page or the available width.
+- Continuous mode builds a vertical page strip and uses an IntersectionObserver to load nearby pages. The current page index is reported back to the shared progress model. On resize, loaded pages are re-scaled to the new reading width.
+
+The UI does not provide a right-to-left override. It leaves the source book's original progression metadata intact. Comic background surfaces (wood desk, linen and slate) are rendered with CSS gradients and texture layers, so no remote images or third-party background assets are required. The background remains outside the page content; it must not tint or reduce contrast in the actual comic artwork.
+
+The four-page demo is generated in the browser from original SVG panels and packed into a temporary CBZ Blob. It exercises CBZ parsing, cover handling, single/double spreads, image fit and the continuous page strip without storing a sample comic archive in the public repository.
