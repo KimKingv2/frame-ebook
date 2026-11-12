@@ -249,3 +249,15 @@ Not yet verified / blocked on configuration:
 - Direct Range-backed loading into Foliate, large-file memory use, and physical phone / tablet verification remain future work.
 
 Use docs/CLOUDFLARE-SETUP.md for the exact D1 binding, migration and Pages secret names. Do not put any password or token in Git.
+
+
+## 2026-11-12 — V0.6 final route and access-control verification
+
+- The deployed /reading-stats/ and /cloud/ static routes were retrieved successfully.
+- The deployed GET /api/auth/session route returned authenticated=false, databaseConfigured=false and openListConfigured=false. This is the expected state before the owner adds the D1 binding and server-side settings.
+- Unauthenticated GET /api/reading/stats and GET /api/cloud/books returned HTTP 401. No private reading aggregates or OpenList directory content were returned.
+- The cloud directory UI now requests 80 items per page and exposes previous / next controls; successful cloud login also attempts to sync pending local reading events.
+- When the session endpoint reports that D1 is not configured, the cloud login button is disabled and the stats page explains that the feature is not enabled yet.
+- A final syntax pass succeeded for the local store, library page, reading tracker, insights page, cloud library, Reading Room adapter and all Pages Functions modules.
+
+Still pending after owner configuration: D1 creation / binding / SQL migration, private login, OpenList real-folder listing, protected download / Range behavior, D1 event writes and cross-device aggregate reads. No end-to-end browser timer test was completed in this run.
