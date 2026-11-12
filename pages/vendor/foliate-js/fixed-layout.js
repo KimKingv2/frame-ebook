@@ -204,6 +204,7 @@ export class FixedLayout extends HTMLElement {
                 display: 'block',
                 flexShrink: '0',
                 marginBlock: 'auto',
+                boxShadow: '0 14px 34px rgba(0, 0, 0, .28)',
             })
             if (portrait && frame !== target) {
                 element.style.display = 'none'
@@ -545,6 +546,7 @@ export class FixedLayout extends HTMLElement {
     destroy() {
         this.#observer.unobserve(this)
         this.#disposeScrollView()
+        this.book?.destroy?.()
         if (this.#scrollFrame) cancelAnimationFrame(this.#scrollFrame)
     }
 }
