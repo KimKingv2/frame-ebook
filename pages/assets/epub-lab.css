@@ -33,6 +33,8 @@ button:disabled { opacity: .38; cursor: default; }
 .appearance-group { min-width: 0; }
 .appearance-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; color: #d8cdeb; font-size: 10px; letter-spacing: .4px; }
 .appearance-group-heading small { color: #746b83; font-size: 7px; letter-spacing: 1.3px; }
+.layout-note { margin: 10px 0 0; color: #777083; font-size: 8px; line-height: 1.7; }
+.setting-control select:disabled { opacity: .45; cursor: not-allowed; }
 .setting-grid { display: grid; gap: 10px 12px; }
 .setting-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .setting-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
