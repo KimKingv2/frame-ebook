@@ -71,7 +71,7 @@ button:disabled { opacity: .38; cursor: default; }
   .intro { padding-top: 27px; }
   .engine-status { width: 100%; margin-left: 0; }
   .appearance-controls { align-items: stretch; gap: 10px; }
-  .setting-control { flex: 1; min-width: calc(33.333% - 8px); }
+  .setting-control { flex: 1 1 calc(50% - 10px); min-width: calc(50% - 10px); }
   .setting-control select { width: 100%; min-width: 0; }
   .theme-control { width: 100%; }
   .theme-buttons { width: 100%; }
@@ -92,7 +92,7 @@ button:disabled { opacity: .38; cursor: default; }
   .appearance-panel { padding: 0 11px; }
   .appearance-summary-note { font-size: 7px; }
   .appearance-controls { gap: 8px; }
-  .setting-control { min-width: calc(33.333% - 6px); }
+  .setting-control { min-width: calc(50% - 6px); }
   .setting-control select { padding: 0 6px; font-size: 9px; }
   .book-progress strong { font-size: 20px; }
   .reader-viewport { min-height: 290px; }
