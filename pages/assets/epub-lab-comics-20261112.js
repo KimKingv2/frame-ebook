@@ -396,6 +396,11 @@
     var metadata = parsedBook.metadata || {};
     currentBookId = bookId || null;
     currentAppearanceKey = currentBookId ? APPEARANCE_KEY + ':' + currentBookId : APPEARANCE_KEY;
+    if (currentBookId) {
+      window.history.replaceState(null, '', '/epub-lab/?book=' + encodeURIComponent(currentBookId));
+    } else {
+      window.history.replaceState(null, '', '/epub-lab/');
+    }
     loadAppearance();
     var libraryStore = await libraryStorePromise;
     var libraryRecord = currentBookId ? await libraryStore.getBook(currentBookId) : null;
