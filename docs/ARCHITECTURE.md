@@ -54,6 +54,7 @@ For reflowable EPUB chapters, the adapter injects a small per-document style she
 
 - Font scale: 90–130%.
 - Line spacing: 1.45–2.0.
+- Typography controls: original / serif / sans family; original / 400 / 500 body weight; original / compact / standard / loose paragraph spacing; original / left / justified alignment.
 - Independent paginator margins: top/bottom margin is 8, 16 or 24 CSS pixels (16 px by default); left/right page gap is 4%, 7% or 10% (7% by default). The adapter must pass a unit-bearing CSS length such as `16px` to Foliate's `margin` attribute and a percentage such as `7%` to `gap`. These settings must remain independent.
 - Paper white, warm sepia and night themes.
 
