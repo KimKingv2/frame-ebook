@@ -34,12 +34,14 @@ function formatDuration(seconds) {
   const total=Math.max(0,Math.floor(Number(seconds)||0));
   const hours=Math.floor(total/3600), minutes=Math.floor((total%3600)/60);
   if(hours) return hours+" 小時 "+minutes+" 分鐘";
-  return minutes+" 分鐘";
+  if(total>=60) return minutes+" 分鐘";
+  return total>0?total+" 秒":"0 分鐘";
 }
 function formatShort(seconds) {
   const total=Math.max(0,Math.floor(Number(seconds)||0));
   const h=Math.floor(total/3600),m=Math.floor((total%3600)/60);
-  return h ? h+"小時"+(m?m+"分":"") : m+"分鐘";
+  if(h)return h+"小時"+(m?m+"分":"");
+  return total>=60?m+"分鐘":(total>0?total+"秒":"0分");
 }
 function localSummary(events) {
   const daySeconds={},bookSeconds={},bookTitles={},timeBands=[0,0,0,0],rawSessions=[];
