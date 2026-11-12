@@ -10,7 +10,14 @@
   var restoreCfi = null;
   var restorePageIndex = null;
   var restoring = false;
+  var currentBookId = null;
+  var currentAppearanceKey = null;
+  var progressSaveTimer = null;
+  var pendingProgress = null;
+  var pendingProgressBookId = null;
+  var libraryStorePromise = import('/assets/library-store.js');
   var APPEARANCE_KEY = 'frame-reader-appearance-v1';
+  currentAppearanceKey = APPEARANCE_KEY;
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
     sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
@@ -73,22 +80,62 @@
     });
     select.disabled = false;
   }
+  async function flushLibraryProgress() {
+    if (progressSaveTimer) {
+      clearTimeout(progressSaveTimer);
+      progressSaveTimer = null;
+    }
+    if (!pendingProgress || !pendingProgressBookId) return;
+    var bookId = pendingProgressBookId;
+    var patch = pendingProgress;
+    pendingProgress = null;
+    pendingProgressBookId = null;
+    try {
+      var store = await libraryStorePromise;
+      var book = await store.getBook(bookId);
+      if (book) {
+        await store.updateBook(bookId, {
+          progress: Object.assign({}, book.progress || {}, patch),
+          lastOpenedAt: Date.now()
+        });
+      }
+    } catch (error) {
+      console.warn('FRAME Reader could not save local progress:', error);
+    }
+  }
+  function queueLibraryProgress(patch) {
+    if (!currentBookId) return;
+    pendingProgressBookId = currentBookId;
+    pendingProgress = Object.assign({}, pendingProgress || {}, patch);
+    if (progressSaveTimer) clearTimeout(progressSaveTimer);
+    progressSaveTimer = setTimeout(function () {
+      flushLibraryProgress();
+    }, 350);
+  }
   function updateLocation(detail) {
     if (!detail) return;
+    var progressPatch = {};
     if (typeof detail.fraction === 'number' && isFinite(detail.fraction)) {
       var percent = Math.max(0, Math.min(100, Math.round(detail.fraction * 100)));
       setText('progress-percent', percent + '%');
       var section = detail.section;
-      if (section && section.total) setText('progress-detail', '章節 ' + (section.current + 1) + ' / ' + section.total);
-      else setText('progress-detail', '閱讀位置已更新');
+      var label = section && section.total
+        ? '章節 ' + (section.current + 1) + ' / ' + section.total
+        : (typeof detail.index === 'number' ? '第 ' + (detail.index + 1) + ' 頁' : '閱讀位置已更新');
+      setText('progress-detail', label);
+      progressPatch.percent = percent;
+      progressPatch.label = label;
     }
     if (detail.cfi && currentStorageKey && !restoring) {
       if (safeSet(currentStorageKey, detail.cfi)) setText('reader-status', '閱讀位置已保存在這台設備。跨設備同步尚未啟用。');
       else setText('reader-status', '瀏覽器不允許保存本機閱讀位置。');
+      progressPatch.cfi = detail.cfi;
     }
     if (typeof detail.index === 'number' && currentIndexStorageKey && !restoring) {
       safeSet(currentIndexStorageKey, String(detail.index));
+      progressPatch.index = detail.index;
     }
+    if (Object.keys(progressPatch).length) queueLibraryProgress(progressPatch);
   }
   function makeLoader(zip) {
     return {
@@ -110,7 +157,7 @@
     };
   }
   function loadAppearance() {
-    var saved = safeGet(APPEARANCE_KEY);
+    var saved = safeGet(currentAppearanceKey || APPEARANCE_KEY);
     if (saved) {
       try {
         var value = JSON.parse(saved);
@@ -156,7 +203,7 @@
     updateLayoutControlState();
   }
   function saveAppearance() {
-    var ok = safeSet(APPEARANCE_KEY, JSON.stringify(appearance));
+    var ok = safeSet(currentAppearanceKey || APPEARANCE_KEY, JSON.stringify(appearance));
     setText('appearance-status', ok
       ? '外觀設定已保存在這台設備；其他設備尚未同步。'
       : '瀏覽器未允許本機儲存，這次設定不會保留。');
@@ -306,7 +353,8 @@
     applyAppearance();
     updateLayoutControlState();
   }
-  async function openEpub(source, name) {
+  async function openEpub(source, name, bookId) {
+    await flushLibraryProgress();
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
     setText('reader-status', '正在讀取書籍封裝與目錄……');
     setText('engine-status', '正在解析書籍');
@@ -340,18 +388,31 @@
     parsedBook = view.book;
 
     var metadata = parsedBook.metadata || {};
-    var identifier = metadata.identifier || name || 'sample';
+    currentBookId = bookId || null;
+    currentAppearanceKey = currentBookId ? APPEARANCE_KEY + ':' + currentBookId : APPEARANCE_KEY;
+    loadAppearance();
+    var libraryStore = await libraryStorePromise;
+    var libraryRecord = currentBookId ? await libraryStore.getBook(currentBookId) : null;
+    var identifier = currentBookId || metadata.identifier || name || 'sample';
     currentStorageKey = view.isFixedLayout ? null : 'frame-reader-epub-cfi:' + String(identifier);
     currentIndexStorageKey = view.isFixedLayout
       ? 'frame-reader-fixed-index:' + String(identifier)
-      : null;
+      : 'frame-reader-fixed-index:' + String(identifier);
     restoreCfi = currentStorageKey ? safeGet(currentStorageKey) : null;
     var storedIndex = currentIndexStorageKey ? Number(safeGet(currentIndexStorageKey)) : NaN;
+    var savedProgress = libraryRecord && libraryRecord.progress ? libraryRecord.progress : {};
+    if (!restoreCfi && !view.isFixedLayout && savedProgress.cfi) restoreCfi = savedProgress.cfi;
+    if ((!Number.isInteger(storedIndex) || storedIndex < 0) && Number.isInteger(savedProgress.index)) {
+      storedIndex = savedProgress.index;
+    }
     restorePageIndex = Number.isInteger(storedIndex) && storedIndex >= 0 ? storedIndex : null;
     restoring = !!restoreCfi || restorePageIndex !== null;
-    setText('book-title', titleText(metadata.title) || name);
-    setText('book-author', titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : (name || 'EPUB 測試書')));
+    setText('book-title', (libraryRecord && libraryRecord.title) || titleText(metadata.title) || name);
+    setText('book-author', (libraryRecord && libraryRecord.author) || titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : (name || 'EPUB 測試書')));
     populateTOC(parsedBook.toc || []);
+    if (libraryRecord) {
+      await libraryStore.updateBook(currentBookId, { lastOpenedAt: Date.now() });
+    }
 
     if (view.isFixedLayout) {
       if (typeof view.renderer.setPageLayout === 'function') {
@@ -486,10 +547,14 @@
   el('epub-file').addEventListener('change', function (event) {
     var file = event.target.files && event.target.files[0];
     if (!file) return;
-    openEpub(file, file.name).then(function () {
-      setText('engine-status', '本機 EPUB 已載入');
-    }).catch(function (error) {
-      setText('engine-status', '解析失敗');
+    (async function () {
+      var store = await libraryStorePromise;
+      var record = await store.importBookFile(file);
+      await openEpub(file, file.name, record.id);
+      setText('engine-status', '本機書籍已加入書架');
+      setText('reader-status', '已加入本機書架。檔案與閱讀記錄只保存在這台設備。');
+    }()).catch(function (error) {
+      setText('engine-status', '解析或匯入失敗');
       setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
       console.error(error);
     });
@@ -504,12 +569,20 @@
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
   setText('engine-status', featureSummary());
-  import('/vendor/foliate-js/view.js').then(function () {
+  import('/vendor/foliate-js/view.js').then(async function () {
     setText('engine-status', featureSummary() + ' · Foliate ready');
-    loadDemo();
+    var bookId = new URLSearchParams(window.location.search).get('book');
+    if (bookId) {
+      var store = await libraryStorePromise;
+      var record = await store.getBook(bookId);
+      if (!record || !record.blob) throw new Error('找不到這本本機書籍。請回到書架確認檔案是否仍存在。');
+      await openEpub(record.blob, record.fileName, record.id);
+    } else {
+      loadDemo();
+    }
   }).catch(function (error) {
-    setText('engine-status', '閱讀引擎無法載入');
-    setText('reader-status', '瀏覽器相容性錯誤：' + (error && error.message ? error.message : String(error)));
+    setText('engine-status', '書籍或閱讀引擎載入失敗');
+    setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
     console.error(error);
   });
 }());
