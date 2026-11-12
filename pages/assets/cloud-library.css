@@ -56,3 +56,9 @@
  .cloud-item-actions { grid-column:2; justify-content:flex-start; }
  .cloud-item-icon { width:30px; height:32px; }
 }
+
+
+.cloud-pagination { display:flex; align-items:center; justify-content:center; gap:12px; margin:14px 0 4px; }
+.cloud-pagination button { min-height:31px; padding:0 12px; border-color:rgba(205,188,239,.15); color:#c2b5d7; background:rgba(36,30,48,.65); font-size:8px; }
+.cloud-pagination button:disabled { opacity:.35; cursor:default; }
+.cloud-pagination span { min-width:90px; color:#8f859a; text-align:center; font-size:8px; }
