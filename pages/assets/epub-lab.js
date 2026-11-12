@@ -23,6 +23,8 @@
     fontWeight: 'original',
     paragraphSpacing: 'original',
     textAlign: 'original',
+    readingMode: 'paginated',
+    pageLayout: '2',
     theme: 'paper'
   };
   var el = function (id) { return document.getElementById(id); };
@@ -112,6 +114,8 @@
           if (['original', 'normal', 'medium'].indexOf(String(value.fontWeight)) !== -1) appearance.fontWeight = String(value.fontWeight);
           if (['original', 'compact', 'standard', 'loose'].indexOf(String(value.paragraphSpacing)) !== -1) appearance.paragraphSpacing = String(value.paragraphSpacing);
           if (['original', 'left', 'justify'].indexOf(String(value.textAlign)) !== -1) appearance.textAlign = String(value.textAlign);
+          if (['paginated', 'scrolled'].indexOf(String(value.readingMode)) !== -1) appearance.readingMode = String(value.readingMode);
+          if (['1', '2'].indexOf(String(value.pageLayout)) !== -1) appearance.pageLayout = String(value.pageLayout);
           // Migrate the previous combined control and preserve its selected scale.
           if (!value.verticalMargin && !value.horizontalMargin && ['8', '16', '24'].indexOf(String(value.margin)) !== -1) {
             appearance.verticalMargin = String(value.margin);
@@ -129,7 +133,10 @@
     el('font-weight').value = appearance.fontWeight;
     el('paragraph-spacing').value = appearance.paragraphSpacing;
     el('text-align').value = appearance.textAlign;
+    el('reading-mode').value = appearance.readingMode;
+    el('page-layout').value = appearance.pageLayout;
     updateThemeButtons();
+    updateLayoutControlState();
   }
   function saveAppearance() {
     var ok = safeSet(APPEARANCE_KEY, JSON.stringify(appearance));
@@ -195,6 +202,25 @@
     }
     style.textContent = documentStyleText();
   }
+  function updateReadingModeNote() {
+    var note = el('reading-mode-note');
+    if (!note) return;
+    if (view && view.isFixedLayout) {
+      note.textContent = '固定版面 EPUB 沿用書籍原生的頁面與跨頁設定。';
+    } else if (appearance.readingMode === 'scrolled') {
+      note.textContent = '連續捲動模式；頁面欄數與上下留白會在切回分頁時恢復。';
+    } else if (appearance.pageLayout === '2') {
+      note.textContent = '雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。';
+    } else {
+      note.textContent = '單頁翻頁模式，適合窄螢幕或逐頁專注閱讀。';
+    }
+  }
+  function updateLayoutControlState() {
+    var fixed = !!(view && view.isFixedLayout);
+    el('reading-mode').disabled = fixed;
+    el('page-layout').disabled = fixed;
+    updateReadingModeNote();
+  }
   function applyAppearance() {
     var theme = THEMES[appearance.theme];
     var viewport = el('reader-viewport');
@@ -212,6 +238,12 @@
       // vertical margin and a percentage for horizontal page gap.
       view.renderer.setAttribute('margin', appearance.verticalMargin + 'px');
       view.renderer.setAttribute('gap', appearance.horizontalMargin + '%');
+      if (appearance.readingMode === 'scrolled') {
+        view.renderer.setAttribute('flow', 'scrolled');
+      } else {
+        view.renderer.removeAttribute('flow');
+      }
+      view.renderer.setAttribute('max-column-count', appearance.pageLayout);
       try {
         view.renderer.getContents().forEach(function (item) {
           applyDocumentAppearance(item.doc);
@@ -222,11 +254,13 @@
       }
     }
     updateThemeButtons();
+    updateReadingModeNote();
   }
   function setAppearance(name, value) {
     appearance[name] = String(value);
     saveAppearance();
     applyAppearance();
+    updateLayoutControlState();
   }
   async function openEpub(source, name) {
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
@@ -286,6 +320,7 @@
     }
     restoring = false;
     restoreCfi = null;
+    updateLayoutControlState();
     applyAppearance();
     el('prev-page').disabled = false;
     el('next-page').disabled = false;
@@ -326,6 +361,8 @@
   el('font-weight').addEventListener('change', function (event) { setAppearance('fontWeight', event.target.value); });
   el('paragraph-spacing').addEventListener('change', function (event) { setAppearance('paragraphSpacing', event.target.value); });
   el('text-align').addEventListener('change', function (event) { setAppearance('textAlign', event.target.value); });
+  el('reading-mode').addEventListener('change', function (event) { setAppearance('readingMode', event.target.value); });
+  el('page-layout').addEventListener('change', function (event) { setAppearance('pageLayout', event.target.value); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
     button.addEventListener('click', function () { setAppearance('theme', button.getAttribute('data-theme')); });
   });
