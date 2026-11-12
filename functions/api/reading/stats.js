@@ -47,7 +47,7 @@ export async function onRequestGet({ request, env }) {
       db.prepare(
         "SELECT book_id AS bookId, book_title AS bookTitle, format, day_key AS dayKey, " +
         "seconds, started_at AS startedAt, ended_at AS endedAt " +
-        "FROM reading_events WHERE day_key BETWEEN ? AND ? ORDER BY ended_at DESC LIMIT 12"
+        "FROM reading_events WHERE day_key BETWEEN ? AND ? ORDER BY ended_at DESC LIMIT 200"
       ).bind(from, to).all()
     ]);
     const days = daysResult.results || [];
