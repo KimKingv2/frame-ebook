@@ -135,3 +135,50 @@ The fixed-layout renderer has two distinct presentation paths:
 The UI does not provide a right-to-left override. It leaves the source book's original progression metadata intact. Comic background surfaces (wood desk, linen and slate) are rendered with CSS gradients and texture layers, so no remote images or third-party background assets are required. The background remains outside the page content; it must not tint or reduce contrast in the actual comic artwork.
 
 The four-page demo is generated in the browser from original SVG panels and packed into a CBZ Blob. When the user chooses the demo, it is imported into the local IndexedDB bookshelf like any other book. No sample comic archive is committed to the public repository.
+
+
+## V0.6 — Reading Insights and Cloud Library
+
+### Foreground reading timer
+
+The Reading Room starts the timer only after the Foliate view is initialized. The timer uses a 15-second heartbeat and records short event rows in the IndexedDB reading_events store. An event includes a stable event ID, local day key, local hour, book ID/title/format, seconds, and start/end timestamps.
+
+Activity from pointer, key, wheel, touch and reader scrolling refreshes a five-minute idle deadline. The timer also requires the document to be visible and the browser window to have focus. Hidden tabs and blurred windows pause the clock. Each segment is split at local midnight so daily totals do not spill into the wrong day.
+
+Adjacent heartbeat rows for the same book and local day are merged into a reading session for the recent-session UI. The underlying short rows stay separate for idempotent upload and reliable daily aggregation.
+
+Reading-day counting uses a threshold of at least 60 seconds per local day, matching the public WeChat Reading data definition. Daily goal preference (default 30 minutes) remains local to each browser for now.
+
+### Reading insights data
+
+The /reading-stats/ route summarizes the local IndexedDB event store and offers weekly, monthly, yearly and all-time ranges. It renders total duration, natural-day average, reading days, books opened, a current/best streak, the daily goal ring, calendar heatmap, reading trend, top books, time-of-day distribution and recent reading sessions. Local JSON / CSV exports contain local browser event details.
+
+When signed in, the page attempts to read the same aggregates from D1. The server returns daily totals, all-time daily totals for streaks, a distinct book count, top books, local-hour bands and recent events. The D1 data takes precedence for the selected period; unsynced / offline events remain in IndexedDB until upload succeeds.
+
+### D1 event sync
+
+The reading tracker batches up to 100 pending local events to POST /api/reading/events. Each D1 row uses event_id as the primary key and INSERT OR IGNORE so retrying a batch cannot double-count an event. The endpoint checks the signed session and same-origin POST, validates a small maximum duration per event, and stores no book file content.
+
+The /api/reading/stats endpoint is read-only and returns aggregate statistics for the requested day range. The database migration is migrations/0001_reading_events.sql.
+
+### Pages Functions and OpenList trust boundary
+
+Cloudflare Pages serves static content from pages/, but the Pages Functions source directory is at the repository root as /functions/. The file-based routes are:
+
+- POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout.
+- GET /api/cloud/books?path=... for a directory listing.
+- GET /api/cloud/file?path=... for a protected file download with Range forwarding.
+- POST /api/reading/events and GET /api/reading/stats.
+
+The session cookie is named __Host-frame-reader and is signed with HMAC using FRAME_READER_SESSION_SECRET. It is Secure, HttpOnly and SameSite=Lax. Login checks FRAME_READER_ACCESS_PASSWORD and applies a D1-backed per-IP rate limit. The intended deployment is one private library owner, not public multi-user authentication.
+
+OpenList configuration is read only from the Pages Function environment: OPENLIST_BASE_URL, OPENLIST_TOKEN and OPENLIST_ROOT_PATH. OPENLIST_ROOT_PATH is required and all requested paths are normalized and constrained to this directory. The token is sent in the Authorization header to OpenList. It is never returned to frontend code.
+
+The OpenList directory endpoint uses /api/fs/list. The file endpoint first calls /api/fs/get server-side to resolve raw_url, then streams the upstream body through the Pages Function and forwards valid Range requests and relevant response headers. Neither raw_url nor the OpenList token is exposed in the browser response.
+
+The cloud shelf currently downloads a selected file through this protected proxy into IndexedDB before opening it. The proxy supports Range, but the Foliate loader is not yet adapted to consume remote HTTP ranges directly. Large EPUBs therefore still incur full-download memory / storage cost in the browser.
+
+### Required deployment configuration
+
+Before private cloud features work, bind a D1 database as FRAME_READER_DB, apply migrations/0001_reading_events.sql, and configure the five environment variables/secrets described in docs/CLOUDFLARE-SETUP.md. Until then, /api/auth/session correctly reports that the database and OpenList are not configured. Local reading history remains available without those bindings.
+
