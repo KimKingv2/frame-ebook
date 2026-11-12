@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#12101a">
+  <title>雲端書庫 · FRAME Reader</title>
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/cloud-library.css">
+</head>
+<body>
+  <main class="shell cloud-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="FRAME Reader 首頁">
+        <span class="brand-mark">F</span>
+        <span class="brand-name">FRAME <b>READER</b><small>PRIVATE CLOUD LIBRARY</small></span>
+      </a>
+      <nav class="main-nav" aria-label="主要導覽">
+        <a href="/">我的書架</a>
+        <a href="/reading-stats/">閱讀時光</a>
+        <a class="active" href="/cloud/">雲端書庫</a>
+      </nav>
+      <span class="edition"><span class="edition-dot"></span> OPENLIST · PRIVATE</span>
+    </header>
+
+    <section class="cloud-hero">
+      <p class="eyebrow"><span class="eyebrow-line"></span> YOUR BOOKS, WHERE YOU KEEP THEM</p>
+      <h1>把私人書庫，<br><em>接回自己的閱讀室。</em></h1>
+      <p>透過 Cloudflare Worker／Pages Functions 安全連接 OpenList。你的 OpenList Token 只留在伺服器端，不會交給瀏覽器。</p>
+    </section>
+
+    <section id="cloud-login-panel" class="cloud-auth-panel">
+      <div class="cloud-auth-symbol">⌂</div>
+      <div class="cloud-auth-copy">
+        <p class="section-kicker">PRIVATE ACCESS</p>
+        <h2>登入你的雲端書庫</h2>
+        <p>使用你在 Cloudflare Pages Secrets 設定的 FRAME Reader 私人密碼。這不是 OpenList 密碼。</p>
+      </div>
+      <form id="cloud-login-form">
+        <label for="cloud-password">FRAME Reader 私人密碼</label>
+        <div class="cloud-password-row">
+          <input id="cloud-password" type="password" autocomplete="current-password" placeholder="輸入私人密碼" required>
+          <button class="primary-link" type="submit">登入 <span>↗</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section id="cloud-browser" class="cloud-browser" hidden>
+      <div class="cloud-browser-heading">
+        <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端書庫</h2></div>
+        <div class="cloud-browser-actions">
+          <span id="cloud-connection-status" class="cloud-status-pill">連線中</span>
+          <button id="cloud-refresh" class="quiet-button" type="button">重新整理</button>
+          <button id="cloud-logout" class="quiet-button" type="button">登出</button>
+        </div>
+      </div>
+      <div class="cloud-path-bar">
+        <button id="cloud-root" type="button" aria-label="回到書庫根目錄">⌂</button>
+        <span id="cloud-breadcrumb">正在讀取目錄……</span>
+      </div>
+      <div class="cloud-list-toolbar">
+        <label for="cloud-search"><span>⌕</span><input id="cloud-search" type="search" placeholder="搜尋這個資料夾中的書籍"></label>
+        <span id="cloud-item-count">0 個項目</span>
+      </div>
+      <div id="cloud-items" class="cloud-items"></div>
+      <div id="cloud-empty" class="cloud-empty" hidden>
+        <div>✧</div><strong>這個資料夾還沒有 EPUB 或 CBZ</strong><p>你可以切換其他資料夾，或在 OpenList 中整理書籍。</p>
+      </div>
+      <p id="cloud-browser-status" class="cloud-browser-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="cloud-security-note">
+      <span>✦</span>
+      <div><strong>密鑰在伺服器，書籍在你的雲端。</strong><p>本頁只呼叫同源的 /api/cloud/* 路由。OpenList Token 不會出現在 JavaScript、URL 或瀏覽器儲存空間。加入本機書架時，書檔會經由受保護的下載代理讀入目前瀏覽器的 IndexedDB。</p></div>
+    </section>
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
+  </main>
+  <script type="module" src="/assets/cloud-library.js"></script>
+</body>
+</html>
