@@ -311,7 +311,11 @@ export class FixedLayout extends HTMLElement {
         return section ? this.book.sections.indexOf(section) : -1
     }
     #reportLocation(reason, index = this.index, fraction = 0) {
-        const size = this.book?.sections?.[index]?.size ?? 1
+        // SectionProgress treats size as the fraction of a page covered by this
+        // location update, not as the image's byte size. A page turn advances
+        // by one full image; continuous scrolling reports only its in-page
+        // fraction.
+        const size = reason === 'page' ? 1 : 0
         this.dispatchEvent(new CustomEvent('relocate', { detail:
             { reason, range: null, index, fraction, size } }))
     }
