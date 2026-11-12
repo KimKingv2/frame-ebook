@@ -11,6 +11,7 @@ let lastActivityAt = 0;
 let tickWasActive = false;
 let syncing = false;
 let cloudBackoffUntil = 0;
+let sessionSeconds = 0;
 
 function isForegroundActive(now = Date.now()) {
   return !!activeBook &&
@@ -84,7 +85,13 @@ function tick(now = Date.now()) {
   if (!activeBook) return;
   if (tickWasActive && lastTickAt > 0) {
     const elapsed = Math.min(now - lastTickAt, HEARTBEAT_MS * 2);
-    if (elapsed > 0) persistInterval(lastTickAt, now);
+    if (elapsed > 0) {
+      sessionSeconds += Math.round(elapsed / 1000);
+      persistInterval(lastTickAt, now);
+      window.dispatchEvent(new CustomEvent("frame-reader-reading-time", {
+        detail: { seconds: sessionSeconds, bookId: activeBook.id, title: activeBook.title }
+      }));
+    }
   }
   lastTickAt = now;
   tickWasActive = isForegroundActive(now);
@@ -150,6 +157,7 @@ async function start(book) {
     title: String(book && book.title || "未命名書籍").slice(0, 240),
     format: String(book && book.format || "EPUB").toUpperCase()
   };
+  sessionSeconds = 0;
   const now = Date.now();
   lastTickAt = now;
   lastActivityAt = now;
@@ -168,6 +176,7 @@ async function stop() {
   detachListeners();
   activeBook = null;
   lastTickAt = 0;
+  window.dispatchEvent(new CustomEvent("frame-reader-reading-time", { detail: { stopped: true, seconds: sessionSeconds } }));
   await syncPending();
 }
 
