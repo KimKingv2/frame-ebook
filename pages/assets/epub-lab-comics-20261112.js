@@ -16,6 +16,7 @@
   var pendingProgress = null;
   var pendingProgressBookId = null;
   var libraryStorePromise = import('/assets/library-store.js');
+  var readingTrackerPromise = import('/assets/reading-tracker.js');
   var APPEARANCE_KEY = 'frame-reader-appearance-v1';
   currentAppearanceKey = APPEARANCE_KEY;
   var THEMES = {
@@ -361,6 +362,7 @@
   }
   async function openEpub(source, name, bookId) {
     await flushLibraryProgress();
+    await readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
     setText('reader-status', '正在讀取書籍封裝與目錄……');
     setText('engine-status', '正在解析書籍');
@@ -394,7 +396,7 @@
     parsedBook = view.book;
 
     var metadata = parsedBook.metadata || {};
-    currentBookId = bookId || null;
+    currentBookId = bookId || ('standalone:' + String(name || 'untitled'));
     currentAppearanceKey = currentBookId ? APPEARANCE_KEY + ':' + currentBookId : APPEARANCE_KEY;
     if (currentBookId) {
       window.history.replaceState(null, '', '/epub-lab/?book=' + encodeURIComponent(currentBookId));
@@ -472,6 +474,10 @@
     setText('engine-status', isCbz
       ? 'CBZ 漫畫閱讀引擎已就緒'
       : (view.isFixedLayout ? '固定版面 EPUB 已載入' : 'EPUB 閱讀引擎已就緒'));
+    var trackerTitle = (libraryRecord && libraryRecord.title) || titleText(metadata.title) || name || '未命名書籍';
+    await readingTrackerPromise.then(function (tracker) {
+      return tracker.start({ id: currentBookId, title: trackerTitle, format: isCbz ? 'CBZ' : 'EPUB' });
+    });
   }
   async function loadComicDemo() {
     try {
@@ -581,7 +587,10 @@
   el('toc-select').addEventListener('change', function (event) {
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
-  window.addEventListener('pagehide', function () { flushLibraryProgress(); });
+  window.addEventListener('pagehide', function () {
+    flushLibraryProgress();
+    readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
+  });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) flushLibraryProgress();
   });
