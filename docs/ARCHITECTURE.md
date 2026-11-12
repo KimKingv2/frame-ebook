@@ -56,6 +56,9 @@ For reflowable EPUB chapters, the adapter injects a small per-document style she
 - Line spacing: 1.45–2.0.
 - Typography controls: original / serif / sans family; original / 400 / 500 body weight; original / compact / standard / loose paragraph spacing; original / left / justified alignment.
 - Independent paginator margins: top/bottom margin is 8, 16 or 24 CSS pixels (16 px by default); left/right page gap is 4%, 7% or 10% (7% by default). The adapter must pass a unit-bearing CSS length such as `16px` to Foliate's `margin` attribute and a percentage such as `7%` to `gap`. These settings must remain independent.
+- Reading flow: the reflowable paginator uses its native `flow="scrolled"` attribute for continuous scroll; removing the attribute restores paginated mode.
+- Page columns: `max-column-count` controls one or two columns. The pinned Foliate paginator's container query reduces the spread to one column in portrait orientation, even when two columns are preferred.
+- Fixed-layout EPUBs use Foliate's separate fixed-layout renderer and retain the book's native spread and progression direction; flow and column controls are disabled for them.
 - Paper white, warm sepia and night themes.
 
 Settings are validated against a fixed allow-list and stored locally under `frame-reader-appearance-v1`. Fixed-layout EPUBs keep their authored layout rather than having text styling forced on them.
