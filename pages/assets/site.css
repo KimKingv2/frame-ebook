@@ -314,7 +314,7 @@ a { color: inherit; }
 .secondary-import-button span { color:#c6b0ed; font-size:16px; }
 .secondary-import-button:disabled,.category-add-button:disabled { opacity:.5; cursor:wait; }
 
-.library-shelf-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:stretch; }
+.library-shelf-columns { display:grid; grid-template-columns:1fr; gap:24px; align-items:stretch; }
 .library-category-shelf {
   min-width:0; padding:19px 18px 17px; border:1px solid rgba(205,188,239,.13);
   border-radius:12px; background:
