@@ -1,4 +1,4 @@
-import { json, isAuthenticated, getOpenListProfiles, getOpenListRootPath } from "../../_lib/common.js";
+import { json, isAuthenticated, getOpenListProfiles, getOpenListRootPaths } from "../../_lib/common.js";
 
 export async function onRequestGet({ request, env }) {
   const authenticated = await isAuthenticated(request, env);
@@ -8,7 +8,7 @@ export async function onRequestGet({ request, env }) {
     authenticated,
     openListConfigured: anyServerProfileConfigured,
     openListProfiles: profiles,
-    rootPath: authenticated ? getOpenListRootPath(env) : null,
+    rootPaths: authenticated ? getOpenListRootPaths(env) : null,
     databaseConfigured: !!(env.FRAME_READER_DB || env.DB)
   });
 }
