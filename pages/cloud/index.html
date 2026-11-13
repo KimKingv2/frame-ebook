@@ -27,7 +27,7 @@
     <section class="cloud-hero">
       <p class="eyebrow"><span class="eyebrow-line"></span> YOUR BOOKS, WHERE YOU KEEP THEM</p>
       <h1>把私人書庫，<br><em>接回自己的閱讀室。</em></h1>
-      <p>透過 Cloudflare Worker／Pages Functions 安全連接 OpenList。你的 OpenList Token 只留在伺服器端，不會交給瀏覽器。</p>
+      <p>以四路來源連接私人 OpenList：VPS Alist、OpenList Worker、Mobile Device Alist，或目前裝置直連區域網路 OpenList。伺服器端 Token 不會交給瀏覽器。</p>
     </section>
 
     <section id="cloud-login-panel" class="cloud-auth-panel">
@@ -48,10 +48,40 @@
     </section>
 
     <section id="cloud-browser" class="cloud-browser" hidden>
+      <section class="cloud-connection-panel" aria-label="四路 OpenList 連線設定">
+        <div class="cloud-connection-heading">
+          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源共用相同的雲端目錄結構。登入後不會自動連線，只有按下測試按鈕才會讀取目錄。</p></div>
+          <span id="cloud-connection-status" class="cloud-status-pill">尚未測試</span>
+        </div>
+        <div class="cloud-provider-select">
+          <label for="cloud-provider">目前使用的書庫來源</label>
+          <select id="cloud-provider">
+            <option value="vps">VPS Alist（伺服器端）</option>
+            <option value="worker">OpenList Worker（伺服器端）</option>
+            <option value="mobile">Mobile Device Alist（伺服器端）</option>
+            <option value="local">區域網路 OpenList（裝置直連）</option>
+          </select>
+        </div>
+        <div class="cloud-provider-grid">
+          <article class="cloud-provider-card"><div><strong>VPS Alist</strong><span>SERVER PROXY</span></div><p id="cloud-vps-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_VPS_API_BASE_URL</code><br>Pages Secret：<code>ALIST_VPS_API_TOKEN</code></small></article>
+          <article class="cloud-provider-card"><div><strong>OpenList Worker</strong><span>SERVER PROXY</span></div><p id="cloud-worker-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_WORKER_API_BASE_URL</code><br>Pages Secret：<code>ALIST_WORKER_API_TOKEN</code></small></article>
+          <article class="cloud-provider-card"><div><strong>Mobile Device Alist</strong><span>SERVER PROXY</span></div><p id="cloud-mobile-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_MOBILE_DEVICE_API_BASE_URL</code><br>Pages Secret：<code>ALIST_MOBILE_DEVICE_API_TOKEN</code></small></article>
+          <article class="cloud-provider-card cloud-provider-local"><div><strong>區域網路 OpenList</strong><span>DEVICE DIRECT</span></div>
+            <label for="cloud-local-url">本機 OpenList API 網址</label><input id="cloud-local-url" type="url" placeholder="http://192.168.31.185:5244" autocomplete="off" spellcheck="false">
+            <label for="cloud-local-token">本機 OpenList API Token</label><input id="cloud-local-token" type="password" placeholder="只保存在目前裝置" autocomplete="new-password" spellcheck="false">
+            <small>網址與 Token 只保存在這台裝置的瀏覽器。請使用唯讀 Token；HTTP 僅適合可信任的 LAN／已加密 VPN。</small>
+          </article>
+        </div>
+        <div class="cloud-connection-actions">
+          <button id="cloud-save-source" class="quiet-button" type="button">保存來源設定</button>
+          <button id="cloud-test-source" class="primary-link" type="button">測試目前來源並讀取書庫 <span>↗</span></button>
+        </div>
+        <p id="cloud-source-status" class="cloud-source-status" role="status">尚未連線。請選擇來源並點擊測試。</p>
+      </section>
       <div class="cloud-browser-heading">
         <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端書庫</h2></div>
         <div class="cloud-browser-actions">
-          <span id="cloud-connection-status" class="cloud-status-pill">連線中</span>
+          
           <button id="cloud-refresh" class="quiet-button" type="button">重新整理</button>
           <button id="cloud-logout" class="quiet-button" type="button">登出</button>
         </div>
