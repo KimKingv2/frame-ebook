@@ -146,7 +146,7 @@ The bookshelf and reading history work locally in the current browser profile an
 
 ### Four-source OpenList access
 
-The private cloud library offers four read-only connection profiles: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are called by Pages Functions with separate server-side Variables / Secrets. The LAN profile stores its URL and Token only in the current browser and sends requests directly to that LAN host. All profiles share the same OPENLIST_ROOT_PATH boundary. The page waits for an explicit connection test before requesting a directory.
+The private cloud library offers four read-only connection profiles: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are called by Pages Functions with separate server-side Variables / Secrets. The LAN profile stores its URL and Token only in the current browser and sends requests directly to that LAN host. The server independently restricts EPUB browsing to OPENLIST_BOOKS_ROOT_PATH and CBZ browsing to OPENLIST_COMICS_ROOT_PATH; each device may select a narrower preferred folder. The page waits for an explicit connection test before requesting a directory.
 
 ### Reading habits and statistics
 
@@ -162,7 +162,7 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 
 - The root-level functions directory is the Cloudflare Pages Functions source directory. It is separate from the static pages output directory.
 - /api/auth/* provides password-based private login and a signed HttpOnly, Secure, SameSite=Lax session cookie.
-- /api/cloud/books lists EPUB / CBZ files and folders below the mandatory OPENLIST_ROOT_PATH.
+- /api/cloud/books lists EPUB or CBZ files and folders below the corresponding mandatory OPENLIST_BOOKS_ROOT_PATH or OPENLIST_COMICS_ROOT_PATH.
 - /api/cloud/file proxies an authenticated OpenList download and forwards valid HTTP Range requests. The OpenList token and raw download URL remain server-side.
 - /api/reading/events stores unique short reading-time events in D1; duplicate retries do not double-count.
 - /api/reading/stats returns D1 daily totals, streak calendar source data, most-read books, time-of-day totals and recent events.
