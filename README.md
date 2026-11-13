@@ -144,6 +144,10 @@ The bookshelf and reading history work locally in the current browser profile an
 
 ## V0.6 Reading Insights and Cloud Library
 
+### Four-source OpenList access
+
+The private cloud library offers four read-only connection profiles: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are called by Pages Functions with separate server-side Variables / Secrets. The LAN profile stores its URL and Token only in the current browser and sends requests directly to that LAN host. All profiles share the same OPENLIST_ROOT_PATH boundary. The page waits for an explicit connection test before requesting a directory.
+
 ### Reading habits and statistics
 
 The Reading Room starts a local foreground timer for the active book. It counts only while the reader tab is visible and the browser window has focus. Pointer, key, touch and scroll activity refresh a five-minute idle timeout; the timer pauses while the tab is hidden, the window is unfocused or the reader remains idle.
