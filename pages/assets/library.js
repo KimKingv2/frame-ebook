@@ -110,7 +110,7 @@ function createCard(book, compact) {
   const details = document.createElement("button");
   details.type = "button";
   details.className = "library-details-button";
-  details.textContent = "書籍資訊";
+  details.textContent = "作品資訊";
   details.addEventListener("click", () => showBookDetails(book.id));
   actions.append(continueLink, details);
 
