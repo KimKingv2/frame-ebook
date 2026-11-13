@@ -109,7 +109,7 @@
 
     <section class="cloud-security-note">
       <span>✦</span>
-      <div><strong>密鑰在伺服器，書籍在你的雲端。</strong><p>本頁只呼叫同源的 /api/cloud/* 路由。OpenList Token 不會出現在 JavaScript、URL 或瀏覽器儲存空間。加入本機書架時，書檔會經由受保護的下載代理讀入目前瀏覽器的 IndexedDB。</p></div>
+      <div><strong>密鑰在伺服器，書籍在你的雲端。</strong><p>VPS Alist、OpenList Worker 與 Mobile Device 的 Token 只由 Pages Functions 在伺服器端讀取，不會傳給瀏覽器。區域網路來源則例外：該裝置自己的 Token 會保存在目前瀏覽器，並直接傳給你指定的 LAN OpenList。加入本機書架時，書檔會讀入目前瀏覽器的 IndexedDB。</p></div>
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
