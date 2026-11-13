@@ -106,11 +106,24 @@ function renderProfileStatus() {
   }
 }
 function persistActiveProvider(provider) {
+  const changed=state.activeProvider!==provider;
   state.activeProvider=provider;
   try { localStorage.setItem(ACTIVE_PROVIDER_KEY,provider); } catch (_) {}
   $("cloud-provider").value=provider;
   $("cloud-connection-status").textContent="尚未測試 · "+PROVIDER_LABELS[provider];
   state.connected=false;
+  if(changed) {
+    state.items=[];
+    state.total=0;
+    state.currentPath=state.rootPath||"/";
+    $("cloud-items").replaceChildren();
+    $("cloud-item-count").textContent="0 個項目";
+    $("cloud-breadcrumb").textContent=state.rootPath||"尚未設定根目錄";
+    $("cloud-page-label").textContent="尚未連線";
+    $("cloud-prev-page").disabled=true;
+    $("cloud-next-page").disabled=true;
+    $("cloud-empty").hidden=true;
+  }
 }
 function saveSourceSettings() {
   const provider=$("cloud-provider").value;
