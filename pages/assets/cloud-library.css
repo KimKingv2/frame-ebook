@@ -97,3 +97,30 @@
  .cloud-connection-actions { align-items:stretch; flex-direction:column; }
  .cloud-connection-actions button { width:100%; }
 }
+
+
+.cloud-root-settings { margin:14px 0 12px; padding:14px; border:1px solid rgba(205,188,239,.11); border-radius:8px; background:rgba(23,20,32,.52); }
+.cloud-root-settings-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.cloud-root-settings-heading strong { color:#ded4ec; font-size:9px; font-weight:600; }
+.cloud-root-settings-heading span { color:#837995; font-size:7px; letter-spacing:.12em; }
+.cloud-root-settings > p { margin:6px 0 12px; color:#91879e; font-size:8px; line-height:1.7; }
+.cloud-roots-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.cloud-root-field { display:grid; align-content:start; gap:7px; min-width:0; padding:11px; border:1px solid rgba(205,188,239,.08); border-radius:7px; background:#171420; }
+.cloud-root-field label { color:#a99db8; font-size:8px; }
+.cloud-root-field input { width:100%; min-width:0; min-height:34px; padding:0 9px; border:1px solid rgba(205,188,239,.16); border-radius:5px; outline:none; color:#e8e0f1; background:#211c2b; font:inherit; font-size:8px; }
+.cloud-root-field input:focus { border-color:#a58bdd; }
+.cloud-root-field button { min-height:30px; padding:0 9px; font-size:7px; }
+.cloud-root-field small { min-height:13px; color:#82798d; font-size:7px; line-height:1.7; overflow-wrap:anywhere; }
+.cloud-root-save-row { display:flex; align-items:center; flex-wrap:wrap; gap:9px; margin-top:10px; }
+.cloud-root-save-row button { min-height:30px; padding:0 10px; font-size:8px; }
+.cloud-root-save-row span { color:#81788c; font-size:7px; line-height:1.7; }
+.cloud-library-select { display:flex; align-items:center; gap:9px; margin:12px 0 9px; }
+.cloud-library-select label { color:#978da3; font-size:8px; }
+.cloud-library-select select { min-height:31px; padding:0 10px; border:1px solid rgba(205,188,239,.17); border-radius:6px; outline:none; color:#e8e0f1; background:#1b1725; font:inherit; font-size:8px; }
+@media(max-width:720px) {
+ .cloud-roots-grid { grid-template-columns:1fr; }
+ .cloud-root-save-row { align-items:stretch; flex-direction:column; }
+ .cloud-root-save-row button { width:100%; }
+ .cloud-library-select { align-items:flex-start; flex-direction:column; }
+ .cloud-library-select select { width:100%; }
+}
