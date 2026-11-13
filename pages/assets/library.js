@@ -132,15 +132,28 @@ function filteredBooks() {
   return books;
 }
 
+function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmptyId, countId) {
+  const grid = $(gridId);
+  const empty = $(emptyId);
+  const searchEmpty = $(searchEmptyId);
+  grid.classList.toggle("is-list", state.view === "list");
+  grid.replaceChildren();
+  visibleItems.forEach(book => grid.appendChild(createCard(book, false)));
+  $(countId).textContent = String(allItems.length).padStart(2, "0");
+  empty.hidden = allItems.length > 0;
+  searchEmpty.hidden = allItems.length === 0 || visibleItems.length > 0;
+  grid.hidden = visibleItems.length === 0;
+}
+
 function render() {
   const total = state.books.length;
   const started = state.books.filter(book => Number(book.progress && book.progress.percent) > 0).length;
-  const epubCount = state.books.filter(book => book.format === "EPUB").length;
-  const comicCount = total - epubCount;
+  const allBooks = state.books.filter(book => book.format === "EPUB");
+  const allComics = state.books.filter(book => book.format === "CBZ");
   $("book-count").textContent = String(total).padStart(2, "0");
   $("started-count").textContent = String(started).padStart(2, "0");
-  $("epub-count").textContent = String(epubCount).padStart(2, "0");
-  $("comic-count").textContent = String(comicCount).padStart(2, "0");
+  $("epub-count").textContent = String(allBooks.length).padStart(2, "0");
+  $("comic-count").textContent = String(allComics.length).padStart(2, "0");
 
   const recent = state.books.filter(book => Number(book.lastOpenedAt) > 0)
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 3);
@@ -150,16 +163,14 @@ function render() {
   recentSection.hidden = recent.length === 0;
   recent.forEach(book => recentGrid.appendChild(createCard(book, true)));
 
-  const books = filteredBooks();
-  const grid = $("book-grid");
-  grid.classList.toggle("is-list", state.view === "list");
-  grid.replaceChildren();
-  books.forEach(book => grid.appendChild(createCard(book, false)));
-  $("shelf-count-label").textContent = total + " BOOK" + (total === 1 ? "" : "S");
-  $("result-count").textContent = "顯示 " + books.length + " 本";
-  $("library-empty").hidden = total > 0;
-  $("search-empty").hidden = total === 0 || books.length > 0;
-  $("book-grid").hidden = books.length === 0;
+  const visible = filteredBooks();
+  const visibleBooks = visible.filter(book => book.format === "EPUB");
+  const visibleComics = visible.filter(book => book.format === "CBZ");
+  renderCategoryShelf(allBooks, visibleBooks, "books-grid", "books-empty", "books-search-empty", "books-shelf-count");
+  renderCategoryShelf(allComics, visibleComics, "comics-grid", "comics-empty", "comics-search-empty", "comics-shelf-count");
+
+  $("shelf-count-label").textContent = total + " ITEM" + (total === 1 ? "" : "S");
+  $("result-count").textContent = "目前顯示 " + visibleBooks.length + " 本電子書 · " + visibleComics.length + " 部漫畫";
   $("view-grid").setAttribute("aria-pressed", state.view === "grid" ? "true" : "false");
   $("view-list").setAttribute("aria-pressed", state.view === "list" ? "true" : "false");
 }
@@ -168,38 +179,48 @@ async function refresh() {
   try {
     state.books = await listBooks();
     render();
+    const epubCount = state.books.filter(book => book.format === "EPUB").length;
+    const comicCount = state.books.filter(book => book.format === "CBZ").length;
     $("library-status").textContent = state.books.length
-      ? "書籍只保存在這台瀏覽器的本機書庫，尚未連接雲端。"
-      : "你的書架目前是空的。匯入 EPUB 或 CBZ，建立第一本收藏。";
+      ? "本機書架已就緒：電子書 " + epubCount + " 本，漫畫 " + comicCount + " 部。"
+      : "電子書與漫畫書架都已就緒，匯入作品即可開始收藏。";
   } catch (error) {
     $("library-status").textContent = "無法開啟本機書庫：" + (error.message || String(error));
-    $("import-button").disabled = true;
-    $("library-files").disabled = true;
+    document.querySelectorAll("[data-import-type]").forEach(button => { button.disabled = true; });
+    $("books-files").disabled = true;
+    $("comics-files").disabled = true;
   }
 }
 
-async function importFiles(files) {
+async function importFiles(files, expectedFormat) {
   const selected = Array.from(files || []);
   if (!selected.length) return;
-  $("library-status").textContent = "正在整理 " + selected.length + " 個檔案……";
-  $("import-button").disabled = true;
+  const formatLabel = expectedFormat === "EPUB" ? "電子書" : "漫畫";
+  const input = $(expectedFormat === "EPUB" ? "books-files" : "comics-files");
+  const buttons = Array.from(document.querySelectorAll('[data-import-type="' + (expectedFormat === "EPUB" ? "books" : "comics") + '"]'));
+  $("library-status").textContent = "正在整理 " + selected.length + " 個" + formatLabel + "檔案……";
+  buttons.forEach(button => { button.disabled = true; });
+  input.disabled = true;
   let success = 0;
   const errors = [];
   for (const file of selected) {
     try {
+      const extension = String(file.name || "").split(".").pop().toUpperCase();
+      if (extension !== expectedFormat) throw new Error("這個書架只接受 " + expectedFormat + " 格式。");
       await importBookFile(file);
       success++;
     } catch (error) {
       errors.push(file.name + "：" + (error.message || String(error)));
     }
   }
-  $("import-button").disabled = false;
-  $("library-files").value = "";
+  buttons.forEach(button => { button.disabled = false; });
+  input.disabled = false;
+  input.value = "";
   await refresh();
   if (errors.length) {
-    $("library-status").textContent = "已加入 " + success + " 本；有 " + errors.length + " 個檔案未加入：" + errors.slice(0, 2).join("；");
+    $("library-status").textContent = "已加入 " + success + " 個" + formatLabel + "項目；有 " + errors.length + " 個檔案未加入：" + errors.slice(0, 2).join("；");
   } else {
-    $("library-status").textContent = "完成，已將 " + success + " 本書加入本機書架。";
+    $("library-status").textContent = "完成，已將 " + success + " 個" + formatLabel + "項目加入對應書架。";
   }
 }
 
@@ -207,6 +228,7 @@ async function showBookDetails(id) {
   const book = await getBook(id);
   if (!book) return;
   state.dialogBookId = id;
+  $("detail-heading").textContent = book.format === "CBZ" ? "漫畫資訊" : "電子書資訊";
   $("detail-title").value = book.title || "";
   $("detail-author").value = book.author || "";
   $("detail-format").textContent = book.format;
@@ -257,8 +279,14 @@ async function removeCurrentBook() {
   $("library-status").textContent = "已從本機書架移除書籍，原始檔案不受影響。";
 }
 
-$("import-button").addEventListener("click", () => $("library-files").click());
-$("library-files").addEventListener("change", event => importFiles(event.target.files));
+document.querySelectorAll("[data-import-type]").forEach(button => {
+  button.addEventListener("click", () => {
+    const type = button.dataset.importType === "comics" ? "comics" : "books";
+    $(type === "comics" ? "comics-files" : "books-files").click();
+  });
+});
+$("books-files").addEventListener("change", event => importFiles(event.target.files, "EPUB"));
+$("comics-files").addEventListener("change", event => importFiles(event.target.files, "CBZ"));
 $("search-books").addEventListener("input", event => {
   state.query = event.target.value || "";
   render();
