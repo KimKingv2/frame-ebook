@@ -140,25 +140,62 @@ export function joinPath(parent, name) {
   return normalizePath((base || "") + "/" + child);
 }
 
-export function getOpenListConfig(env) {
-  const base = String(env.OPENLIST_BASE_URL || "").trim().replace(/\/+$/, "");
-  const token = String(env.OPENLIST_TOKEN || "").trim();
-  const rootSetting = String(env.OPENLIST_ROOT_PATH || "").trim();
-  const rootPath = rootSetting ? normalizePath(rootSetting) : null;
-  if (!base || !token || !rootPath) return null;
-  let url;
-  try {
-    url = new URL(base);
-  } catch (_) {
-    return null;
+const OPENLIST_PROVIDERS = Object.freeze({
+  vps: {
+    label: "VPS Alist",
+    baseUrl: env => env.ALIST_VPS_API_BASE_URL || env.OPENLIST_BASE_URL,
+    token: env => env.ALIST_VPS_API_TOKEN || env.OPENLIST_TOKEN
+  },
+  worker: {
+    label: "OpenList Worker",
+    baseUrl: env => env.ALIST_WORKER_API_BASE_URL || env.OPENLIST_WORKER_API_BASE_URL,
+    token: env => env.ALIST_WORKER_API_TOKEN
+  },
+  mobile: {
+    label: "Mobile Device Alist",
+    baseUrl: env => env.ALIST_MOBILE_DEVICE_API_BASE_URL,
+    token: env => env.ALIST_MOBILE_DEVICE_API_TOKEN
   }
-  if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return null;
-  return { base: url.origin, token, rootPath };
+});
+
+export function getOpenListRootPath(env) {
+  const rootSetting = String(env.OPENLIST_ROOT_PATH || "").trim();
+  return rootSetting ? normalizePath(rootSetting) : null;
 }
 
-export async function openListPost(env, endpoint, body) {
-  const config = getOpenListConfig(env);
-  if (!config) throw new Error("OpenList 尚未完成伺服器端設定。");
+function normalizeServerBaseUrl(value) {
+  const raw = String(value || "").trim().replace(/\/+$/, "");
+  if (!raw) return null;
+  let url;
+  try { url = new URL(raw); } catch (_) { return null; }
+  if (url.username || url.password || url.search || url.hash) return null;
+  if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return null;
+  return url.origin;
+}
+
+export function getOpenListConfig(env, provider = "vps") {
+  const key = Object.prototype.hasOwnProperty.call(OPENLIST_PROVIDERS, provider) ? provider : "vps";
+  const profile = OPENLIST_PROVIDERS[key];
+  const base = normalizeServerBaseUrl(profile.baseUrl(env));
+  const token = String(profile.token(env) || "").trim();
+  const rootPath = getOpenListRootPath(env);
+  if (!base || !token || !rootPath) return null;
+  return { provider: key, label: profile.label, base, token, rootPath };
+}
+
+export function getOpenListProfiles(env) {
+  return Object.fromEntries(Object.entries(OPENLIST_PROVIDERS).map(([provider, profile]) => [
+    provider,
+    {
+      label: profile.label,
+      configured: !!getOpenListConfig(env, provider)
+    }
+  ]));
+}
+
+export async function openListPost(env, endpoint, body, provider = "vps") {
+  const config = getOpenListConfig(env, provider);
+  if (!config) throw new Error((OPENLIST_PROVIDERS[provider]?.label || "OpenList") + " 尚未完成伺服器端設定。請檢查該來源的 Pages URL、Token Secret，以及共用的 OPENLIST_ROOT_PATH。");
   const response = await fetch(config.base + endpoint, {
     method: "POST",
     headers: {
@@ -168,15 +205,14 @@ export async function openListPost(env, endpoint, body) {
     },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error("OpenList API HTTP " + response.status);
+  if (!response.ok) throw new Error(config.label + " API HTTP " + response.status);
   const result = await response.json();
   if (!result || Number(result.code) !== 200) {
     const code = result && result.code ? String(result.code) : "unknown";
-    throw new Error("OpenList API 回報錯誤（" + code + "）。");
+    throw new Error(config.label + " API 回報錯誤（" + code + "）。");
   }
   return result.data;
 }
-
 export async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
   return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
