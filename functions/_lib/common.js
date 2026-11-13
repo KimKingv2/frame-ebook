@@ -161,8 +161,7 @@ const OPENLIST_PROVIDERS = Object.freeze({
 export function getOpenListRootPath(env, library = "books") {
   const key = library === "comics" ? "comics" : "books";
   const specific = key === "comics" ? env.OPENLIST_COMICS_ROOT_PATH : env.OPENLIST_BOOKS_ROOT_PATH;
-  const legacy = env.OPENLIST_ROOT_PATH;
-  const rootSetting = String(specific || legacy || "").trim();
+  const rootSetting = String(specific || "").trim();
   return rootSetting ? normalizePath(rootSetting) : null;
 }
 
