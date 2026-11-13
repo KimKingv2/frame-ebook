@@ -337,9 +337,24 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
   const allowed=getAllowedRoot();
   const selected=getActiveRoot();
   const safePath=normalizePath(path);
-  if(!allowed)throw new Error("尚未設定 "+(state.activeLibrary==="books"?"OPENLIST_BOOKS_ROOT_PATH":"OPENLIST_COMICS_ROOT_PATH")+"。");
-  if(!selected||!isWithinRoot(selected,allowed))throw new Error("目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄不在伺服器允許範圍內。");
-  if(!safePath||!isWithinRoot(safePath,selected))throw new Error("目錄路徑無效或超出目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄。");
+  if(!allowed) {
+    const message="尚未設定 "+(state.activeLibrary==="books"?"OPENLIST_BOOKS_ROOT_PATH":"OPENLIST_COMICS_ROOT_PATH")+"。";
+    $("cloud-browser-status").textContent=message;
+    setSourceStatus(message,true);
+    return;
+  }
+  if(!selected||!isWithinRoot(selected,allowed)) {
+    const message="目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄不在伺服器允許範圍內。";
+    $("cloud-browser-status").textContent=message;
+    setSourceStatus(message,true);
+    return;
+  }
+  if(!safePath||!isWithinRoot(safePath,selected)) {
+    const message="目錄路徑無效或超出目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄。";
+    $("cloud-browser-status").textContent=message;
+    setSourceStatus(message,true);
+    return;
+  }
   $("cloud-browser-status").textContent="正在連接 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+"……";
   $("cloud-refresh").disabled=true;
   $("cloud-test-source").disabled=true;
