@@ -62,15 +62,15 @@ Paste the generated output only into Cloudflare's Secret field. Do not put any s
 
 - **VPS Alist**, **OpenList Worker** and **Mobile Device Alist** are server-side profiles. Each uses its own Pages URL Variable and Token Secret. Copy the values into the frame-ebook Pages project; environment settings from frame-audio are not shared automatically between Pages projects.
 - **LAN OpenList** is configured inside the cloud page on each device. Its URL and read-only Token are saved in that browser's local storage and sent directly to the configured LAN host. Add the exact FRAME Reader production origin https://frame-ebook.pages.dev to that OpenList instance's CORS allowlist, including Authorization and Content-Type. Add the Preview origin only when testing Preview.
-- All four sources must expose the same absolute book-library paths below the shared OPENLIST_ROOT_PATH. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
+- All four sources must expose the same absolute directory paths for OPENLIST_BOOKS_ROOT_PATH and OPENLIST_COMICS_ROOT_PATH. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
 - For LAN direct downloads, the final host returned as raw_url must also permit browser CORS. Plain HTTP does not encrypt traffic by itself; use a trusted LAN, an encrypted VPN such as Tailscale, or HTTPS.
 
 ## 4. Verify the configuration
 
 After saving the binding and variables, trigger a new deployment. Then check:
 
-- `https://frame-ebook.pages.dev/api/auth/session` should report `databaseConfigured: true` and `openListConfigured: true` (it will still report `authenticated: false` before login).
-- Open `https://frame-ebook.pages.dev/cloud/`, sign in with `FRAME_READER_ACCESS_PASSWORD`, then browse the configured OpenList root.
+- `https://frame-ebook.pages.dev/api/auth/session` should report `databaseConfigured: true`, `openListConfigured: true`, and (after login) separate `rootPaths.books` / `rootPaths.comics` values. Before login, `authenticated` is `false` and root paths are hidden.
+- Open `https://frame-ebook.pages.dev/cloud/`, sign in with `FRAME_READER_ACCESS_PASSWORD`, choose a source and either 電子書 or 漫畫, then browse the matching configured root.
 - Open `https://frame-ebook.pages.dev/reading-stats/`, sign in to enable D1 statistics sync. Locally stored reading events are uploaded with unique event IDs; duplicate retries are ignored by D1.
 - Read a book for at least one minute, then revisit the stats page and check the daily total. A reading day is counted at 60 seconds.
 
