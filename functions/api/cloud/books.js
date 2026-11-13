@@ -10,9 +10,10 @@ export async function onRequestGet({ request, env }) {
   if (denied) return denied;
   const url = new URL(request.url);
   const provider = url.searchParams.get("provider") || "vps";
+  const library = url.searchParams.get("library") === "comics" ? "comics" : "books";
   if (!["vps", "worker", "mobile"].includes(provider)) return json({ error: "不支援的雲端來源。區域網路來源必須由目前裝置直接連線。" }, 400);
-  const config = getOpenListConfig(env, provider);
-  if (!config) return json({ error: "選取的來源尚未設定。請確認其 Cloudflare Pages URL／Token Secret 與共用 OPENLIST_ROOT_PATH。" }, 503);
+  const config = getOpenListConfig(env, provider, library);
+  if (!config) return json({ error: "選取的來源或對應根目錄尚未設定。請確認 Pages URL／Token Secret 與 OPENLIST_BOOKS_ROOT_PATH／OPENLIST_COMICS_ROOT_PATH。" }, 503);
 
   const path = normalizePath(url.searchParams.get("path") || config.rootPath);
   if (!path || !isWithinRoot(path, config.rootPath)) return json({ error: "路徑無效，或超出設定的書庫根目錄。" }, 400);
@@ -26,7 +27,7 @@ export async function onRequestGet({ request, env }) {
       page,
       per_page: perPage,
       refresh: false
-    }, provider);
+    }, provider, library);
     const content = Array.isArray(data && data.content) ? data.content : [];
     const items = content.map(item => {
       const itemPath = joinPath(path, item.name);
@@ -42,12 +43,13 @@ export async function onRequestGet({ request, env }) {
         modified: item.modified || item.created || null,
         supported: isDir || !!format
       };
-    }).filter(Boolean).filter(item => item.isDir || item.supported);
+    }).filter(Boolean).filter(item => item.isDir || (library === "books" ? item.format === "EPUB" : item.format === "CBZ"));
 
     return json({
       path,
       rootPath: config.rootPath,
       provider,
+      library,
       page,
       perPage,
       total: Number(data && data.total) || items.length,
