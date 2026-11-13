@@ -37,13 +37,17 @@ Under the Pages project's **Settings → Variables and Secrets**, add these to t
 
 | Name | Type | Value |
 |---|---|---|
-| `OPENLIST_BASE_URL` | Variable | OpenList origin only, for example `https://openlist.example.com` (no API path) |
-| `OPENLIST_ROOT_PATH` | Variable | Exact folder path that contains the private ebook library; use the narrowest suitable directory, not the whole drive |
-| `OPENLIST_TOKEN` | Secret | OpenList API token |
+| `ALIST_VPS_API_BASE_URL` | Variable | VPS Alist origin, e.g. `https://drive.example.com` |
+| `ALIST_VPS_API_TOKEN` | Secret | Read-only VPS Alist API token |
+| `ALIST_WORKER_API_BASE_URL` | Variable | OpenList Worker API origin |
+| `ALIST_WORKER_API_TOKEN` | Secret | Read-only OpenList Worker API token |
+| `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API origin |
+| `ALIST_MOBILE_DEVICE_API_TOKEN` | Secret | Read-only Mobile Device Alist API token |
+| `OPENLIST_ROOT_PATH` | Variable | Shared absolute folder path for the ebook library; all server and LAN sources must expose the same directory structure |
 | `FRAME_READER_ACCESS_PASSWORD` | Secret | A new private FRAME Reader login password; this is not the OpenList password |
 | `FRAME_READER_SESSION_SECRET` | Secret | A long, random signing secret used for the HttpOnly session cookie |
 
-`OPENLIST_ROOT_PATH` is mandatory. The cloud browser refuses paths outside this directory. Do not set it to `/` unless you intentionally want the entire OpenList drive to be browsable.
+`OPENLIST_ROOT_PATH` is mandatory and shared by all four sources. The cloud browser refuses paths outside this directory. Do not set it to `/` unless you intentionally want the entire OpenList drive to be browsable. The VPS, Worker and Mobile Device profiles are server-side; their tokens never reach the browser.
 
 Generate a session secret locally, for example:
 
@@ -64,12 +68,14 @@ After saving the binding and variables, trigger a new deployment. Then check:
 
 ## 5. What V0.6 does and does not do
 
-- The Pages Functions hold the OpenList token and proxy the API calls. The token and OpenList `raw_url` are not returned to the browser.
+- Four interchangeable read-only sources are supported: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are configured as Pages Variables / Secrets and called server-side; the fourth stores its URL and Token only in the current browser's local storage.
+- The Pages Functions hold server-side tokens and proxy the API calls. Server tokens and the OpenList `raw_url` are not returned to the browser. A local-direct request sends only that device's own token directly to its configured LAN OpenList.
 - The file proxy forwards valid HTTP Range headers, but the current cloud shelf still downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Direct Range-backed streaming into Foliate is a later optimization.
 - The bookshelf file itself remains in OpenList. Adding it to the local shelf copies it into this browser's IndexedDB; removing the local copy does not delete the cloud original.
 - Reading duration is tracked locally first. Once authenticated, pending events are sent to D1. Reading statistics aggregate across devices that use the same private account after they sync.
 - Daily reading goal settings are currently per browser, and JSON / CSV export currently contains the local browser's raw event details.
 - The current private login is intended for a single personal library owner, not a multi-user public service. The password is verified at the edge, the session cookie is HttpOnly / Secure, and login attempts are rate-limited in D1.
+- The cloud page does not contact OpenList automatically on page load. Select a provider and press the explicit connection test button before any directory request. For LAN direct, configure a least-privilege Token and the exact site origin in OpenList CORS. Plain HTTP is not encrypted by itself; use trusted LAN or an encrypted VPN, or HTTPS.
 
 ## References
 
