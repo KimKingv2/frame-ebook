@@ -263,8 +263,8 @@ async function checkSession() {
     state.databaseConfigured=!!data.databaseConfigured;
     state.serverProfiles=data.openListProfiles||{};
     state.allowedRoots={
-      books:normalizePath(data.rootPaths?.books||"")||"",
-      comics:normalizePath(data.rootPaths?.comics||"")||""
+      books:data.rootPaths?.books?normalizePath(data.rootPaths.books)||"": "",
+      comics:data.rootPaths?.comics?normalizePath(data.rootPaths.comics)||"": ""
     };
     if(state.authenticated) {
       $("cloud-login-panel").hidden=true;
