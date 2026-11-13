@@ -166,13 +166,13 @@ The /api/reading/stats endpoint is read-only and returns aggregate statistics fo
 Cloudflare Pages serves static content from pages/, but the Pages Functions source directory is at the repository root as /functions/. The file-based routes are:
 
 - POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout.
-- GET /api/cloud/books?path=... for a directory listing.
-- GET /api/cloud/file?path=... for a protected file download with Range forwarding.
+- GET /api/cloud/books?library=books|comics&path=... for a directory listing scoped to the separate EPUB or CBZ root.
+- GET /api/cloud/file?library=books|comics&path=... for a protected file download constrained to the matching root and extension.
 - POST /api/reading/events and GET /api/reading/stats.
 
 The session cookie is named __Host-frame-reader and is signed with HMAC using FRAME_READER_SESSION_SECRET. It is Secure, HttpOnly and SameSite=Lax. Login checks FRAME_READER_ACCESS_PASSWORD and applies a D1-backed per-IP rate limit. The intended deployment is one private library owner, not public multi-user authentication.
 
-OpenList configuration is read only from the Pages Function environment: OPENLIST_BASE_URL, OPENLIST_TOKEN and OPENLIST_ROOT_PATH. OPENLIST_ROOT_PATH is required and all requested paths are normalized and constrained to this directory. The token is sent in the Authorization header to OpenList. It is never returned to frontend code.
+OpenList configuration is read only from the Pages Function environment. VPS Alist, OpenList Worker and Mobile Device Alist use their own base URL Variables and Token Secrets. `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` define independent maximum directories for EPUB and CBZ access. All requested paths are normalized and constrained to the matching root; the browser may save a narrower preferred sub-root per device. The selected server token is sent in the Authorization header to OpenList and is never returned to frontend code.
 
 The OpenList directory endpoint uses /api/fs/list. The file endpoint first calls /api/fs/get server-side to resolve raw_url, then streams the upstream body through the Pages Function and forwards valid Range requests and relevant response headers. Neither raw_url nor the OpenList token is exposed in the browser response.
 
