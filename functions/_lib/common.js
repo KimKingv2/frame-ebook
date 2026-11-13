@@ -158,9 +158,19 @@ const OPENLIST_PROVIDERS = Object.freeze({
   }
 });
 
-export function getOpenListRootPath(env) {
-  const rootSetting = String(env.OPENLIST_ROOT_PATH || "").trim();
+export function getOpenListRootPath(env, library = "books") {
+  const key = library === "comics" ? "comics" : "books";
+  const specific = key === "comics" ? env.OPENLIST_COMICS_ROOT_PATH : env.OPENLIST_BOOKS_ROOT_PATH;
+  const legacy = env.OPENLIST_ROOT_PATH;
+  const rootSetting = String(specific || legacy || "").trim();
   return rootSetting ? normalizePath(rootSetting) : null;
+}
+
+export function getOpenListRootPaths(env) {
+  return {
+    books: getOpenListRootPath(env, "books"),
+    comics: getOpenListRootPath(env, "comics")
+  };
 }
 
 function normalizeServerBaseUrl(value) {
@@ -173,14 +183,20 @@ function normalizeServerBaseUrl(value) {
   return url.origin;
 }
 
-export function getOpenListConfig(env, provider = "vps") {
+function getOpenListProviderCredentials(env, provider = "vps") {
   const key = Object.prototype.hasOwnProperty.call(OPENLIST_PROVIDERS, provider) ? provider : "vps";
   const profile = OPENLIST_PROVIDERS[key];
   const base = normalizeServerBaseUrl(profile.baseUrl(env));
   const token = String(profile.token(env) || "").trim();
-  const rootPath = getOpenListRootPath(env);
-  if (!base || !token || !rootPath) return null;
-  return { provider: key, label: profile.label, base, token, rootPath };
+  if (!base || !token) return null;
+  return { provider: key, label: profile.label, base, token };
+}
+
+export function getOpenListConfig(env, provider = "vps", library = "books") {
+  const credentials = getOpenListProviderCredentials(env, provider);
+  const rootPath = getOpenListRootPath(env, library);
+  if (!credentials || !rootPath) return null;
+  return { ...credentials, library: library === "comics" ? "comics" : "books", rootPath };
 }
 
 export function getOpenListProfiles(env) {
@@ -188,14 +204,14 @@ export function getOpenListProfiles(env) {
     provider,
     {
       label: profile.label,
-      configured: !!getOpenListConfig(env, provider)
+      configured: !!getOpenListProviderCredentials(env, provider)
     }
   ]));
 }
 
-export async function openListPost(env, endpoint, body, provider = "vps") {
-  const config = getOpenListConfig(env, provider);
-  if (!config) throw new Error((OPENLIST_PROVIDERS[provider]?.label || "OpenList") + " 尚未完成伺服器端設定。請檢查該來源的 Pages URL、Token Secret，以及共用的 OPENLIST_ROOT_PATH。");
+export async function openListPost(env, endpoint, body, provider = "vps", library = "books") {
+  const config = getOpenListConfig(env, provider, library);
+  if (!config) throw new Error((OPENLIST_PROVIDERS[provider]?.label || "OpenList") + " 尚未完成伺服器端設定。請檢查該來源的 Pages URL、Token Secret，以及對應的 OPENLIST_BOOKS_ROOT_PATH／OPENLIST_COMICS_ROOT_PATH。");
   const response = await fetch(config.base + endpoint, {
     method: "POST",
     headers: {
