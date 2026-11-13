@@ -57,6 +57,13 @@ openssl rand -hex 32
 
 Paste the generated output only into Cloudflare's Secret field. Do not put any secret in Git, frontend JavaScript, chat messages or URL query strings.
 
+### Four connection profiles
+
+- **VPS Alist**, **OpenList Worker** and **Mobile Device Alist** are server-side profiles. Each uses its own Pages URL Variable and Token Secret. Copy the values into the frame-ebook Pages project; environment settings from frame-audio are not shared automatically between Pages projects.
+- **LAN OpenList** is configured inside the cloud page on each device. Its URL and read-only Token are saved in that browser's local storage and sent directly to the configured LAN host. Add the exact FRAME Reader production origin https://frame-ebook.pages.dev to that OpenList instance's CORS allowlist, including Authorization and Content-Type. Add the Preview origin only when testing Preview.
+- All four sources must expose the same absolute book-library paths below the shared OPENLIST_ROOT_PATH. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
+- For LAN direct downloads, the final host returned as raw_url must also permit browser CORS. Plain HTTP does not encrypt traffic by itself; use a trusted LAN, an encrypted VPN such as Tailscale, or HTTPS.
+
 ## 4. Verify the configuration
 
 After saving the binding and variables, trigger a new deployment. Then check:
