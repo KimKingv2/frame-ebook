@@ -43,11 +43,12 @@ Under the Pages project's **Settings → Variables and Secrets**, add these to t
 | `ALIST_WORKER_API_TOKEN` | Secret | Read-only OpenList Worker API token |
 | `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API origin |
 | `ALIST_MOBILE_DEVICE_API_TOKEN` | Secret | Read-only Mobile Device Alist API token |
-| `OPENLIST_ROOT_PATH` | Variable | Shared absolute folder path for the ebook library; all server and LAN sources must expose the same directory structure |
+| `OPENLIST_BOOKS_ROOT_PATH` | Variable | Maximum allowed absolute path for the EPUB book library |
+| `OPENLIST_COMICS_ROOT_PATH` | Variable | Maximum allowed absolute path for the CBZ comic library |
 | `FRAME_READER_ACCESS_PASSWORD` | Secret | A new private FRAME Reader login password; this is not the OpenList password |
 | `FRAME_READER_SESSION_SECRET` | Secret | A long, random signing secret used for the HttpOnly session cookie |
 
-`OPENLIST_ROOT_PATH` is mandatory and shared by all four sources. The cloud browser refuses paths outside this directory. Do not set it to `/` unless you intentionally want the entire OpenList drive to be browsable. The VPS, Worker and Mobile Device profiles are server-side; their tokens never reach the browser.
+Both `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` are mandatory and independent. Set each to the narrowest suitable directory, not `/`. The server rejects paths outside the matching root, and the browser cannot use the book root to access comics or vice versa. The root inputs on the cloud page may narrow each root further on the current device; those selections are saved in that browser only. All four connection sources must expose the same absolute paths. Remove the old `OPENLIST_ROOT_PATH` variable if you previously added it; the new setup does not use it.
 
 Generate a session secret locally, for example:
 
@@ -82,7 +83,7 @@ After saving the binding and variables, trigger a new deployment. Then check:
 - Reading duration is tracked locally first. Once authenticated, pending events are sent to D1. Reading statistics aggregate across devices that use the same private account after they sync.
 - Daily reading goal settings are currently per browser, and JSON / CSV export currently contains the local browser's raw event details.
 - The current private login is intended for a single personal library owner, not a multi-user public service. The password is verified at the edge, the session cookie is HttpOnly / Secure, and login attempts are rate-limited in D1.
-- The cloud page does not contact OpenList automatically on page load. Select a provider and press the explicit connection test button before any directory request. For LAN direct, configure a least-privilege Token and the exact site origin in OpenList CORS. Plain HTTP is not encrypted by itself; use trusted LAN or an encrypted VPN, or HTTPS.
+- The cloud page does not contact OpenList automatically on page load. Select a provider and the **電子書** or **漫畫** library, then press the explicit connection test button before any directory request. Each library has its own root input; a folder chosen from the browser can become that device's preferred sub-root, but the server-side maximum root remains authoritative. For LAN direct, configure a least-privilege Token and the exact site origin in OpenList CORS. Plain HTTP is not encrypted by itself; use trusted LAN or an encrypted VPN, or HTTPS.
 
 ## References
 
