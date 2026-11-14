@@ -227,20 +227,20 @@ async function listLocalDirectory(path,page) {
   const payload=await directOpenList("list",{path,password:"",page,per_page:state.perPage,refresh:false});
   const data=payload.data||{};
   const content=Array.isArray(data.content)?data.content:[];
-  const wanted=state.activeLibrary==="comics"?"CBZ":"EPUB";
   const items=content.map(item=>{
     const itemPath=normalizePath(joinPath(path,item.name));
     if(!itemPath||!isWithinRoot(itemPath,getActiveRoot()))return null;
     const isDir=!!item.is_dir;
     const format=isDir?"":fileKind(item);
-    if(!isDir&&format!==wanted)return null;
+    const allowed=state.activeLibrary==="comics"?(format==="EPUB"||format==="CBZ"):format==="EPUB";
+    if(!isDir&&!allowed)return null;
     return {name:String(item.name||""),path:itemPath,isDir,format,size:Number(item.size)||0,modified:item.modified||item.created||null,supported:true};
   }).filter(Boolean);
   return {path,rootPath:getAllowedRoot(),page:Number(data.page)||page,perPage:Number(data.per_page)||state.perPage,total:Number(data.total)||items.length,items};
 }
 async function downloadLocalFile(path) {
-  const wantedExtension=state.activeLibrary==="comics"?/\.cbz$/i:/\.epub$/i;
-  if(!isWithinRoot(path,getActiveRoot())||!wantedExtension.test(path))throw new Error("檔案格式或路徑不符合目前的"+LIBRARY_LABELS[state.activeLibrary]+"書庫。");
+  const allowedExtension=state.activeLibrary==="comics"?/\.(epub|cbz)$/i:/\.epub$/i;
+  if(!isWithinRoot(path,getActiveRoot())||!allowedExtension.test(path))throw new Error("檔案格式或路徑不符合目前的"+LIBRARY_LABELS[state.activeLibrary]+"書庫。");
   const payload=await directOpenList("get",{path,password:""});
   const metadata=payload.data||{};
   if(metadata.is_dir||!metadata.raw_url)throw new Error("OpenList 沒有提供這個檔案的下載位址。");
@@ -429,7 +429,7 @@ async function importCloudFile(item) {
     $("cloud-browser-status").textContent="檔案路徑超出目前書庫根目錄。";
     return;
   }
-  if((library==="books"&&item.format!=="EPUB")||(library==="comics"&&item.format!=="CBZ")) {
+  if((library==="books"&&item.format!=="EPUB")||(library==="comics"&&item.format!=="EPUB"&&item.format!=="CBZ")) {
     $("cloud-browser-status").textContent="檔案格式與目前選擇的書庫分類不符。";
     return;
   }
@@ -448,10 +448,10 @@ async function importCloudFile(item) {
       }
       blob=await response.blob();
     }
-    const mime=library==="books"?"application/epub+zip":"application/vnd.comicbook+zip";
+    const mime=item.format==="EPUB"?"application/epub+zip":"application/vnd.comicbook+zip";
     const modified=Date.parse(item.modified||"")||Date.now();
     const file=new File([blob],item.name,{type:mime,lastModified:modified});
-    const record=await importBookFile(file);
+    const record=await importBookFile(file,{shelf:library});
     $("cloud-browser-status").textContent="已加入本機書架："+record.title+"。正在開啟閱讀室……";
     location.href="/epub-lab/?book="+encodeURIComponent(record.id);
   } catch(error) {

@@ -44,11 +44,11 @@ Under the Pages project's **Settings → Variables and Secrets**, add these to t
 | `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API origin |
 | `ALIST_MOBILE_DEVICE_API_TOKEN` | Secret | Read-only Mobile Device Alist API token |
 | `OPENLIST_BOOKS_ROOT_PATH` | Variable | Maximum allowed absolute path for the EPUB book library |
-| `OPENLIST_COMICS_ROOT_PATH` | Variable | Maximum allowed absolute path for the CBZ comic library |
+| `OPENLIST_COMICS_ROOT_PATH` | Variable | Maximum allowed absolute path for the EPUB / CBZ comic library |
 | `FRAME_READER_ACCESS_PASSWORD` | Secret | A new private FRAME Reader login password; this is not the OpenList password |
 | `FRAME_READER_SESSION_SECRET` | Secret | A long, random signing secret used for the HttpOnly session cookie |
 
-Both `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` are mandatory and independent. Set each to the narrowest suitable directory, not `/`. The server rejects paths outside the matching root, and the browser cannot use the book root to access comics or vice versa. The root inputs on the cloud page may narrow each root further on the current device; those selections are saved in that browser only. All four connection sources must expose the same absolute paths. Remove the old `OPENLIST_ROOT_PATH` variable if you previously added it; the new setup does not use it.
+Both `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` are mandatory and independent. The book root lists EPUB files only; the comics root lists both EPUB and CBZ files. Set each to the narrowest suitable directory, not `/`. The server rejects paths outside the matching root, and the browser cannot use the book root to access comics or vice versa. The root inputs on the cloud page may narrow each root further on the current device; those selections are saved in that browser only. All four connection sources must expose the same absolute paths. Remove the old `OPENLIST_ROOT_PATH` variable if you previously added it; the new setup does not use it.
 
 Generate a session secret locally, for example:
 
@@ -62,7 +62,7 @@ Paste the generated output only into Cloudflare's Secret field. Do not put any s
 
 - **VPS Alist**, **OpenList Worker** and **Mobile Device Alist** are server-side profiles. Each uses its own Pages URL Variable and Token Secret. Copy the values into the frame-ebook Pages project; environment settings from frame-audio are not shared automatically between Pages projects.
 - **LAN OpenList** is configured inside the cloud page on each device. Its URL and read-only Token are saved in that browser's local storage and sent directly to the configured LAN host. Add the exact FRAME Reader production origin https://frame-ebook.pages.dev to that OpenList instance's CORS allowlist, including Authorization and Content-Type. Add the Preview origin only when testing Preview.
-- All four sources must expose the same absolute directory paths for OPENLIST_BOOKS_ROOT_PATH and OPENLIST_COMICS_ROOT_PATH. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
+- All four sources must expose the same absolute directory paths for OPENLIST_BOOKS_ROOT_PATH and OPENLIST_COMICS_ROOT_PATH. The comics root may contain both EPUB and CBZ files; the books root is EPUB-only. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
 - For LAN direct downloads, the final host returned as raw_url must also permit browser CORS. Plain HTTP does not encrypt traffic by itself; use a trusted LAN, an encrypted VPN such as Tailscale, or HTTPS.
 
 ## 4. Verify the configuration

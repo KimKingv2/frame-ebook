@@ -17,8 +17,8 @@ export async function onRequestGet({ request, env }) {
 
   const path = normalizePath(requestUrl.searchParams.get("path") || "");
   if (!path || !isWithinRoot(path, config.rootPath)) return json({ error: "路徑無效，或超出目前電子書／漫畫的設定根目錄。" }, 400);
-  const allowedExtension = library === "comics" ? /\.cbz$/i : /\.epub$/i;
-  if (!allowedExtension.test(path)) return json({ error: library === "comics" ? "漫畫來源只允許 CBZ 檔案。" : "電子書來源只允許 EPUB 檔案。" }, 415);
+  const allowedExtension = library === "comics" ? /\.(epub|cbz)$/i : /\.epub$/i;
+  if (!allowedExtension.test(path)) return json({ error: library === "comics" ? "漫畫來源只允許 EPUB 或 CBZ 檔案。" : "電子書來源只允許 EPUB 檔案。" }, 415);
 
   try {
     const metadata = await openListPost(env, "/api/fs/get", {

@@ -200,7 +200,7 @@ function quotaMessage(error) {
   return error;
 }
 
-async function importBookFile(file) {
+async function importBookFile(file, options = {}) {
   if (!(file instanceof Blob) || !file.name) throw new Error("請選擇有效的 EPUB 或 CBZ 檔案。");
   const extension = String(file.name).split(".").pop().toLowerCase();
   if (extension !== "epub" && extension !== "cbz") throw new Error("目前只支援 EPUB 與 CBZ。");
@@ -211,6 +211,8 @@ async function importBookFile(file) {
   );
   const metadata = extension === "epub" ? await inspectEpub(file) : await inspectCbz(file);
   const now = Date.now();
+  const requestedShelf = options && (options.shelf === "books" || options.shelf === "comics") ? options.shelf : "";
+  const shelf = extension === "cbz" ? "comics" : (requestedShelf || (existing && existing.shelf === "comics" ? "comics" : "books"));
   const record = {
     id: existing ? existing.id : makeId(),
     fileName: file.name,
@@ -219,6 +221,7 @@ async function importBookFile(file) {
     language: metadata.language || "",
     identifier: metadata.identifier || "",
     format: extension.toUpperCase(),
+    shelf,
     pageCount: Number(metadata.pageCount) || 0,
     size: file.size,
     lastModified: Number(file.lastModified) || 0,

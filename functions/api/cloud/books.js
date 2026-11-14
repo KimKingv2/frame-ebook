@@ -43,7 +43,7 @@ export async function onRequestGet({ request, env }) {
         modified: item.modified || item.created || null,
         supported: isDir || !!format
       };
-    }).filter(Boolean).filter(item => item.isDir || (library === "books" ? item.format === "EPUB" : item.format === "CBZ"));
+    }).filter(Boolean).filter(item => item.isDir || (library === "books" ? item.format === "EPUB" : item.format === "EPUB" || item.format === "CBZ"));
 
     return json({
       path,

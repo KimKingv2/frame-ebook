@@ -7,6 +7,12 @@ const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId
 const coverUrls = new Map();
 const readerUrl = id => "/epub-lab/?book=" + encodeURIComponent(id);
 
+function getBookShelf(book) {
+  if (!book) return "books";
+  if (book.format === "CBZ") return "comics";
+  return book.shelf === "comics" ? "comics" : "books";
+}
+
 function formatSize(bytes) {
   const value = Number(bytes) || 0;
   if (value < 1024 * 1024) return (value / 1024).toFixed(0) + " KB";
@@ -61,7 +67,7 @@ function makeFallback(book) {
   const title = document.createElement("strong");
   title.textContent = book.title || "未命名書籍";
   const bottom = document.createElement("small");
-  bottom.textContent = book.format === "CBZ" ? "COMIC EDITION" : "READING EDITION";
+  bottom.textContent = getBookShelf(book) === "comics" ? "COMIC EDITION" : "READING EDITION";
   fallback.append(top, title, bottom);
   return fallback;
 }
@@ -81,7 +87,7 @@ function createCard(book, compact) {
   const title = document.createElement("h3");
   title.textContent = book.title || book.fileName;
   const author = document.createElement("p");
-  author.textContent = book.author || (book.format === "CBZ" ? "漫畫／圖像書" : "作者未提供");
+  author.textContent = book.author || (getBookShelf(book) === "comics" ? "漫畫／圖像書" : "作者未提供");
   copy.append(title, author);
   const kind = document.createElement("span");
   kind.className = "book-kind";
@@ -148,12 +154,14 @@ function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmpt
 function render() {
   const total = state.books.length;
   const started = state.books.filter(book => Number(book.progress && book.progress.percent) > 0).length;
-  const allBooks = state.books.filter(book => book.format === "EPUB");
-  const allComics = state.books.filter(book => book.format === "CBZ");
+  const allBooks = state.books.filter(book => getBookShelf(book) === "books");
+  const allComics = state.books.filter(book => getBookShelf(book) === "comics");
+  const epubFiles = state.books.filter(book => book.format === "EPUB");
+  const cbzFiles = state.books.filter(book => book.format === "CBZ");
   $("book-count").textContent = String(total).padStart(2, "0");
   $("started-count").textContent = String(started).padStart(2, "0");
-  $("epub-count").textContent = String(allBooks.length).padStart(2, "0");
-  $("comic-count").textContent = String(allComics.length).padStart(2, "0");
+  $("epub-count").textContent = String(epubFiles.length).padStart(2, "0");
+  $("comic-count").textContent = String(cbzFiles.length).padStart(2, "0");
 
   const recent = state.books.filter(book => Number(book.lastOpenedAt) > 0)
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 3);
@@ -164,8 +172,8 @@ function render() {
   recent.forEach(book => recentGrid.appendChild(createCard(book, true)));
 
   const visible = filteredBooks();
-  const visibleBooks = visible.filter(book => book.format === "EPUB");
-  const visibleComics = visible.filter(book => book.format === "CBZ");
+  const visibleBooks = visible.filter(book => getBookShelf(book) === "books");
+  const visibleComics = visible.filter(book => getBookShelf(book) === "comics");
   renderCategoryShelf(allBooks, visibleBooks, "books-grid", "books-empty", "books-search-empty", "books-shelf-count");
   renderCategoryShelf(allComics, visibleComics, "comics-grid", "comics-empty", "comics-search-empty", "comics-shelf-count");
 
@@ -179,8 +187,8 @@ async function refresh() {
   try {
     state.books = await listBooks();
     render();
-    const epubCount = state.books.filter(book => book.format === "EPUB").length;
-    const comicCount = state.books.filter(book => book.format === "CBZ").length;
+    const epubCount = state.books.filter(book => getBookShelf(book) === "books").length;
+    const comicCount = state.books.filter(book => getBookShelf(book) === "comics").length;
     $("library-status").textContent = state.books.length
       ? "本機書架已就緒：電子書 " + epubCount + " 本，漫畫 " + comicCount + " 部。"
       : "電子書與漫畫書架都已就緒，匯入作品即可開始收藏。";
@@ -192,12 +200,12 @@ async function refresh() {
   }
 }
 
-async function importFiles(files, expectedFormat) {
+async function importFiles(files, shelf) {
   const selected = Array.from(files || []);
   if (!selected.length) return;
-  const formatLabel = expectedFormat === "EPUB" ? "電子書" : "漫畫";
-  const input = $(expectedFormat === "EPUB" ? "books-files" : "comics-files");
-  const buttons = Array.from(document.querySelectorAll('[data-import-type="' + (expectedFormat === "EPUB" ? "books" : "comics") + '"]'));
+  const formatLabel = shelf === "comics" ? "漫畫" : "電子書";
+  const input = $(shelf === "comics" ? "comics-files" : "books-files");
+  const buttons = Array.from(document.querySelectorAll('[data-import-type="' + shelf + '"]'));
   $("library-status").textContent = "正在整理 " + selected.length + " 個" + formatLabel + "檔案……";
   buttons.forEach(button => { button.disabled = true; });
   input.disabled = true;
@@ -206,8 +214,9 @@ async function importFiles(files, expectedFormat) {
   for (const file of selected) {
     try {
       const extension = String(file.name || "").split(".").pop().toUpperCase();
-      if (extension !== expectedFormat) throw new Error("這個書架只接受 " + expectedFormat + " 格式。");
-      await importBookFile(file);
+      const allowed = shelf === "comics" ? (extension === "EPUB" || extension === "CBZ") : extension === "EPUB";
+      if (!allowed) throw new Error(shelf === "comics" ? "漫畫書架接受 EPUB 或 CBZ 格式。" : "電子書架只接受 EPUB 格式。");
+      await importBookFile(file, { shelf });
       success++;
     } catch (error) {
       errors.push(file.name + "：" + (error.message || String(error)));
@@ -228,8 +237,11 @@ async function showBookDetails(id) {
   const book = await getBook(id);
   if (!book) return;
   state.dialogBookId = id;
-  $("detail-heading").textContent = book.format === "CBZ" ? "漫畫資訊" : "電子書資訊";
+  $("detail-heading").textContent = getBookShelf(book) === "comics" ? "漫畫資訊" : "電子書資訊";
   $("detail-title").value = book.title || "";
+  $("detail-shelf").value = getBookShelf(book);
+  $("detail-shelf").disabled = book.format === "CBZ";
+  $("detail-shelf-note").textContent = book.format === "CBZ" ? "CBZ 圖像封存固定放在漫畫書架。" : "EPUB 可依內容自由放入電子書或漫畫書架。";
   $("detail-author").value = book.author || "";
   $("detail-format").textContent = book.format;
   $("detail-file").textContent = book.fileName;
@@ -253,9 +265,13 @@ async function saveDetails(event) {
     $("detail-title").focus();
     return;
   }
+  const currentBook = await getBook(state.dialogBookId);
+  if (!currentBook) return;
+  const shelf = currentBook.format === "CBZ" ? "comics" : ($("detail-shelf").value === "comics" ? "comics" : "books");
   await updateBook(state.dialogBookId, {
     title,
     author,
+    shelf,
     manualTitle: true,
     manualAuthor: true
   });
@@ -285,8 +301,8 @@ document.querySelectorAll("[data-import-type]").forEach(button => {
     $(type === "comics" ? "comics-files" : "books-files").click();
   });
 });
-$("books-files").addEventListener("change", event => importFiles(event.target.files, "EPUB"));
-$("comics-files").addEventListener("change", event => importFiles(event.target.files, "CBZ"));
+$("books-files").addEventListener("change", event => importFiles(event.target.files, "books"));
+$("comics-files").addEventListener("change", event => importFiles(event.target.files, "comics"));
 $("search-books").addEventListener("input", event => {
   state.query = event.target.value || "";
   render();

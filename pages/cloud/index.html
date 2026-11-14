@@ -50,7 +50,7 @@
     <section id="cloud-browser" class="cloud-browser" hidden>
       <section class="cloud-connection-panel" aria-label="四路 OpenList 連線設定">
         <div class="cloud-connection-heading">
-          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源使用相同目錄結構，但電子書與漫畫有各自獨立的根目錄。登入後不會自動連線，只有按下測試按鈕才會讀取目錄。</p></div>
+          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源使用相同目錄結構，但電子書與漫畫有各自獨立的根目錄；電子書只顯示 EPUB，漫畫可同時收藏固定版面 EPUB 與 CBZ。登入後不會自動連線，只有按下測試按鈕才會讀取目錄。</p></div>
           <span id="cloud-connection-status" class="cloud-status-pill">尚未測試</span>
         </div>
         <div class="cloud-provider-select">
@@ -77,7 +77,7 @@
           <p>和 FRAME Audio 的 Music／Podcast 一樣，電子書與漫畫分開設定。可輸入路徑，或在下方瀏覽資料夾後，將目前目錄指定為其中一個根目錄。</p>
           <div class="cloud-roots-grid">
             <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">等待伺服器設定…</small></div>
-            <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（CBZ）</label><input id="cloud-comics-root" type="text" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">等待伺服器設定…</small></div>
+            <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">等待伺服器設定…</small></div>
           </div>
           <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存兩個目錄設定</button><span>目前選擇會保存在這台裝置；Cloudflare 設定的最大存取範圍仍由伺服器限制。</span></div>
         </div>
@@ -97,7 +97,7 @@
       </div>
       <div class="cloud-library-select">
         <label for="cloud-library-type">目前瀏覽分類</label>
-        <select id="cloud-library-type"><option value="books">電子書 · EPUB</option><option value="comics">漫畫 · CBZ</option></select>
+        <select id="cloud-library-type"><option value="books">電子書 · EPUB</option><option value="comics">漫畫 · EPUB / CBZ</option></select>
       </div>
       <div class="cloud-path-bar">
         <button id="cloud-root" type="button" aria-label="回到目前分類根目錄">⌂</button>
@@ -126,6 +126,6 @@
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-shelf-classification1"></script>
 </body>
 </html>
