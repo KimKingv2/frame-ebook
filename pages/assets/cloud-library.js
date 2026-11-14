@@ -16,7 +16,6 @@ const state = {
   authenticated:false,
   accessEnabled:false,
   accessTeamDomain:"",
-  databaseConfigured:false,
   allowedRoots:{books:"/",comics:"/"},
   selectedRoots:{books:"/",comics:"/"},
   currentPath:"/",
@@ -285,7 +284,6 @@ async function checkSession() {
     state.authenticated=!!(response.ok&&data.authenticated);
     state.accessEnabled=!!data.accessEnabled;
     state.accessTeamDomain=String(data.accessTeamDomain||"");
-    state.databaseConfigured=!!data.databaseConfigured;
     state.serverProfiles=data.openListProfiles||{};
     state.allowedRoots={books:"/",comics:"/"};
     if(state.authenticated) {
@@ -320,51 +318,21 @@ async function checkSession() {
     } else {
       $("cloud-login-panel").hidden=false;
       $("cloud-browser").hidden=true;
-      const loginForm=$("cloud-login-form");
-      const loginButton=loginForm.querySelector("button");
-      loginForm.hidden=state.accessEnabled;
-      $("cloud-access-required").hidden=!state.accessEnabled;
-      loginButton.disabled=!state.databaseConfigured||state.accessEnabled;
-      $("cloud-login-error").textContent=state.accessEnabled
-        ?"Cloudflare Access 尚未通過驗證。請確認 Access 應用網域、政策與 Team Domain／AUD 設定。"
-        :(state.databaseConfigured?"":"Cloudflare D1 尚未綁定，請先完成專案設定再登入。詳見 docs/CLOUDFLARE-SETUP.md。");
+      $("cloud-access-required").hidden=false;
+      $("cloud-access-required").textContent=state.accessEnabled
+        ?"已設定 Cloudflare Access，但目前請求未通過 JWT 驗證。請確認此網域已套用 Access 政策，並核對 Team Domain、Application AUD。"
+        :"尚未設定 Cloudflare Access。請先建立 Access 應用，再設定 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。";
     }
   } catch(error) {
     $("cloud-browser-status").textContent="無法確認登入狀態："+(error.message||String(error));
   }
 }
-async function login(event) {
-  event.preventDefault();
-  if(state.accessEnabled) {
-    $("cloud-login-error").textContent="本網站使用 Cloudflare Access，無需 Reader 私人密碼。";
-    return;
-  }
-  const button=$("cloud-login-form").querySelector("button");
-  button.disabled=true;
-  $("cloud-browser-status").textContent="正在驗證私人密碼……";
-  try {
-    const response=await fetch("/api/auth/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("cloud-password").value})});
-    const data=await response.json();
-    if(!response.ok)throw new Error(data.error||"登入失敗。");
-    $("cloud-login-error").textContent="";
-    $("cloud-password").value="";
-    await checkSession();
-  } catch(error) {
-    $("cloud-login-error").textContent=error.message||String(error);
-  } finally {
-    button.disabled=!state.databaseConfigured;
-  }
-}
 async function logout() {
-  if(state.accessEnabled&&state.accessTeamDomain) {
-    location.href=new URL("/cdn-cgi/access/logout",state.accessTeamDomain).href;
+  if(!state.accessTeamDomain) {
+    setSourceStatus("尚未取得 Cloudflare Access Team Domain，無法執行 Access 登出。",true);
     return;
   }
-  try { await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"}); } catch (_) {}
-  state.authenticated=false;
-  state.connected=false;
-  $("cloud-login-panel").hidden=false;
-  $("cloud-browser").hidden=true;
+  location.href=new URL("/cdn-cgi/access/logout",state.accessTeamDomain).href;
 }
 async function loadDirectory(path=getActiveRoot(),page=1) {
   state.page=Math.max(1,Number(page)||1);
@@ -503,7 +471,6 @@ function setCurrentFolderAsRoot(library) {
   $(id).value=candidate;
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「套用兩個目錄設定」。");
 }
-$("cloud-login-form").addEventListener("submit",login);
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
 $("cloud-prev-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page-1));
 $("cloud-next-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page+1));
