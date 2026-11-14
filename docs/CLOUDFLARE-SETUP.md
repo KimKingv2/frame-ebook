@@ -26,18 +26,18 @@ Under the Pages project's Settings → Variables and Secrets, add the following 
 | Name | Type | Purpose |
 |---|---|---|
 | `ALIST_VPS_API_BASE_URL` | Variable | VPS Alist HTTPS API base URL |
-| `ALIST_VPS_API_USERNAME` | Variable | Read-only VPS Alist account name |
-| `ALIST_VPS_API_PASSWORD` | Secret | Password for the VPS Alist account |
+| `ALIST_VPS_USERNAME` | Variable | Read-only VPS Alist account name |
+| `ALIST_VPS_PASSWORD` | Secret | Password for the VPS Alist account |
 | `ALIST_WORKER_API_BASE_URL` | Variable | OpenList Worker HTTPS API base URL |
-| `ALIST_WORKER_API_USERNAME` | Variable | Read-only Worker account name |
-| `ALIST_WORKER_API_PASSWORD` | Secret | Password for the Worker account |
+| `ALIST_WORKER_USERNAME` | Variable | Read-only Worker account name |
+| `ALIST_WORKER_PASSWORD` | Secret | Password for the Worker account |
 | `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API base URL |
-| `ALIST_MOBILE_DEVICE_API_USERNAME` | Variable | Read-only Mobile Device account name |
-| `ALIST_MOBILE_DEVICE_API_PASSWORD` | Secret | Password for the Mobile Device account |
-| `FRAME_READER_ACCESS_PASSWORD` | Secret | Separate password used to enter the private FRAME Reader |
-| `FRAME_READER_SESSION_SECRET` | Secret | Random signing secret for the HttpOnly session cookie |
+| `ALIST_MOBILE_DEVICE_USERNAME` | Variable | Read-only Mobile Device account name |
+| `ALIST_MOBILE_DEVICE_PASSWORD` | Secret | Password for the Mobile Device account |
+| `FRAME_READER_ACCESS_TEAM_DOMAIN` | Variable | Cloudflare Zero Trust team domain, such as `https://your-team.cloudflareaccess.com` |
+| `FRAME_READER_ACCESS_AUD` | Variable | Application Audience (AUD) tag from the Reader Access application |
 
-The three server-side profiles are independent. Configure only the sources you intend to use. Use an Alist account with read-only access and grant it access only to the intended book and comic directories.
+The three server-side profiles are independent. Configure only the sources you intend to use. The account and password names above intentionally omit `API_`; the server also accepts the older `*_API_USERNAME` / `*_API_PASSWORD` variants for compatibility. Use an Alist account with read-only access and grant it access only to the intended book and comic directories.
 
 ### How Alist authentication works
 
