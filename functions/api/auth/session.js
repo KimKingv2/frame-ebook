@@ -1,21 +1,18 @@
-import { json, getAccessAuthDiagnostics, isAccessVerifierConfigured, getOpenListProfiles, getOpenListRootPaths } from "../../_lib/common.js";
+import { json, getOpenListProfiles, getOpenListRootPaths, getDatabase } from "../../_lib/common.js";
 
-export async function onRequestGet({ request, env }) {
-  const auth = await getAccessAuthDiagnostics(request, env);
-  const authenticated = auth.authenticated;
+// Cloudflare Access has already authenticated or rejected the request at the
+// edge. This endpoint only reports Reader service readiness; it does not run
+// a second JWT verifier or establish a separate application session.
+export async function onRequestGet({ env }) {
   const profiles = getOpenListProfiles(env);
   const anyServerProfileConfigured = Object.values(profiles).some(profile => profile.configured);
   return json({
-    authenticated,
+    authenticated: true,
     accessEnabled: true,
-    jwtValidationConfigured: isAccessVerifierConfigured(env),
-    accessJwtDiagnostics: {
-      failureReason: auth.failureReason,
-      checks: auth.checks
-    },
+    authenticationMode: "cloudflare-access-edge",
     openListConfigured: anyServerProfileConfigured,
     openListProfiles: profiles,
-    rootPaths: authenticated ? getOpenListRootPaths(env) : null,
+    rootPaths: getOpenListRootPaths(env),
     databaseConfigured: !!(env.FRAME_READER_DB || env.DB)
   });
 }
