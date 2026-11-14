@@ -1,7 +1,10 @@
-import { json, getDatabase, verifyPassword, createSessionCookie, getOpenListProfiles, sha256Hex, isSameOrigin } from "../../_lib/common.js";
+import { json, getDatabase, verifyPassword, createSessionCookie, getOpenListProfiles, sha256Hex, isSameOrigin, isCloudflareAccessConfigured } from "../../_lib/common.js";
 
 export async function onRequestPost({ request, env }) {
   if (!isSameOrigin(request)) return json({ error: "不允許跨來源登入請求。" }, 403);
+  if (isCloudflareAccessConfigured(env)) {
+    return json({ error: "本網站已使用 Cloudflare Zero Trust Access 驗證，請先通過 Access 門禁。" }, 403);
+  }
   const db = getDatabase(env);
   if (!db) return json({ error: "Cloudflare D1 尚未綁定。請先設定 FRAME_READER_DB，完成後才能啟用雲端登入。" }, 503);
   if (!env.FRAME_READER_ACCESS_PASSWORD || !env.FRAME_READER_SESSION_SECRET) {
