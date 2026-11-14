@@ -867,6 +867,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
   state.scanRunning=true;
   state.scanPauseRequested=false;
   scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=true;});
+  ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=true;});
   if(pauseButton)pauseButton.disabled=false;
   const startedAt=Date.now();
 
@@ -1067,7 +1068,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
     state.scanPauseRequested=false;
     if(pauseButton)pauseButton.disabled=true;
     if(!state.scanAllRunning)scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=false;});
-    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{
+    if(!state.scanAllRunning)["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{
       const control=$(id);
       if(control)control.disabled=false;
     });
@@ -1104,6 +1105,7 @@ async function runLibraryScanContinuous(library) {
   } finally {
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
   }
 }
 async function runAllIndexScans() {
