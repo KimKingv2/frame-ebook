@@ -611,7 +611,7 @@ class HttpRangeReader {
         return bytes;
       } catch(error) {
         const message=String(error?.message||error);
-        const retryable=/HTTP (?:429|500|502|503|504)\\b|failed to fetch|networkerror|network request failed/i.test(message);
+        const retryable=/HTTP (?:429|500|502|503|504)\b|failed to fetch|networkerror|network request failed/i.test(message);
         if(retryable&&attempt<maxAttempts) {
           const delay=400*attempt;
           this.onEvent("封面 Range #"+number+" 暫時性錯誤（第 "+attempt+"/"+maxAttempts+" 次）："+message+"；"+delay+" ms 後重試。","warning");
