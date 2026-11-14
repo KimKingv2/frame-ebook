@@ -86,7 +86,125 @@ function getCookie(request, name) {
   return "";
 }
 
+let accessKeysCache = { domain: "", keys: [], loadedAt: 0 };
+const ACCESS_KEYS_CACHE_MS = 10 * 60 * 1000;
+
+function getCloudflareAccessSettings(env) {
+  const rawDomain = String(env.FRAME_READER_ACCESS_TEAM_DOMAIN || "").trim();
+  const aud = String(env.FRAME_READER_ACCESS_AUD || "").trim();
+  const enabled = !!(rawDomain || aud);
+  let teamDomain = "";
+  try {
+    const url = new URL(rawDomain);
+    if (url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash && (url.pathname === "/" || !url.pathname)) {
+      teamDomain = url.origin;
+    }
+  } catch (_) {}
+  return { enabled, teamDomain, aud };
+}
+
+export function isCloudflareAccessConfigured(env) {
+  return getCloudflareAccessSettings(env).enabled;
+}
+
+export function getCloudflareAccessTeamDomain(env) {
+  return getCloudflareAccessSettings(env).teamDomain || null;
+}
+
+function decodeJwtPart(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function decodeJwtJson(value) {
+  return JSON.parse(new TextDecoder().decode(decodeJwtPart(value)));
+}
+
+async function getCloudflareAccessKeys(teamDomain, forceRefresh = false) {
+  const fresh = accessKeysCache.domain === teamDomain &&
+    Array.isArray(accessKeysCache.keys) &&
+    accessKeysCache.keys.length > 0 &&
+    Date.now() - accessKeysCache.loadedAt < ACCESS_KEYS_CACHE_MS;
+  if (!forceRefresh && fresh) return accessKeysCache.keys;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(new URL("/cdn-cgi/access/certs", teamDomain).href, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Cloudflare Access 公鑰端點回應 HTTP " + response.status);
+    const payload = await response.json();
+    const keys = Array.isArray(payload && payload.keys) ? payload.keys.filter(key =>
+      key && key.kty === "RSA" && key.kid && key.n && key.e && (!key.alg || key.alg === "RS256")
+    ) : [];
+    if (!keys.length) throw new Error("Cloudflare Access 沒有提供有效的 RS256 公鑰。");
+    accessKeysCache = { domain: teamDomain, keys, loadedAt: Date.now() };
+    return keys;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function verifyCloudflareAccessAssertion(request, settings) {
+  const token = String(request.headers.get("Cf-Access-Jwt-Assertion") || "");
+  if (!token || token.length > 16384) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+
+  try {
+    const header = decodeJwtJson(parts[0]);
+    const payload = decodeJwtJson(parts[1]);
+    if (!header || header.alg !== "RS256" || !header.kid) return false;
+    if (!payload || payload.iss !== settings.teamDomain) return false;
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!audiences.includes(settings.aud)) return false;
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(Number(payload.exp)) || Number(payload.exp) <= now) return false;
+    if (payload.nbf != null && Number(payload.nbf) > now + 15) return false;
+    if (payload.iat != null && Number(payload.iat) > now + 60) return false;
+
+    let keys = await getCloudflareAccessKeys(settings.teamDomain);
+    let jwk = keys.find(key => key.kid === header.kid);
+    if (!jwk) {
+      keys = await getCloudflareAccessKeys(settings.teamDomain, true);
+      jwk = keys.find(key => key.kid === header.kid);
+    }
+    if (!jwk) return false;
+
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    return await crypto.subtle.verify(
+      { name: "RSASSA-PKCS1-v1_5" },
+      publicKey,
+      decodeJwtPart(parts[2]),
+      new TextEncoder().encode(parts[0] + "." + parts[1])
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function isAuthenticated(request, env) {
+  const access = getCloudflareAccessSettings(env);
+  if (access.enabled) {
+    // Access mode is exclusive: an invalid/missing Access assertion must not
+    // fall back to the legacy Reader password cookie.
+    if (!access.teamDomain || !access.aud) return false;
+    return await verifyCloudflareAccessAssertion(request, access);
+  }
+
   const token = getCookie(request, COOKIE_NAME);
   const secret = env.FRAME_READER_SESSION_SECRET;
   if (!token || !secret) return false;
