@@ -1008,6 +1008,7 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
       provider:state.activeProvider,
       library:state.activeLibrary
     });
+    if(safePath===selected)query.set("recursive","1");
     const response=await fetch("/api/cloud/books?"+query.toString(),{credentials:"same-origin"});
     const data=await readJsonResponse(response,"D1 書庫索引讀取失敗。");
     state.currentPath=data.path||safePath;
@@ -1090,7 +1091,13 @@ function makeItem(item) {
   const title=document.createElement("strong");title.textContent=item.name.replace(/\.(epub|cbz)$/i,"");
   title.title=item.name;
   const meta=document.createElement("span");
-  meta.textContent=(item.format||"書籍")+" · "+formatBytes(item.size)+(item.modified?" · "+String(item.modified).slice(0,10):"");
+  const root=getActiveRoot();
+  const relativeFolder=item.parentPath&&String(item.parentPath).startsWith(root)
+    ?String(item.parentPath).slice(root.length).replace(/^\/+/,"")
+    :String(item.parentPath||"");
+  meta.textContent=(item.format||"書籍")+" · "+formatBytes(item.size)+
+    (item.modified?" · "+String(item.modified).slice(0,10):"")+
+    (relativeFolder?" · "+relativeFolder:"");
   copy.append(title,meta);
   const actions=document.createElement("div");actions.className="cloud-item-actions";
   const add=document.createElement("button");add.type="button";add.className="cloud-import-button";
