@@ -269,7 +269,7 @@ export async function openListPost(env, endpoint, body, provider = "vps", librar
     const message = String(result?.message || result?.error || "");
     throw new Error(config.label + " API 回報錯誤（" + code + "）" + (message ? "：" + message : "。"));
   }
-  return result;
+  return result.data;
 }
 export async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));

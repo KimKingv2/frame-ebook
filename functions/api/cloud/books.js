@@ -31,7 +31,7 @@ export async function onRequestGet({ request, env }) {
     const content = Array.isArray(data && data.content) ? data.content : [];
     const items = content.map(item => {
       const itemPath = joinPath(path, item.name);
-      if (!itemPath || !isWithinRoot(itemPath, config.rootPath)) return null;
+      if (!itemPath) return null;
       const isDir = !!item.is_dir;
       const format = isDir ? "" : getFormat(item.name);
       return {
