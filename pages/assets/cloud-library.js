@@ -1134,8 +1134,10 @@ async function runAllIndexScans() {
   } finally {
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
   }
-}function pauseIndexScan() {
+}
+function pauseIndexScan() {
   if (!state.scanRunning) return;
   state.scanPauseRequested = true;
   $("cloud-scan-pause").disabled = true;
