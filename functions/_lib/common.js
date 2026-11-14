@@ -91,10 +91,28 @@ async function getAccessJwks(teamDomain, forceRefresh = false) {
         redirect: "error",
         signal: controller.signal
       });
-      if (!response.ok) throw new Error("Unable to load Cloudflare Access JWKS");
-      const payload = await response.json();
+      if (!response.ok) {
+        const error = new Error("Cloudflare Access JWKS HTTP " + response.status);
+        error.code = "jwks_http_error";
+        error.httpStatus = response.status;
+        error.contentType = response.headers.get("content-type") || "";
+        throw error;
+      }
+      let payload;
+      try {
+        payload = await response.json();
+      } catch (cause) {
+        const error = new Error("Cloudflare Access JWKS response was not valid JSON");
+        error.code = "jwks_invalid_json";
+        error.contentType = response.headers.get("content-type") || "";
+        error.cause = cause;
+        throw error;
+      }
       if (!Array.isArray(payload?.keys) || !payload.keys.some(key => key?.kid && key?.kty === "RSA")) {
-        throw new Error("Cloudflare Access JWKS has no usable RSA signing keys");
+        const error = new Error("Cloudflare Access JWKS has no usable RSA signing keys");
+        error.code = "jwks_invalid_payload";
+        error.contentType = response.headers.get("content-type") || "";
+        throw error;
       }
 
       const keys = payload.keys.filter(key =>
@@ -205,8 +223,17 @@ async function inspectCloudflareAccessJwt(token, config) {
   try {
     keys = await getAccessJwks(config.teamDomain);
     checks.jwksAvailable = Array.isArray(keys) && keys.length > 0;
-  } catch (_) {
+  } catch (error) {
     checks.jwksAvailable = false;
+    checks.jwksFailure = {
+      errorName: typeof error?.name === "string" ? error.name.slice(0, 40) : "Error",
+      errorCode: typeof error?.code === "string" ? error.code.slice(0, 80) : null,
+      httpStatus: Number.isInteger(error?.httpStatus) ? error.httpStatus : null,
+      contentType: typeof error?.contentType === "string" ? error.contentType.slice(0, 100) : null,
+      message: typeof error?.message === "string" ? error.message.slice(0, 160) : "Unknown JWKS fetch error",
+      causeCode: typeof error?.cause?.code === "string" ? error.cause.code.slice(0, 80) : null,
+      causeMessage: typeof error?.cause?.message === "string" ? error.cause.message.slice(0, 160) : null
+    };
     return fail("jwks_unavailable");
   }
   if (!checks.jwksAvailable) return fail("jwks_unavailable");
