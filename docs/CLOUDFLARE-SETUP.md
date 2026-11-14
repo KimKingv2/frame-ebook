@@ -1,6 +1,6 @@
-# FRAME Reader V0.7 — Cloudflare setup
+# FRAME Reader V0.8 — Cloudflare setup
 
-FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf reads original EPUB / CBZ files from OpenList; adding a cloud file copies it into the current browser's IndexedDB.
+FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf keeps a metadata-only catalog and resumable scan state in D1; original EPUB / CBZ files remain in OpenList. Adding a cloud file copies its content into the current browser's IndexedDB.
 
 ## 1. Create and bind the D1 database
 
@@ -15,6 +15,7 @@ Apply the schema from the repository root if it has not already been applied:
 
 ```sh
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0002_cloud_catalog.sql
 ```
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Save and redeploy so the binding is available to Pages Functions. Do not recreate or reset an existing database.
@@ -56,7 +57,7 @@ These are ordinary Variables, not Secrets. Do not add email addresses here. Addi
 
 Pages Functions fetch and cache the public signing keys automatically from `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`. If a JWT contains a previously unseen key ID, the verifier refreshes the JWKS. Cloudflare's signing-key rotation therefore does not require manual Variable updates or scheduled maintenance.
 
-D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
+D1 stores reading events/statistics plus the metadata-only cloud catalog and resumable scan state. It never stores EPUB / CBZ file contents or OpenList credentials. The old `auth_attempts` table may remain in D1 and is no longer used.
 
 ## 4. Configure the LAN-direct source (optional)
 
@@ -77,11 +78,11 @@ You can type an absolute path directly, or browse folders and use the current fo
 
 All sources should expose the same absolute folder layout so the two HTML input paths work after switching sources. The default paths are the `value` attributes of `cloud-books-root` and `cloud-comics-root` in `pages/cloud/index.html`. Changes made in the browser apply only to the current page session; refreshing restores the HTML defaults. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are not used for path defaults or access control. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
-After Cloudflare Access authentication succeeds, the cloud page automatically opens the previously selected source and the HTML-default path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
+After Cloudflare Access authentication succeeds, the cloud page automatically reads the D1 index for the previously selected source, library and HTML-default root path. The first use of each source/library/root combination requires **手動掃描／續掃**. The recursive scan stores its folder queue and page cursor in D1 after each directory page, so a paused or interrupted scan can resume later. Once complete, normal page loads and folder navigation query D1 only; they do not list directories from OpenList. Run another manual scan after adding, removing or reorganizing cloud files. The next completed scan removes stale catalog entries only after the whole root has been traversed successfully. Each VPS, Worker, Mobile Device and LAN-direct source, and each Books/Comics root, has an independent catalog and scan state.
 
 ## 6. Verify the configuration
 
-1. Confirm the D1 binding exists for reading-history synchronization and statistics.
+1. Confirm the D1 binding exists for reading-history synchronization, statistics and cloud catalog indexing. Apply both `migrations/0001_reading_events.sql` and `migrations/0002_cloud_catalog.sql` to the `frame-reader-db` database.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
@@ -90,16 +91,17 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
    - If a custom domain is used, Cloudflare Pages requires a separate Access application for that hostname. Add its AUD tag to `FRAME_READER_ACCESS_AUD`, separated from the other AUD tags by a comma. The Team Domain stays the same.
    This is configured in Cloudflare Access, not under Pages Variables or Secrets. Access must cover the whole hostname, including `/api/*`. Confirm at least one server-side source has its API URL, username and password configured.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
-4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
-5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
-6. Add a file to the local shelf. The original cloud file is not changed or deleted.
+4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
+5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
+6. After the first completed scan, folder navigation reads D1. Re-run the scan when you want to synchronize new, modified or deleted OpenList files.
+7. Add a selected file to the local shelf. Only then is the original EPUB / CBZ downloaded to this browser's IndexedDB; the cloud original is not changed or deleted.
 
 ## 7. Existing data and current behavior
 
-- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused. The two Access verification Variables must be configured as described above.
+- Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. It is additive and does not alter existing reading events, local books, reading progress or appearance settings. The two Access verification Variables must be configured as described above.
 - Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
-- Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
+- Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device. D1 cloud catalog rows contain directory/file names, paths, formats, sizes and modified timestamps, not book contents or credentials.
 - Cloud browsing and file-info requests are read-only. The file proxy forwards valid HTTP Range headers, but the current cloud shelf downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Range-backed reading is a later optimization.
 - Reading duration is tracked locally first. Once authenticated through Cloudflare Access, pending events sync to D1. Reading statistics aggregate across devices after they sync.
 - Cloud originals remain in OpenList. Removing a local copy does not delete the cloud original.
