@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.8 Reading Insights + persistent Cloud Library index**. The cloud shelf uses a D1 metadata catalog with manual full scans, resumable D1 checkpoints, and D1-backed browsing between scans. Original EPUB / CBZ files remain in OpenList until explicitly added to a browser's local IndexedDB shelf.
+> Current status: **V0.9 Reading Insights + persistent Cloud Library index and cover shelf**. The cloud shelf uses a D1 metadata catalog with manual full scans, resumable D1 checkpoints, and D1-backed browsing between scans. Original EPUB / CBZ files remain in OpenList; cover thumbnails are extracted with HTTP Range reads, deduplicated in private R2, and displayed from the indexed shelf.
 
 ## Product scope
 
@@ -171,3 +171,12 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 The current cloud shelf imports a selected OpenList file through the protected proxy into this browser's IndexedDB. It does not yet mount a remote book directly into Foliate; very large books still download fully into browser storage before opening. The backend proxy is Range-capable so a later reader-loader integration can stream partial requests.
 
 See docs/CLOUDFLARE-SETUP.md before enabling cloud features. Do not paste passwords or API tokens into chat or commit them to Git.
+
+
+## Cloud cover storage
+
+- D1 binding: `FRAME_READER_DB` → `frame-reader-db`.
+- Private R2 binding: `FRAME_READER_COVERS` → `frame-reader-covers` (public access disabled).
+- Apply `migrations/0003_cloud_covers.sql` after the existing reading-events and cloud-catalog migrations.
+- EPUB covers are selected from OPF metadata; CBZ covers prefer `cover` / `front` images, otherwise the first image. Thumbnails are normalized to WebP (JPEG fallback), capped at 512 px on the longest edge, and SHA-256 deduplicated.
+- Cover extraction uses HTTP Range requests through the protected file API; it does not intentionally fetch complete EPUB / CBZ files. Missing or failed covers are recorded in D1 and can be retried independently.
