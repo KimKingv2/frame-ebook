@@ -28,7 +28,11 @@ const state = {
   activeProvider:"vps",
   activeLibrary:"books",
   localProfile:{baseUrl:"",username:"",password:""},
-  connected:false
+  connected:false,
+  scanRunning:false,
+  scanPauseRequested:false,
+  scanState:null,
+  scanLogEntries:[]
 };
 
 function formatBytes(bytes) {
@@ -240,8 +244,8 @@ async function directOpenList(endpoint,payload) {
   if(Number(data?.code)!==200)throw new Error("區域網路 OpenList API "+(data?.code||"unknown")+"："+String(data?.message||"未知錯誤"));
   return data;
 }
-async function listLocalDirectory(path,page) {
-  const payload=await directOpenList("list",{path,password:"",page,per_page:state.perPage,refresh:false});
+async function listLocalDirectory(path,page,perPage=state.perPage) {
+  const payload=await directOpenList("list",{path,password:"",page,per_page:perPage,refresh:false});
   const data=payload.data||{};
   const content=Array.isArray(data.content)?data.content:[];
   const items=content.map(item=>{
@@ -276,6 +280,340 @@ function isActiveSourceReady() {
   if(state.activeProvider==="local") return !!(state.localProfile.baseUrl&&state.localProfile.username&&state.localProfile.password);
   return !!state.serverProfiles[state.activeProvider]?.configured;
 }
+async function readJsonResponse(response, fallback) {
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || fallback || ("HTTP " + response.status));
+  }
+  return data;
+}
+function indexScope() {
+  return {
+    provider: state.activeProvider,
+    library: state.activeLibrary,
+    rootPath: getActiveRoot()
+  };
+}
+function setIndexProgress(message, isError=false) {
+  const node = $("cloud-index-progress");
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle("is-error", !!isError);
+}
+function appendIndexLog(message, level="info") {
+  const now = new Date();
+  const timestamp = [now.getHours(),now.getMinutes(),now.getSeconds()].map(v=>String(v).padStart(2,"0")).join(":") +
+    "." + String(now.getMilliseconds()).padStart(3,"0");
+  const line = timestamp + "  " + String(message || "");
+  state.scanLogEntries.push(line);
+  if (state.scanLogEntries.length > 300) state.scanLogEntries.shift();
+  const output = $("cloud-index-log");
+  if (output) {
+    output.textContent = state.scanLogEntries.join("\\n");
+    output.scrollTop = output.scrollHeight;
+  }
+  const count = $("cloud-index-log-count");
+  if (count) count.textContent = state.scanLogEntries.length + " 筆";
+}
+function renderIndexStatus(summary) {
+  const node = $("cloud-index-status");
+  if (!node) return;
+  if (!summary) {
+    node.textContent = "尚未建立索引";
+    setIndexProgress("首次使用請先手動掃描電子書或漫畫目錄。掃描完成後，日常開啟會直接讀取 D1 索引。");
+    return;
+  }
+  state.scanState = summary;
+  if (summary.completed) {
+    const date = summary.updatedAt ? new Date(summary.updatedAt).toLocaleString("zh-TW") : "時間未知";
+    node.textContent = "索引已完成 · " + Number(summary.indexedCount || 0) + " 個項目";
+    setIndexProgress("最近完成：" + date + "；已檢查 " + Number(summary.scannedCount || 0) +
+      " 個目錄項目，索引 " + Number(summary.indexedCount || 0) + " 個項目，資料夾 " +
+      Number(summary.visitedFolderCount || 0) + " 個。再次掃描會檢查新增、變更及已刪除項目。");
+  } else {
+    node.textContent = summary.currentFolder || summary.pendingFolders?.length
+      ? "索引未完成 · 可續掃"
+      : "索引尚未完成 · 可續掃";
+    setIndexProgress("目前已檢查 " + Number(summary.scannedCount || 0) + " 個目錄項目，索引 " +
+      Number(summary.indexedCount || 0) + " 個項目；已完成資料夾 " +
+      Number(summary.visitedFolderCount || 0) + " 個。點擊「手動掃描／續掃」會從 D1 保存的游標繼續。");
+  }
+}
+async function scanStateRequest(method="GET", scanState=null) {
+  const scope = indexScope();
+  const url = new URLSearchParams({
+    provider: scope.provider,
+    library: scope.library,
+    root_path: scope.rootPath
+  });
+  const response = await fetch("/api/cloud/index/state" + (method === "GET" ? "?" + url.toString() : ""), {
+    method,
+    credentials: "same-origin",
+    headers: method === "POST" ? { "Content-Type": "application/json" } : {},
+    body: method === "POST" ? JSON.stringify({
+      provider: scope.provider,
+      library: scope.library,
+      rootPath: scope.rootPath,
+      state: scanState
+    }) : undefined
+  });
+  return readJsonResponse(response, "讀取／保存 D1 掃描進度失敗。");
+}
+async function loadIndexScanState() {
+  return (await scanStateRequest("GET")).state || null;
+}
+async function saveIndexScanState(scanState) {
+  scanState.updatedAt = new Date().toISOString();
+  await scanStateRequest("POST", scanState);
+}
+function newIndexScanState(rootPath, provider, library) {
+  const scanId = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID().replace(/-/g, "")
+    : "scan_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,12);
+  return {
+    version: 1,
+    provider,
+    library,
+    rootPath,
+    scanId,
+    pendingFolders: [rootPath],
+    currentFolder: null,
+    page: 1,
+    seenFolders: [rootPath],
+    scannedCount: 0,
+    indexedCount: 0,
+    visitedFolderCount: 0,
+    completed: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+function indexScanProgressText(scanState, batch, finished=false) {
+  const lines = [
+    "來源：" + PROVIDER_LABELS[scanState.provider] + " · " + LIBRARY_LABELS[scanState.library],
+    "根目錄：" + scanState.rootPath,
+    "已檢查：" + Number(scanState.scannedCount || 0) + " 個目錄項目",
+    "已寫入／更新：" + Number(scanState.indexedCount || 0) + " 個索引項目",
+    "已完成資料夾：" + Number(scanState.visitedFolderCount || 0) + " 個",
+    "待掃描資料夾：" + scanState.pendingFolders.length + (scanState.currentFolder ? "；目前：" + scanState.currentFolder : ""),
+    "本批檢查：" + batch.entries + " 個項目；寫入：" + batch.indexed + " 個；完成資料夾：" + batch.folders + " 個"
+  ];
+  if (scanState.currentFolder) lines.push("目前頁面：" + scanState.page + "；掃描游標會在每頁完成後保存。");
+  if (scanState.completed) lines.push("完整索引已完成。下次開啟書庫會直接讀取 D1，不會自動重新掃描。");
+  else if (finished) lines.push("本批結束，進度已保存到 D1；可以關閉頁面，之後再續掃。");
+  else if (state.scanPauseRequested) lines.push("已要求暫停，當前頁完成並保存後停止。");
+  else lines.push("掃描進行中；每完成一頁都會將索引資料和續掃游標保存至 D1。");
+  return lines.join("\\n");
+}
+async function fetchScanDirectory(path, page, perPage) {
+  if (state.activeProvider === "local") {
+    return listLocalDirectory(path, page, perPage);
+  }
+  const scope = indexScope();
+  const query = new URLSearchParams({
+    provider: scope.provider,
+    library: scope.library,
+    root_path: scope.rootPath,
+    path,
+    page: String(page),
+    per_page: String(perPage)
+  });
+  const response = await fetch("/api/cloud/scan-list?" + query.toString(), { credentials: "same-origin" });
+  const data = await readJsonResponse(response, "讀取 OpenList 目錄失敗。");
+  return data;
+}
+async function writeIndexEntries(scanState, entries) {
+  if (!entries.length) return 0;
+  const scope = indexScope();
+  let saved = 0;
+  for (let offset = 0; offset < entries.length; offset += 100) {
+    const response = await fetch("/api/cloud/index/entries", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: scope.provider,
+        library: scope.library,
+        rootPath: scope.rootPath,
+        scanId: scanState.scanId,
+        entries: entries.slice(offset, offset + 100)
+      })
+    });
+    const data = await readJsonResponse(response, "寫入 D1 書庫索引失敗。");
+    saved += Number(data.saved || 0);
+  }
+  return saved;
+}
+async function runIndexScan() {
+  if (state.scanRunning) return;
+  if (!state.authenticated) {
+    setIndexProgress("尚未通過 Cloudflare Access，無法開始索引。", true);
+    return;
+  }
+  if (!isActiveSourceReady()) {
+    setIndexProgress("請先完成目前 OpenList 來源的網址、帳號與密碼設定。", true);
+    return;
+  }
+  const scope = indexScope();
+  const startButton = $("cloud-scan-start");
+  const pauseButton = $("cloud-scan-pause");
+  let scanState = null;
+  const batch = { entries: 0, indexed: 0, folders: 0 };
+  try {
+    appendIndexLog("========== 雲端書庫索引開始 ==========");
+    appendIndexLog("讀取 D1 掃描進度開始。");
+    scanState = await loadIndexScanState();
+    if (scanState && scanState.rootPath === scope.rootPath &&
+        scanState.provider === scope.provider && scanState.library === scope.library &&
+        scanState.version === 1 && !scanState.completed) {
+      appendIndexLog("找到未完成的掃描進度，將從上次保存的位置續掃。", "warning");
+    } else {
+      if (scanState?.completed && !window.confirm(
+        "這個來源與分類的上一輪索引已完成。重新掃描會檢查新增、變更和刪除的檔案；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
+      )) return;
+      scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
+      await saveIndexScanState(scanState);
+      appendIndexLog("建立新掃描工作與 D1 進度記錄。", "success");
+    }
+
+    state.scanRunning = true;
+    state.scanPauseRequested = false;
+    startButton.disabled = true;
+    pauseButton.disabled = false;
+    const startedAt = Date.now();
+    const maxEntriesPerBatch = 500;
+    const maxFoldersPerBatch = 500;
+    const maxDurationMs = 240000;
+    const pageSize = 100;
+    const seen = new Set(Array.isArray(scanState.seenFolders) ? scanState.seenFolders : [scope.rootPath]);
+
+    while (!scanState.completed &&
+      batch.entries < maxEntriesPerBatch &&
+      batch.folders < maxFoldersPerBatch &&
+      Date.now() - startedAt < maxDurationMs &&
+      !state.scanPauseRequested) {
+      if (!scanState.currentFolder) {
+        if (!scanState.pendingFolders.length) break;
+        scanState.currentFolder = scanState.pendingFolders.shift();
+        scanState.page = 1;
+        await saveIndexScanState(scanState);
+        appendIndexLog("進入資料夾：" + scanState.currentFolder);
+      }
+
+      const currentFolder = scanState.currentFolder;
+      const page = Math.max(1, Number(scanState.page) || 1);
+      setIndexProgress(indexScanProgressText(scanState, batch), false);
+      appendIndexLog("讀取目錄列表：" + currentFolder + "；第 " + page + " 頁。");
+      const listing = await fetchScanDirectory(currentFolder, page, pageSize);
+      const found = Array.isArray(listing.items) ? listing.items : [];
+      const entries = [];
+      for (const item of found) {
+        const path = normalizePath(item.path || joinPath(currentFolder, item.name));
+        const name = String(item.name || "");
+        if (!path || !name) continue;
+        const isDir = !!item.isDir;
+        const format = isDir ? "" : fileKind(item);
+        const allowed = isDir || (scope.library === "comics"
+          ? format === "EPUB" || format === "CBZ"
+          : format === "EPUB");
+        if (!allowed || !isWithinRoot(path, scope.rootPath)) continue;
+        entries.push({
+          path,
+          parentPath: currentFolder,
+          name,
+          isDir,
+          format,
+          size: Math.max(0, Number(item.size) || 0),
+          modified: item.modified || null
+        });
+        if (isDir && !seen.has(path)) {
+          seen.add(path);
+          scanState.seenFolders.push(path);
+          scanState.pendingFolders.push(path);
+        }
+      }
+
+      const saved = await writeIndexEntries(scanState, entries);
+      scanState.scannedCount += found.length;
+      scanState.indexedCount += saved;
+      batch.entries += found.length;
+      batch.indexed += saved;
+      appendIndexLog("本頁完成：" + currentFolder + "；第 " + page + " 頁；讀取 " +
+        found.length + " 個項目；保存 " + saved + " 筆索引。", "success");
+
+      const total = Math.max(0, Number(listing.total) || found.length);
+      if (page * pageSize < total) {
+        scanState.page = page + 1;
+      } else {
+        scanState.currentFolder = null;
+        scanState.page = 1;
+        scanState.visitedFolderCount += 1;
+        batch.folders += 1;
+      }
+      await saveIndexScanState(scanState);
+      setIndexProgress(indexScanProgressText(scanState, batch), false);
+    }
+
+    if (!scanState.currentFolder && scanState.pendingFolders.length === 0) {
+      appendIndexLog("所有資料夾已掃描，開始清理本根目錄中已不存在的索引項目。");
+      const response = await fetch("/api/cloud/index/complete", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: scope.provider,
+          library: scope.library,
+          rootPath: scope.rootPath,
+          scanId: scanState.scanId
+        })
+      });
+      const completed = await readJsonResponse(response, "清理過期索引失敗。");
+      scanState.completed = true;
+      scanState.completedAt = new Date().toISOString();
+      await saveIndexScanState(scanState);
+      appendIndexLog("索引完成；清理已不存在項目 " + Number(completed.removed || 0) + " 筆。", "success");
+    }
+
+    if (scanState.completed) {
+      setIndexProgress(indexScanProgressText(scanState, batch, true), false);
+      appendIndexLog("========== 完整索引完成 ==========", "success");
+    } else {
+      const reason = state.scanPauseRequested ? "使用者暫停" :
+        batch.entries >= maxEntriesPerBatch ? "達到每批 500 個項目上限" :
+        batch.folders >= maxFoldersPerBatch ? "達到每批 500 個資料夾上限" :
+        "達到單批 4 分鐘安全時限";
+      await saveIndexScanState(scanState);
+      setIndexProgress(indexScanProgressText(scanState, batch, true) + "\\n本批停止原因：" + reason, false);
+      appendIndexLog("本批結束：" + reason + "；進度已保存，可再次點擊續掃。", "warning");
+    }
+  } catch (error) {
+    appendIndexLog("索引發生錯誤：" + (error.message || error), "error");
+    if (scanState) {
+      scanState.lastError = String(error.message || error).slice(0, 700);
+      try { await saveIndexScanState(scanState); } catch (_) {}
+    }
+    setIndexProgress((error.message || "索引失敗。") +
+      "\\n目前游標已盡可能保存；修復問題後可再次點擊續掃。", true);
+  } finally {
+    state.scanRunning = false;
+    state.scanPauseRequested = false;
+    startButton.disabled = false;
+    pauseButton.disabled = true;
+    try {
+      const latest = await loadIndexScanState();
+      renderIndexStatus(latest);
+      if (isActiveSourceReady()) await loadDirectory(state.currentPath || getActiveRoot(), state.page || 1);
+    } catch (_) {}
+  }
+}
+function pauseIndexScan() {
+  if (!state.scanRunning) return;
+  state.scanPauseRequested = true;
+  $("cloud-scan-pause").disabled = true;
+  setIndexProgress("已要求暫停；目前目錄頁完成並保存 D1 游標後就會停止。");
+}
+
 async function checkSession() {
   try {
     const response=await fetch("/api/auth/session",{credentials:"same-origin"});
@@ -304,7 +642,7 @@ async function checkSession() {
       clearListing();
       if(isActiveSourceReady()) {
         state.currentPath=getActiveRoot();
-        setSourceStatus("私人書庫已登入，正在自動連接 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+"……");
+        setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
         await loadDirectory(state.currentPath,1);
       } else {
         setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「重新連線／讀取書架」。",true);
@@ -330,17 +668,10 @@ async function logout() {
 }
 async function loadDirectory(path=getActiveRoot(),page=1) {
   state.page=Math.max(1,Number(page)||1);
-  const allowed=getAllowedRoot();
   const selected=getActiveRoot();
   const safePath=normalizePath(path);
-  if(!allowed) {
-    const message="尚未設定 "+(state.activeLibrary==="books"?"OPENLIST_BOOKS_ROOT_PATH":"OPENLIST_COMICS_ROOT_PATH")+"。";
-    $("cloud-browser-status").textContent=message;
-    setSourceStatus(message,true);
-    return;
-  }
-  if(!selected||!isWithinRoot(selected,allowed)) {
-    const message="目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄不在伺服器允許範圍內。";
+  if(!selected||!isWithinRoot(selected,"/")) {
+    const message="目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄無效。";
     $("cloud-browser-status").textContent=message;
     setSourceStatus(message,true);
     return;
@@ -351,42 +682,54 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
     setSourceStatus(message,true);
     return;
   }
-  $("cloud-browser-status").textContent="正在連接 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+"……";
+  $("cloud-browser-status").textContent="正在讀取 D1 書庫索引……";
   $("cloud-refresh").disabled=true;
   $("cloud-test-source").disabled=true;
   try {
-    let data;
-    if(state.activeProvider==="local") {
-      data=await listLocalDirectory(safePath,state.page);
-    } else {
-      const query=new URLSearchParams({path:safePath,page:String(state.page),per_page:String(state.perPage),provider:state.activeProvider,library:state.activeLibrary});
-      const response=await fetch("/api/cloud/books?"+query.toString(),{credentials:"same-origin"});
-      data=await response.json();
-      if(!response.ok)throw new Error(data.error||"OpenList 目錄讀取失敗。");
-    }
+    const query=new URLSearchParams({
+      path:safePath,
+      root_path:selected,
+      page:String(state.page),
+      per_page:String(state.perPage),
+      provider:state.activeProvider,
+      library:state.activeLibrary
+    });
+    const response=await fetch("/api/cloud/books?"+query.toString(),{credentials:"same-origin"});
+    const data=await readJsonResponse(response,"D1 書庫索引讀取失敗。");
     state.currentPath=data.path||safePath;
     state.items=Array.isArray(data.items)?data.items:[];
     state.total=Number(data.total)||0;
     state.page=Number(data.page)||state.page;
     state.connected=true;
-    $("cloud-connection-status").textContent="已連線 · "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary];
+    renderIndexStatus(data.scanState);
+    $("cloud-connection-status").textContent=data.indexed
+      ?"已載入 D1 索引 · "+PROVIDER_LABELS[state.activeProvider]
+      :data.scanState?"索引尚未完成 · "+PROVIDER_LABELS[state.activeProvider]:"尚無索引 · "+PROVIDER_LABELS[state.activeProvider];
     $("cloud-breadcrumb").textContent=breadcrumb(state.currentPath);
     $("cloud-item-count").textContent="顯示 "+state.items.length+" / "+state.total+" 個項目";
     $("cloud-page-label").textContent="第 "+state.page+" 頁 · 共 "+Math.max(1,Math.ceil(state.total/state.perPage))+" 頁";
     $("cloud-prev-page").disabled=state.page<=1;
     $("cloud-next-page").disabled=state.page*state.perPage>=state.total;
     renderItems();
-    $("cloud-browser-status").textContent="已連接 "+PROVIDER_LABELS[state.activeProvider]+" 的"+LIBRARY_LABELS[state.activeLibrary]+"目錄。只有選擇書籍後才會下載內容。";
-    setSourceStatus("連線成功："+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" · "+safePath);
+    if(data.indexed) {
+      $("cloud-browser-status").textContent="已從 D1 載入索引目錄。選擇書籍時才會讀取原始檔案；開啟此頁不會重新掃描 OpenList。";
+      setSourceStatus("索引讀取成功："+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" · "+safePath);
+    } else if(data.scanState) {
+      $("cloud-browser-status").textContent="目前顯示已建立的部分索引。掃描尚未完成，點擊「手動掃描／續掃」可繼續。";
+      setSourceStatus("已讀取部分 D1 索引；尚有目錄待掃描。",true);
+    } else {
+      $("cloud-browser-status").textContent="這個來源與分類尚未建立索引。請先點擊「手動掃描／續掃」。";
+      setSourceStatus("尚無索引："+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+"。首次使用請手動掃描。",true);
+    }
   } catch(error) {
     state.connected=false;
     $("cloud-items").replaceChildren();
-    $("cloud-page-label").textContent="目錄尚未載入";
+    $("cloud-page-label").textContent="索引尚未載入";
     $("cloud-prev-page").disabled=true;
     $("cloud-next-page").disabled=true;
-    $("cloud-connection-status").textContent="連線失敗 · "+PROVIDER_LABELS[state.activeProvider];
+    $("cloud-connection-status").textContent="索引讀取失敗";
     $("cloud-browser-status").textContent=error.message||String(error);
-    setSourceStatus((error.message||String(error))+". 請檢查來源帳號密碼、API 網址與目前目錄。",true);
+    setSourceStatus((error.message||String(error))+". 請確認 FRAME_READER_DB 已綁定並執行 0002 索引資料表遷移。",true);
   } finally {
     $("cloud-refresh").disabled=false;
     $("cloud-test-source").disabled=false;
@@ -465,6 +808,8 @@ function setCurrentFolderAsRoot(library) {
   $(id).value=candidate;
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「套用兩個目錄設定」。");
 }
+$("cloud-scan-start").addEventListener("click",runIndexScan);
+$("cloud-scan-pause").addEventListener("click",pauseIndexScan);
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
 $("cloud-prev-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page-1));
 $("cloud-next-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page+1));
