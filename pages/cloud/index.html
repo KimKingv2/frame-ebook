@@ -81,6 +81,25 @@
         </div>
         <p id="cloud-source-status" class="cloud-source-status" role="status">登入後會自動連接上次使用的來源，並使用下方 HTML 欄位中的根目錄預設值。</p>
       </section>
+      <section class="cloud-index-panel" aria-label="雲端書庫索引">
+        <div class="cloud-index-heading">
+          <div class="cloud-index-copy">
+            <p class="section-kicker">PERSISTENT CLOUD INDEX</p>
+            <h3>書庫索引</h3>
+            <p>首次使用時手動掃描一次。之後開啟書庫會直接讀取 D1；新增、刪除或整理檔案後，再手動掃描更新即可。掃描進度會保存，可中斷後續掃。</p>
+          </div>
+          <div class="cloud-index-actions">
+            <span id="cloud-index-status" class="cloud-index-status">尚未建立索引</span>
+            <button id="cloud-scan-start" class="primary-link" type="button">手動掃描／續掃 <span>↗</span></button>
+            <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停掃描</button>
+          </div>
+        </div>
+        <p id="cloud-index-progress" class="cloud-index-progress" role="status">首次使用請先手動掃描電子書或漫畫目錄。掃描完成後，日常開啟會直接讀取 D1 索引。</p>
+        <details class="cloud-index-log">
+          <summary>掃描記錄 <span id="cloud-index-log-count">0 筆</span></summary>
+          <pre id="cloud-index-log">尚無掃描記錄。</pre>
+        </details>
+      </section>
       <div class="cloud-browser-heading">
         <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端書庫</h2></div>
         <div class="cloud-browser-actions">
