@@ -1,4 +1,4 @@
-import { json, requireAuth, getOpenListConfig, openListPost, normalizePath } from "../../_lib/common.js";
+import { json, requireAuth, getDatabase, getOpenListConfig, openListPost, normalizePath } from "../../_lib/common.js";
 
 function isLocalHost(hostname) {
   const host = String(hostname || "").toLowerCase();
@@ -16,9 +16,24 @@ export async function onRequestGet({ request, env }) {
   if (!config) return json({ error: "選取的來源尚未設定。請確認 Pages API Base URL、帳號 Variable 與密碼 Secret。" }, 503);
 
   const path = normalizePath(requestUrl.searchParams.get("path") || "");
-  if (!path || path === "/") return json({ error: "檔案路徑無效。" }, 400);
+  const rootPath = normalizePath(requestUrl.searchParams.get("root_path") || "");
+  if (!path || path === "/" || !rootPath) return json({ error: "檔案路徑或書庫根目錄無效。" }, 400);
   const allowedExtension = library === "comics" ? /\.(epub|cbz)$/i : /\.epub$/i;
   if (!allowedExtension.test(path)) return json({ error: library === "comics" ? "漫畫來源只允許 EPUB 或 CBZ 檔案。" : "電子書來源只允許 EPUB 檔案。" }, 415);
+
+  const db = getDatabase(env);
+  if (!db || typeof db.prepare !== "function") return json({ error: "FRAME_READER_DB 尚未綁定。" }, 503);
+  try {
+    const indexed = await db.prepare(
+      "SELECT is_dir,format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=?"
+    ).bind(provider, library, rootPath, path).first();
+    const expectedFormat = path.toLowerCase().endsWith(".cbz") ? "CBZ" : "EPUB";
+    if (!indexed || Number(indexed.is_dir) !== 0 || indexed.format !== expectedFormat) {
+      return json({ error: "這個檔案不在目前來源的書庫索引中。請先完成或更新索引，再重新載入書架。" }, 404);
+    }
+  } catch {
+    return json({ error: "讀取 D1 書庫索引失敗。請確認已執行 migrations/0002_cloud_catalog.sql。" }, 503);
+  }
 
   try {
     const metadata = await openListPost(env, "/api/fs/get", {
