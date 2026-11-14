@@ -43,7 +43,7 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
 
-The FRAME Reader private password is a separate login gate. It is not an Alist account password. The existing `FRAME_READER_SESSION_SECRET` signs a Secure, HttpOnly session cookie. Login attempts are rate-limited in D1.
+When both `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD` are configured, FRAME Reader switches to Cloudflare Zero Trust Access authentication. Pages Functions verify the `Cf-Access-Jwt-Assertion` signature against the current Access JWKS and validate issuer, audience and token expiry. Access mode is exclusive: a missing or invalid Access assertion is rejected and cannot fall back to the old Reader password cookie. No `FRAME_READER_ACCESS_PASSWORD` or `FRAME_READER_SESSION_SECRET` is required in Access mode. Until both Access variables are configured, the old Reader password login remains temporarily available only as a migration fallback.
 
 ## 3. Configure the LAN-direct source (optional)
 
@@ -64,13 +64,13 @@ You can type an absolute path directly, or browse folders and use the current fo
 
 All sources should expose the same absolute folder layout so the two HTML input paths work after switching sources. The default paths are the `value` attributes of `cloud-books-root` and `cloud-comics-root` in `pages/cloud/index.html`. Changes made in the browser apply only to the current page session; refreshing restores the HTML defaults. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are not used for path defaults or access control. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
-After the Reader private login succeeds, the cloud page automatically opens the previously selected source and the last saved path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
+After Cloudflare Access authentication succeeds, the cloud page automatically opens the previously selected source and the HTML-default path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
 
 ## 5. Verify the configuration
 
-1. Confirm the D1 binding and the two FRAME Reader login Secrets exist.
-2. Confirm at least one server-side source has its API URL, username and password configured.
-3. Open `https://frame-ebook.pages.dev/cloud/` and sign in with `FRAME_READER_ACCESS_PASSWORD`.
+1. Confirm the D1 binding exists for reading-history synchronization and statistics.
+2. Create a Cloudflare Zero Trust Access application for the FRAME Reader hostname, then set `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD` from that application. Confirm at least one server-side source has its API URL, username and password configured.
+3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
 6. Add a file to the local shelf. The original cloud file is not changed or deleted.
@@ -82,7 +82,7 @@ After the Reader private login succeeds, the cloud page automatically opens the 
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
 - Cloud browsing and file-info requests are read-only. The file proxy forwards valid HTTP Range headers, but the current cloud shelf downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Range-backed reading is a later optimization.
-- Reading duration is tracked locally first. Once authenticated, pending events sync to D1. Reading statistics aggregate across devices using the same FRAME Reader private login after they sync.
+- Reading duration is tracked locally first. Once authenticated through Cloudflare Access, pending events sync to D1. Reading statistics aggregate across devices after they sync.
 - Cloud originals remain in OpenList. Removing a local copy does not delete the cloud original.
 
 ## References
