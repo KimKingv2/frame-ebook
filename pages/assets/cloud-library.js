@@ -3,6 +3,8 @@ import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip
 
 const $ = id => document.getElementById(id);
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
+const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v2";
+const ACTIVE_LIBRARY_KEY = "frame-reader-active-library";
 const LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v2";
 const LEGACY_LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v1";
 const LOCAL_PASSWORD_SESSION_KEY = "frame-reader-local-openlist-password-v1";
@@ -31,6 +33,7 @@ const state = {
   localProfile:{baseUrl:"",username:"",password:""},
   connected:false,
   scanRunning:false,
+  scanAllRunning:false,
   scanPauseRequested:false,
   scanState:null,
   scanLogEntries:[]
@@ -109,21 +112,30 @@ function readLocalProfile() {
   $("cloud-local-username").value=state.localProfile.username;
   $("cloud-local-password").value=state.localProfile.password;
 }
-function readRootSelections() {
-  try { localStorage.removeItem("frame-reader-cloud-root-selections-v1"); } catch (_) {}
+function readRootSelections(provider=state.activeProvider) {
+  let saved={};
+  try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root":"cloud-comics-root";
-    const candidate=normalizePath($(id).value||"/");
+    const defaultPath=$(id).getAttribute("value")||"/";
+    const candidate=normalizePath(saved?.[provider]?.[library]||defaultPath||"/");
     state.selectedRoots[library]=candidate||"/";
     $(id).value=state.selectedRoots[library];
   }
   renderRootStatus();
 }
+function persistRootSelections(provider=state.activeProvider) {
+  let saved={};
+  try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
+  saved[provider]={books:state.selectedRoots.books||"/",comics:state.selectedRoots.comics||"/"};
+  try { localStorage.setItem(ROOT_SELECTIONS_KEY,JSON.stringify(saved)); }
+  catch (_) { throw new Error("無法保存書庫根目錄，請檢查瀏覽器本機儲存空間權限。"); }
+}
 function renderRootStatus() {
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
     const selected=state.selectedRoots[library]||"/";
-    $(id).textContent="目前頁面使用："+selected+"（重新整理後回到 HTML 預設值）";
+    $(id).textContent="目前已保存於這台裝置："+selected;
   }
 }
 function normalizeLocalBase(value) {
@@ -193,9 +205,10 @@ function saveRootSelections() {
     state.selectedRoots[library]=candidate;
     $(library==="books"?"cloud-books-root":"cloud-comics-root").value=candidate;
   }
+  persistRootSelections(state.activeProvider);
   renderRootStatus();
   clearListing("目錄設定已套用");
-  setSourceStatus("電子書與漫畫根目錄已套用到目前頁面。切換 VPS、Worker、Mobile Device 或 LAN 時會沿用；重新整理後會回到 HTML 的 value 預設值。");
+  setSourceStatus("電子書與漫畫根目錄已保存於這台裝置；重新進入或重新整理後仍會沿用。不同 OpenList 來源可保存各自的路徑。");
 }
 function saveSourceSettings() {
   const provider=$("cloud-provider").value;
@@ -336,29 +349,76 @@ function appendIndexLog(message, level="info") {
   if (count) count.textContent = state.scanLogEntries.length + " 筆";
 }
 function renderIndexStatus(summary) {
-  const node = $("cloud-index-status");
-  if (!node) return;
-  if (!summary) {
-    node.textContent = "尚未建立索引";
-    setIndexProgress("首次使用請先手動掃描電子書或漫畫目錄。掃描完成後，日常開啟會直接讀取 D1 索引。");
+  const node=$("cloud-index-status");
+  if(!node)return;
+  if(!summary) {
+    node.textContent="尚未建立索引";
+    setIndexProgress("電子書與漫畫各自保存根目錄和掃描進度。可分別掃描，也可一鍵依序掃描兩個書庫。");
     return;
   }
-  state.scanState = summary;
-  if (summary.completed) {
-    const date = summary.updatedAt ? new Date(summary.updatedAt).toLocaleString("zh-TW") : "時間未知";
-    node.textContent = "索引已完成 · " + Number(summary.indexedCount || 0) + " 個項目";
-    setIndexProgress("最近完成：" + date + "；已檢查 " + Number(summary.scannedCount || 0) +
-      " 個目錄項目，索引 " + Number(summary.indexedCount || 0) + " 個項目，資料夾 " +
-      Number(summary.visitedFolderCount || 0) + " 個。再次掃描會檢查新增、變更及已刪除項目。");
+  state.scanState=summary;
+  if(summary.completed) {
+    const date=summary.updatedAt?new Date(summary.updatedAt).toLocaleString("zh-TW"):"時間未知";
+    node.textContent="索引已完成 · "+Number(summary.indexedCount||0)+" 個項目";
+    setIndexProgress("最近完成："+date+"；已檢查 "+Number(summary.scannedCount||0)+
+      " 個目錄項目，寫入／更新 "+Number(summary.indexedCount||0)+" 個，略過 "+
+      Number(summary.skippedCount||0)+" 個，失敗 "+Number(summary.failedCount||0)+
+      " 個；已完成資料夾 "+Number(summary.visitedFolderCount||0)+" 個。");
   } else {
-    node.textContent = "索引未完成 · 可續掃";
-    setIndexProgress("目前已檢查 " + Number(summary.scannedCount || 0) + " 個目錄項目，索引 " +
-      Number(summary.indexedCount || 0) + " 個項目；已完成資料夾 " +
-      Number(summary.visitedFolderCount || 0) + " 個。點擊「手動掃描／續掃」會從 D1 保存的游標繼續。");
+    node.textContent="索引未完成 · 可續掃";
+    setIndexProgress("目前已檢查 "+Number(summary.scannedCount||0)+" 個目錄項目，寫入／更新 "+
+      Number(summary.indexedCount||0)+" 個；略過 "+Number(summary.skippedCount||0)+
+      " 個；失敗 "+Number(summary.failedCount||0)+" 個；已完成資料夾 "+
+      Number(summary.visitedFolderCount||0)+" 個。可從 D1 保存的游標續掃。");
   }
 }
-async function scanStateRequest(method="GET", scanState=null) {
-  const scope = indexScope();
+function renderLibraryScanSummary(library,scanState,rootPath) {
+  const node=$(library==="books"?"cloud-books-scan-summary":"cloud-comics-scan-summary");
+  const status=$(library==="books"?"cloud-books-scan-status":"cloud-comics-scan-status");
+  if(!node)return;
+  if(!scanState) {
+    node.textContent="掃描根目錄："+(rootPath||"/")+"\n尚未開始掃描。";
+    if(status)status.textContent="尚未掃描";
+    return;
+  }
+  const complete=!!scanState.completed;
+  if(status)status.textContent=complete?"索引完成":"可續掃";
+  const lines=[
+    "掃描根目錄："+String(scanState.rootPath||rootPath||"/"),
+    "掃描模式："+String(scanState.scanMode||"完整遞迴掃描"),
+    "已檢查："+Number(scanState.scannedCount||0)+" 個目錄項目",
+    "已寫入／更新："+Number(scanState.indexedCount||0)+" 筆",
+    "格式不符而略過："+Number(scanState.skippedCount||0)+" 筆",
+    "累計失敗："+Number(scanState.failedCount||0)+" 筆",
+    "已完成資料夾："+Number(scanState.visitedFolderCount||0)+" 個",
+    "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
+    "封面已保存："+Number(scanState.coverReadyCount||0)+" 本；無封面："+Number(scanState.coverMissingCount||0)+
+      " 本；失敗："+Number(scanState.coverFailedCount||0)+" 本"
+  ];
+  if(scanState.currentFolder)lines.push("續作游標：第 "+Number(scanState.page||1)+" 頁");
+  if(scanState.lastError)lines.push("最近錯誤："+String(scanState.lastError));
+  if(scanState.completed)lines.push("狀態：目錄索引已完成；D1 書架已可直接載入。");
+  else lines.push("狀態：掃描未完成；再次點擊對應按鈕即可續掃。");
+  node.textContent=lines.join("\n");
+}
+async function renderAllScanSummaries() {
+  const provider=state.activeProvider;
+  for(const library of ["books","comics"]) {
+    const rootPath=state.selectedRoots[library]||"/";
+    const scope={provider,library,rootPath};
+    try {
+      const summary=await loadIndexScanState(scope);
+      renderLibraryScanSummary(library,summary,rootPath);
+      if(library===state.activeLibrary)renderIndexStatus(summary);
+    } catch(error) {
+      const node=$(library==="books"?"cloud-books-scan-summary":"cloud-comics-scan-summary");
+      if(node)node.textContent="讀取掃描進度失敗："+(error.message||String(error));
+    }
+  }
+}
+
+async function scanStateRequest(method="GET", scanState=null, scopeOverride=null) {
+  const scope = scopeOverride || indexScope();
   const url = new URLSearchParams({
     provider: scope.provider,
     library: scope.library,
@@ -377,12 +437,12 @@ async function scanStateRequest(method="GET", scanState=null) {
   });
   return readJsonResponse(response, "讀取／保存 D1 掃描進度失敗。");
 }
-async function loadIndexScanState() {
-  return (await scanStateRequest("GET")).state || null;
+async function loadIndexScanState(scopeOverride=null) {
+  return (await scanStateRequest("GET",null,scopeOverride)).state || null;
 }
-async function saveIndexScanState(scanState) {
+async function saveIndexScanState(scanState,scopeOverride=null) {
   scanState.updatedAt = new Date().toISOString();
-  await scanStateRequest("POST", scanState);
+  await scanStateRequest("POST",scanState,scopeOverride);
 }
 function newIndexScanState(rootPath, provider, library) {
   const scanId = typeof crypto.randomUUID === "function"
@@ -400,29 +460,48 @@ function newIndexScanState(rootPath, provider, library) {
     seenFolders: [rootPath],
     scannedCount: 0,
     indexedCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
     visitedFolderCount: 0,
+    coverReadyCount: 0,
+    coverMissingCount: 0,
+    coverFailedCount: 0,
+    errors: [],
     completed: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
 }
-function indexScanProgressText(scanState, batch, finished=false) {
-  const lines = [
-    "來源：" + PROVIDER_LABELS[scanState.provider] + " · " + LIBRARY_LABELS[scanState.library],
-    "根目錄：" + scanState.rootPath,
-    "已檢查：" + Number(scanState.scannedCount || 0) + " 個目錄項目",
-    "已寫入／更新：" + Number(scanState.indexedCount || 0) + " 個索引項目",
-    "已完成資料夾：" + Number(scanState.visitedFolderCount || 0) + " 個",
-    "待掃描資料夾：" + scanState.pendingFolders.length + (scanState.currentFolder ? "；目前：" + scanState.currentFolder : ""),
-    "本批檢查：" + batch.entries + " 個項目；寫入：" + batch.indexed + " 個；完成資料夾：" + batch.folders + " 個"
+function indexScanProgressText(scanState,batch,finished=false) {
+  const lines=[
+    "掃描根目錄："+scanState.rootPath,
+    "掃描來源／分類："+PROVIDER_LABELS[scanState.provider]+" · "+LIBRARY_LABELS[scanState.library],
+    "掃描模式：完整遞迴掃描（每頁同步 D1；不下載原始 EPUB／CBZ）",
+    "已檢查目錄項目："+Number(scanState.scannedCount||0),
+    "已寫入／更新："+Number(scanState.indexedCount||0)+" 筆",
+    "不符合書庫格式而略過："+Number(scanState.skippedCount||0)+" 筆",
+    "累計失敗："+Number(scanState.failedCount||0)+" 筆",
+    "已完成資料夾："+Number(scanState.visitedFolderCount||0)+" 個",
+    "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
+    "本批檢查："+Number(batch.entries||0)+" 個；寫入／更新："+Number(batch.indexed||0)+
+      " 個；略過："+Number(batch.skipped||0)+" 個；失敗："+Number(batch.failed||0)+
+      " 個；完成資料夾："+Number(batch.folders||0)+" 個"
   ];
-  if (scanState.currentFolder) lines.push("目前頁面：" + scanState.page + "；掃描游標會在每頁完成後保存。");
-  if (scanState.completed) lines.push("完整索引已完成。下次開啟書庫會直接讀取 D1，不會自動重新掃描。");
-  else if (finished) lines.push("本批結束，進度已保存到 D1；可以關閉頁面，之後再續掃。");
-  else if (state.scanPauseRequested) lines.push("已要求暫停，當前頁完成並保存後停止。");
-  else lines.push("掃描進行中；每完成一頁都會將索引資料和續掃游標保存至 D1。");
+  if(batch.currentPath)lines.push("正在處理："+batch.currentPath);
+  if(batch.lastCompleted)lines.push("最近完成："+batch.lastCompleted);
+  if(batch.coverProcessed!=null)lines.push("本批封面：處理 "+batch.coverProcessed+" 本；無封面 "+
+    Number(batch.coverMissing||0)+" 本；失敗 "+Number(batch.coverFailed||0)+" 本；待處理 "+Number(batch.coverRemaining||0)+" 本");
+  if(batch.stopReason)lines.push("本批停止原因："+batch.stopReason);
+  if(scanState.currentFolder)lines.push("續作游標：第 "+Number(scanState.page||1)+" 頁；每頁完成後保存至 D1。");
+  if(scanState.completed)lines.push("目錄索引已完成。重新進入時會直接讀取 D1 書架；封面佇列完成後不會重複遍歷目錄。");
+  else if(finished&&state.scanPauseRequested)lines.push("已要求暫停，進度已保存；可在下次進入時續掃。");
+  else if(finished)lines.push("本批結束，進度已保存到 D1；可關閉頁面，之後再續掃。");
+  else lines.push("掃描進行中；目錄索引與續作游標會持續保存至 D1。");
+  const lastError=scanState.errors?.[scanState.errors.length-1];
+  if(lastError)lines.push("最近錯誤："+String(lastError.path||"")+"｜"+String(lastError.message||""));
   return lines.join("\n");
 }
+
 async function fetchScanDirectory(path, page, perPage) {
   if (state.activeProvider === "local") {
     return listLocalDirectory(path, page, perPage);
@@ -680,37 +759,48 @@ async function retryFailedCovers(scope) {
   const data=await readJsonResponse(response,"重設失敗封面佇列失敗。");
   return Number(data.retried||0);
 }
-async function processPendingCovers(scope,maxDurationMs=120000) {
+async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
   const started=Date.now();
   let processed=0,failed=0,missing=0;
   appendIndexLog("封面索引開始：使用 HTTP Range 讀取 ZIP 封面資料，不下載整本書。");
+  appendIndexLog("封面分類："+LIBRARY_LABELS[scope.library]+"；根目錄："+scope.rootPath);
   while(Date.now()-started<maxDurationMs&&!state.scanPauseRequested) {
     const queue=await fetchPendingCovers(scope,8);
     if(!queue.items.length)break;
     for(const item of queue.items) {
       if(Date.now()-started>=maxDurationMs||state.scanPauseRequested)break;
-      setIndexProgress("正在建立封面索引："+item.name+"（已處理 "+processed+" 本）");
+      setIndexProgress("正在建立封面索引："+item.path+"（已處理 "+processed+" 本）");
+      appendIndexLog("正在處理封面："+item.path);
+      const coverStartedAt=performance.now();
       try {
         const cover=await extractCloudCover(item);
         if(!cover) {
           await saveCoverState(scope,item,"missing");
           missing++;
-          appendIndexLog("沒有找到可用封面："+item.path,"warning");
+          if(scanState)scanState.coverMissingCount=Number(scanState.coverMissingCount||0)+1;
+          appendIndexLog("沒有找到可用封面："+item.path+"；耗時 "+Math.round(performance.now()-coverStartedAt)+" ms","warning");
         } else {
           const hash=await blobSha256(cover.blob);
           await uploadCover(scope,item,hash,cover);
-          appendIndexLog("封面已保存至私有 R2："+item.name+" · "+hash.slice(0,12),"success");
+          if(scanState)scanState.coverReadyCount=Number(scanState.coverReadyCount||0)+1;
+          appendIndexLog("封面已保存至私有 R2："+item.name+" · "+hash.slice(0,12)+"；耗時 "+Math.round(performance.now()-coverStartedAt)+" ms","success");
         }
       } catch(error) {
         failed++;
+        if(scanState)scanState.coverFailedCount=Number(scanState.coverFailedCount||0)+1;
         try { await saveCoverState(scope,item,"error",{error:String(error.message||error).slice(0,450)}); }
         catch(stateError) { appendIndexLog("封面狀態保存失敗："+(stateError.message||stateError),"error"); }
         appendIndexLog("封面處理失敗："+item.path+" · "+(error.message||error),"error");
       }
       processed++;
+      if(scanState)scanState.coverProcessedCount=Number(scanState.coverProcessedCount||0)+1;
     }
   }
   const remaining=await fetchPendingCovers(scope,1);
+  if(scanState) {
+    scanState.coverPendingCount=Number(remaining.total||0);
+    await saveIndexScanState(scanState,scope);
+  }
   appendIndexLog("封面索引本批完成：處理 "+processed+" 本，無封面 "+missing+" 本，失敗 "+failed+" 本，待處理 "+remaining.total+" 本。");
   return {processed,failed,missing,remaining:Number(remaining.total||0)};
 }
@@ -925,7 +1015,7 @@ function pauseIndexScan() {
   if (!state.scanRunning) return;
   state.scanPauseRequested = true;
   $("cloud-scan-pause").disabled = true;
-  setIndexProgress("已要求暫停；目前目錄頁完成並保存 D1 游標後就會停止。");
+  setIndexProgress("已要求暫停；目前目錄頁或封面工作完成並保存 D1 游標後就會停止。");
 }
 
 async function checkSession() {
@@ -940,26 +1030,27 @@ async function checkSession() {
       $("cloud-login-panel").hidden=true;
       $("cloud-browser").hidden=false;
       readLocalProfile();
-      readRootSelections();
       renderProfileStatus();
       let selectedProvider="vps",selectedLibrary="books";
       try {
         const savedProvider=localStorage.getItem(ACTIVE_PROVIDER_KEY)||"vps";
         if(Object.prototype.hasOwnProperty.call(PROVIDER_LABELS,savedProvider))selectedProvider=savedProvider;
-        const savedLibrary=localStorage.getItem("frame-reader-active-library")||"books";
+        const savedLibrary=localStorage.getItem(ACTIVE_LIBRARY_KEY)||"books";
         if(savedLibrary==="books"||savedLibrary==="comics")selectedLibrary=savedLibrary;
       } catch (_) {}
       state.activeProvider=selectedProvider;
       state.activeLibrary=selectedLibrary;
       $("cloud-provider").value=selectedProvider;
       $("cloud-library-type").value=selectedLibrary;
+      readRootSelections(selectedProvider);
       clearListing();
+      await renderAllScanSummaries();
       if(isActiveSourceReady()) {
         state.currentPath=getActiveRoot();
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
         await loadDirectory(state.currentPath,1);
       } else {
-        setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「重新連線／讀取書架」。",true);
+        setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
       }
       try {
         const tracker=await import("/assets/reading-tracker.js");
@@ -1163,8 +1254,25 @@ function setCurrentFolderAsRoot(library) {
   $(id).value=candidate;
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「套用兩個目錄設定」。");
 }
-$("cloud-scan-start").addEventListener("click",runIndexScan);
+$("cloud-scan-books").addEventListener("click",()=>runIndexScan("books"));
+$("cloud-scan-comics").addEventListener("click",()=>runIndexScan("comics"));
+$("cloud-scan-all").addEventListener("click",runAllIndexScans);
 $("cloud-scan-pause").addEventListener("click",pauseIndexScan);
+$("cloud-index-log-copy").addEventListener("click",async()=>{
+  try {
+    await navigator.clipboard.writeText(state.scanLogEntries.join("\n"));
+    appendIndexLog("掃描日誌已複製到剪貼簿。","success");
+  } catch(error) {
+    appendIndexLog("複製日誌失敗："+(error.message||error),"error");
+  }
+});
+$("cloud-index-log-clear").addEventListener("click",()=>{
+  state.scanLogEntries.length=0;
+  const output=$("cloud-index-log");
+  if(output)output.textContent="日誌已清空。下一個掃描事件會顯示於此。";
+  const count=$("cloud-index-log-count");
+  if(count)count.textContent="0 筆";
+});
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
 $("cloud-prev-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page-1));
 $("cloud-next-page").addEventListener("click",()=>loadDirectory(state.currentPath,state.page+1));
@@ -1180,9 +1288,13 @@ $("cloud-up").addEventListener("click",()=>{
 $("cloud-logout").addEventListener("click",logout);
 $("cloud-search").addEventListener("input",event=>{state.query=event.target.value||"";renderItems();});
 $("cloud-provider").addEventListener("change",event=>{
+  const previousProvider=state.activeProvider;
+  try { persistRootSelections(previousProvider); } catch(error) { setSourceStatus(error.message||String(error),true); }
   const provider=event.target.value;
   state.activeProvider=provider;
   try { localStorage.setItem(ACTIVE_PROVIDER_KEY,provider); } catch (_) {}
+  readRootSelections(provider);
+  void renderAllScanSummaries();
   clearListing();
   if(isActiveSourceReady()) {
     state.currentPath=getActiveRoot();
@@ -1194,7 +1306,7 @@ $("cloud-provider").addEventListener("change",event=>{
 $("cloud-library-type").addEventListener("change",event=>{
   const library=event.target.value==="comics"?"comics":"books";
   state.activeLibrary=library;
-  try { localStorage.setItem("frame-reader-active-library",library); } catch (_) {}
+  try { localStorage.setItem(ACTIVE_LIBRARY_KEY,library); } catch (_) {}
   clearListing();
   if(isActiveSourceReady()) {
     state.currentPath=getActiveRoot(library);

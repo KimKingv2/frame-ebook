@@ -98,7 +98,12 @@ export async function onRequestGet({ request, env }) {
         completed: !!scanState.completed,
         scannedCount: Number(scanState.scannedCount || 0),
         indexedCount: Number(scanState.indexedCount || 0),
+        skippedCount: Number(scanState.skippedCount || 0),
+        failedCount: Number(scanState.failedCount || 0),
         visitedFolderCount: Number(scanState.visitedFolderCount || 0),
+        coverReadyCount: Number(scanState.coverReadyCount || 0),
+        coverMissingCount: Number(scanState.coverMissingCount || 0),
+        coverFailedCount: Number(scanState.coverFailedCount || 0),
         updatedAt: stateRow.updated_at || scanState.updatedAt || null
       } : null,
       path,

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#12101a">
   <title>雲端書庫 · FRAME Reader</title>
   <link rel="stylesheet" href="/assets/site.css">
-  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261114-r2-covers1">
+  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261114-r4-dual-scan">
 </head>
 <body>
   <main class="shell cloud-shell">
@@ -85,19 +85,39 @@
         <div class="cloud-index-heading">
           <div class="cloud-index-copy">
             <p class="section-kicker">PERSISTENT CLOUD INDEX</p>
-            <h3>書庫索引</h3>
-            <p>首次使用時手動掃描一次，系統會同步建立書籍封面索引。之後開啟書庫會直接讀取 D1 與私有 R2 封面；新增、刪除或整理檔案後，再手動掃描更新即可。封面掃描進度也可中斷後續做。</p>
+            <h3>書庫掃描與索引</h3>
+            <p>電子書與漫畫使用獨立根目錄、獨立 D1 進度及封面佇列。可分別掃描，也可一鍵依序掃描兩個書庫。完整掃描完成後會自動重新載入對應的雲端書架；原始 EPUB／CBZ 不會被下載或修改。</p>
           </div>
           <div class="cloud-index-actions">
             <span id="cloud-index-status" class="cloud-index-status">尚未建立索引</span>
-            <button id="cloud-scan-start" class="primary-link" type="button">手動掃描／續掃（含封面） <span>↗</span></button>
-            <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停掃描</button>
           </div>
         </div>
-        <p id="cloud-index-progress" class="cloud-index-progress" role="status">首次使用請先手動掃描電子書或漫畫目錄。掃描完成後，日常開啟會直接讀取 D1 書籍索引及私有 R2 封面。</p>
-        <details class="cloud-index-log">
-          <summary>掃描記錄 <span id="cloud-index-log-count">0 筆</span></summary>
-          <pre id="cloud-index-log">尚無掃描記錄。</pre>
+        <div class="cloud-index-scan-actions">
+          <button id="cloud-scan-books" class="primary-link" type="button">掃描／續掃電子書 <span>↗</span></button>
+          <button id="cloud-scan-comics" class="primary-link" type="button">掃描／續掃漫畫 <span>↗</span></button>
+          <button id="cloud-scan-all" class="quiet-button" type="button">依序掃描電子書＋漫畫</button>
+          <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停目前掃描</button>
+        </div>
+        <div class="cloud-index-summary-grid">
+          <article class="cloud-index-summary-card">
+            <div><strong>電子書索引進度</strong><span id="cloud-books-scan-status">尚未掃描</span></div>
+            <pre id="cloud-books-scan-summary">掃描根目錄：/
+尚未開始掃描。</pre>
+          </article>
+          <article class="cloud-index-summary-card">
+            <div><strong>漫畫索引進度</strong><span id="cloud-comics-scan-status">尚未掃描</span></div>
+            <pre id="cloud-comics-scan-summary">掃描根目錄：/
+尚未開始掃描。</pre>
+          </article>
+        </div>
+        <p id="cloud-index-progress" class="cloud-index-progress" role="status">首次使用請先設定電子書與漫畫根目錄，再分別掃描或一鍵掃描兩個書庫。</p>
+        <details class="cloud-index-log" open>
+          <summary>即時掃描日誌 <span id="cloud-index-log-count">0 筆</span></summary>
+          <div class="cloud-index-log-toolbar">
+            <span>逐步記錄目錄遍歷、D1 寫入、封面 Range 解析、R2 上傳及進度保存</span>
+            <div><button id="cloud-index-log-copy" class="quiet-button" type="button">複製日誌</button><button id="cloud-index-log-clear" class="quiet-button" type="button">清空</button></div>
+          </div>
+          <pre id="cloud-index-log">尚無日誌。開始或續作掃描後，這裡會即時列出處理階段。</pre>
         </details>
       </section>
       <div class="cloud-browser-heading">
@@ -139,6 +159,6 @@
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js?v=20261114-r3-d1diagnostics"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-r4-dual-scan"></script>
 </body>
 </html>
