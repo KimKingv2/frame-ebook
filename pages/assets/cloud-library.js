@@ -1044,7 +1044,7 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
     $("cloud-next-page").disabled=true;
     $("cloud-connection-status").textContent="索引讀取失敗";
     $("cloud-browser-status").textContent=error.message||String(error);
-    setSourceStatus((error.message||String(error))+". 請確認 FRAME_READER_DB 已綁定並執行 0002 索引資料表遷移。",true);
+    setSourceStatus(error.message||String(error),true);
   } finally {
     $("cloud-refresh").disabled=false;
     $("cloud-test-source").disabled=false;

@@ -32,7 +32,9 @@ export async function onRequestGet({ request, env }) {
   const perPage = Math.max(1, Math.min(100, Number(url.searchParams.get("per_page")) || 80));
   const offset = (page - 1) * perPage;
 
+  let stage = "initialize";
   try {
+    stage = "prepare_queries";
     const recursiveShelf = url.searchParams.get("recursive") === "1" && path === rootPath;
     const prefix = rootPath === "/" ? "/" : rootPath + "/";
     const countStatement = recursiveShelf
@@ -55,7 +57,6 @@ export async function onRequestGet({ request, env }) {
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
         ).bind(provider, library, rootPath, path, perPage, offset);
-    let stage = "prepare_queries";
     stage = "count_and_rows";
     const [count, rows, scanKey] = await Promise.all([
       countStatement.first(),

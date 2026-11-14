@@ -8,7 +8,7 @@ function validScope(provider, library, rootPath) {
 }
 
 async function stateKey(provider, library, rootPath) {
-  const input = provider + "\\n" + library + "\\n" + rootPath;
+  const input = provider + "\n" + library + "\n" + rootPath;
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return "reader_scan_" + hex;
