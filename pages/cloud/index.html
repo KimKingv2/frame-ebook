@@ -97,6 +97,7 @@
           <button id="cloud-scan-comics" class="primary-link" type="button">掃描／續掃漫畫 <span>↗</span></button>
           <button id="cloud-scan-all" class="quiet-button" type="button">依序掃描電子書＋漫畫</button>
           <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停目前掃描</button>
+          <button id="cloud-retry-covers" class="quiet-button" type="button">重試本分類失敗封面</button>
         </div>
         <div class="cloud-index-summary-grid">
           <article class="cloud-index-summary-card">
@@ -114,7 +115,7 @@
         <details class="cloud-index-log" open>
           <summary>即時掃描日誌 <span id="cloud-index-log-count">0 筆</span></summary>
           <div class="cloud-index-log-toolbar">
-            <span>逐步記錄目錄遍歷、D1 寫入、封面 Range 解析、R2 上傳及進度保存</span>
+            <span>逐步記錄目錄遍歷、D1 寫入、封面 Range 解析、R2 上傳及進度保存；失敗封面可重新排入佇列</span>
             <div><button id="cloud-index-log-copy" class="quiet-button" type="button">複製日誌</button><button id="cloud-index-log-clear" class="quiet-button" type="button">清空</button></div>
           </div>
           <pre id="cloud-index-log">尚無日誌。開始或續作掃描後，這裡會即時列出處理階段。</pre>
@@ -159,6 +160,6 @@
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js?v=20261114-r8-separate-default-roots"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-r9-cover-range-stream-fix"></script>
 </body>
 </html>
