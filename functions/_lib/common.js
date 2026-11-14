@@ -1,3 +1,5 @@
+import { getProviderToken, invalidateProviderToken } from "./provider-auth.js";
+
 export function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -360,9 +362,9 @@ const OPENLIST_PROVIDERS = Object.freeze({
   },
   worker: {
     label: "OpenList Worker",
-    baseUrl: env => env.ALIST_WORKER_API_BASE_URL || env.OPENLIST_WORKER_API_BASE_URL,
-    username: env => env.ALIST_WORKER_USERNAME || env.ALIST_WORKER_API_USERNAME,
-    password: env => env.ALIST_WORKER_PASSWORD || env.ALIST_WORKER_API_PASSWORD
+    baseUrl: env => env.OPENLIST_WORKER_API_BASE_URL || env.ALIST_WORKER_API_BASE_URL,
+    username: env => env.OPENLIST_WORKER_USERNAME || env.ALIST_WORKER_USERNAME || env.ALIST_WORKER_API_USERNAME,
+    password: env => env.OPENLIST_WORKER_PASSWORD || env.ALIST_WORKER_PASSWORD || env.ALIST_WORKER_API_PASSWORD
   },
   mobile: {
     label: "Mobile Device Alist",
@@ -395,7 +397,7 @@ function normalizeServerBaseUrl(value) {
   try { url = new URL(raw); } catch (_) { return null; }
   if (url.username || url.password || url.search || url.hash) return null;
   if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return null;
-  return url.origin;
+  return url.origin + url.pathname.replace(/\\/+$/, "");
 }
 
 function getOpenListProviderCredentials(env, provider = "vps") {
@@ -405,7 +407,14 @@ function getOpenListProviderCredentials(env, provider = "vps") {
   const username = String(profile.username(env) || "").trim();
   const password = String(profile.password(env) || "");
   if (!base || !username || !password) return null;
-  return { provider: key, label: profile.label, base, username, password };
+  return {
+    provider: key,
+    authProvider: key === "mobile" ? "mobile-device" : key,
+    label: profile.label,
+    base,
+    username,
+    password
+  };
 }
 
 export function getOpenListConfig(env, provider = "vps", library = "books") {
@@ -436,13 +445,15 @@ async function postOpenListJson(url, body, timeoutMs = 45000, headers = {}) {
       throw new Error("OpenList API 回傳 HTTP " + response.status + " 重新導向；請檢查 Pages API Base URL。");
     }
     let payload;
-    try { payload = await response.json(); }
-    catch (_) { throw new Error("OpenList API 回應不是有效 JSON（HTTP " + response.status + "）。"); }
-    if (!response.ok) {
-      const message = String(payload?.message || payload?.error || "");
-      throw new Error("OpenList API HTTP " + response.status + (message ? "：" + message : "。"));
+    try {
+      payload = await response.json();
+    } catch (_) {
+      if (response.status === 401) {
+        return { payload: null, status: response.status, ok: false };
+      }
+      throw new Error("OpenList API 回應不是有效 JSON（HTTP " + response.status + "）。");
     }
-    return payload;
+    return { payload, status: response.status, ok: response.ok };
   } catch (cause) {
     if (cause?.name === "AbortError") throw new Error("OpenList API 請求逾時（" + Math.round(timeoutMs / 1000) + " 秒）。");
     throw cause;
@@ -458,29 +469,50 @@ export async function openListPost(env, endpoint, body, provider = "vps", librar
     throw new Error(profile.label + " 尚未完成伺服器端設定。請檢查 API Base URL、帳號 Variable 與密碼 Secret。");
   }
 
-  const loginUrl = new URL("api/auth/login", config.base + "/").href;
-  const login = await postOpenListJson(loginUrl, {
-    username: config.username,
-    password: config.password
-  }, 20000);
-  const shortLivedToken = String(login?.data?.token || "");
-  if (Number(login?.code) !== 200 || !shortLivedToken) {
-    const code = login?.code ? "（" + String(login.code) + "）" : "";
-    const message = String(login?.message || login?.error || "");
-    throw new Error(config.label + " 帳號密碼登入失敗" + code + (message ? "：" + message : "。"));
+  const authProvider = config.authProvider;
+  let auth;
+  try {
+    auth = await getProviderToken(env, authProvider, config.base, config);
+  } catch (cause) {
+    throw new Error(config.label + " 自動登入或 Token 快取失敗：" + String(cause?.message || "請檢查服務帳號設定。").slice(0, 180));
   }
 
-  // Tokens expire. Use this freshly issued token for this request only.
-  // Never persist it in D1, Pages storage, or send it to the browser.
-  const apiPath = String(endpoint || "").replace(/^\/+/, "");
+  const apiPath = String(endpoint || "").replace(/^\\/+/, "");
   const apiUrl = new URL(apiPath, config.base + "/").href;
-  const result = await postOpenListJson(apiUrl, body, 55000, { "Authorization": shortLivedToken });
-  if (Number(result?.code) !== 200) {
-    const code = result?.code ? String(result.code) : "unknown";
-    const message = String(result?.message || result?.error || "");
+  const requestHeaders = {
+    "Authorization": auth.token,
+    "Client-Id": "media-platform-server-" + authProvider
+  };
+
+  let result = await postOpenListJson(apiUrl, body, 55000, requestHeaders);
+  const authRejected = result.status === 401 || Number(result.payload?.code) === 401;
+  if (auth.managed && authRejected) {
+    await invalidateProviderToken(env, authProvider, config.base, config);
+    try {
+      auth = await getProviderToken(env, authProvider, config.base, config, { forceRefresh: true });
+      result = await postOpenListJson(apiUrl, body, 55000, {
+        "Authorization": auth.token,
+        "Client-Id": "media-platform-server-" + authProvider
+      });
+    } catch (cause) {
+      throw new Error(config.label + " Token 已失效，重新登入失敗：" + String(cause?.message || "請檢查服務帳號。").slice(0, 180));
+    }
+  }
+
+  if (!result.ok) {
+    const message = String(result.payload?.message || result.payload?.error || "");
+    throw new Error(config.label + " API HTTP " + result.status + (message ? "：" + message : "。"));
+  }
+  const payload = result.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error(config.label + " API 回應格式不正確。");
+  }
+  if (Number(payload.code) !== 200) {
+    const code = payload.code ? String(payload.code) : "unknown";
+    const message = String(payload.message || payload.error || "");
     throw new Error(config.label + " API 回報錯誤（" + code + "）" + (message ? "：" + message : "。"));
   }
-  return result.data;
+  return payload.data;
 }
 export async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
