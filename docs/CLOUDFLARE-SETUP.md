@@ -67,7 +67,13 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
 ## 5. Verify the configuration
 
 1. Confirm the D1 binding exists for reading-history synchronization and statistics.
-2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. For a Pages `.pages.dev` hostname, enable the project Access policy from Workers & Pages → `frame-ebook` → Settings → Enable access policy, then verify the generated Access application covers the production hostname and all API paths. This is an edge-level setting, not a Pages Variable or Secret. If you also use Preview deployments or a custom domain, protect those hostnames separately, as FRAME Audio does for Production and Preview. Confirm at least one server-side source has its API URL, username and password configured.
+2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
+   - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
+   - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
+   - Under Public hostname, remove the wildcard `*` from the Subdomain field and save. This secures `frame-ebook.pages.dev`.
+   - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Confirm the two policies cover Production `frame-ebook.pages.dev` and Preview `*.frame-ebook.pages.dev`.
+   - If a custom domain is used, add that hostname to its own Access application/policy too.
+   This is configured in Cloudflare Access, not under Pages Variables or Secrets. Access must cover the whole hostname, including `/api/*`. Confirm at least one server-side source has its API URL, username and password configured.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
