@@ -34,8 +34,6 @@ Under the Pages project's Settings → Variables and Secrets, add the following 
 | `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API base URL |
 | `ALIST_MOBILE_DEVICE_USERNAME` | Variable | Read-only Mobile Device account name |
 | `ALIST_MOBILE_DEVICE_PASSWORD` | Secret | Password for the Mobile Device account |
-| `FRAME_READER_ACCESS_TEAM_DOMAIN` | Variable | Cloudflare Zero Trust team domain, such as `https://your-team.cloudflareaccess.com` |
-| `FRAME_READER_ACCESS_AUD` | Variable | Application Audience (AUD) tag from the Reader Access application |
 
 The three server-side profiles are independent. Configure only the sources you intend to use. The account and password names above intentionally omit `API_`; the server also accepts the older `*_API_USERNAME` / `*_API_PASSWORD` variants for compatibility. Use an Alist account with read-only access and grant it access only to the intended book and comic directories.
 
@@ -43,7 +41,7 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
 
-FRAME Reader uses Cloudflare Zero Trust Access as its only website authentication. Pages Functions verify the `Cf-Access-Jwt-Assertion` signature against the current Access JWKS and validate issuer, audience and token expiry. A missing or invalid Access assertion is rejected. There is no separate Reader password or Reader-owned session cookie. Set both Access Variables before using the site. If you protect more than one hostname or Pages deployment with separate Access applications, list their AUD tags in `FRAME_READER_ACCESS_AUD` separated by commas. D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
+FRAME Reader uses Cloudflare Zero Trust Access as its only website authentication, following the existing FRAME Audio deployment model. Cloudflare Access must protect the complete Pages hostname at the edge. Pages Functions require the `Cf-Access-Jwt-Assertion` header on private API requests and reject requests where it is missing. The edge Access policy performs the user authentication, so Reader does not need separate Team Domain or AUD Variables, a Reader password, or a Reader-owned session cookie. D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
 
 ## 3. Configure the LAN-direct source (optional)
 
@@ -69,7 +67,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
 ## 5. Verify the configuration
 
 1. Confirm the D1 binding exists for reading-history synchronization and statistics.
-2. Protect the entire production hostname `frame-ebook.pages.dev` with Cloudflare Access, not just the `/cloud/` page. For a Pages `.pages.dev` hostname, you can enable the project Access policy from Workers & Pages → `frame-ebook` → Settings → Enable access policy, then verify the generated Access application covers the production hostname. The same Access policy must cover the API paths. If you also use preview deployments or a custom domain, protect those hostnames too; where they use separate Access applications, add each corresponding AUD to the comma-separated `FRAME_READER_ACCESS_AUD` Variable. Set `FRAME_READER_ACCESS_TEAM_DOMAIN` to your Cloudflare One team domain and `FRAME_READER_ACCESS_AUD` to the Application Audience tag(s). Confirm at least one server-side source has its API URL, username and password configured.
+2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. For a Pages `.pages.dev` hostname, enable the project Access policy from Workers & Pages → `frame-ebook` → Settings → Enable access policy, then verify the generated Access application covers the production hostname and all API paths. This is an edge-level setting, not a Pages Variable or Secret. If you also use Preview deployments or a custom domain, protect those hostnames separately, as FRAME Audio does for Production and Preview. Confirm at least one server-side source has its API URL, username and password configured.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
@@ -77,7 +75,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
 
 ## 6. Existing data and current behavior
 
-- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused.
+- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused. No Access Team Domain or AUD values need to be added under Variables and Secrets.
 - Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
