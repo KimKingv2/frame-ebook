@@ -55,14 +55,18 @@ export async function onRequestGet({ request, env }) {
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
         ).bind(provider, library, rootPath, path, perPage, offset);
+    let stage = "prepare_queries";
+    stage = "count_and_rows";
     const [count, rows, scanKey] = await Promise.all([
       countStatement.first(),
       rowsStatement.all(),
       scanStateKey(provider, library, rootPath)
     ]);
+    stage = "read_scan_state";
     const stateRow = await db.prepare(
       "SELECT state_json,updated_at FROM cloud_scan_state WHERE scan_key=?"
     ).bind(scanKey).first();
+    stage = "parse_scan_state";
     const scanState = stateRow ? JSON.parse(stateRow.state_json) : null;
     const total = Number(count?.count || 0);
     const items = (rows.results || []).map(row => ({
@@ -98,9 +102,14 @@ export async function onRequestGet({ request, env }) {
       total,
       items
     });
-  } catch {
+  } catch (error) {
+    // Keep diagnostics limited to the authenticated caller. D1 error messages
+    // identify missing schema objects or query stages, but never return row data.
+    const detail = String(error?.message || error?.name || "Unknown D1 error")
+      .replace(/[\\r\\n\\t]+/g, " ")
+      .slice(0, 220);
     return json({
-      error: "雲端書庫索引尚未初始化或查詢失敗。請先執行 migrations/0002_cloud_catalog.sql 與 0003_cloud_covers.sql。"
+      error: "D1 書庫索引查詢失敗（" + stage + "）：" + detail
     }, 503);
   }
 }
