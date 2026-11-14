@@ -161,7 +161,7 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 ### Cloud architecture
 
 - The root-level functions directory is the Cloudflare Pages Functions source directory. It is separate from the static pages output directory.
-- Cloudflare Access handles website sign-in; Pages Functions independently verify each protected request's signed Access JWT, including its signature, issuer, audience and expiry.
+- Cloudflare Access is the sole website authentication boundary and must protect the complete hostname, including all Pages Functions API routes. Pages Functions rely on the Access edge and do not run a duplicate JWT verifier.
 - /api/cloud/books lists EPUB or CBZ files and folders below the corresponding mandatory OPENLIST_BOOKS_ROOT_PATH or OPENLIST_COMICS_ROOT_PATH.
 - /api/cloud/file proxies an authenticated OpenList download and forwards valid HTTP Range requests. The OpenList token and raw download URL remain server-side.
 - /api/reading/events stores unique short reading-time events in D1; duplicate retries do not double-count.
