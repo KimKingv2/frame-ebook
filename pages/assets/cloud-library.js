@@ -792,7 +792,7 @@ async function importCloudFile(item) {
     if(state.activeProvider==="local") {
       blob=await downloadLocalFile(item.path);
     } else {
-      const query=new URLSearchParams({path:item.path,provider:state.activeProvider,library});
+      const query=new URLSearchParams({path:item.path,root_path:getActiveRoot(),provider:state.activeProvider,library});
       const response=await fetch("/api/cloud/file?"+query.toString(),{credentials:"same-origin"});
       if(!response.ok) {
         const data=await response.json().catch(()=>({}));
