@@ -135,10 +135,29 @@ async function getAccessJwks(teamDomain, forceRefresh = false) {
   }
 }
 
-async function verifyCloudflareAccessJwt(token, config) {
-  if (typeof token !== "string" || token.length > 32768) return false;
+async function inspectCloudflareAccessJwt(token, config) {
+  const checks = {
+    assertionHeaderPresent: typeof token === "string" && token.length > 0,
+    jwtStructureValid: null,
+    algorithmValid: null,
+    issuerMatches: null,
+    audienceMatches: null,
+    timeValid: null,
+    jwksAvailable: null,
+    signingKeyFound: null,
+    signatureValid: null
+  };
+  const fail = failureReason => ({ authenticated: false, failureReason, checks });
+
+  if (!config) return fail("verifier_not_configured");
+  if (!checks.assertionHeaderPresent) return fail("access_jwt_header_missing");
+  if (token.length > 32768) return fail("access_jwt_too_large");
+
   const parts = token.split(".");
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return false;
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
+    checks.jwtStructureValid = false;
+    return fail("jwt_malformed");
+  }
 
   let header;
   let payload;
@@ -147,31 +166,50 @@ async function verifyCloudflareAccessJwt(token, config) {
     header = decodeBase64UrlJson(parts[0]);
     payload = decodeBase64UrlJson(parts[1]);
     signature = decodeBase64UrlBytes(parts[2]);
+    if (!header || typeof header !== "object" || !payload || typeof payload !== "object") {
+      throw new Error("Invalid JWT JSON structure");
+    }
+    checks.jwtStructureValid = true;
   } catch (_) {
-    return false;
+    checks.jwtStructureValid = false;
+    return fail("jwt_malformed");
   }
 
   // Cloudflare Access application tokens use RS256.
-  if (header?.alg !== "RS256" || typeof header?.kid !== "string") return false;
-  if (payload?.iss !== config.teamDomain) return false;
+  checks.algorithmValid = header.alg === "RS256" && typeof header.kid === "string" && !!header.kid;
+  if (!checks.algorithmValid) return fail("jwt_algorithm_or_key_id_invalid");
+
+  checks.issuerMatches = payload.iss === config.teamDomain;
+  if (!checks.issuerMatches) return fail("issuer_mismatch");
 
   const tokenAudiences = typeof payload.aud === "string"
     ? [payload.aud]
     : Array.isArray(payload.aud) ? payload.aud : [];
-  if (!config.audiences.some(audience => tokenAudiences.includes(audience))) return false;
+  checks.audienceMatches = config.audiences.some(audience => tokenAudiences.includes(audience));
+  if (!checks.audienceMatches) return fail("audience_mismatch");
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   const clockToleranceSeconds = 30;
-  if (!Number.isFinite(payload.exp) || payload.exp <= nowSeconds - clockToleranceSeconds) return false;
-  if (payload.nbf !== undefined && (!Number.isFinite(payload.nbf) || payload.nbf > nowSeconds + clockToleranceSeconds)) return false;
-  if (payload.iat !== undefined && (!Number.isFinite(payload.iat) || payload.iat > nowSeconds + clockToleranceSeconds)) return false;
+  checks.timeValid =
+    Number.isFinite(payload.exp) &&
+    payload.exp > nowSeconds - clockToleranceSeconds &&
+    (payload.nbf === undefined || (
+      Number.isFinite(payload.nbf) && payload.nbf <= nowSeconds + clockToleranceSeconds
+    )) &&
+    (payload.iat === undefined || (
+      Number.isFinite(payload.iat) && payload.iat <= nowSeconds + clockToleranceSeconds
+    ));
+  if (!checks.timeValid) return fail("jwt_expired_or_not_yet_valid");
 
   let keys;
   try {
     keys = await getAccessJwks(config.teamDomain);
+    checks.jwksAvailable = Array.isArray(keys) && keys.length > 0;
   } catch (_) {
-    return false;
+    checks.jwksAvailable = false;
+    return fail("jwks_unavailable");
   }
+  if (!checks.jwksAvailable) return fail("jwks_unavailable");
 
   let signingJwk = keys.find(key => key.kid === header.kid);
   if (!signingJwk) {
@@ -179,10 +217,12 @@ async function verifyCloudflareAccessJwt(token, config) {
       keys = await getAccessJwks(config.teamDomain, true);
       signingJwk = keys.find(key => key.kid === header.kid);
     } catch (_) {
-      return false;
+      checks.signingKeyFound = false;
+      return fail("jwks_refresh_failed");
     }
   }
-  if (!signingJwk) return false;
+  checks.signingKeyFound = !!signingJwk;
+  if (!signingJwk) return fail("signing_key_not_found");
 
   try {
     const publicKey = await crypto.subtle.importKey(
@@ -193,15 +233,33 @@ async function verifyCloudflareAccessJwt(token, config) {
       ["verify"]
     );
     const signingInput = new TextEncoder().encode(parts[0] + "." + parts[1]);
-    return await crypto.subtle.verify(
+    checks.signatureValid = await crypto.subtle.verify(
       { name: "RSASSA-PKCS1-v1_5" },
       publicKey,
       signature,
       signingInput
     );
   } catch (_) {
-    return false;
+    checks.signatureValid = false;
+    return fail("signature_check_error");
   }
+
+  if (!checks.signatureValid) return fail("signature_invalid");
+  return { authenticated: true, failureReason: null, checks };
+}
+
+export async function getAccessAuthDiagnostics(request, env) {
+  const config = getAccessVerifierConfig(env);
+  const result = await inspectCloudflareAccessJwt(
+    request.headers.get("Cf-Access-Jwt-Assertion"),
+    config
+  );
+  return {
+    authenticated: result.authenticated,
+    jwtValidationConfigured: !!config,
+    failureReason: result.failureReason,
+    checks: result.checks
+  };
 }
 
 export async function isAuthenticated(request, env) {
