@@ -1,4 +1,4 @@
-import { json, requireAuth, getOpenListConfig, openListPost, normalizePath, isWithinRoot } from "../../_lib/common.js";
+import { json, requireAuth, getOpenListConfig, openListPost, normalizePath } from "../../_lib/common.js";
 
 function isLocalHost(hostname) {
   const host = String(hostname || "").toLowerCase();
@@ -13,10 +13,10 @@ export async function onRequestGet({ request, env }) {
   const library = requestUrl.searchParams.get("library") === "comics" ? "comics" : "books";
   if (!["vps", "worker", "mobile"].includes(provider)) return json({ error: "不支援的雲端來源。區域網路來源必須由目前裝置直接連線。" }, 400);
   const config = getOpenListConfig(env, provider, library);
-  if (!config) return json({ error: "選取的來源或對應根目錄尚未設定。請確認 Pages URL／Token Secret 與 OPENLIST_BOOKS_ROOT_PATH／OPENLIST_COMICS_ROOT_PATH。" }, 503);
+  if (!config) return json({ error: "選取的來源尚未設定。請確認 Pages API Base URL、帳號 Variable 與密碼 Secret。" }, 503);
 
   const path = normalizePath(requestUrl.searchParams.get("path") || "");
-  if (!path || !isWithinRoot(path, config.rootPath)) return json({ error: "路徑無效，或超出目前電子書／漫畫的設定根目錄。" }, 400);
+  if (!path || path === "/") return json({ error: "檔案路徑無效。" }, 400);
   const allowedExtension = library === "comics" ? /\.(epub|cbz)$/i : /\.epub$/i;
   if (!allowedExtension.test(path)) return json({ error: library === "comics" ? "漫畫來源只允許 EPUB 或 CBZ 檔案。" : "電子書來源只允許 EPUB 檔案。" }, 415);
 

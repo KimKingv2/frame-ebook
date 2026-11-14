@@ -27,7 +27,7 @@
     <section class="cloud-hero">
       <p class="eyebrow"><span class="eyebrow-line"></span> YOUR BOOKS, WHERE YOU KEEP THEM</p>
       <h1>把私人書庫，<br><em>接回自己的閱讀室。</em></h1>
-      <p>以四路來源連接私人 OpenList：VPS Alist、OpenList Worker、Mobile Device Alist，或目前裝置直連區域網路 OpenList。伺服器端 Token 不會交給瀏覽器。</p>
+      <p>以四路來源連接私人 OpenList：VPS Alist、OpenList Worker、Mobile Device Alist，或目前裝置直連區域網路 OpenList。伺服器端使用帳號密碼自動登入，短效 Token 不會交給瀏覽器。</p>
     </section>
 
     <section id="cloud-login-panel" class="cloud-auth-panel">
@@ -63,29 +63,30 @@
           </select>
         </div>
         <div class="cloud-provider-grid">
-          <article class="cloud-provider-card"><div><strong>VPS Alist</strong><span>SERVER PROXY</span></div><p id="cloud-vps-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_VPS_API_BASE_URL</code><br>Pages Secret：<code>ALIST_VPS_API_TOKEN</code></small></article>
-          <article class="cloud-provider-card"><div><strong>OpenList Worker</strong><span>SERVER PROXY</span></div><p id="cloud-worker-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_WORKER_API_BASE_URL</code><br>Pages Secret：<code>ALIST_WORKER_API_TOKEN</code></small></article>
-          <article class="cloud-provider-card"><div><strong>Mobile Device Alist</strong><span>SERVER PROXY</span></div><p id="cloud-mobile-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_MOBILE_DEVICE_API_BASE_URL</code><br>Pages Secret：<code>ALIST_MOBILE_DEVICE_API_TOKEN</code></small></article>
+          <article class="cloud-provider-card"><div><strong>VPS Alist</strong><span>SERVER PROXY</span></div><p id="cloud-vps-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_VPS_API_BASE_URL</code><br>Pages Variable：<code>ALIST_VPS_API_USERNAME</code><br>Pages Secret：<code>ALIST_VPS_API_PASSWORD</code></small></article>
+          <article class="cloud-provider-card"><div><strong>OpenList Worker</strong><span>SERVER PROXY</span></div><p id="cloud-worker-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_WORKER_API_BASE_URL</code><br>Pages Variable：<code>ALIST_WORKER_API_USERNAME</code><br>Pages Secret：<code>ALIST_WORKER_API_PASSWORD</code></small></article>
+          <article class="cloud-provider-card"><div><strong>Mobile Device Alist</strong><span>SERVER PROXY</span></div><p id="cloud-mobile-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_MOBILE_DEVICE_API_BASE_URL</code><br>Pages Variable：<code>ALIST_MOBILE_DEVICE_API_USERNAME</code><br>Pages Secret：<code>ALIST_MOBILE_DEVICE_API_PASSWORD</code></small></article>
           <article class="cloud-provider-card cloud-provider-local"><div><strong>區域網路 OpenList</strong><span>DEVICE DIRECT</span></div>
             <label for="cloud-local-url">本機 OpenList API 網址</label><input id="cloud-local-url" type="url" placeholder="http://192.168.31.185:5244" autocomplete="off" spellcheck="false">
-            <label for="cloud-local-token">本機 OpenList API Token</label><input id="cloud-local-token" type="password" placeholder="只保存在目前裝置" autocomplete="new-password" spellcheck="false">
-            <small>網址與 Token 只保存在這台裝置的瀏覽器。請使用唯讀 Token；HTTP 僅適合可信任的 LAN／已加密 VPN。</small>
+            <label for="cloud-local-username">本機 OpenList 帳號</label><input id="cloud-local-username" type="text" placeholder="OpenList 登入帳號" autocomplete="username" spellcheck="false">
+            <label for="cloud-local-password">本機 OpenList 密碼</label><input id="cloud-local-password" type="password" placeholder="目前分頁工作階段使用" autocomplete="current-password" spellcheck="false">
+            <small>網址與帳號保存在這台裝置；密碼只保存在目前分頁的工作階段，關閉分頁後需重新輸入。帳號密碼直接傳給指定的 LAN OpenList。HTTP 不加密，僅適合可信任的 LAN／已加密 VPN。</small>
           </article>
         </div>
         <div class="cloud-root-settings">
           <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
-          <p>和 FRAME Audio 的 Music／Podcast 一樣，電子書與漫畫分開設定。可輸入路徑，或在下方瀏覽資料夾後，將目前目錄指定為其中一個根目錄。</p>
+          <p>參考 FRAME Audio 的根目錄設定方式：電子書與漫畫各自保存一條路徑。可直接輸入絕對路徑，或在下方瀏覽資料夾後，將目前位置指定為根目錄；設定保存在目前裝置，切換來源時沿用。</p>
           <div class="cloud-roots-grid">
             <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">等待伺服器設定…</small></div>
             <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">等待伺服器設定…</small></div>
           </div>
-          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存兩個目錄設定</button><span>目前選擇會保存在這台裝置；Cloudflare 設定的最大存取範圍仍由伺服器限制。</span></div>
+          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存兩個目錄設定</button><span>兩條路徑分別保存在這台裝置。請為各 OpenList 帳號設定合適的唯讀目錄權限。</span></div>
         </div>
         <div class="cloud-connection-actions">
           <button id="cloud-save-source" class="quiet-button" type="button">保存來源設定</button>
-          <button id="cloud-test-source" class="primary-link" type="button">測試目前來源並讀取書庫 <span>↗</span></button>
+          <button id="cloud-test-source" class="primary-link" type="button">重新連線／讀取書架 <span>↗</span></button>
         </div>
-        <p id="cloud-source-status" class="cloud-source-status" role="status">尚未連線。請選擇來源並點擊測試。</p>
+        <p id="cloud-source-status" class="cloud-source-status" role="status">登入後會自動連接上次使用的來源與根目錄。</p>
       </section>
       <div class="cloud-browser-heading">
         <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端書庫</h2></div>
@@ -122,10 +123,10 @@
 
     <section class="cloud-security-note">
       <span>✦</span>
-      <div><strong>密鑰在伺服器，書籍在你的雲端。</strong><p>VPS Alist、OpenList Worker 與 Mobile Device 的 Token 只由 Pages Functions 在伺服器端讀取，不會傳給瀏覽器。區域網路來源則例外：該裝置自己的 Token 會保存在目前瀏覽器，並直接傳給你指定的 LAN OpenList。加入本機書架時，書檔會讀入目前瀏覽器的 IndexedDB。</p></div>
+      <div><strong>帳密留在各自的連線端，書籍仍在你的雲端。</strong><p>VPS Alist、OpenList Worker 與 Mobile Device 的帳號密碼只由 Pages Functions 讀取；每次 API 請求時自動登入取得短效 Token，Token 僅在伺服器本次請求中使用，不寫入 D1 或傳給瀏覽器。區域網路來源由目前裝置直接登入，帳號名稱保存在這台裝置，密碼只保存在目前分頁工作階段。加入本機書架時，書檔會讀入目前瀏覽器的 IndexedDB。</p></div>
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js?v=20261114-shelf-classification1"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-account-paths1"></script>
 </body>
 </html>

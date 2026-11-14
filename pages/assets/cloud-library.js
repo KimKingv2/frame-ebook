@@ -2,7 +2,9 @@ import { importBookFile } from "/assets/library-store.js?v=20261114-shelf-classi
 
 const $ = id => document.getElementById(id);
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
-const LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v1";
+const LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v2";
+const LEGACY_LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v1";
+const LOCAL_PASSWORD_SESSION_KEY = "frame-reader-local-openlist-password-v1";
 const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v1";
 const PROVIDER_LABELS = {
   vps: "VPS Alist",
@@ -14,8 +16,9 @@ const LIBRARY_LABELS = { books: "電子書", comics: "漫畫" };
 const state = {
   authenticated:false,
   databaseConfigured:false,
-  allowedRoots:{books:"",comics:""},
-  selectedRoots:{books:"",comics:""},
+  allowedRoots:{books:"/",comics:"/"},
+  suggestedRoots:{books:"/",comics:"/"},
+  selectedRoots:{books:"/",comics:"/"},
   currentPath:"/",
   items:[],
   query:"",
@@ -26,7 +29,7 @@ const state = {
   serverProfiles:{},
   activeProvider:"vps",
   activeLibrary:"books",
-  localProfile:{baseUrl:"",token:""},
+  localProfile:{baseUrl:"",username:"",password:""},
   connected:false
 };
 
@@ -57,7 +60,8 @@ function fileKind(item) {
   return ext==="epub"?"EPUB":ext==="cbz"?"CBZ":"";
 }
 function getAllowedRoot(library=state.activeLibrary) {
-  return state.allowedRoots[library]||"";
+  void library;
+  return "/";
 }
 function getActiveRoot(library=state.activeLibrary) {
   return state.selectedRoots[library]||getAllowedRoot(library);
@@ -68,35 +72,38 @@ function breadcrumb(path) {
   return rel?root.replace(/\/$/,"")+" / "+rel.replace(/\//g," / "):root;
 }
 function readLocalProfile() {
-  try {
-    const parsed=JSON.parse(localStorage.getItem(LOCAL_PROFILE_KEY)||"{}");
-    state.localProfile={baseUrl:String(parsed.baseUrl||""),token:String(parsed.token||"")};
-  } catch (_) {
-    state.localProfile={baseUrl:"",token:""};
-  }
+  let saved={};
+  let legacy={};
+  try { saved=JSON.parse(localStorage.getItem(LOCAL_PROFILE_KEY)||"{}"); } catch (_) {}
+  try { legacy=JSON.parse(localStorage.getItem(LEGACY_LOCAL_PROFILE_KEY)||"{}"); } catch (_) {}
+  let sessionPassword="";
+  try { sessionPassword=sessionStorage.getItem(LOCAL_PASSWORD_SESSION_KEY)||""; } catch (_) {}
+  state.localProfile={
+    baseUrl:String(saved.baseUrl||legacy.baseUrl||""),
+    username:String(saved.username||""),
+    password:sessionPassword
+  };
+  try { localStorage.removeItem(LEGACY_LOCAL_PROFILE_KEY); } catch (_) {}
   $("cloud-local-url").value=state.localProfile.baseUrl;
-  $("cloud-local-token").value=state.localProfile.token;
+  $("cloud-local-username").value=state.localProfile.username;
+  $("cloud-local-password").value=state.localProfile.password;
 }
 function readRootSelections() {
   let saved={};
   try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
   for(const library of ["books","comics"]) {
-    const allowed=getAllowedRoot(library);
-    const candidate=normalizePath(saved[library]||allowed);
-    state.selectedRoots[library]=candidate&&isWithinRoot(candidate,allowed)?candidate:allowed;
+    const candidate=normalizePath(saved[library]||state.suggestedRoots[library]||"/");
+    state.selectedRoots[library]=candidate||"/";
   }
-  $("cloud-books-root").value=state.selectedRoots.books||"";
-  $("cloud-comics-root").value=state.selectedRoots.comics||"";
+  $("cloud-books-root").value=state.selectedRoots.books||"/";
+  $("cloud-comics-root").value=state.selectedRoots.comics||"/";
   renderRootStatus();
 }
 function renderRootStatus() {
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
-    const selected=state.selectedRoots[library];
-    const allowed=getAllowedRoot(library);
-    $(id).textContent=allowed
-      ?"最大允許範圍："+allowed+(selected&&selected!==allowed?" · 本機目前使用："+selected:"")
-      :"尚未設定 OPENLIST_"+(library==="books"?"BOOKS":"COMICS")+"_ROOT_PATH";
+    const selected=state.selectedRoots[library]||"/";
+    $(id).textContent="目前裝置使用："+selected+"（可手動修改，或從下方目錄瀏覽器選取）";
   }
 }
 function normalizeLocalBase(value) {
@@ -161,61 +168,76 @@ function saveRootSelections() {
     comics:String($("cloud-comics-root").value||"").trim()
   };
   for(const library of ["books","comics"]) {
-    const allowed=getAllowedRoot(library);
-    if(!allowed) {
-      if(values[library])throw new Error(LIBRARY_LABELS[library]+"尚未設定伺服器端允許範圍。請先設定 OPENLIST_"+(library==="books"?"BOOKS":"COMICS")+"_ROOT_PATH。");
-      state.selectedRoots[library]="";
-      continue;
-    }
-    const candidate=normalizePath(values[library]||allowed);
-    if(!candidate||!isWithinRoot(candidate,allowed))throw new Error(LIBRARY_LABELS[library]+"路徑必須位於伺服器允許範圍內："+allowed);
+    const candidate=normalizePath(values[library]||"/");
+    if(!candidate)throw new Error(LIBRARY_LABELS[library]+"路徑無效，請使用絕對路徑且不要包含 ..。");
     state.selectedRoots[library]=candidate;
+    $(library==="books"?"cloud-books-root":"cloud-comics-root").value=candidate;
   }
   try { localStorage.setItem(ROOT_SELECTIONS_KEY,JSON.stringify(state.selectedRoots)); }
   catch (_) { throw new Error("無法保存目錄設定。請檢查瀏覽器的網站儲存空間。"); }
   renderRootStatus();
   clearListing("目錄設定已保存");
-  setSourceStatus("電子書與漫畫目錄設定已保存在這台裝置。伺服器仍會強制限制在 Cloudflare 設定的最大允許範圍內。");
+  setSourceStatus("電子書與漫畫根目錄已分別保存在這台裝置。切換 VPS、Worker、Mobile Device 或 LAN 時會沿用相同的絕對路徑。");
 }
 function saveSourceSettings() {
   const provider=$("cloud-provider").value;
   if(!Object.prototype.hasOwnProperty.call(PROVIDER_LABELS,provider))throw new Error("請選擇有效的書庫來源。");
   if(provider==="local") {
     const baseUrl=normalizeLocalBase($("cloud-local-url").value);
-    const token=String($("cloud-local-token").value||"").trim();
-    if(!token)throw new Error("請填入這台裝置的區域網路 OpenList API Token。");
-    state.localProfile={baseUrl,token};
-    try { localStorage.setItem(LOCAL_PROFILE_KEY,JSON.stringify(state.localProfile)); }
-    catch (_) { throw new Error("無法將本機來源設定保存在瀏覽器。請檢查網站儲存空間權限。"); }
+    const username=String($("cloud-local-username").value||"").trim();
+    const password=String($("cloud-local-password").value||"");
+    if(!username||!password)throw new Error("請填入這台裝置的區域網路 OpenList 帳號與密碼。");
+    state.localProfile={baseUrl,username,password};
+    try {
+      localStorage.setItem(LOCAL_PROFILE_KEY,JSON.stringify({baseUrl,username}));
+      sessionStorage.setItem(LOCAL_PASSWORD_SESSION_KEY,password);
+    } catch (_) { throw new Error("無法保存本機來源連線資料，請檢查瀏覽器儲存空間權限。"); }
   } else if(!state.serverProfiles[provider]?.configured) {
     throw new Error(PROVIDER_LABELS[provider]+" 尚未在 Cloudflare Pages Variables／Secrets 完成設定。");
   }
   persistActiveProvider(provider);
-  setSourceStatus("已保存來源設定："+PROVIDER_LABELS[provider]+"。尚未發出 OpenList 請求；按「測試目前來源」後才會讀取目錄。");
+  setSourceStatus("已保存來源設定："+PROVIDER_LABELS[provider]+"。OpenList 會在連線時使用帳號密碼自動登入。");
   return provider;
 }
 function getActiveProfile() {
   if(state.activeProvider==="local") {
     const profile=state.localProfile;
-    if(!profile.baseUrl||!profile.token)throw new Error("尚未保存區域網路 OpenList 網址與 Token。");
-    return {baseUrl:normalizeLocalBase(profile.baseUrl),token:profile.token};
+    if(!profile.baseUrl||!profile.username||!profile.password)throw new Error("尚未保存區域網路 OpenList 網址、帳號與目前分頁密碼。");
+    return {baseUrl:normalizeLocalBase(profile.baseUrl),username:profile.username,password:profile.password};
   }
-  if(!state.serverProfiles[state.activeProvider]?.configured)throw new Error(PROVIDER_LABELS[state.activeProvider]+" 尚未完成 Cloudflare Pages 伺服器端設定。");
+  if(!state.serverProfiles[state.activeProvider]?.configured)throw new Error(PROVIDER_LABELS[state.activeProvider]+" 尚未完成 Cloudflare Pages 帳號密碼設定。");
   return null;
 }
 async function directOpenList(endpoint,payload) {
   const profile=getActiveProfile();
+  const loginUrl=new URL("api/auth/login",profile.baseUrl+"/").href;
+  let loginResponse;
+  try {
+    loginResponse=await fetch(loginUrl,{
+      method:"POST",mode:"cors",credentials:"omit",redirect:"error",
+      headers:{"Content-Type":"application/json",Accept:"application/json"},
+      body:JSON.stringify({username:profile.username,password:profile.password}),
+      ...localNetworkOptions(loginUrl)
+    });
+  } catch (cause) {
+    throw new Error("無法連接區域網路 OpenList 登入端點。請確認服務、網址、CORS（Content-Type）及本機網路權限。"+(cause?.message?" 詳情："+String(cause.message).slice(0,140):""));
+  }
+  let loginData;
+  try { loginData=await loginResponse.json(); } catch (_) { throw new Error("區域網路 OpenList 登入回應不是有效 JSON（HTTP "+loginResponse.status+"）。"); }
+  if(!loginResponse.ok||Number(loginData?.code)!==200||!loginData?.data?.token) {
+    throw new Error("區域網路 OpenList 帳號密碼登入失敗："+String(loginData?.message||loginData?.error||("HTTP "+loginResponse.status)));
+  }
   const url=new URL("api/fs/"+endpoint,profile.baseUrl+"/").href;
   let response;
   try {
     response=await fetch(url,{
       method:"POST",mode:"cors",credentials:"omit",redirect:"error",
-      headers:{Authorization:profile.token,"Content-Type":"application/json",Accept:"application/json"},
+      headers:{Authorization:String(loginData.data.token),"Content-Type":"application/json",Accept:"application/json"},
       body:JSON.stringify(payload),
       ...localNetworkOptions(url)
     });
   } catch (cause) {
-    throw new Error("無法直接連接區域網路 OpenList。請確認服務、網址、CORS（Authorization／Content-Type）及本機網路權限。"+(cause?.message?" 詳情："+String(cause.message).slice(0,140):""));
+    throw new Error("無法直接連接區域網路 OpenList API。請確認服務、CORS（Authorization／Content-Type）及本機網路權限。"+(cause?.message?" 詳情："+String(cause.message).slice(0,140):""));
   }
   let data;
   try { data=await response.json(); } catch (_) { throw new Error("區域網路 OpenList 回應不是有效 JSON（HTTP "+response.status+"）。"); }
@@ -255,6 +277,10 @@ async function downloadLocalFile(path) {
   if(!response.ok)throw new Error("檔案下載失敗：HTTP "+response.status);
   return await response.blob();
 }
+function isActiveSourceReady() {
+  if(state.activeProvider==="local") return !!(state.localProfile.baseUrl&&state.localProfile.username&&state.localProfile.password);
+  return !!state.serverProfiles[state.activeProvider]?.configured;
+}
 async function checkSession() {
   try {
     const response=await fetch("/api/auth/session",{credentials:"same-origin"});
@@ -262,18 +288,18 @@ async function checkSession() {
     state.authenticated=!!(response.ok&&data.authenticated);
     state.databaseConfigured=!!data.databaseConfigured;
     state.serverProfiles=data.openListProfiles||{};
-    state.allowedRoots={
-      books:data.rootPaths?.books?normalizePath(data.rootPaths.books)||"": "",
-      comics:data.rootPaths?.comics?normalizePath(data.rootPaths.comics)||"": ""
+    state.suggestedRoots={
+      books:normalizePath(data.rootPaths?.books||"/")||"/",
+      comics:normalizePath(data.rootPaths?.comics||"/")||"/"
     };
+    state.allowedRoots={books:"/",comics:"/"};
     if(state.authenticated) {
       $("cloud-login-panel").hidden=true;
       $("cloud-browser").hidden=false;
       readLocalProfile();
       readRootSelections();
       renderProfileStatus();
-      let selectedProvider="vps";
-      let selectedLibrary="books";
+      let selectedProvider="vps",selectedLibrary="books";
       try {
         const savedProvider=localStorage.getItem(ACTIVE_PROVIDER_KEY)||"vps";
         if(Object.prototype.hasOwnProperty.call(PROVIDER_LABELS,savedProvider))selectedProvider=savedProvider;
@@ -285,11 +311,13 @@ async function checkSession() {
       $("cloud-provider").value=selectedProvider;
       $("cloud-library-type").value=selectedLibrary;
       clearListing();
-      const configuredRoots=["books","comics"].filter(key=>!!state.allowedRoots[key]).length;
-      setSourceStatus(
-        "已登入。請選擇來源及電子書／漫畫分類，再按「測試目前來源」讀取目錄。已配置 "+configuredRoots+"/2 個伺服器目錄範圍。",
-        configuredRoots===0
-      );
+      if(isActiveSourceReady()) {
+        state.currentPath=getActiveRoot();
+        setSourceStatus("私人書庫已登入，正在自動連接 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+"……");
+        await loadDirectory(state.currentPath,1);
+      } else {
+        setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「重新連線／讀取書架」。",true);
+      }
       try {
         const tracker=await import("/assets/reading-tracker.js");
         await tracker.syncPending(true);
@@ -390,7 +418,7 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
     $("cloud-next-page").disabled=true;
     $("cloud-connection-status").textContent="連線失敗 · "+PROVIDER_LABELS[state.activeProvider];
     $("cloud-browser-status").textContent=error.message||String(error);
-    setSourceStatus((error.message||String(error))+". 請檢查來源設定及對應根目錄。",true);
+    setSourceStatus((error.message||String(error))+". 請檢查來源帳號密碼、API 網址與目前目錄。",true);
   } finally {
     $("cloud-refresh").disabled=false;
     $("cloud-test-source").disabled=false;
@@ -460,14 +488,14 @@ async function importCloudFile(item) {
   }
 }
 function setCurrentFolderAsRoot(library) {
-  const allowed=getAllowedRoot(library);
-  if(!state.currentPath||!isWithinRoot(state.currentPath,allowed)) {
-    setSourceStatus("目前瀏覽位置不在"+LIBRARY_LABELS[library]+"的伺服器允許範圍內。",true);
+  const candidate=normalizePath(state.currentPath);
+  if(!candidate) {
+    setSourceStatus("目前目錄路徑無效，無法設為"+LIBRARY_LABELS[library]+"根目錄。",true);
     return;
   }
   const id=library==="books"?"cloud-books-root":"cloud-comics-root";
-  $(id).value=state.currentPath;
-  setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+state.currentPath+"。請按「保存兩個目錄設定」。");
+  $(id).value=candidate;
+  setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「保存兩個目錄設定」。");
 }
 $("cloud-login-form").addEventListener("submit",login);
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
@@ -489,18 +517,33 @@ $("cloud-provider").addEventListener("change",event=>{
   state.activeProvider=provider;
   try { localStorage.setItem(ACTIVE_PROVIDER_KEY,provider); } catch (_) {}
   clearListing();
-  setSourceStatus("已選擇 "+PROVIDER_LABELS[provider]+"。尚未連線；按「測試目前來源」後才會呼叫該來源。");
+  if(isActiveSourceReady()) {
+    state.currentPath=getActiveRoot();
+    void loadDirectory(state.currentPath,1);
+  } else {
+    setSourceStatus("已選擇 "+PROVIDER_LABELS[provider]+"。請先完成該來源的帳號密碼設定。",true);
+  }
 });
 $("cloud-library-type").addEventListener("change",event=>{
   const library=event.target.value==="comics"?"comics":"books";
   state.activeLibrary=library;
   try { localStorage.setItem("frame-reader-active-library",library); } catch (_) {}
   clearListing();
-  setSourceStatus("已切換至"+LIBRARY_LABELS[library]+"。按「測試目前來源」讀取對應根目錄。");
+  if(isActiveSourceReady()) {
+    state.currentPath=getActiveRoot(library);
+    void loadDirectory(state.currentPath,1);
+  } else {
+    setSourceStatus("已切換至"+LIBRARY_LABELS[library]+"。完成目前來源設定後即可讀取。",true);
+  }
 });
 $("cloud-save-source").addEventListener("click",()=>{
-  try { saveSourceSettings(); }
-  catch(error) { setSourceStatus(error.message||String(error),true); }
+  try {
+    saveSourceSettings();
+    if(isActiveSourceReady()) {
+      state.currentPath=getActiveRoot();
+      void loadDirectory(state.currentPath,1);
+    }
+  } catch(error) { setSourceStatus(error.message||String(error),true); }
 });
 $("cloud-save-roots").addEventListener("click",()=>{
   try { saveRootSelections(); }

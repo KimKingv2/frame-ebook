@@ -1,94 +1,93 @@
-# FRAME Reader V0.6 — Cloudflare setup
+# FRAME Reader V0.7 — Cloudflare setup
 
-V0.6 is deployed with the local reading tracker and reading insights page. The authenticated cloud API is present in the repository, but it deliberately stays unavailable until the D1 database, binding and server-side variables below are configured.
+FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf reads original EPUB / CBZ files from OpenList; adding a cloud file copies it into the current browser's IndexedDB.
 
-## 1. Create the D1 database
+## 1. Create and bind the D1 database
 
-Create a D1 database named `frame-reader-db` in Cloudflare Dashboard > Storage & Databases > D1, or use Wrangler:
+Create a D1 database named `frame-reader-db` in Cloudflare Dashboard → Storage & Databases → D1, or use Wrangler:
 
 ```sh
 npx wrangler login
 npx wrangler d1 create frame-reader-db
 ```
 
-Apply the schema from the repository root:
+Apply the schema from the repository root if it has not already been applied:
 
 ```sh
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
 ```
 
-This migration creates `reading_events` (deduplicated reading-time segments) and `auth_attempts` (login rate limiting). The migration is safe to apply to a newly created database. Do not run it against an unrelated existing database without reviewing the SQL first.
+In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Save and redeploy so the binding is available to Pages Functions. Do not recreate or reset an existing database.
 
-## 2. Bind D1 to the Pages project
+## 2. Configure server-side OpenList accounts
 
-In Cloudflare Dashboard:
+Under the Pages project's Settings → Variables and Secrets, add the following to Production. Add the same values to Preview only when you also intend to test private Preview deployments.
 
-1. Open Workers & Pages and select the `frame-ebook` Pages project.
-2. Go to **Settings → Bindings → Add → D1 database bindings**.
-3. Set the variable name to `FRAME_READER_DB`.
-4. Select the `frame-reader-db` database.
-5. Save and redeploy the Pages project so the binding is available to Functions.
-
-The Functions code accepts either `FRAME_READER_DB` or `DB`, but use `FRAME_READER_DB` for this project.
-
-## 3. Add server-side variables and secrets
-
-Under the Pages project's **Settings → Variables and Secrets**, add these to the Production environment. Add them to Preview only when you also intend to test private access on preview deployments.
-
-| Name | Type | Value |
+| Name | Type | Purpose |
 |---|---|---|
-| `ALIST_VPS_API_BASE_URL` | Variable | VPS Alist origin, e.g. `https://drive.example.com` |
-| `ALIST_VPS_API_TOKEN` | Secret | Read-only VPS Alist API token |
-| `ALIST_WORKER_API_BASE_URL` | Variable | OpenList Worker API origin |
-| `ALIST_WORKER_API_TOKEN` | Secret | Read-only OpenList Worker API token |
-| `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API origin |
-| `ALIST_MOBILE_DEVICE_API_TOKEN` | Secret | Read-only Mobile Device Alist API token |
-| `OPENLIST_BOOKS_ROOT_PATH` | Variable | Maximum allowed absolute path for the EPUB book library |
-| `OPENLIST_COMICS_ROOT_PATH` | Variable | Maximum allowed absolute path for the EPUB / CBZ comic library |
-| `FRAME_READER_ACCESS_PASSWORD` | Secret | A new private FRAME Reader login password; this is not the OpenList password |
-| `FRAME_READER_SESSION_SECRET` | Secret | A long, random signing secret used for the HttpOnly session cookie |
+| `ALIST_VPS_API_BASE_URL` | Variable | VPS Alist HTTPS API base URL |
+| `ALIST_VPS_API_USERNAME` | Variable | Read-only VPS Alist account name |
+| `ALIST_VPS_API_PASSWORD` | Secret | Password for the VPS Alist account |
+| `ALIST_WORKER_API_BASE_URL` | Variable | OpenList Worker HTTPS API base URL |
+| `ALIST_WORKER_API_USERNAME` | Variable | Read-only Worker account name |
+| `ALIST_WORKER_API_PASSWORD` | Secret | Password for the Worker account |
+| `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API base URL |
+| `ALIST_MOBILE_DEVICE_API_USERNAME` | Variable | Read-only Mobile Device account name |
+| `ALIST_MOBILE_DEVICE_API_PASSWORD` | Secret | Password for the Mobile Device account |
+| `FRAME_READER_ACCESS_PASSWORD` | Secret | Separate password used to enter the private FRAME Reader |
+| `FRAME_READER_SESSION_SECRET` | Secret | Random signing secret for the HttpOnly session cookie |
 
-Both `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` are mandatory and independent. The book root lists EPUB files only; the comics root lists both EPUB and CBZ files. Set each to the narrowest suitable directory, not `/`. The server rejects paths outside the matching root, and the browser cannot use the book root to access comics or vice versa. The root inputs on the cloud page may narrow each root further on the current device; those selections are saved in that browser only. All four connection sources must expose the same absolute paths. Remove the old `OPENLIST_ROOT_PATH` variable if you previously added it; the new setup does not use it.
+The three server-side profiles are independent. Configure only the sources you intend to use. Use an Alist account with read-only access and grant it access only to the intended book and comic directories.
 
-Generate a session secret locally, for example:
+### How Alist authentication works
 
-```sh
-openssl rand -hex 32
-```
+Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
 
-Paste the generated output only into Cloudflare's Secret field. Do not put any secret in Git, frontend JavaScript, chat messages or URL query strings.
+The FRAME Reader private password is a separate login gate. It is not an Alist account password. The existing `FRAME_READER_SESSION_SECRET` signs a Secure, HttpOnly session cookie. Login attempts are rate-limited in D1.
 
-### Four connection profiles
+## 3. Configure the LAN-direct source (optional)
 
-- **VPS Alist**, **OpenList Worker** and **Mobile Device Alist** are server-side profiles. Each uses its own Pages URL Variable and Token Secret. Copy the values into the frame-ebook Pages project; environment settings from frame-audio are not shared automatically between Pages projects.
-- **LAN OpenList** is configured inside the cloud page on each device. Its URL and read-only Token are saved in that browser's local storage and sent directly to the configured LAN host. Add the exact FRAME Reader production origin https://frame-ebook.pages.dev to that OpenList instance's CORS allowlist, including Authorization and Content-Type. Add the Preview origin only when testing Preview.
-- All four sources must expose the same absolute directory paths for OPENLIST_BOOKS_ROOT_PATH and OPENLIST_COMICS_ROOT_PATH. The comics root may contain both EPUB and CBZ files; the books root is EPUB-only. The cloud page does not connect automatically; click 測試目前來源並讀取書庫 to initiate the selected source.
-- For LAN direct downloads, the final host returned as raw_url must also permit browser CORS. Plain HTTP does not encrypt traffic by itself; use a trusted LAN, an encrypted VPN such as Tailscale, or HTTPS.
+The fourth source is the OpenList instance reachable directly from the current device, such as a Mac or phone on the home network. On the cloud page, enter its URL, account name and password. The URL and username are saved in that browser's local storage. The password is kept only in the current tab's `sessionStorage`, so a page reload in that tab can reconnect, but closing the tab clears it. The credentials are sent directly to the LAN OpenList login and file-list endpoints; they do not pass through Pages, D1 or Worker APIs.
 
-## 4. Verify the configuration
+Use a separate read-only account. Plain HTTP does not encrypt the username/password or Authorization header over Wi-Fi. Use HTTPS when available, or a trusted private LAN / encrypted VPN such as Tailscale. Allow the exact FRAME Reader origin in the LAN OpenList CORS settings. The browser needs `Content-Type` and `Authorization` request headers permitted for the login and file API calls. The final file host returned in `raw_url` must also permit browser CORS.
 
-After saving the binding and variables, trigger a new deployment. Then check:
+Legacy local Token settings are not reused. On first open after this update, the old saved local Token is discarded; enter the LAN account and password once and save the source again.
 
-- `https://frame-ebook.pages.dev/api/auth/session` should report `databaseConfigured: true`, `openListConfigured: true`, and (after login) separate `rootPaths.books` / `rootPaths.comics` values. Before login, `authenticated` is `false` and root paths are hidden.
-- Open `https://frame-ebook.pages.dev/cloud/`, sign in with `FRAME_READER_ACCESS_PASSWORD`, choose a source and either 電子書 or 漫畫, then browse the matching configured root.
-- Open `https://frame-ebook.pages.dev/reading-stats/`, sign in to enable D1 statistics sync. Locally stored reading events are uploaded with unique event IDs; duplicate retries are ignored by D1.
-- Read a book for at least one minute, then revisit the stats page and check the daily total. A reading day is counted at 60 seconds.
+## 4. Set the two library paths like FRAME Audio
 
-## 5. What V0.6 does and does not do
+The cloud page has two independent path fields:
 
-- Four interchangeable read-only sources are supported: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are configured as Pages Variables / Secrets and called server-side; the fourth stores its URL and Token only in the current browser's local storage.
-- The Pages Functions hold server-side tokens and proxy the API calls. Server tokens and the OpenList `raw_url` are not returned to the browser. A local-direct request sends only that device's own token directly to its configured LAN OpenList.
-- The file proxy forwards valid HTTP Range headers, but the current cloud shelf still downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Direct Range-backed streaming into Foliate is a later optimization.
-- The bookshelf file itself remains in OpenList. Adding it to the local shelf copies it into this browser's IndexedDB; removing the local copy does not delete the cloud original.
-- Reading duration is tracked locally first. Once authenticated, pending events are sent to D1. Reading statistics aggregate across devices that use the same private account after they sync.
-- Daily reading goal settings are currently per browser, and JSON / CSV export currently contains the local browser's raw event details.
-- The current private login is intended for a single personal library owner, not a multi-user public service. The password is verified at the edge, the session cookie is HttpOnly / Secure, and login attempts are rate-limited in D1.
-- The cloud page does not contact OpenList automatically on page load. Select a provider and the **電子書** or **漫畫** library, then press the explicit connection test button before any directory request. Each library has its own root input; a folder chosen from the browser can become that device's preferred sub-root, but the server-side maximum root remains authoritative. For LAN direct, configure a least-privilege Token and the exact site origin in OpenList CORS. Plain HTTP is not encrypted by itself; use trusted LAN or an encrypted VPN, or HTTPS.
+- **Books root:** EPUB electronic books.
+- **Comics root:** EPUB and CBZ comics.
+
+You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. Save the two paths. Each path is stored separately in the current browser and reused when switching between VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct OpenList.
+
+All sources should expose the same absolute folder layout so the saved paths work after switching sources. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are no longer required. If they are still present, they are used only as first-run suggested paths; they do not restrict server-side browsing. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
+
+After the Reader private login succeeds, the cloud page automatically opens the previously selected source and the last saved path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
+
+## 5. Verify the configuration
+
+1. Confirm the D1 binding and the two FRAME Reader login Secrets exist.
+2. Confirm at least one server-side source has its API URL, username and password configured.
+3. Open `https://frame-ebook.pages.dev/cloud/` and sign in with `FRAME_READER_ACCESS_PASSWORD`.
+4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
+5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
+6. Add a file to the local shelf. The original cloud file is not changed or deleted.
+
+## 6. Existing data and current behavior
+
+- No D1 migration is required for the account/password change or for per-device path settings. Existing reading events and authentication-attempt records remain intact.
+- Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
+- Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
+- Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
+- Cloud browsing and file-info requests are read-only. The file proxy forwards valid HTTP Range headers, but the current cloud shelf downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Range-backed reading is a later optimization.
+- Reading duration is tracked locally first. Once authenticated, pending events sync to D1. Reading statistics aggregate across devices using the same FRAME Reader private login after they sync.
+- Cloud originals remain in OpenList. Removing a local copy does not delete the cloud original.
 
 ## References
 
-- Cloudflare Pages Functions must live in a `/functions` directory at the root of the Pages project, not inside the static output directory: https://developers.cloudflare.com/pages/functions/get-started/
-- Cloudflare Pages D1 binding setup and redeployment: https://developers.cloudflare.com/pages/functions/bindings/
-- D1 create / execute commands: https://developers.cloudflare.com/d1/wrangler-commands/
-- OpenList FS list / get APIs and the Authorization header: https://openlistteam.github.io/docs/guide/api/fs.html
-
+- Cloudflare Pages Functions: https://developers.cloudflare.com/pages/functions/get-started/
+- Cloudflare Pages D1 bindings: https://developers.cloudflare.com/pages/functions/bindings/
+- D1 Wrangler commands: https://developers.cloudflare.com/d1/wrangler-commands/
+- OpenList API: https://openlistteam.github.io/docs/guide/api/fs.html

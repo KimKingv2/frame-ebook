@@ -1,4 +1,4 @@
-import { json, getDatabase, verifyPassword, createSessionCookie, getOpenListConfig, sha256Hex, isSameOrigin } from "../../_lib/common.js";
+import { json, getDatabase, verifyPassword, createSessionCookie, getOpenListProfiles, sha256Hex, isSameOrigin } from "../../_lib/common.js";
 
 export async function onRequestPost({ request, env }) {
   if (!isSameOrigin(request)) return json({ error: "不允許跨來源登入請求。" }, 403);
@@ -35,10 +35,11 @@ export async function onRequestPost({ request, env }) {
 
     await db.prepare("DELETE FROM auth_attempts WHERE ip_hash = ?").bind(ipHash).run();
     const cookie = await createSessionCookie(env);
-    const config = getOpenListConfig(env);
+    const profiles = getOpenListProfiles(env);
+    const openListConfigured = Object.values(profiles).some(profile => profile.configured);
     return json({
       authenticated: true,
-      openListConfigured: !!config
+      openListConfigured
     }, 200, { "Set-Cookie": cookie });
   } catch (error) {
     return json({ error: "登入服務暫時無法使用：" + (error && error.message ? error.message : "D1 error") }, 503);

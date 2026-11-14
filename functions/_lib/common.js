@@ -144,20 +144,25 @@ const OPENLIST_PROVIDERS = Object.freeze({
   vps: {
     label: "VPS Alist",
     baseUrl: env => env.ALIST_VPS_API_BASE_URL || env.OPENLIST_BASE_URL,
-    token: env => env.ALIST_VPS_API_TOKEN || env.OPENLIST_TOKEN
+    username: env => env.ALIST_VPS_API_USERNAME,
+    password: env => env.ALIST_VPS_API_PASSWORD
   },
   worker: {
     label: "OpenList Worker",
     baseUrl: env => env.ALIST_WORKER_API_BASE_URL || env.OPENLIST_WORKER_API_BASE_URL,
-    token: env => env.ALIST_WORKER_API_TOKEN
+    username: env => env.ALIST_WORKER_API_USERNAME,
+    password: env => env.ALIST_WORKER_API_PASSWORD
   },
   mobile: {
     label: "Mobile Device Alist",
     baseUrl: env => env.ALIST_MOBILE_DEVICE_API_BASE_URL,
-    token: env => env.ALIST_MOBILE_DEVICE_API_TOKEN
+    username: env => env.ALIST_MOBILE_DEVICE_API_USERNAME,
+    password: env => env.ALIST_MOBILE_DEVICE_API_PASSWORD
   }
 });
 
+// Legacy root variables are only first-run path suggestions. They are not
+// server-side authorization boundaries; Alist account permissions are.
 export function getOpenListRootPath(env, library = "books") {
   const key = library === "comics" ? "comics" : "books";
   const specific = key === "comics" ? env.OPENLIST_COMICS_ROOT_PATH : env.OPENLIST_BOOKS_ROOT_PATH;
@@ -186,47 +191,85 @@ function getOpenListProviderCredentials(env, provider = "vps") {
   const key = Object.prototype.hasOwnProperty.call(OPENLIST_PROVIDERS, provider) ? provider : "vps";
   const profile = OPENLIST_PROVIDERS[key];
   const base = normalizeServerBaseUrl(profile.baseUrl(env));
-  const token = String(profile.token(env) || "").trim();
-  if (!base || !token) return null;
-  return { provider: key, label: profile.label, base, token };
+  const username = String(profile.username(env) || "").trim();
+  const password = String(profile.password(env) || "");
+  if (!base || !username || !password) return null;
+  return { provider: key, label: profile.label, base, username, password };
 }
 
 export function getOpenListConfig(env, provider = "vps", library = "books") {
   const credentials = getOpenListProviderCredentials(env, provider);
-  const rootPath = getOpenListRootPath(env, library);
-  if (!credentials || !rootPath) return null;
-  return { ...credentials, library: library === "comics" ? "comics" : "books", rootPath };
+  if (!credentials) return null;
+  return { ...credentials, library: library === "comics" ? "comics" : "books" };
 }
 
 export function getOpenListProfiles(env) {
-  return Object.fromEntries(Object.entries(OPENLIST_PROVIDERS).map(([provider, profile]) => [
+  return Object.fromEntries(Object.entries(OPENLIST_PROVIDERS).map(([provider]) => [
     provider,
-    {
-      label: profile.label,
-      configured: !!getOpenListProviderCredentials(env, provider)
-    }
+    { label: OPENLIST_PROVIDERS[provider].label, configured: !!getOpenListProviderCredentials(env, provider) }
   ]));
+}
+
+async function postOpenListJson(url, body, timeoutMs = 45000, headers = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/json", "Accept": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    if (response.status >= 300 && response.status < 400) {
+      throw new Error("OpenList API 回傳 HTTP " + response.status + " 重新導向；請檢查 Pages API Base URL。");
+    }
+    let payload;
+    try { payload = await response.json(); }
+    catch (_) { throw new Error("OpenList API 回應不是有效 JSON（HTTP " + response.status + "）。"); }
+    if (!response.ok) {
+      const message = String(payload?.message || payload?.error || "");
+      throw new Error("OpenList API HTTP " + response.status + (message ? "：" + message : "。"));
+    }
+    return payload;
+  } catch (cause) {
+    if (cause?.name === "AbortError") throw new Error("OpenList API 請求逾時（" + Math.round(timeoutMs / 1000) + " 秒）。");
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function openListPost(env, endpoint, body, provider = "vps", library = "books") {
   const config = getOpenListConfig(env, provider, library);
-  if (!config) throw new Error((OPENLIST_PROVIDERS[provider]?.label || "OpenList") + " 尚未完成伺服器端設定。請檢查該來源的 Pages URL、Token Secret，以及對應的 OPENLIST_BOOKS_ROOT_PATH／OPENLIST_COMICS_ROOT_PATH。");
-  const response = await fetch(config.base + endpoint, {
-    method: "POST",
-    headers: {
-      "Authorization": config.token,
-      "Content-Type": "application/json",
-      "Accept": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) throw new Error(config.label + " API HTTP " + response.status);
-  const result = await response.json();
-  if (!result || Number(result.code) !== 200) {
-    const code = result && result.code ? String(result.code) : "unknown";
-    throw new Error(config.label + " API 回報錯誤（" + code + "）。");
+  if (!config) {
+    const profile = OPENLIST_PROVIDERS[provider] || OPENLIST_PROVIDERS.vps;
+    throw new Error(profile.label + " 尚未完成伺服器端設定。請檢查 API Base URL、帳號 Variable 與密碼 Secret。");
   }
-  return result.data;
+
+  const loginUrl = new URL("api/auth/login", config.base + "/").href;
+  const login = await postOpenListJson(loginUrl, {
+    username: config.username,
+    password: config.password
+  }, 20000);
+  const shortLivedToken = String(login?.data?.token || "");
+  if (Number(login?.code) !== 200 || !shortLivedToken) {
+    const code = login?.code ? "（" + String(login.code) + "）" : "";
+    const message = String(login?.message || login?.error || "");
+    throw new Error(config.label + " 帳號密碼登入失敗" + code + (message ? "：" + message : "。"));
+  }
+
+  // Tokens expire. Use this freshly issued token for this request only.
+  // Never persist it in D1, Pages storage, or send it to the browser.
+  const apiPath = String(endpoint || "").replace(/^\/+/, "");
+  const apiUrl = new URL(apiPath, config.base + "/").href;
+  const result = await postOpenListJson(apiUrl, body, 55000, { "Authorization": shortLivedToken });
+  if (Number(result?.code) !== 200) {
+    const code = result?.code ? String(result.code) : "unknown";
+    const message = String(result?.message || result?.error || "");
+    throw new Error(config.label + " API 回報錯誤（" + code + "）" + (message ? "：" + message : "。"));
+  }
+  return result;
 }
 export async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
