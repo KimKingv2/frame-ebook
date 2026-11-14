@@ -332,9 +332,7 @@ function renderIndexStatus(summary) {
       " 個目錄項目，索引 " + Number(summary.indexedCount || 0) + " 個項目，資料夾 " +
       Number(summary.visitedFolderCount || 0) + " 個。再次掃描會檢查新增、變更及已刪除項目。");
   } else {
-    node.textContent = summary.currentFolder || summary.pendingFolders?.length
-      ? "索引未完成 · 可續掃"
-      : "索引尚未完成 · 可續掃";
+    node.textContent = "索引未完成 · 可續掃";
     setIndexProgress("目前已檢查 " + Number(summary.scannedCount || 0) + " 個目錄項目，索引 " +
       Number(summary.indexedCount || 0) + " 個項目；已完成資料夾 " +
       Number(summary.visitedFolderCount || 0) + " 個。點擊「手動掃描／續掃」會從 D1 保存的游標繼續。");
@@ -453,6 +451,11 @@ async function runIndexScan() {
   }
   if (!isActiveSourceReady()) {
     setIndexProgress("請先完成目前 OpenList 來源的網址、帳號與密碼設定。", true);
+    return;
+  }
+  try { saveRootSelections(); }
+  catch (error) {
+    setIndexProgress(error.message || "書庫根目錄設定無效。", true);
     return;
   }
   const scope = indexScope();
