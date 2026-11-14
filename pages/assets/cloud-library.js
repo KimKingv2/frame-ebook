@@ -388,7 +388,8 @@ function renderLibraryScanSummary(library,scanState,rootPath) {
     "掃描模式："+String(scanState.scanMode||"完整遞迴掃描"),
     "已檢查："+Number(scanState.scannedCount||0)+" 個目錄項目",
     "已寫入／更新："+Number(scanState.indexedCount||0)+" 筆",
-    "格式不符而略過："+Number(scanState.skippedCount||0)+" 筆",
+    "未變更而跳過：0 筆（完整重掃模式，不跳過既有項目）",
+    "格式不符／範圍外而略過："+Number(scanState.skippedCount||0)+" 筆",
     "累計失敗："+Number(scanState.failedCount||0)+" 筆",
     "已完成資料夾："+Number(scanState.visitedFolderCount||0)+" 個",
     "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
@@ -396,6 +397,7 @@ function renderLibraryScanSummary(library,scanState,rootPath) {
       " 本；失敗："+Number(scanState.coverFailedCount||0)+" 本"
   ];
   if(scanState.currentFolder)lines.push("續作游標：第 "+Number(scanState.page||1)+" 頁");
+  if(scanState.lastCompletedName)lines.push("最近完成："+String(scanState.lastCompletedName)+"｜"+String(scanState.lastCompletedPath||""));
   if(scanState.lastError)lines.push("最近錯誤："+String(scanState.lastError));
   if(scanState.completed)lines.push("狀態：目錄索引已完成；D1 書架已可直接載入。");
   else lines.push("狀態：掃描未完成；再次點擊對應按鈕即可續掃。");
@@ -479,7 +481,8 @@ function indexScanProgressText(scanState,batch,finished=false) {
     "掃描模式：完整遞迴掃描（每頁同步 D1；不下載原始 EPUB／CBZ）",
     "已檢查目錄項目："+Number(scanState.scannedCount||0),
     "已寫入／更新："+Number(scanState.indexedCount||0)+" 筆",
-    "不符合書庫格式而略過："+Number(scanState.skippedCount||0)+" 筆",
+    "未變更而跳過：0 筆（完整重掃模式，不跳過既有項目）",
+    "格式不符／範圍外而略過："+Number(scanState.skippedCount||0)+" 筆",
     "累計失敗："+Number(scanState.failedCount||0)+" 筆",
     "已完成資料夾："+Number(scanState.visitedFolderCount||0)+" 個",
     "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
@@ -489,6 +492,7 @@ function indexScanProgressText(scanState,batch,finished=false) {
   ];
   if(batch.currentPath)lines.push("正在處理："+batch.currentPath);
   if(batch.lastCompleted)lines.push("最近完成："+batch.lastCompleted);
+  else if(scanState.lastCompletedName)lines.push("最近完成："+scanState.lastCompletedName+"｜"+String(scanState.lastCompletedPath||""));
   if(batch.coverProcessed!=null)lines.push("本批封面：處理 "+batch.coverProcessed+" 本；無封面 "+
     Number(batch.coverMissing||0)+" 本；失敗 "+Number(batch.coverFailed||0)+" 本；待處理 "+Number(batch.coverRemaining||0)+" 本");
   if(batch.stopReason)lines.push("本批停止原因："+batch.stopReason);
@@ -723,13 +727,21 @@ async function resizeCover(blob) {
   }
 }
 async function extractCloudCover(item,onEvent=()=>{}) {
+  const started=performance.now();
   const rangeReader=await makeCoverRangeReader(item,onEvent);
   const zip=new ZipReader(rangeReader);
   const entries=await zip.getEntries();
+  onEvent("ZIP 中央目錄解析完成："+entries.length+" 個項目；耗時 "+Math.round(performance.now()-started)+" ms");
   const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries);
-  if(!found)return null;
+  if(!found) {
+    onEvent("封面解析完成：沒有找到可用圖片；Range "+rangeReader.rangeCount+" 次／"+formatBytes(rangeReader.bytesRead),"warning");
+    return null;
+  }
   const sourceBlob=await found.entry.getData(new BlobWriter(found.mime));
-  return resizeCover(sourceBlob);
+  const cover=await resizeCover(sourceBlob);
+  onEvent("封面解析與縮圖完成："+cover.blob.size+" bytes；Range "+rangeReader.rangeCount+
+    " 次／"+formatBytes(rangeReader.bytesRead)+"；總耗時 "+Math.round(performance.now()-started)+" ms","success");
+  return cover;
 }
 async function blobSha256(blob) {
   const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());
@@ -794,8 +806,14 @@ async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
           if(scanState)scanState.coverMissingCount=Number(scanState.coverMissingCount||0)+1;
           appendIndexLog("沒有找到可用封面："+item.path+"；耗時 "+Math.round(performance.now()-coverStartedAt)+" ms","warning");
         } else {
+          appendIndexLog("封面 SHA-256 計算開始："+item.name);
+          const hashStarted=performance.now();
           const hash=await blobSha256(cover.blob);
+          appendIndexLog("封面 SHA-256 完成："+hash.slice(0,12)+"；耗時 "+Math.round(performance.now()-hashStarted)+" ms");
+          appendIndexLog("R2 封面上傳開始："+formatBytes(cover.blob.size));
+          const r2Started=performance.now();
           await uploadCover(scope,item,hash,cover);
+          appendIndexLog("R2 封面上傳完成："+formatBytes(cover.blob.size)+"；含 D1 封面狀態更新耗時 "+Math.round(performance.now()-r2Started)+" ms","success");
           if(scanState)scanState.coverReadyCount=Number(scanState.coverReadyCount||0)+1;
           appendIndexLog("封面已保存至私有 R2："+item.name+" · "+hash.slice(0,12)+"；耗時 "+Math.round(performance.now()-coverStartedAt)+" ms","success");
         }
@@ -965,8 +983,13 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
       batch.lastCompleted=lastBook
         ?lastBook.name+"｜"+lastBook.format+"｜D1 已寫入／更新｜本頁 "+saved+" 筆｜"+writeElapsed+" ms"
         :currentFolder+"｜本頁 "+saved+" 筆｜"+writeElapsed+" ms";
+      if(lastBook) {
+        scanState.lastCompletedName=lastBook.name;
+        scanState.lastCompletedPath=lastBook.path;
+        scanState.lastCompletedAt=new Date().toISOString();
+      }
       appendIndexLog("D1 索引寫入完成："+saved+" 筆；耗時 "+writeElapsed+" ms。","success");
-      if(lastBook)appendIndexLog("最近完成："+lastBook.name+"｜"+lastBook.path+"｜已寫入／更新 D1。","success");
+      if(lastBook)appendIndexLog("最近完成："+lastBook.name+"｜"+lastBook.path+"｜已寫入／更新 D1；本頁 D1 "+writeElapsed+" ms。","success");
 
       const total=Math.max(0,Number(listing.total)||found.length);
       if(page*pageSize<total)scanState.page=page+1;
