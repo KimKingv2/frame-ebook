@@ -144,20 +144,20 @@ const OPENLIST_PROVIDERS = Object.freeze({
   vps: {
     label: "VPS Alist",
     baseUrl: env => env.ALIST_VPS_API_BASE_URL || env.OPENLIST_BASE_URL,
-    username: env => env.ALIST_VPS_API_USERNAME,
-    password: env => env.ALIST_VPS_API_PASSWORD
+    username: env => env.ALIST_VPS_USERNAME || env.ALIST_VPS_API_USERNAME,
+    password: env => env.ALIST_VPS_PASSWORD || env.ALIST_VPS_API_PASSWORD
   },
   worker: {
     label: "OpenList Worker",
     baseUrl: env => env.ALIST_WORKER_API_BASE_URL || env.OPENLIST_WORKER_API_BASE_URL,
-    username: env => env.ALIST_WORKER_API_USERNAME,
-    password: env => env.ALIST_WORKER_API_PASSWORD
+    username: env => env.ALIST_WORKER_USERNAME || env.ALIST_WORKER_API_USERNAME,
+    password: env => env.ALIST_WORKER_PASSWORD || env.ALIST_WORKER_API_PASSWORD
   },
   mobile: {
     label: "Mobile Device Alist",
     baseUrl: env => env.ALIST_MOBILE_DEVICE_API_BASE_URL,
-    username: env => env.ALIST_MOBILE_DEVICE_API_USERNAME,
-    password: env => env.ALIST_MOBILE_DEVICE_API_PASSWORD
+    username: env => env.ALIST_MOBILE_DEVICE_USERNAME || env.ALIST_MOBILE_DEVICE_API_USERNAME,
+    password: env => env.ALIST_MOBILE_DEVICE_PASSWORD || env.ALIST_MOBILE_DEVICE_API_PASSWORD
   }
 });
 
