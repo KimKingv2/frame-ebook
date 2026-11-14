@@ -747,9 +747,7 @@ async function runIndexScan() {
       startButton.disabled = true;
       pauseButton.disabled = false;
       const existingQueue = await fetchPendingCovers(scope, 1);
-      let retryCount = 0;
-      if (!existingQueue.total) retryCount = await retryFailedCovers(scope);
-      if (existingQueue.total || retryCount) {
+      if (existingQueue.total) {
         appendIndexLog("目錄索引已完成；本次只續做尚未完成的封面，不重新遍歷 OpenList。", "warning");
         await processPendingCovers(scope, 180000);
         const left = await fetchPendingCovers(scope, 1);
@@ -757,7 +755,7 @@ async function runIndexScan() {
         return;
       }
       if (!window.confirm(
-        "這個來源與分類的目錄及封面索引都已完成。重新掃描會檢查新增、變更和刪除的檔案；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
+        "這個來源與分類的目錄索引已完成，目前沒有待處理封面。重新掃描會檢查新增、變更和刪除的檔案，並重試先前失敗的封面；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
       )) return;
       scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
       await saveIndexScanState(scanState);
