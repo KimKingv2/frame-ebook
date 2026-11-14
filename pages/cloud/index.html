@@ -68,12 +68,12 @@
         </div>
         <div class="cloud-root-settings">
           <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
-          <p>電子書與漫畫各自使用一條 HTML 輸入欄位中的絕對路徑。可直接修改欄位，或在下方瀏覽資料夾後指定為根目錄；切換 VPS、Worker、Mobile Device 或 LAN 來源時，會沿用目前欄位值。重新整理頁面後，欄位會回到 HTML 的 value 預設值。</p>
+          <p>電子書與漫畫各自使用一條絕對路徑。套用後會保存在目前瀏覽器，重新進入或重新整理仍會記住；不同 OpenList 來源也會分別保存各自的根目錄。</p>
           <div class="cloud-roots-grid">
             <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" value="/" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">HTML 預設路徑：/</small></div>
             <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" value="/" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">HTML 預設路徑：/</small></div>
           </div>
-          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">套用兩個目錄設定</button><span>套用後只在目前頁面工作階段生效；要修改載入時的預設路徑，請編輯本頁 HTML 中兩個輸入欄位的 value。請為各 OpenList 帳號設定合適的唯讀目錄權限。</span></div>
+          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存電子書／漫畫根目錄</button><span>保存後重新進入仍會沿用；請分別選擇實際存放 EPUB 與 EPUB／CBZ 的目錄，避免對整個 / 根目錄掃描。</span></div>
         </div>
         <div class="cloud-connection-actions">
           <button id="cloud-save-source" class="quiet-button" type="button">保存來源設定</button>
