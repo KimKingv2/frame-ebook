@@ -62,7 +62,7 @@ The cloud page has two independent path fields:
 
 You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. Save the two paths. Each path is stored separately in the current browser and reused when switching between VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct OpenList.
 
-All sources should expose the same absolute folder layout so the saved paths work after switching sources. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are no longer required. If they are still present, they are used only as first-run suggested paths; they do not restrict server-side browsing. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
+All sources should expose the same absolute folder layout so the two HTML input paths work after switching sources. The default paths are the `value` attributes of `cloud-books-root` and `cloud-comics-root` in `pages/cloud/index.html`. Changes made in the browser apply only to the current page session; refreshing restores the HTML defaults. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are not used for path defaults or access control. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
 After the Reader private login succeeds, the cloud page automatically opens the previously selected source and the last saved path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
 
