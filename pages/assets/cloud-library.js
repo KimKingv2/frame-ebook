@@ -543,10 +543,13 @@ async function writeIndexEntries(scanState, entries) {
 }
 
 class HttpRangeReader {
-  constructor(size, readRange) {
+  constructor(size,readRange,onEvent=()=>{}) {
     this.size=Number(size)||0;
     this.readRange=readRange;
+    this.onEvent=onEvent;
     this.initialized=false;
+    this.rangeCount=0;
+    this.bytesRead=0;
   }
   async init() { this.initialized=true; }
   async readUint8Array(offset,length) {
@@ -554,10 +557,21 @@ class HttpRangeReader {
     const count=Math.max(0,Number(length)||0);
     if(!count||start>=this.size)return new Uint8Array();
     const end=Math.min(this.size,start+count)-1;
-    return this.readRange(start,end);
+    const number=++this.rangeCount;
+    const started=performance.now();
+    this.onEvent("封面 Range #"+number+" 開始；bytes="+start+"-"+end);
+    try {
+      const bytes=await this.readRange(start,end);
+      this.bytesRead+=bytes.byteLength;
+      this.onEvent("封面 Range #"+number+" 完成；取得 "+formatBytes(bytes.byteLength)+"；累計 "+formatBytes(this.bytesRead)+"；耗時 "+Math.round(performance.now()-started)+" ms","success");
+      return bytes;
+    } catch(error) {
+      this.onEvent("封面 Range #"+number+" 失敗："+(error.message||error)+"；耗時 "+Math.round(performance.now()-started)+" ms","error");
+      throw error;
+    }
   }
 }
-async function makeCoverRangeReader(item) {
+async function makeCoverRangeReader(item,onEvent=()=>{}) {
   const size=Number(item.size)||0;
   if(!Number.isSafeInteger(size)||size<=0)throw new Error("檔案大小無效，無法使用 HTTP Range 讀取封面。");
   if(state.activeProvider==="local") {
@@ -574,7 +588,7 @@ async function makeCoverRangeReader(item) {
         ...localNetworkOptions(target.href)
       });
       return readRangeResponse(response,start,end,size);
-    });
+    },onEvent);
   }
   const query=new URLSearchParams({
     provider:state.activeProvider,
@@ -589,7 +603,7 @@ async function makeCoverRangeReader(item) {
       headers:{Range:"bytes="+start+"-"+end}
     });
     return readRangeResponse(response,start,end,size);
-  });
+  },onEvent);
 }
 async function readRangeResponse(response,start,end,totalSize) {
   if(response.status===206) {
@@ -708,8 +722,8 @@ async function resizeCover(blob) {
     try { bitmap.close(); } catch (_) {}
   }
 }
-async function extractCloudCover(item) {
-  const rangeReader=await makeCoverRangeReader(item);
+async function extractCloudCover(item,onEvent=()=>{}) {
+  const rangeReader=await makeCoverRangeReader(item,onEvent);
   const zip=new ZipReader(rangeReader);
   const entries=await zip.getEntries();
   const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries);
@@ -773,7 +787,7 @@ async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
       appendIndexLog("正在處理封面："+item.path);
       const coverStartedAt=performance.now();
       try {
-        const cover=await extractCloudCover(item);
+        const cover=await extractCloudCover(item,message=>appendIndexLog(message));
         if(!cover) {
           await saveCoverState(scope,item,"missing");
           missing++;
@@ -864,7 +878,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
         batch.coverFailed=coverResult.failed;
         batch.coverRemaining=coverResult.remaining;
         setIndexProgress(indexScanProgressText(scanState,batch,true),!!coverResult.failed);
-        outcome={ok:true,completed:true,coverOnly:true};
+        outcome={ok:true,completed:coverResult.remaining===0,paused:!!state.scanPauseRequested,coverOnly:true,coverRemaining:coverResult.remaining};
         return outcome;
       }
       if(!window.confirm("這個來源與分類的目錄索引已完成，目前沒有待處理封面。重新掃描會再次遍歷整個根目錄，更新新增、變更項目，並在完整結束後清理已不存在的索引。確定開始新一輪嗎？"))
@@ -888,7 +902,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
       appendIndexLog("建立首次掃描工作與 D1 進度記錄。","success");
     }
 
-    const maxEntriesPerBatch=500,maxFoldersPerBatch=500,maxDurationMs=240000,pageSize=100;
+    const maxEntriesPerBatch=500,maxFoldersPerBatch=500,maxDurationMs=7500000,pageSize=100;
     const seen=new Set(Array.isArray(scanState.seenFolders)?scanState.seenFolders:[scope.rootPath]);
 
     while(!scanState.completed&&batch.entries<maxEntriesPerBatch&&batch.folders<maxFoldersPerBatch&&
@@ -998,17 +1012,19 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
     }
 
     if(!state.scanPauseRequested) {
-      const coverBudget=Math.min(150000,Math.max(0,240000-(Date.now()-startedAt)));
-      if(coverBudget>10000) {
+      const coverQueue=await fetchPendingCovers(scope,1);
+      batch.coverRemaining=Number(coverQueue.total||0);
+      const coverBudget=Math.min(150000,Math.max(0,7500000-(Date.now()-startedAt)));
+      if(batch.coverRemaining>0&&coverBudget>10000) {
         const coverResult=await processPendingCovers(scope,coverBudget,scanState);
         batch.coverProcessed=coverResult.processed;
         batch.coverMissing=coverResult.missing;
         batch.coverFailed=coverResult.failed;
         batch.coverRemaining=coverResult.remaining;
-        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\n目錄已掃描至目前游標；尚有 "+coverResult.remaining+" 本封面待處理。",false);
+        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\n尚有 "+coverResult.remaining+" 本封面待處理，會自動續做。",false);
       }
     }
-    outcome={ok:true,completed:!!scanState.completed,paused:!!state.scanPauseRequested};
+    outcome={ok:true,completed:!!scanState.completed&&Number(batch.coverRemaining||0)===0,paused:!!state.scanPauseRequested,coverRemaining:Number(batch.coverRemaining||0)};
     return outcome;
   } catch(error) {
     const message=String(error.message||error).slice(0,700);
@@ -1051,30 +1067,52 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
     }
   }
 }
-async function runAllIndexScans() {
+async function runLibraryScanContinuous(library) {
   if(state.scanAllRunning||state.scanRunning)return;
   state.scanAllRunning=true;
   ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=true;});
-  appendIndexLog("========== 依序掃描電子書與漫畫 ==========");
-  let stopped=false;
+  appendIndexLog("========== 開始連續掃描："+LIBRARY_LABELS[library]+" ==========");
+  let result={ok:false};
   try {
-    for(const library of ["books","comics"]) {
-      if(stopped)break;
-      const result=await runIndexScan(library,true);
-      if(!result?.ok||result.paused) {
-        stopped=true;
-        if(result?.paused)appendIndexLog("使用者已暫停；另一個書庫尚未開始，兩個書庫的進度彼此獨立。","warning");
-        else if(result?.cancelled)appendIndexLog("使用者取消後續掃描。","warning");
-        else appendIndexLog("本次未能完成兩個書庫的全部掃描；已完成的進度不會丟失。","warning");
-      }
-    }
-    if(!stopped)appendIndexLog("========== 電子書與漫畫兩個書庫的本輪掃描已結束 ==========","success");
+    do {
+      result=await runIndexScan(library,true);
+      if(!result?.ok||result.paused||result.cancelled)break;
+      if(!result.completed)appendIndexLog("本批已保存；自動從 D1 游標繼續下一批。","warning");
+    } while(!result.completed);
+    return result;
   } finally {
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
   }
 }
-function pauseIndexScan() {
+async function runAllIndexScans() {
+  if(state.scanAllRunning||state.scanRunning)return;
+  state.scanAllRunning=true;
+  ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=true;});
+  appendIndexLog("========== 依序連續掃描電子書與漫畫 ==========");
+  let stopped=false;
+  try {
+    for(const library of ["books","comics"]) {
+      if(stopped)break;
+      appendIndexLog("開始："+LIBRARY_LABELS[library]+"；根目錄："+(state.selectedRoots[library]||"/"));
+      let result={ok:false};
+      do {
+        result=await runIndexScan(library,true);
+        if(!result?.ok||result.paused||result.cancelled) {
+          stopped=true;
+          break;
+        }
+        if(!result.completed)appendIndexLog(LIBRARY_LABELS[library]+"本批已保存；自動續作下一批。","warning");
+      } while(!result.completed);
+      if(!stopped)appendIndexLog(LIBRARY_LABELS[library]+"索引與封面佇列已完成。","success");
+    }
+    if(!stopped)appendIndexLog("========== 電子書與漫畫兩個書庫均已完成 ==========","success");
+    else appendIndexLog("連續掃描已停止；已完成項目及 D1 進度保留，可稍後續作。","warning");
+  } finally {
+    state.scanAllRunning=false;
+    ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
+  }
+}function pauseIndexScan() {
   if (!state.scanRunning) return;
   state.scanPauseRequested = true;
   $("cloud-scan-pause").disabled = true;
@@ -1317,8 +1355,8 @@ function setCurrentFolderAsRoot(library) {
   $(id).value=candidate;
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「套用兩個目錄設定」。");
 }
-$("cloud-scan-books").addEventListener("click",()=>runIndexScan("books"));
-$("cloud-scan-comics").addEventListener("click",()=>runIndexScan("comics"));
+$("cloud-scan-books").addEventListener("click",()=>runLibraryScanContinuous("books"));
+$("cloud-scan-comics").addEventListener("click",()=>runLibraryScanContinuous("comics"));
 $("cloud-scan-all").addEventListener("click",runAllIndexScans);
 $("cloud-scan-pause").addEventListener("click",pauseIndexScan);
 $("cloud-index-log-copy").addEventListener("click",async()=>{
