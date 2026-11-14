@@ -4,12 +4,17 @@ const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const INSERT_SQL = [
   "INSERT INTO cloud_catalog",
-  "(provider,library,root_path,path,parent_path,name,is_dir,format,size_bytes,modified_at,scan_id,indexed_at)",
-  "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+  "(provider,library,root_path,path,parent_path,name,is_dir,format,size_bytes,modified_at,scan_id,indexed_at,cover_hash,cover_type,cover_status,cover_error,cover_updated_at)",
+  "VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,NULL,NULL,?,NULL,NULL)",
   "ON CONFLICT(provider,library,root_path,path) DO UPDATE SET",
   "parent_path=excluded.parent_path,name=excluded.name,is_dir=excluded.is_dir,",
   "format=excluded.format,size_bytes=excluded.size_bytes,modified_at=excluded.modified_at,",
-  "scan_id=excluded.scan_id,indexed_at=excluded.indexed_at"
+  "scan_id=excluded.scan_id,indexed_at=excluded.indexed_at,",
+  "cover_hash=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_hash END,",
+  "cover_type=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_type END,",
+  "cover_status=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN CASE WHEN excluded.is_dir=1 THEN 'none' ELSE 'pending' END ELSE cloud_catalog.cover_status END,",
+  "cover_error=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_error END,",
+  "cover_updated_at=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_updated_at END"
 ].join(" ");
 
 function validScope(provider, library, rootPath) {
@@ -48,7 +53,7 @@ export async function onRequestPost({ request, env }) {
     const format = isDir ? "" : String(item?.format || "").toUpperCase();
     const size = Number(item?.size) || 0;
     const modified = item?.modified == null ? null : String(item.modified).slice(0, 120);
-    if (!path || path === rootPath || !(path.startsWith(prefix)) ||
+    if (!path || path === rootPath || !path.startsWith(prefix) ||
         !parentPath || !isWithinRoot(parentPath, rootPath) ||
         !name || name.length > 1024 || name.includes("/") || name.includes("\\") ||
         name.includes("\0") || !Number.isSafeInteger(size) || size < 0 ||
@@ -63,7 +68,8 @@ export async function onRequestPost({ request, env }) {
     }
     statements.push(db.prepare(INSERT_SQL).bind(
       provider, library, rootPath, path, parentPath, name,
-      isDir ? 1 : 0, format, size, modified, scanId, now
+      isDir ? 1 : 0, format, size, modified, scanId, now,
+      isDir ? "none" : "pending"
     ));
   }
 
@@ -71,6 +77,6 @@ export async function onRequestPost({ request, env }) {
     await db.batch(statements);
     return json({ ok: true, saved: statements.length, provider, library, rootPath, scanId, indexedAt: now });
   } catch {
-    return json({ error: "寫入雲端書庫索引失敗。請保留掃描進度後重試。" }, 503);
+    return json({ error: "寫入雲端書庫索引失敗。請確認已執行 0002 與 0003 D1 migration。" }, 503);
   }
 }
