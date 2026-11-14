@@ -88,9 +88,18 @@ async function getAccessJwks(teamDomain, forceRefresh = false) {
       const response = await fetch(teamDomain + "/cdn-cgi/access/certs", {
         method: "GET",
         headers: { "Accept": "application/json" },
-        redirect: "error",
+        // Cloudflare Workers do not support redirect: "error".
+        // Keep redirects manual and reject them explicitly below.
+        redirect: "manual",
         signal: controller.signal
       });
+      if (response.status >= 300 && response.status < 400) {
+        const error = new Error("Cloudflare Access JWKS returned an unexpected redirect");
+        error.code = "jwks_redirect_blocked";
+        error.httpStatus = response.status;
+        error.contentType = response.headers.get("content-type") || "";
+        throw error;
+      }
       if (!response.ok) {
         const error = new Error("Cloudflare Access JWKS HTTP " + response.status);
         error.code = "jwks_http_error";
