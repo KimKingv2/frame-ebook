@@ -397,7 +397,7 @@ function normalizeServerBaseUrl(value) {
   try { url = new URL(raw); } catch (_) { return null; }
   if (url.username || url.password || url.search || url.hash) return null;
   if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return null;
-  return url.origin + url.pathname.replace(/\\/+$/, "");
+  return url.origin + url.pathname.replace(/\/+$/, "");
 }
 
 function getOpenListProviderCredentials(env, provider = "vps") {
@@ -477,7 +477,7 @@ export async function openListPost(env, endpoint, body, provider = "vps", librar
     throw new Error(config.label + " 自動登入或 Token 快取失敗：" + String(cause?.message || "請檢查服務帳號設定。").slice(0, 180));
   }
 
-  const apiPath = String(endpoint || "").replace(/^\\/+/, "");
+  const apiPath = String(endpoint || "").replace(/^\/+/, "");
   const apiUrl = new URL(apiPath, config.base + "/").href;
   const requestHeaders = {
     "Authorization": auth.token,
