@@ -10,11 +10,11 @@ const INSERT_SQL = [
   "parent_path=excluded.parent_path,name=excluded.name,is_dir=excluded.is_dir,",
   "format=excluded.format,size_bytes=excluded.size_bytes,modified_at=excluded.modified_at,",
   "scan_id=excluded.scan_id,indexed_at=excluded.indexed_at,",
-  "cover_hash=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_hash END,",
-  "cover_type=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_type END,",
-  "cover_status=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN CASE WHEN excluded.is_dir=1 THEN 'none' ELSE 'pending' END ELSE cloud_catalog.cover_status END,",
-  "cover_error=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_error END,",
-  "cover_updated_at=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') THEN NULL ELSE cloud_catalog.cover_updated_at END"
+  "cover_hash=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') OR cloud_catalog.cover_status='error' THEN NULL ELSE cloud_catalog.cover_hash END,",
+  "cover_type=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') OR cloud_catalog.cover_status='error' THEN NULL ELSE cloud_catalog.cover_type END,",
+  "cover_status=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') OR cloud_catalog.cover_status='error' THEN CASE WHEN excluded.is_dir=1 THEN 'none' ELSE 'pending' END ELSE cloud_catalog.cover_status END,",
+  "cover_error=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') OR cloud_catalog.cover_status='error' THEN NULL ELSE cloud_catalog.cover_error END,",
+  "cover_updated_at=CASE WHEN cloud_catalog.size_bytes<>excluded.size_bytes OR COALESCE(cloud_catalog.modified_at,'')<>COALESCE(excluded.modified_at,'') OR cloud_catalog.cover_status='error' THEN NULL ELSE cloud_catalog.cover_updated_at END"
 ].join(" ");
 
 function validScope(provider, library, rootPath) {
