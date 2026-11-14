@@ -846,11 +846,6 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
   let outcome={ok:false};
   const batch={entries:0,indexed:0,skipped:0,failed:0,folders:0,currentPath:"",coverProcessed:0,coverMissing:0,coverFailed:0};
 
-  if(scope.rootPath==="/") {
-    if(!window.confirm("目前"+LIBRARY_LABELS[targetLibrary]+"根目錄是「/」，代表會遞迴掃描整個 OpenList 根目錄。\n\n建議先填入專門的書籍／漫畫資料夾，以免掃描其他雲端檔案。仍要繼續嗎？"))
-      return {ok:false,cancelled:true};
-  }
-
   state.scanRunning=true;
   state.scanPauseRequested=false;
   scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=true;});
@@ -896,6 +891,9 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
       scanState.coverMissingCount=Number(scanState.coverMissingCount||0);
       scanState.coverFailedCount=Number(scanState.coverFailedCount||0);
     } else {
+      if(scope.rootPath==="/"&&!window.confirm(
+        "目前"+LIBRARY_LABELS[targetLibrary]+"根目錄是「/」，代表會遞迴掃描整個 OpenList 根目錄。\\n\\n建議先填入專門的書籍／漫畫資料夾，以免掃描其他雲端檔案。仍要繼續嗎？"
+      ))return {ok:false,cancelled:true};
       scanState=newIndexScanState(scope.rootPath,scope.provider,scope.library);
       scanState.scanMode="首次完整掃描";
       await saveIndexScanState(scanState,scope);
