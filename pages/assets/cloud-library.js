@@ -14,6 +14,8 @@ const PROVIDER_LABELS = {
 const LIBRARY_LABELS = { books: "電子書", comics: "漫畫" };
 const state = {
   authenticated:false,
+  accessEnabled:false,
+  accessTeamDomain:"",
   databaseConfigured:false,
   allowedRoots:{books:"/",comics:"/"},
   selectedRoots:{books:"/",comics:"/"},
@@ -281,6 +283,8 @@ async function checkSession() {
     const response=await fetch("/api/auth/session",{credentials:"same-origin"});
     const data=await response.json();
     state.authenticated=!!(response.ok&&data.authenticated);
+    state.accessEnabled=!!data.accessEnabled;
+    state.accessTeamDomain=String(data.accessTeamDomain||"");
     state.databaseConfigured=!!data.databaseConfigured;
     state.serverProfiles=data.openListProfiles||{};
     state.allowedRoots={books:"/",comics:"/"};
@@ -316,11 +320,14 @@ async function checkSession() {
     } else {
       $("cloud-login-panel").hidden=false;
       $("cloud-browser").hidden=true;
-      const loginButton=$("cloud-login-form").querySelector("button");
-      loginButton.disabled=!state.databaseConfigured;
-      $("cloud-login-error").textContent=state.databaseConfigured
-        ?""
-        :"Cloudflare D1 尚未綁定，請先完成專案設定再登入。詳見 docs/CLOUDFLARE-SETUP.md。";
+      const loginForm=$("cloud-login-form");
+      const loginButton=loginForm.querySelector("button");
+      loginForm.hidden=state.accessEnabled;
+      $("cloud-access-required").hidden=!state.accessEnabled;
+      loginButton.disabled=!state.databaseConfigured||state.accessEnabled;
+      $("cloud-login-error").textContent=state.accessEnabled
+        ?"Cloudflare Access 尚未通過驗證。請確認 Access 應用網域、政策與 Team Domain／AUD 設定。"
+        :(state.databaseConfigured?"":"Cloudflare D1 尚未綁定，請先完成專案設定再登入。詳見 docs/CLOUDFLARE-SETUP.md。");
     }
   } catch(error) {
     $("cloud-browser-status").textContent="無法確認登入狀態："+(error.message||String(error));
@@ -328,6 +335,10 @@ async function checkSession() {
 }
 async function login(event) {
   event.preventDefault();
+  if(state.accessEnabled) {
+    $("cloud-login-error").textContent="本網站使用 Cloudflare Access，無需 Reader 私人密碼。";
+    return;
+  }
   const button=$("cloud-login-form").querySelector("button");
   button.disabled=true;
   $("cloud-browser-status").textContent="正在驗證私人密碼……";
@@ -345,6 +356,10 @@ async function login(event) {
   }
 }
 async function logout() {
+  if(state.accessEnabled&&state.accessTeamDomain) {
+    location.href=new URL("/cdn-cgi/access/logout",state.accessTeamDomain).href;
+    return;
+  }
   try { await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"}); } catch (_) {}
   state.authenticated=false;
   state.connected=false;
