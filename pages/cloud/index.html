@@ -43,7 +43,7 @@
     <section id="cloud-browser" class="cloud-browser" hidden>
       <section class="cloud-connection-panel" aria-label="四路 OpenList 連線設定">
         <div class="cloud-connection-heading">
-          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源沿用相同目錄結構；電子書與漫畫共用一條書庫根目錄，但各自保留獨立 D1 索引與掃描進度。登入後會自動載入上次使用來源的索引。</p></div>
+          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源沿用相同目錄結構；電子書與漫畫分別設定根目錄，但各自保留獨立 D1 索引與掃描進度。登入後會自動載入上次使用來源的索引。</p></div>
           <span id="cloud-connection-status" class="cloud-status-pill">尚未測試</span>
         </div>
         <div class="cloud-provider-select">
@@ -68,11 +68,12 @@
         </div>
         <div class="cloud-root-settings">
           <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
-          <p>電子書與漫畫共用同一條絕對路徑；VPS Alist、OpenList Worker、Mobile Device Alist 與區域網路 OpenList 都沿用這個路徑。設定保存在目前瀏覽器，重新進入、重新整理或切換來源後仍會記住。</p>
-          <div class="cloud-roots-grid cloud-roots-grid-single">
-            <div class="cloud-root-field"><label for="cloud-library-root">共用書庫根目錄（電子書 EPUB／漫畫 EPUB、CBZ）</label><input id="cloud-library-root" type="text" value="/" placeholder="/你的書庫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-root" class="quiet-button" type="button">將目前瀏覽位置設為共用根目錄</button><small id="cloud-root-status">HTML 預設路徑：/</small></div>
+          <p>電子書與漫畫分別設定根目錄；VPS Alist、OpenList Worker、Mobile Device Alist 與區域網路 OpenList 都使用相同的資料夾路徑。設定保存在目前瀏覽器，重新進入、重新整理或切換來源後仍會記住。</p>
+          <div class="cloud-roots-grid">
+            <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" value="/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">預設：/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔</small></div>
+            <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" value="/中國移動雲盤/Kim King/11 Comic" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">預設：/中國移動雲盤/Kim King/11 Comic</small></div>
           </div>
-          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存共用根目錄</button><span>電子書與漫畫會從同一個目錄開始掃描，再依檔案類型分別建立索引；不需要設定兩條路徑。</span></div>
+          <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存電子書／漫畫根目錄</button><span>兩條路徑分別保存；切換書庫類型時會自動切換對應路徑。</span></div>
         </div>
         <div class="cloud-connection-actions">
           <button id="cloud-save-source" class="quiet-button" type="button">保存來源設定</button>
@@ -85,7 +86,7 @@
           <div class="cloud-index-copy">
             <p class="section-kicker">PERSISTENT CLOUD INDEX</p>
             <h3>書庫掃描與索引</h3>
-            <p>電子書與漫畫共用同一根目錄，但各自使用獨立 D1 進度及封面佇列。可分別掃描，也可一鍵依序掃描兩個書庫。完整掃描完成後會自動重新載入對應的雲端書架；原始 EPUB／CBZ 不會被下載或修改。</p>
+            <p>電子書與漫畫使用各自根目錄，但各自使用獨立 D1 進度及封面佇列。可分別掃描，也可一鍵依序掃描兩個書庫。完整掃描完成後會自動重新載入對應的雲端書架；原始 EPUB／CBZ 不會被下載或修改。</p>
           </div>
           <div class="cloud-index-actions">
             <span id="cloud-index-status" class="cloud-index-status">尚未建立索引</span>
@@ -109,7 +110,7 @@
 尚未開始掃描。</pre>
           </article>
         </div>
-        <p id="cloud-index-progress" class="cloud-index-progress" role="status">首次使用請設定共用書庫根目錄，再分別掃描或一鍵掃描兩個書庫。</p>
+        <p id="cloud-index-progress" class="cloud-index-progress" role="status">首次使用請確認電子書與漫畫根目錄，再分別掃描或一鍵掃描兩個書庫。</p>
         <details class="cloud-index-log" open>
           <summary>即時掃描日誌 <span id="cloud-index-log-count">0 筆</span></summary>
           <div class="cloud-index-log-toolbar">
@@ -158,6 +159,6 @@
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js?v=20261114-r7-shared-root"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-r8-separate-default-roots"></script>
 </body>
 </html>
