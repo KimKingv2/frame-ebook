@@ -119,11 +119,11 @@ function readRootSelections() {
   try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
   try { legacy=JSON.parse(localStorage.getItem(LEGACY_ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
 
-  let candidate=normalizePath(saved.rootPath||"");
+  let candidate=saved.rootPath?normalizePath(saved.rootPath):null;
   if(!candidate) {
     const oldSource=legacy?.[state.activeProvider]||{};
-    const oldBooks=normalizePath(oldSource.books||"");
-    const oldComics=normalizePath(oldSource.comics||"");
+    const oldBooks=oldSource.books?normalizePath(oldSource.books):null;
+    const oldComics=oldSource.comics?normalizePath(oldSource.comics):null;
     const preferred=state.activeLibrary==="comics"?oldComics:oldBooks;
     candidate=preferred||oldBooks||oldComics||
       normalizePath($("cloud-library-root").getAttribute("value")||"/");
