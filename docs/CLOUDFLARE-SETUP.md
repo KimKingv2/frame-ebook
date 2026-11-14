@@ -43,7 +43,7 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
 
-When both `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD` are configured, FRAME Reader switches to Cloudflare Zero Trust Access authentication. Pages Functions verify the `Cf-Access-Jwt-Assertion` signature against the current Access JWKS and validate issuer, audience and token expiry. Access mode is exclusive: a missing or invalid Access assertion is rejected and cannot fall back to the old Reader password cookie. No `FRAME_READER_ACCESS_PASSWORD` or `FRAME_READER_SESSION_SECRET` is required in Access mode. Until both Access variables are configured, the old Reader password login remains temporarily available only as a migration fallback.
+FRAME Reader uses Cloudflare Zero Trust Access as its only website authentication. Pages Functions verify the `Cf-Access-Jwt-Assertion` signature against the current Access JWKS and validate issuer, audience and token expiry. A missing or invalid Access assertion is rejected. There is no separate Reader password or Reader-owned session cookie. Set both Access Variables before using the site. D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
 
 ## 3. Configure the LAN-direct source (optional)
 
@@ -60,7 +60,7 @@ The cloud page has two independent path fields:
 - **Books root:** EPUB electronic books.
 - **Comics root:** EPUB and CBZ comics.
 
-You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. Save the two paths. Each path is stored separately in the current browser and reused when switching between VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct OpenList.
+You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. The two HTML input `value` attributes are the defaults. Changes in the page apply only to the current page session; refreshing restores the HTML defaults. The current values are reused when switching between VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct OpenList.
 
 All sources should expose the same absolute folder layout so the two HTML input paths work after switching sources. The default paths are the `value` attributes of `cloud-books-root` and `cloud-comics-root` in `pages/cloud/index.html`. Changes made in the browser apply only to the current page session; refreshing restores the HTML defaults. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are not used for path defaults or access control. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
@@ -77,7 +77,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
 
 ## 6. Existing data and current behavior
 
-- No D1 migration is required for the account/password change or for per-device path settings. Existing reading events and authentication-attempt records remain intact.
+- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused.
 - Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
