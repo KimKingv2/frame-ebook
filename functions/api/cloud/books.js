@@ -1,10 +1,10 @@
-import { json, requireAuth, getDatabase, normalizePath, isWithinRoot, joinPath } from "../../_lib/common.js";
+import { json, requireAuth, getDatabase, normalizePath, isWithinRoot } from "../../_lib/common.js";
 
 const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const LIBRARIES = new Set(["books", "comics"]);
 
 async function scanStateKey(provider, library, rootPath) {
-  const input = provider + "\\n" + library + "\\n" + rootPath;
+  const input = provider + "\n" + library + "\n" + rootPath;
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return "reader_scan_" + hex;
@@ -38,8 +38,8 @@ export async function onRequestGet({ request, env }) {
         "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=?"
       ).bind(provider, library, rootPath, path).first(),
       db.prepare(
-        "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at FROM cloud_catalog " +
-        "WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
+        "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
+        "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
         "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
       ).bind(provider, library, rootPath, path, perPage, offset).all(),
       scanStateKey(provider, library, rootPath)
@@ -57,6 +57,10 @@ export async function onRequestGet({ request, env }) {
       format: row.format || "",
       size: Number(row.size_bytes || 0),
       modified: row.modified_at || null,
+      coverHash: row.cover_hash || null,
+      coverType: row.cover_type || null,
+      coverStatus: row.cover_status || (Number(row.is_dir) === 1 ? "none" : "pending"),
+      coverError: row.cover_error || null,
       supported: true
     }));
     return json({
@@ -80,7 +84,7 @@ export async function onRequestGet({ request, env }) {
     });
   } catch {
     return json({
-      error: "雲端書庫索引尚未初始化或查詢失敗。請先執行 migrations/0002_cloud_catalog.sql。"
+      error: "雲端書庫索引尚未初始化或查詢失敗。請先執行 migrations/0002_cloud_catalog.sql 與 0003_cloud_covers.sql。"
     }, 503);
   }
 }
