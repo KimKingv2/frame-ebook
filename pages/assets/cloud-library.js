@@ -805,210 +805,273 @@ async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
   return {processed,failed,missing,remaining:Number(remaining.total||0)};
 }
 
-async function runIndexScan() {
-  if (state.scanRunning) return;
-  if (!state.authenticated) {
-    setIndexProgress("尚未通過 Cloudflare Access，無法開始索引。", true);
-    return;
+async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
+  if(state.scanRunning||(!fromAll&&state.scanAllRunning))return {ok:false,reason:"already_running"};
+  if(!["books","comics"].includes(targetLibrary))return {ok:false,reason:"invalid_library"};
+  state.activeLibrary=targetLibrary;
+  $("cloud-library-type").value=targetLibrary;
+  state.currentPath=getActiveRoot(targetLibrary);
+  if(!state.authenticated) {
+    setIndexProgress("尚未通過 Cloudflare Access，無法開始索引。",true);
+    return {ok:false,reason:"not_authenticated"};
   }
-  if (!isActiveSourceReady()) {
-    setIndexProgress("請先完成目前 OpenList 來源的網址、帳號與密碼設定。", true);
-    return;
+  if(!isActiveSourceReady()) {
+    setIndexProgress("請先完成目前 OpenList 來源的網址、帳號與密碼設定。",true);
+    return {ok:false,reason:"source_not_ready"};
   }
   try { saveRootSelections(); }
-  catch (error) {
-    setIndexProgress(error.message || "書庫根目錄設定無效。", true);
-    return;
+  catch(error) {
+    setIndexProgress(error.message||"書庫根目錄設定無效。",true);
+    return {ok:false,reason:"invalid_root"};
   }
-  const scope = indexScope();
-  const startButton = $("cloud-scan-start");
-  const pauseButton = $("cloud-scan-pause");
-  let scanState = null;
-  const batch = { entries: 0, indexed: 0, folders: 0 };
+
+  const scope=indexScope();
+  const scanButtons=["cloud-scan-books","cloud-scan-comics","cloud-scan-all"];
+  const pauseButton=$("cloud-scan-pause");
+  let scanState=null;
+  let outcome={ok:false};
+  const batch={entries:0,indexed:0,skipped:0,failed:0,folders:0,currentPath:"",coverProcessed:0,coverMissing:0,coverFailed:0};
+
+  if(scope.rootPath==="/") {
+    if(!window.confirm("目前"+LIBRARY_LABELS[targetLibrary]+"根目錄是「/」，代表會遞迴掃描整個 OpenList 根目錄。\n\n建議先填入專門的書籍／漫畫資料夾，以免掃描其他雲端檔案。仍要繼續嗎？"))
+      return {ok:false,cancelled:true};
+  }
+
+  state.scanRunning=true;
+  state.scanPauseRequested=false;
+  scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=true;});
+  if(pauseButton)pauseButton.disabled=false;
+  const startedAt=Date.now();
+
   try {
-    appendIndexLog("========== 雲端書庫索引開始 ==========");
+    appendIndexLog("========== "+LIBRARY_LABELS[targetLibrary]+"掃描開始 ==========");
+    appendIndexLog("掃描根目錄："+scope.rootPath);
+    appendIndexLog("掃描來源："+PROVIDER_LABELS[scope.provider]);
+    appendIndexLog("掃描模式：完整遞迴掃描（不跳過已存在的目錄項目；D1 執行新增／更新）");
+    appendIndexLog("檔案範圍："+(targetLibrary==="books"?"EPUB":"EPUB／CBZ")+"；原始書檔不會下載或修改。");
     appendIndexLog("讀取 D1 掃描進度開始。");
-    scanState = await loadIndexScanState();
-    if (scanState && scanState.rootPath === scope.rootPath &&
-        scanState.provider === scope.provider && scanState.library === scope.library &&
-        scanState.version === 1 && scanState.completed) {
-      state.scanRunning = true;
-      state.scanPauseRequested = false;
-      startButton.disabled = true;
-      pauseButton.disabled = false;
-      const existingQueue = await fetchPendingCovers(scope, 1);
-      if (existingQueue.total) {
-        appendIndexLog("目錄索引已完成；本次只續做尚未完成的封面，不重新遍歷 OpenList。", "warning");
-        await processPendingCovers(scope, 180000);
-        const left = await fetchPendingCovers(scope, 1);
-        setIndexProgress("目錄索引已完成；封面待處理 "+Number(left.total||0)+" 本。再次點擊可繼續封面索引。", !!left.total);
-        return;
+    scanState=await loadIndexScanState(scope);
+    appendIndexLog("D1 掃描進度讀取完成："+(scanState?"找到既有進度":"尚無進度"),scanState?"success":"info");
+
+    if(scanState&&scanState.rootPath===scope.rootPath&&scanState.provider===scope.provider&&
+       scanState.library===scope.library&&scanState.version===1&&scanState.completed) {
+      const existingQueue=await fetchPendingCovers(scope,1);
+      if(existingQueue.total) {
+        appendIndexLog("目錄索引已完成；本次只續做尚未完成的封面，不重新遍歷 OpenList。","warning");
+        const coverResult=await processPendingCovers(scope,180000,scanState);
+        batch.coverProcessed=coverResult.processed;
+        batch.coverMissing=coverResult.missing;
+        batch.coverFailed=coverResult.failed;
+        batch.coverRemaining=coverResult.remaining;
+        setIndexProgress(indexScanProgressText(scanState,batch,true),!!coverResult.failed);
+        outcome={ok:true,completed:true,coverOnly:true};
+        return outcome;
       }
-      if (!window.confirm(
-        "這個來源與分類的目錄索引已完成，目前沒有待處理封面。重新掃描會檢查新增、變更和刪除的檔案，並重試先前失敗的封面；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
-      )) return;
-      scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
-      await saveIndexScanState(scanState);
-      appendIndexLog("建立新掃描工作與 D1 進度記錄。", "success");
-    } else if (scanState && scanState.rootPath === scope.rootPath &&
-        scanState.provider === scope.provider && scanState.library === scope.library &&
-        scanState.version === 1 && !scanState.completed) {
-      appendIndexLog("找到未完成的掃描進度，將從上次保存的位置續掃。", "warning");
+      if(!window.confirm("這個來源與分類的目錄索引已完成，目前沒有待處理封面。重新掃描會再次遍歷整個根目錄，更新新增、變更項目，並在完整結束後清理已不存在的索引。確定開始新一輪嗎？"))
+        return {ok:false,cancelled:true};
+      scanState=newIndexScanState(scope.rootPath,scope.provider,scope.library);
+      scanState.scanMode="完整重掃";
+      await saveIndexScanState(scanState,scope);
+      appendIndexLog("建立新一輪完整掃描與 D1 進度記錄。","success");
+    } else if(scanState&&scanState.rootPath===scope.rootPath&&scanState.provider===scope.provider&&
+      scanState.library===scope.library&&scanState.version===1&&!scanState.completed) {
+      appendIndexLog("找到未完成的掃描進度，將從上次保存的位置續掃。","warning");
+      scanState.skippedCount=Number(scanState.skippedCount||0);
+      scanState.failedCount=Number(scanState.failedCount||0);
+      scanState.coverReadyCount=Number(scanState.coverReadyCount||0);
+      scanState.coverMissingCount=Number(scanState.coverMissingCount||0);
+      scanState.coverFailedCount=Number(scanState.coverFailedCount||0);
     } else {
-      scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
-      await saveIndexScanState(scanState);
-      appendIndexLog("建立新掃描工作與 D1 進度記錄。", "success");
+      scanState=newIndexScanState(scope.rootPath,scope.provider,scope.library);
+      scanState.scanMode="首次完整掃描";
+      await saveIndexScanState(scanState,scope);
+      appendIndexLog("建立首次掃描工作與 D1 進度記錄。","success");
     }
 
-    state.scanRunning = true;
-    state.scanPauseRequested = false;
-    startButton.disabled = true;
-    pauseButton.disabled = false;
-    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root",
-      "cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id => {
-      const control = $(id);
-      if (control) control.disabled = true;
-    });
-    const startedAt = Date.now();
-    const maxEntriesPerBatch = 500;
-    const maxFoldersPerBatch = 500;
-    const maxDurationMs = 240000;
-    const pageSize = 100;
-    const seen = new Set(Array.isArray(scanState.seenFolders) ? scanState.seenFolders : [scope.rootPath]);
+    const maxEntriesPerBatch=500,maxFoldersPerBatch=500,maxDurationMs=240000,pageSize=100;
+    const seen=new Set(Array.isArray(scanState.seenFolders)?scanState.seenFolders:[scope.rootPath]);
 
-    while (!scanState.completed &&
-      batch.entries < maxEntriesPerBatch &&
-      batch.folders < maxFoldersPerBatch &&
-      Date.now() - startedAt < maxDurationMs &&
-      !state.scanPauseRequested) {
-      if (!scanState.currentFolder) {
-        if (!scanState.pendingFolders.length) break;
-        scanState.currentFolder = scanState.pendingFolders.shift();
-        scanState.page = 1;
-        await saveIndexScanState(scanState);
-        appendIndexLog("進入資料夾：" + scanState.currentFolder);
+    while(!scanState.completed&&batch.entries<maxEntriesPerBatch&&batch.folders<maxFoldersPerBatch&&
+      Date.now()-startedAt<maxDurationMs&&!state.scanPauseRequested) {
+      if(!scanState.currentFolder) {
+        if(!scanState.pendingFolders.length)break;
+        scanState.currentFolder=scanState.pendingFolders.shift();
+        scanState.page=1;
+        await saveIndexScanState(scanState,scope);
+        appendIndexLog("進入資料夾："+scanState.currentFolder);
       }
 
-      const currentFolder = scanState.currentFolder;
-      const page = Math.max(1, Number(scanState.page) || 1);
-      setIndexProgress(indexScanProgressText(scanState, batch), false);
-      appendIndexLog("讀取目錄列表：" + currentFolder + "；第 " + page + " 頁。");
-      const listing = await fetchScanDirectory(currentFolder, page, pageSize);
-      const found = Array.isArray(listing.items) ? listing.items : [];
-      const entries = [];
-      for (const item of found) {
-        const path = normalizePath(item.path || joinPath(currentFolder, item.name));
-        const name = String(item.name || "");
-        if (!path || !name) continue;
-        const isDir = !!item.isDir;
-        const format = isDir ? "" : fileKind(item);
-        const allowed = isDir || (scope.library === "comics"
-          ? format === "EPUB" || format === "CBZ"
-          : format === "EPUB");
-        if (!allowed || !isWithinRoot(path, scope.rootPath)) continue;
-        entries.push({
-          path,
-          parentPath: currentFolder,
-          name,
-          isDir,
-          format,
-          size: Math.max(0, Number(item.size) || 0),
-          modified: item.modified || null
-        });
-        if (isDir && !seen.has(path)) {
-          seen.add(path);
-          scanState.seenFolders.push(path);
-          scanState.pendingFolders.push(path);
-        }
+      const currentFolder=scanState.currentFolder;
+      const page=Math.max(1,Number(scanState.page)||1);
+      batch.currentPath=currentFolder;
+      setIndexProgress(indexScanProgressText(scanState,batch),false);
+      appendIndexLog("讀取目錄列表："+currentFolder+"；第 "+page+" 頁。");
+      const listStarted=performance.now();
+      const listing=await fetchScanDirectory(currentFolder,page,pageSize);
+      const listElapsed=Math.round(performance.now()-listStarted);
+      const found=Array.isArray(listing.items)?listing.items:[];
+      appendIndexLog("目錄列表完成："+currentFolder+"；第 "+page+" 頁；本頁 "+found.length+"/"+Number(listing.total||found.length)+" 項；耗時 "+listElapsed+" ms","success");
+
+      const entries=[];
+      let folderCount=0,epubCount=0,cbzCount=0;
+      for(const item of found) {
+        const path=normalizePath(item.path||joinPath(currentFolder,item.name));
+        const name=String(item.name||"");
+        if(!path||!name)continue;
+        const isDir=!!item.isDir;
+        const format=isDir?"":fileKind(item);
+        const allowed=isDir||(scope.library==="comics"?(format==="EPUB"||format==="CBZ"):format==="EPUB");
+        if(!allowed||!isWithinRoot(path,scope.rootPath))continue;
+        entries.push({path,parentPath:currentFolder,name,isDir,format,size:Math.max(0,Number(item.size)||0),modified:item.modified||null});
+        if(isDir) {
+          folderCount++;
+          if(!seen.has(path)) {
+            seen.add(path);
+            scanState.seenFolders.push(path);
+            scanState.pendingFolders.push(path);
+          }
+        } else if(format==="EPUB")epubCount++;
+        else if(format==="CBZ")cbzCount++;
       }
 
-      const saved = await writeIndexEntries(scanState, entries);
-      scanState.scannedCount += found.length;
-      scanState.indexedCount += saved;
-      batch.entries += found.length;
-      batch.indexed += saved;
-      appendIndexLog("本頁完成：" + currentFolder + "；第 " + page + " 頁；讀取 " +
-        found.length + " 個項目；保存 " + saved + " 筆索引。", "success");
+      const skipped=Math.max(0,found.length-entries.length);
+      batch.skipped+=skipped;
+      batch.entries+=found.length;
+      appendIndexLog("本頁項目：資料夾 "+folderCount+" 個；EPUB "+epubCount+" 個；CBZ "+cbzCount+" 個；格式不符／範圍外略過 "+skipped+" 個。");
+      appendIndexLog("D1 索引寫入開始："+entries.length+" 筆。");
+      const writeStarted=performance.now();
+      batch.currentWriteCount=entries.length;
+      const saved=entries.length?await writeIndexEntries(scanState,entries):0;
+      const writeElapsed=Math.round(performance.now()-writeStarted);
+      batch.currentWriteCount=0;
+      scanState.scannedCount=Number(scanState.scannedCount||0)+found.length;
+      scanState.indexedCount=Number(scanState.indexedCount||0)+saved;
+      scanState.skippedCount=Number(scanState.skippedCount||0)+skipped;
+      batch.indexed+=saved;
+      batch.currentPath="";
+      const lastBook=[...entries].reverse().find(item=>!item.isDir);
+      batch.lastCompleted=lastBook
+        ?lastBook.name+"｜"+lastBook.format+"｜D1 已寫入／更新｜本頁 "+saved+" 筆｜"+writeElapsed+" ms"
+        :currentFolder+"｜本頁 "+saved+" 筆｜"+writeElapsed+" ms";
+      appendIndexLog("D1 索引寫入完成："+saved+" 筆；耗時 "+writeElapsed+" ms。","success");
+      if(lastBook)appendIndexLog("最近完成："+lastBook.name+"｜"+lastBook.path+"｜已寫入／更新 D1。","success");
 
-      const total = Math.max(0, Number(listing.total) || found.length);
-      if (page * pageSize < total) {
-        scanState.page = page + 1;
-      } else {
-        scanState.currentFolder = null;
-        scanState.page = 1;
-        scanState.visitedFolderCount += 1;
-        batch.folders += 1;
+      const total=Math.max(0,Number(listing.total)||found.length);
+      if(page*pageSize<total)scanState.page=page+1;
+      else {
+        scanState.currentFolder=null;
+        scanState.page=1;
+        scanState.visitedFolderCount=Number(scanState.visitedFolderCount||0)+1;
+        batch.folders+=1;
       }
-      await saveIndexScanState(scanState);
-      setIndexProgress(indexScanProgressText(scanState, batch), false);
+      await saveIndexScanState(scanState,scope);
+      appendIndexLog("D1 掃描進度保存完成：已完成資料夾 "+scanState.visitedFolderCount+" 個；待掃描 "+scanState.pendingFolders.length+" 個。","success");
+      renderLibraryScanSummary(scope.library,scanState,scope.rootPath);
+      setIndexProgress(indexScanProgressText(scanState,batch),false);
     }
 
-    if (!scanState.currentFolder && scanState.pendingFolders.length === 0) {
+    if(!scanState.currentFolder&&scanState.pendingFolders.length===0) {
       appendIndexLog("所有資料夾已掃描，開始清理本根目錄中已不存在的索引項目。");
-      const response = await fetch("/api/cloud/index/complete", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: scope.provider,
-          library: scope.library,
-          rootPath: scope.rootPath,
-          scanId: scanState.scanId
-        })
+      const response=await fetch("/api/cloud/index/complete",{
+        method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({provider:scope.provider,library:scope.library,rootPath:scope.rootPath,scanId:scanState.scanId})
       });
-      const completed = await readJsonResponse(response, "清理過期索引失敗。");
-      scanState.completed = true;
-      scanState.completedAt = new Date().toISOString();
-      await saveIndexScanState(scanState);
-      appendIndexLog("索引完成；清理已不存在項目 " + Number(completed.removed || 0) + " 筆。", "success");
+      const completed=await readJsonResponse(response,"清理過期索引失敗。");
+      scanState.completed=true;
+      scanState.completedAt=new Date().toISOString();
+      scanState.removedCount=Number(completed.removed||0);
+      await saveIndexScanState(scanState,scope);
+      appendIndexLog("索引完成；清理已不存在項目 "+scanState.removedCount+" 筆。","success");
     }
 
-    if (scanState.completed) {
-      setIndexProgress(indexScanProgressText(scanState, batch, true), false);
-      appendIndexLog("========== 完整索引完成 ==========", "success");
+    if(scanState.completed) {
+      setIndexProgress(indexScanProgressText(scanState,batch,true),false);
+      appendIndexLog("========== "+LIBRARY_LABELS[targetLibrary]+"完整索引完成 ==========","success");
     } else {
-      const reason = state.scanPauseRequested ? "使用者暫停" :
-        batch.entries >= maxEntriesPerBatch ? "達到每批 500 個項目上限" :
-        batch.folders >= maxFoldersPerBatch ? "達到每批 500 個資料夾上限" :
-        "達到單批 4 分鐘安全時限";
-      await saveIndexScanState(scanState);
-      setIndexProgress(indexScanProgressText(scanState, batch, true) + "\n本批停止原因：" + reason, false);
-      appendIndexLog("本批結束：" + reason + "；進度已保存，可再次點擊續掃。", "warning");
+      const reason=state.scanPauseRequested?"使用者暫停":
+        batch.entries>=maxEntriesPerBatch?"達到每批 500 個目錄項目上限":
+        batch.folders>=maxFoldersPerBatch?"達到每批 500 個資料夾上限":"達到單批 4 分鐘安全時限";
+      batch.stopReason=reason;
+      await saveIndexScanState(scanState,scope);
+      setIndexProgress(indexScanProgressText(scanState,batch,true),false);
+      appendIndexLog("本批結束："+reason+"；進度已保存，可再次點擊續掃。","warning");
     }
 
-    if (!state.scanPauseRequested) {
-      const coverBudget = Math.min(150000, Math.max(0, 240000 - (Date.now() - startedAt)));
-      if (coverBudget > 10000) {
-        const coverResult = await processPendingCovers(scope, coverBudget);
-        if (coverResult.remaining) {
-          setIndexProgress("目錄索引"+(scanState.completed?"已完成":"本批已保存")+
-            "；另有 "+coverResult.remaining+" 本封面待處理。再次點擊「手動掃描／續掃」會先處理封面，不會重掃已完成的目錄。");
-        }
+    if(!state.scanPauseRequested) {
+      const coverBudget=Math.min(150000,Math.max(0,240000-(Date.now()-startedAt)));
+      if(coverBudget>10000) {
+        const coverResult=await processPendingCovers(scope,coverBudget,scanState);
+        batch.coverProcessed=coverResult.processed;
+        batch.coverMissing=coverResult.missing;
+        batch.coverFailed=coverResult.failed;
+        batch.coverRemaining=coverResult.remaining;
+        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\n目錄已掃描至目前游標；尚有 "+coverResult.remaining+" 本封面待處理。",false);
       }
     }
-  } catch (error) {
-    appendIndexLog("索引發生錯誤：" + (error.message || error), "error");
-    if (scanState) {
-      scanState.lastError = String(error.message || error).slice(0, 700);
-      try { await saveIndexScanState(scanState); } catch (_) {}
+    outcome={ok:true,completed:!!scanState.completed,paused:!!state.scanPauseRequested};
+    return outcome;
+  } catch(error) {
+    const message=String(error.message||error).slice(0,700);
+    appendIndexLog("索引發生錯誤："+message,"error");
+    if(scanState) {
+      scanState.failedCount=Number(scanState.failedCount||0)+Math.max(1,Number(batch.currentWriteCount||0));
+      scanState.lastError=message;
+      scanState.errors=Array.isArray(scanState.errors)?scanState.errors:[];
+      scanState.errors.push({path:batch.currentPath||scanState.currentFolder||scope.rootPath,message,at:new Date().toISOString()});
+      if(scanState.errors.length>20)scanState.errors=scanState.errors.slice(-20);
+      try { await saveIndexScanState(scanState,scope); }
+      catch(saveError) { appendIndexLog("錯誤後保存 D1 進度失敗："+(saveError.message||saveError),"error"); }
     }
-    setIndexProgress((error.message || "索引失敗。") +
-      "\n目前游標已盡可能保存；修復問題後可再次點擊續掃。", true);
+    setIndexProgress((error.message||"索引失敗。")+"\n目前游標已盡可能保存；修復問題後可再次點擊續掃。",true);
+    outcome={ok:false,error:message};
+    return outcome;
   } finally {
-    state.scanRunning = false;
-    state.scanPauseRequested = false;
-    startButton.disabled = false;
-    pauseButton.disabled = true;
-    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root",
-      "cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id => {
-      const control = $(id);
-      if (control) control.disabled = false;
+    state.scanRunning=false;
+    state.scanPauseRequested=false;
+    if(pauseButton)pauseButton.disabled=true;
+    if(!state.scanAllRunning)scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=false;});
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{
+      const control=$(id);
+      if(control)control.disabled=false;
     });
     try {
-      const latest = await loadIndexScanState();
-      renderIndexStatus(latest);
-      if (isActiveSourceReady()) await loadDirectory(state.currentPath || getActiveRoot(), state.page || 1);
-    } catch (_) {}
+      const latest=await loadIndexScanState(scope);
+      renderLibraryScanSummary(scope.library,latest,scope.rootPath);
+      if(state.activeLibrary===scope.library)renderIndexStatus(latest);
+    } catch(_) {}
+    try {
+      state.currentPath=scope.rootPath;
+      if(isActiveSourceReady()) {
+        await loadDirectory(scope.rootPath,1);
+        if(outcome.ok&&outcome.completed)setSourceStatus(LIBRARY_LABELS[scope.library]+"索引已完成，已自動載入雲端書架："+scope.rootPath);
+        else if(outcome.ok)setSourceStatus(LIBRARY_LABELS[scope.library]+"本批索引已保存；再次掃描可接續："+scope.rootPath);
+      }
+    } catch(refreshError) {
+      appendIndexLog("掃描後自動載入書架失敗："+(refreshError.message||refreshError),"error");
+    }
+  }
+}
+async function runAllIndexScans() {
+  if(state.scanAllRunning||state.scanRunning)return;
+  state.scanAllRunning=true;
+  ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=true;});
+  appendIndexLog("========== 依序掃描電子書與漫畫 ==========");
+  let stopped=false;
+  try {
+    for(const library of ["books","comics"]) {
+      if(stopped)break;
+      const result=await runIndexScan(library,true);
+      if(!result?.ok||result.paused) {
+        stopped=true;
+        if(result?.paused)appendIndexLog("使用者已暫停；另一個書庫尚未開始，兩個書庫的進度彼此獨立。","warning");
+        else if(result?.cancelled)appendIndexLog("使用者取消後續掃描。","warning");
+        else appendIndexLog("本次未能完成兩個書庫的全部掃描；已完成的進度不會丟失。","warning");
+      }
+    }
+    if(!stopped)appendIndexLog("========== 電子書與漫畫兩個書庫的本輪掃描已結束 ==========","success");
+  } finally {
+    state.scanAllRunning=false;
+    ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
   }
 }
 function pauseIndexScan() {
