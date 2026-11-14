@@ -41,9 +41,24 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
 
-FRAME Reader uses Cloudflare Zero Trust Access as its only website authentication, following the existing FRAME Audio deployment model. Cloudflare Access must protect the complete Pages hostname at the edge. Pages Functions require the `Cf-Access-Jwt-Assertion` header on private API requests and reject requests where it is missing. The edge Access policy performs the user authentication, so Reader does not need separate Team Domain or AUD Variables, a Reader password, or a Reader-owned session cookie. D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
+FRAME Reader uses Cloudflare Zero Trust Access as its website login, and Pages Functions independently verify the signed `Cf-Access-Jwt-Assertion` JWT on every protected API request. This second check validates the RS256 signature against Cloudflare's live JWKS endpoint, as well as the issuer, audience and token time claims. Do not rely on the presence of the header alone.
 
-## 3. Configure the LAN-direct source (optional)
+Add these two non-secret Variables to Production, and to Preview when Preview deployments are protected:
+
+| Name | Type | Purpose |
+|---|---|---|
+| `FRAME_READER_ACCESS_TEAM_DOMAIN` | Variable | Your Cloudflare Zero Trust team domain, for example `https://your-team.cloudflareaccess.com` |
+| `FRAME_READER_ACCESS_AUD` | Variable | Application Audience (AUD) tag for each Access application protecting this Reader |
+
+Find the Team Domain in Zero Trust settings. Find each AUD in Zero Trust → Access controls → Applications → select the application → Additional settings → Application Audience (AUD) Tag. The `FRAME_READER_ACCESS_AUD` value accepts one or more AUD tags separated by commas, with no quotes required. This supports separate Access applications for Production, Preview and custom hostnames. Use the same Team Domain for all applications in the same Zero Trust account.
+
+These are ordinary Variables, not Secrets. Do not add email addresses here. Adding or removing allowed email addresses in an existing Access policy does not change the Team Domain or AUD. An application's AUD changes only if that Access application is deleted and recreated; when that happens, replace the old AUD with the new one.
+
+Pages Functions fetch and cache the public signing keys automatically from `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`. If a JWT contains a previously unseen key ID, the verifier refreshes the JWKS. Cloudflare's signing-key rotation therefore does not require manual Variable updates or scheduled maintenance.
+
+D1 remains necessary for reading history and statistics, but not for authentication. The old `auth_attempts` table may remain in D1 and is no longer used.
+
+## 4. Configure the LAN-direct source (optional)
 
 The fourth source is the OpenList instance reachable directly from the current device, such as a Mac or phone on the home network. On the cloud page, enter its URL, account name and password. The URL and username are saved in that browser's local storage. The password is kept only in the current tab's `sessionStorage`, so a page reload in that tab can reconnect, but closing the tab clears it. The credentials are sent directly to the LAN OpenList login and file-list endpoints; they do not pass through Pages, D1 or Worker APIs.
 
@@ -51,7 +66,7 @@ Use a separate read-only account. Plain HTTP does not encrypt the username/passw
 
 Legacy local Token settings are not reused. On first open after this update, the old saved local Token is discarded; enter the LAN account and password once and save the source again.
 
-## 4. Set the two library paths like FRAME Audio
+## 5. Set the two library paths like FRAME Audio
 
 The cloud page has two independent path fields:
 
@@ -64,7 +79,7 @@ All sources should expose the same absolute folder layout so the two HTML input 
 
 After Cloudflare Access authentication succeeds, the cloud page automatically opens the previously selected source and the HTML-default path for the selected library. Use **重新連線／讀取書架** to retry manually. Changing the source or switching between Books and Comics also reloads the corresponding saved path.
 
-## 5. Verify the configuration
+## 6. Verify the configuration
 
 1. Confirm the D1 binding exists for reading-history synchronization and statistics.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
@@ -79,9 +94,9 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
 5. Browse to the book directory and save it as the Books root. Switch to Comics, browse to its directory and save it as the Comics root.
 6. Add a file to the local shelf. The original cloud file is not changed or deleted.
 
-## 6. Existing data and current behavior
+## 7. Existing data and current behavior
 
-- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused. No Access Team Domain or AUD values need to be added under Variables and Secrets.
+- No D1 migration is required for Cloudflare Access authentication or HTML-default paths. Existing reading events remain intact. The old authentication-attempt table may remain unused. The two Access verification Variables must be configured as described above.
 - Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device.
