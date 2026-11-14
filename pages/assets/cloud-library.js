@@ -1,4 +1,4 @@
-import { importBookFile } from "/assets/library-store.js";
+import { importBookFile } from "/assets/library-store.js?v=20261114-shelf-classification1";
 
 const $ = id => document.getElementById(id);
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";

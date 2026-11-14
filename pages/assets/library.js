@@ -1,6 +1,6 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js";
+} from "/assets/library-store.js?v=20261114-shelf-classification1";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null };
