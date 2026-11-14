@@ -124,3 +124,88 @@
  .cloud-library-select { align-items:flex-start; flex-direction:column; }
  .cloud-library-select select { width:100%; }
 }
+
+
+/* Persistent D1 cloud catalogue and resumable scan controls */
+.cloud-index-panel {
+  margin: 1.4rem 0 2rem;
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+  border: 1px solid rgba(190, 169, 240, .18);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(99, 75, 142, .14), rgba(23, 20, 34, .72));
+}
+.cloud-index-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+.cloud-index-copy { min-width: 0; }
+.cloud-index-copy h3 {
+  margin: .2rem 0 .45rem;
+  color: var(--text, #f3efff);
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+.cloud-index-copy > p:last-child {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted, #aaa2ba);
+  font-size: .88rem;
+  line-height: 1.7;
+}
+.cloud-index-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .55rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.cloud-index-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: .35rem .7rem;
+  border: 1px solid rgba(177, 151, 232, .22);
+  border-radius: 999px;
+  color: #d9cdf4;
+  background: rgba(130, 98, 192, .10);
+  font-size: .78rem;
+}
+.cloud-index-progress {
+  margin: 1rem 0 0;
+  padding: .8rem 1rem;
+  border-radius: 10px;
+  color: var(--muted, #aaa2ba);
+  background: rgba(8, 7, 13, .34);
+  font-size: .84rem;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.cloud-index-progress.is-error { color: #e8a6a6; }
+.cloud-index-log { margin-top: .75rem; color: var(--muted, #aaa2ba); }
+.cloud-index-log summary {
+  cursor: pointer;
+  font-size: .82rem;
+  user-select: none;
+}
+.cloud-index-log summary span { margin-left: .45rem; opacity: .7; }
+.cloud-index-log pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: .65rem 0 0;
+  padding: .8rem;
+  border: 1px solid rgba(190, 169, 240, .12);
+  border-radius: 9px;
+  color: #c7bfd8;
+  background: rgba(5, 4, 9, .55);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .cloud-index-heading { flex-direction: column; }
+  .cloud-index-actions { justify-content: flex-start; width: 100%; }
+  .cloud-index-actions .primary-link { flex: 1 1 100%; }
+}
