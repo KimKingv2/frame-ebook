@@ -5,7 +5,6 @@ const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
 const LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v2";
 const LEGACY_LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v1";
 const LOCAL_PASSWORD_SESSION_KEY = "frame-reader-local-openlist-password-v1";
-const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v1";
 const PROVIDER_LABELS = {
   vps: "VPS Alist",
   worker: "OpenList Worker",
@@ -17,7 +16,6 @@ const state = {
   authenticated:false,
   databaseConfigured:false,
   allowedRoots:{books:"/",comics:"/"},
-  suggestedRoots:{books:"/",comics:"/"},
   selectedRoots:{books:"/",comics:"/"},
   currentPath:"/",
   items:[],
@@ -89,21 +87,19 @@ function readLocalProfile() {
   $("cloud-local-password").value=state.localProfile.password;
 }
 function readRootSelections() {
-  let saved={};
-  try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
   for(const library of ["books","comics"]) {
-    const candidate=normalizePath(saved[library]||state.suggestedRoots[library]||"/");
+    const id=library==="books"?"cloud-books-root":"cloud-comics-root";
+    const candidate=normalizePath($(id).value||"/");
     state.selectedRoots[library]=candidate||"/";
+    $(id).value=state.selectedRoots[library];
   }
-  $("cloud-books-root").value=state.selectedRoots.books||"/";
-  $("cloud-comics-root").value=state.selectedRoots.comics||"/";
   renderRootStatus();
 }
 function renderRootStatus() {
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
     const selected=state.selectedRoots[library]||"/";
-    $(id).textContent="目前裝置使用："+selected+"（可手動修改，或從下方目錄瀏覽器選取）";
+    $(id).textContent="目前頁面使用："+selected+"（重新整理後回到 HTML 預設值）";
   }
 }
 function normalizeLocalBase(value) {
@@ -173,11 +169,9 @@ function saveRootSelections() {
     state.selectedRoots[library]=candidate;
     $(library==="books"?"cloud-books-root":"cloud-comics-root").value=candidate;
   }
-  try { localStorage.setItem(ROOT_SELECTIONS_KEY,JSON.stringify(state.selectedRoots)); }
-  catch (_) { throw new Error("無法保存目錄設定。請檢查瀏覽器的網站儲存空間。"); }
   renderRootStatus();
-  clearListing("目錄設定已保存");
-  setSourceStatus("電子書與漫畫根目錄已分別保存在這台裝置。切換 VPS、Worker、Mobile Device 或 LAN 時會沿用相同的絕對路徑。");
+  clearListing("目錄設定已套用");
+  setSourceStatus("電子書與漫畫根目錄已套用到目前頁面。切換 VPS、Worker、Mobile Device 或 LAN 時會沿用；重新整理後會回到 HTML 的 value 預設值。");
 }
 function saveSourceSettings() {
   const provider=$("cloud-provider").value;
@@ -288,10 +282,6 @@ async function checkSession() {
     state.authenticated=!!(response.ok&&data.authenticated);
     state.databaseConfigured=!!data.databaseConfigured;
     state.serverProfiles=data.openListProfiles||{};
-    state.suggestedRoots={
-      books:normalizePath(data.rootPaths?.books||"/")||"/",
-      comics:normalizePath(data.rootPaths?.comics||"/")||"/"
-    };
     state.allowedRoots={books:"/",comics:"/"};
     if(state.authenticated) {
       $("cloud-login-panel").hidden=true;
@@ -495,7 +485,7 @@ function setCurrentFolderAsRoot(library) {
   }
   const id=library==="books"?"cloud-books-root":"cloud-comics-root";
   $(id).value=candidate;
-  setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「保存兩個目錄設定」。");
+  setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「套用兩個目錄設定」。");
 }
 $("cloud-login-form").addEventListener("submit",login);
 $("cloud-refresh").addEventListener("click",()=>loadDirectory(state.currentPath,state.page));
