@@ -87,7 +87,7 @@ New commits to `main` should trigger automatic deployment.
 - Never commit OpenList tokens, credentials, private books, private metadata exports or `.env` files.
 - The included sample EPUB is original demonstration content.
 - Local EPUB file selection stays in the browser and is not transmitted.
-- Do not connect a public reader directly to OpenList using a long-lived administrator token. A future Worker should provide authenticated, short-lived, narrowly scoped file access.
+- Server-side Pages Functions log in with read-only Alist accounts, reuse short-lived JWTs through the shared KV cache, and keep both passwords and JWTs out of browser JavaScript. Never use a long-lived administrator token in frontend code.
 - See [PRIVACY.md](PRIVACY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Third-party software
@@ -146,7 +146,7 @@ The bookshelf and reading history work locally in the current browser profile an
 
 ### Four-source OpenList access
 
-The private cloud library offers four read-only connection profiles: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are called by Pages Functions with separate server-side Variables / Secrets. The LAN profile stores its URL and Token only in the current browser and sends requests directly to that LAN host. The server independently restricts EPUB browsing to OPENLIST_BOOKS_ROOT_PATH and CBZ browsing to OPENLIST_COMICS_ROOT_PATH; each device may select a narrower preferred folder. The page waits for an explicit connection test before requesting a directory.
+The private cloud library offers four read-only connection profiles: VPS Alist, OpenList Worker, Mobile Device Alist and device-local LAN OpenList. The first three are called by Pages Functions with dedicated server-side URL Variables and username/password Secrets. Their short-lived JWTs use the shared `MEDIA_AUTH_TOKEN_CACHE` KV namespace and the same provider cache contract as FRAME Audio, allowing a matching source account to reuse a cached login. The LAN profile logs in directly from the browser; only its URL and username persist in localStorage, while the temporary JWT remains in tab sessionStorage. The server independently restricts EPUB browsing to OPENLIST_BOOKS_ROOT_PATH and CBZ browsing to OPENLIST_COMICS_ROOT_PATH; each device may select a narrower preferred folder. The page waits for an explicit connection test before requesting a directory.
 
 ### Reading habits and statistics
 
