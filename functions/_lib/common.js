@@ -20,8 +20,8 @@ const ACCESS_KEYS_CACHE_MS = 10 * 60 * 1000;
 
 function getCloudflareAccessSettings(env) {
   const rawDomain = String(env.FRAME_READER_ACCESS_TEAM_DOMAIN || "").trim();
-  const aud = String(env.FRAME_READER_ACCESS_AUD || "").trim();
-  const enabled = !!(rawDomain || aud);
+  const audiences = String(env.FRAME_READER_ACCESS_AUD || "").split(",").map(value => value.trim()).filter(Boolean);
+  const enabled = !!(rawDomain || audiences.length);
   let teamDomain = "";
   try {
     const url = new URL(rawDomain);
@@ -29,7 +29,7 @@ function getCloudflareAccessSettings(env) {
       teamDomain = url.origin;
     }
   } catch (_) {}
-  return { enabled, teamDomain, aud };
+  return { enabled, teamDomain, audiences };
 }
 
 export function isCloudflareAccessConfigured(env) {
@@ -92,7 +92,7 @@ async function verifyCloudflareAccessAssertion(request, settings) {
     if (!header || header.alg !== "RS256" || !header.kid) return false;
     if (!payload || payload.iss !== settings.teamDomain) return false;
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!audiences.includes(settings.aud)) return false;
+    if (!audiences.some(value => settings.audiences.includes(value))) return false;
 
     const now = Math.floor(Date.now() / 1000);
     if (!Number.isFinite(Number(payload.exp)) || Number(payload.exp) <= now) return false;
@@ -127,7 +127,7 @@ async function verifyCloudflareAccessAssertion(request, settings) {
 
 export async function isAuthenticated(request, env) {
   const access = getCloudflareAccessSettings(env);
-  if (!access.enabled || !access.teamDomain || !access.aud) return false;
+  if (!access.enabled || !access.teamDomain || !access.audiences.length) return false;
   return await verifyCloudflareAccessAssertion(request, access);
 }
 
