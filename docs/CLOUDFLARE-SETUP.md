@@ -1,6 +1,6 @@
-# FRAME Reader V0.8 — Cloudflare setup
+# FRAME Reader V0.9 — Cloudflare setup
 
-FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf keeps a metadata-only catalog and resumable scan state in D1; original EPUB / CBZ files remain in OpenList. Adding a cloud file copies its content into the current browser's IndexedDB.
+FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf keeps file metadata and resumable scan state in D1, with normalized cover thumbnails in a private R2 bucket. Original EPUB / CBZ files remain in OpenList. Adding a cloud file copies its content into the current browser's IndexedDB.
 
 ## 1. Create and bind D1 and private R2 cover storage
 
