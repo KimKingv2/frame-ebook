@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#12101a">
   <title>雲端書庫 · FRAME Reader</title>
   <link rel="stylesheet" href="/assets/site.css">
-  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261114-d1-catalog1">
+  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261114-r2-covers1">
 </head>
 <body>
   <main class="shell cloud-shell">
@@ -86,11 +86,11 @@
           <div class="cloud-index-copy">
             <p class="section-kicker">PERSISTENT CLOUD INDEX</p>
             <h3>書庫索引</h3>
-            <p>首次使用時手動掃描一次。之後開啟書庫會直接讀取 D1；新增、刪除或整理檔案後，再手動掃描更新即可。掃描進度會保存，可中斷後續掃。</p>
+            <p>首次使用時手動掃描一次，系統會同步建立書籍封面索引。之後開啟書庫會直接讀取 D1 與私有 R2 封面；新增、刪除或整理檔案後，再手動掃描更新即可。封面掃描進度也可中斷後續做。</p>
           </div>
           <div class="cloud-index-actions">
             <span id="cloud-index-status" class="cloud-index-status">尚未建立索引</span>
-            <button id="cloud-scan-start" class="primary-link" type="button">手動掃描／續掃 <span>↗</span></button>
+            <button id="cloud-scan-start" class="primary-link" type="button">手動掃描／續掃（含封面） <span>↗</span></button>
             <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停掃描</button>
           </div>
         </div>
@@ -139,6 +139,6 @@
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
-  <script type="module" src="/assets/cloud-library.js?v=20261114-d1-catalog2"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261114-r2-covers1"></script>
 </body>
 </html>
