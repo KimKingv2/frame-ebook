@@ -1,4 +1,5 @@
 import { importBookFile } from "/assets/library-store.js?v=20261114-shelf-classification1";
+import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip.js";
 
 const $ = id => document.getElementById(id);
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
@@ -60,6 +61,24 @@ function isWithinRoot(path,root) {
 function fileKind(item) {
   const ext=String(item.name||"").split(".").pop().toLowerCase();
   return ext==="epub"?"EPUB":ext==="cbz"?"CBZ":"";
+}
+function zipPath(value) {
+  const parts=[];
+  String(value||"").replace(/\\/g,"/").split("/").forEach(part=>{
+    if(!part||part===".")return;
+    if(part===".."){parts.pop();return;}
+    parts.push(part);
+  });
+  return parts.join("/");
+}
+function archiveRelativePath(base,href) {
+  let value=String(href||"").split(/[?#]/,1)[0];
+  try { value=decodeURIComponent(value); } catch (_) {}
+  return zipPath(value.startsWith("/")?value:(base?base+"/":"")+value);
+}
+function mimeFromCoverName(name) {
+  const ext=String(name||"").split(".").pop().toLowerCase();
+  return ({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif",bmp:"image/bmp",avif:"image/avif"})[ext]||"";
 }
 function getAllowedRoot(library=state.activeLibrary) {
   void library;
@@ -443,6 +462,259 @@ async function writeIndexEntries(scanState, entries) {
   }
   return saved;
 }
+
+class HttpRangeReader {
+  constructor(size, readRange) {
+    this.size=Number(size)||0;
+    this.readRange=readRange;
+    this.initialized=false;
+  }
+  async init() { this.initialized=true; }
+  async readUint8Array(offset,length) {
+    const start=Math.max(0,Number(offset)||0);
+    const count=Math.max(0,Number(length)||0);
+    if(!count||start>=this.size)return new Uint8Array();
+    const end=Math.min(this.size,start+count)-1;
+    return this.readRange(start,end);
+  }
+}
+async function makeCoverRangeReader(item) {
+  const size=Number(item.size)||0;
+  if(!Number.isSafeInteger(size)||size<=0)throw new Error("檔案大小無效，無法使用 HTTP Range 讀取封面。");
+  if(state.activeProvider==="local") {
+    const profile=getActiveProfile();
+    const payload=await directOpenList("get",{path:item.path,password:""});
+    const metadata=payload.data||{};
+    if(metadata.is_dir||!metadata.raw_url)throw new Error("區域網路 OpenList 沒有提供檔案下載位址。");
+    const target=new URL(String(metadata.raw_url),profile.baseUrl+"/");
+    if(!["http:","https:"].includes(target.protocol))throw new Error("封面來源網址格式不受支援。");
+    return new HttpRangeReader(size,async(start,end)=>{
+      const response=await fetch(target.href,{
+        method:"GET",mode:"cors",credentials:"omit",redirect:"follow",
+        headers:{Range:"bytes="+start+"-"+end},
+        ...localNetworkOptions(target.href)
+      });
+      return readRangeResponse(response,start,end,size);
+    });
+  }
+  const query=new URLSearchParams({
+    provider:state.activeProvider,
+    library:state.activeLibrary,
+    root_path:getActiveRoot(),
+    path:item.path
+  });
+  const url="/api/cloud/file?"+query.toString();
+  return new HttpRangeReader(size,async(start,end)=>{
+    const response=await fetch(url,{
+      method:"GET",credentials:"same-origin",
+      headers:{Range:"bytes="+start+"-"+end}
+    });
+    return readRangeResponse(response,start,end,size);
+  });
+}
+async function readRangeResponse(response,start,end,totalSize) {
+  if(response.status===206) {
+    const bytes=new Uint8Array(await response.arrayBuffer());
+    if(!bytes.length||bytes.length>end-start+1)throw new Error("HTTP Range 回傳長度不正確。");
+    const contentRange=response.headers.get("Content-Range");
+    if(contentRange) {
+      const match=contentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+|\*)$/i);
+      if(match&&(Number(match[1])!==start||Number(match[2])<end||match[3]!=="*"&&Number(match[3])!==totalSize)) {
+        throw new Error("HTTP Range Content-Range 與請求不一致。");
+      }
+    }
+    return bytes;
+  }
+  if(response.status===200&&totalSize<=6*1024*1024) {
+    const bytes=new Uint8Array(await response.arrayBuffer());
+    if(bytes.length!==totalSize)throw new Error("來源伺服器沒有正確回應 Range，完整檔案大小不符。");
+    return bytes.slice(start,Math.min(end+1,bytes.length));
+  }
+  try { await response.body?.cancel(); } catch (_) {}
+  if(!response.ok)throw new Error("讀取封面資料失敗：HTTP "+response.status);
+  throw new Error("來源未支援 HTTP Range，為避免下載整本書，已停止封面擷取。");
+}
+async function findEpubCover(zipEntries) {
+  const byName=new Map(zipEntries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
+  const container=byName.get("META-INF/container.xml");
+  if(!container)return null;
+  const containerText=await container.getData(new TextWriter("utf-8"));
+  const containerXml=new DOMParser().parseFromString(String(containerText),"application/xml");
+  const rootfile=containerXml.getElementsByTagName("rootfile")[0];
+  const opfPath=zipPath(rootfile?.getAttribute("full-path")||"");
+  if(!opfPath)return null;
+  const opfEntry=byName.get(opfPath);
+  if(!opfEntry)return null;
+  const opfText=await opfEntry.getData(new TextWriter("utf-8"));
+  const opfXml=new DOMParser().parseFromString(String(opfText),"application/xml");
+  if(opfXml.getElementsByTagName("parsererror").length)return null;
+  const manifest=Array.from(opfXml.getElementsByTagName("item"));
+  const metaItems=Array.from(opfXml.getElementsByTagName("meta"));
+  let coverId="";
+  for(const meta of metaItems) {
+    const name=String(meta.getAttribute("name")||"").toLowerCase();
+    const property=String(meta.getAttribute("property")||"").toLowerCase();
+    if(name==="cover"||property==="cover-image") {
+      coverId=String(meta.getAttribute("content")||"").trim();
+      if(coverId)break;
+    }
+  }
+  let coverItem=coverId?manifest.find(item=>item.getAttribute("id")===coverId):null;
+  if(!coverItem)coverItem=manifest.find(item=>(item.getAttribute("properties")||"").split(/\s+/).includes("cover-image"));
+  if(!coverItem)coverItem=manifest.find(item=>/^image\//i.test(item.getAttribute("media-type")||"")&&/cover|front/i.test(item.getAttribute("href")||""));
+  if(!coverItem)return null;
+  const base=opfPath.includes("/")?opfPath.slice(0,opfPath.lastIndexOf("/")):"";
+  const coverPath=archiveRelativePath(base,coverItem.getAttribute("href"));
+  const entry=byName.get(coverPath);
+  if(!entry)return null;
+  const mime=String(coverItem.getAttribute("media-type")||mimeFromCoverName(coverPath)||"").toLowerCase();
+  if(!mime.startsWith("image/")||mime==="image/svg+xml")return null;
+  return {entry,mime};
+}
+async function findCbzCover(zipEntries) {
+  const candidates=zipEntries.filter(entry=>!entry.directory&&
+    /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(entry.filename)&&
+    !/(^|\/)(__MACOSX|\.AppleDouble)\//i.test(entry.filename)&&
+    !/(^|\/)\._/.test(entry.filename));
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>a.filename.localeCompare(b.filename,undefined,{numeric:true,sensitivity:"base"}));
+  const selected=candidates.find(entry=>/(^|[/_-])(cover|front)([/_.-]|$)/i.test(entry.filename))||candidates[0];
+  return {entry:selected,mime:mimeFromCoverName(selected.filename)||"image/jpeg"};
+}
+async function resizeCover(blob) {
+  if(!(blob instanceof Blob)||!blob.size||blob.size>15*1024*1024)throw new Error("原始封面不存在或超過 15 MiB。");
+  let bitmap;
+  try {
+    if(typeof createImageBitmap==="function")bitmap=await createImageBitmap(blob);
+    else {
+      const url=URL.createObjectURL(blob);
+      try {
+        const image=new Image();
+        image.src=url;
+        await image.decode();
+        const canvas=document.createElement("canvas");
+        const scale=Math.min(1,512/Math.max(image.naturalWidth,image.naturalHeight));
+        canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+        canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+        canvas.getContext("2d",{alpha:false}).drawImage(image,0,0,canvas.width,canvas.height);
+        let output=await new Promise(resolve=>canvas.toBlob(resolve,"image/webp",0.84));
+        let mime="image/webp";
+        if(!output){output=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.86));mime="image/jpeg";}
+        if(output)return {blob:output,mime};
+      } finally { URL.revokeObjectURL(url); }
+      throw new Error("封面圖片無法轉換。");
+    }
+  } catch(error) { throw new Error("封面圖片解碼失敗："+(error.message||error)); }
+  try {
+    const width=bitmap.width||bitmap.displayWidth;
+    const height=bitmap.height||bitmap.displayHeight;
+    if(!width||!height||width*height>150000000)throw new Error("封面圖片尺寸異常。");
+    const scale=Math.min(1,512/Math.max(width,height));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(width*scale));
+    canvas.height=Math.max(1,Math.round(height*scale));
+    const context=canvas.getContext("2d",{alpha:false});
+    if(!context)throw new Error("無法建立封面縮圖畫布。");
+    context.drawImage(bitmap,0,0,canvas.width,canvas.height);
+    let output=await new Promise(resolve=>canvas.toBlob(resolve,"image/webp",0.84));
+    let mime="image/webp";
+    if(!output) {
+      output=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.86));
+      mime="image/jpeg";
+    }
+    if(!output||!output.size)throw new Error("瀏覽器無法產生封面縮圖。");
+    if(output.size>2*1024*1024)throw new Error("封面縮圖仍超過 2 MiB。");
+    return {blob:output,mime};
+  } finally {
+    try { bitmap.close(); } catch (_) {}
+  }
+}
+async function extractCloudCover(item) {
+  const rangeReader=await makeCoverRangeReader(item);
+  const zip=new ZipReader(rangeReader);
+  const entries=await zip.getEntries();
+  const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries);
+  if(!found)return null;
+  const sourceBlob=await found.entry.getData(new BlobWriter(found.mime));
+  return resizeCover(sourceBlob);
+}
+async function blobSha256(blob) {
+  const digest=await crypto.subtle.digest("SHA-256",await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,"0")).join("");
+}
+async function saveCoverState(scope,item,status,details={}) {
+  const response=await fetch("/api/cloud/covers",{
+    method:"POST",credentials:"same-origin",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      provider:scope.provider,library:scope.library,rootPath:scope.rootPath,
+      path:item.path,status,error:details.error||null
+    })
+  });
+  return readJsonResponse(response,"保存封面索引狀態失敗。");
+}
+async function uploadCover(scope,item,hash,cover) {
+  const query=new URLSearchParams({
+    provider:scope.provider,library:scope.library,root_path:scope.rootPath,path:item.path
+  });
+  const response=await fetch("/api/cloud/covers?"+query.toString(),{
+    method:"POST",credentials:"same-origin",
+    headers:{"Content-Type":cover.mime,"X-Cover-Hash":hash},
+    body:cover.blob
+  });
+  return readJsonResponse(response,"上傳封面至 R2 失敗。");
+}
+async function fetchPendingCovers(scope,limit=12) {
+  const query=new URLSearchParams({
+    provider:scope.provider,library:scope.library,root_path:scope.rootPath,limit:String(limit)
+  });
+  const response=await fetch("/api/cloud/covers?"+query.toString(),{credentials:"same-origin"});
+  return readJsonResponse(response,"讀取封面索引佇列失敗。");
+}
+async function retryFailedCovers(scope) {
+  const response=await fetch("/api/cloud/covers",{
+    method:"POST",credentials:"same-origin",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"retry-errors",provider:scope.provider,library:scope.library,rootPath:scope.rootPath})
+  });
+  const data=await readJsonResponse(response,"重設失敗封面佇列失敗。");
+  return Number(data.retried||0);
+}
+async function processPendingCovers(scope,maxDurationMs=120000) {
+  const started=Date.now();
+  let processed=0,failed=0,missing=0;
+  appendIndexLog("封面索引開始：使用 HTTP Range 讀取 ZIP 封面資料，不下載整本書。");
+  while(Date.now()-started<maxDurationMs&&!state.scanPauseRequested) {
+    const queue=await fetchPendingCovers(scope,8);
+    if(!queue.items.length)break;
+    for(const item of queue.items) {
+      if(Date.now()-started>=maxDurationMs||state.scanPauseRequested)break;
+      setIndexProgress("正在建立封面索引："+item.name+"（已處理 "+processed+" 本）");
+      try {
+        const cover=await extractCloudCover(item);
+        if(!cover) {
+          await saveCoverState(scope,item,"missing");
+          missing++;
+          appendIndexLog("沒有找到可用封面："+item.path,"warning");
+        } else {
+          const hash=await blobSha256(cover.blob);
+          await uploadCover(scope,item,hash,cover);
+          appendIndexLog("封面已保存至私有 R2："+item.name+" · "+hash.slice(0,12),"success");
+        }
+      } catch(error) {
+        failed++;
+        try { await saveCoverState(scope,item,"error",{error:String(error.message||error).slice(0,450)}); }
+        catch(stateError) { appendIndexLog("封面狀態保存失敗："+(stateError.message||stateError),"error"); }
+        appendIndexLog("封面處理失敗："+item.path+" · "+(error.message||error),"error");
+      }
+      processed++;
+    }
+  }
+  const remaining=await fetchPendingCovers(scope,1);
+  appendIndexLog("封面索引本批完成：處理 "+processed+" 本，無封面 "+missing+" 本，失敗 "+failed+" 本，待處理 "+remaining.total+" 本。");
+  return {processed,failed,missing,remaining:Number(remaining.total||0)};
+}
+
 async function runIndexScan() {
   if (state.scanRunning) return;
   if (!state.authenticated) {
@@ -469,12 +741,32 @@ async function runIndexScan() {
     scanState = await loadIndexScanState();
     if (scanState && scanState.rootPath === scope.rootPath &&
         scanState.provider === scope.provider && scanState.library === scope.library &&
+        scanState.version === 1 && scanState.completed) {
+      state.scanRunning = true;
+      state.scanPauseRequested = false;
+      startButton.disabled = true;
+      pauseButton.disabled = false;
+      const existingQueue = await fetchPendingCovers(scope, 1);
+      let retryCount = 0;
+      if (!existingQueue.total) retryCount = await retryFailedCovers(scope);
+      if (existingQueue.total || retryCount) {
+        appendIndexLog("目錄索引已完成；本次只續做尚未完成的封面，不重新遍歷 OpenList。", "warning");
+        await processPendingCovers(scope, 180000);
+        const left = await fetchPendingCovers(scope, 1);
+        setIndexProgress("目錄索引已完成；封面待處理 "+Number(left.total||0)+" 本。再次點擊可繼續封面索引。", !!left.total);
+        return;
+      }
+      if (!window.confirm(
+        "這個來源與分類的目錄及封面索引都已完成。重新掃描會檢查新增、變更和刪除的檔案；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
+      )) return;
+      scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
+      await saveIndexScanState(scanState);
+      appendIndexLog("建立新掃描工作與 D1 進度記錄。", "success");
+    } else if (scanState && scanState.rootPath === scope.rootPath &&
+        scanState.provider === scope.provider && scanState.library === scope.library &&
         scanState.version === 1 && !scanState.completed) {
       appendIndexLog("找到未完成的掃描進度，將從上次保存的位置續掃。", "warning");
     } else {
-      if (scanState?.completed && !window.confirm(
-        "這個來源與分類的上一輪索引已完成。重新掃描會檢查新增、變更和刪除的檔案；只有完整掃描結束後才會清理已不存在的索引。確定開始新一輪嗎？"
-      )) return;
       scanState = newIndexScanState(scope.rootPath, scope.provider, scope.library);
       await saveIndexScanState(scanState);
       appendIndexLog("建立新掃描工作與 D1 進度記錄。", "success");
@@ -594,6 +886,17 @@ async function runIndexScan() {
       await saveIndexScanState(scanState);
       setIndexProgress(indexScanProgressText(scanState, batch, true) + "\n本批停止原因：" + reason, false);
       appendIndexLog("本批結束：" + reason + "；進度已保存，可再次點擊續掃。", "warning");
+    }
+
+    if (!state.scanPauseRequested) {
+      const coverBudget = Math.min(150000, Math.max(0, 240000 - (Date.now() - startedAt)));
+      if (coverBudget > 10000) {
+        const coverResult = await processPendingCovers(scope, coverBudget);
+        if (coverResult.remaining) {
+          setIndexProgress("目錄索引"+(scanState.completed?"已完成":"本批已保存")+
+            "；另有 "+coverResult.remaining+" 本封面待處理。再次點擊「手動掃描／續掃」會先處理封面，不會重掃已完成的目錄。");
+        }
+      }
     }
   } catch (error) {
     appendIndexLog("索引發生錯誤：" + (error.message || error), "error");
@@ -749,21 +1052,55 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
   }
 }
 function makeItem(item) {
-  const row=document.createElement("article");row.className="cloud-item";
-  const icon=document.createElement("span");icon.className="cloud-item-icon";icon.textContent=item.isDir?"▰":item.format==="EPUB"?"▤":"▣";
+  const row=document.createElement("article");
+  row.className=item.isDir?"cloud-item cloud-folder-item":"cloud-item cloud-book-card";
+  if(item.isDir) {
+    const icon=document.createElement("span");icon.className="cloud-item-icon";icon.textContent="▰";
+    const copy=document.createElement("div");copy.className="cloud-item-copy";
+    const title=document.createElement("strong");title.textContent=item.name;
+    const meta=document.createElement("span");meta.textContent="資料夾";
+    copy.append(title,meta);
+    const actions=document.createElement("div");actions.className="cloud-item-actions";
+    const open=document.createElement("button");open.type="button";open.className="cloud-folder-button";open.textContent="開啟資料夾";
+    open.addEventListener("click",()=>loadDirectory(item.path,1));
+    actions.append(open);row.append(icon,copy,actions);
+    return row;
+  }
+
+  const cover=document.createElement("div");cover.className="cloud-book-cover";
+  const placeholder=document.createElement("div");placeholder.className="cloud-cover-placeholder";
+  placeholder.innerHTML='<span>F</span><small>FRAME READER</small>';
+  cover.append(placeholder);
+  if(item.coverHash&&item.coverStatus==="ready") {
+    const image=document.createElement("img");
+    image.className="cloud-cover-image";
+    image.alt=item.name+" 封面";
+    image.loading="lazy";
+    image.decoding="async";
+    image.src="/api/cloud/covers?hash="+encodeURIComponent(item.coverHash);
+    image.addEventListener("load",()=>placeholder.remove(),{once:true});
+    image.addEventListener("error",()=>{image.remove();placeholder.classList.add("is-unavailable");},{once:true});
+    cover.append(image);
+  } else {
+    const status=document.createElement("small");
+    status.className="cloud-cover-status";
+    status.textContent=item.coverStatus==="error"?"封面待重試":item.coverStatus==="missing"?"沒有內嵌封面":"封面待索引";
+    cover.append(status);
+  }
+
   const copy=document.createElement("div");copy.className="cloud-item-copy";
-  const title=document.createElement("strong");title.textContent=item.name;
-  const meta=document.createElement("span");meta.textContent=item.isDir?"資料夾":(item.format+" · "+formatBytes(item.size)+(item.modified?" · "+String(item.modified).slice(0,10):""));
+  const title=document.createElement("strong");title.textContent=item.name.replace(/\.(epub|cbz)$/i,"");
+  title.title=item.name;
+  const meta=document.createElement("span");
+  meta.textContent=(item.format||"書籍")+" · "+formatBytes(item.size)+(item.modified?" · "+String(item.modified).slice(0,10):"");
   copy.append(title,meta);
   const actions=document.createElement("div");actions.className="cloud-item-actions";
-  if(item.isDir) {
-    const open=document.createElement("button");open.type="button";open.className="cloud-folder-button";open.textContent="開啟資料夾";
-    open.addEventListener("click",()=>loadDirectory(item.path,1));actions.append(open);
-  } else if(item.format) {
-    const add=document.createElement("button");add.type="button";add.className="cloud-import-button";add.textContent=state.busy.has(item.path)?"正在加入……":"加入本機書架";add.disabled=state.busy.has(item.path);
-    add.addEventListener("click",()=>importCloudFile(item));actions.append(add);
-  }
-  row.append(icon,copy,actions);
+  const add=document.createElement("button");add.type="button";add.className="cloud-import-button";
+  add.textContent=state.busy.has(item.path)?"正在加入……":"加入本機書架";
+  add.disabled=state.busy.has(item.path);
+  add.addEventListener("click",()=>importCloudFile(item));
+  actions.append(add);
+  row.append(cover,copy,actions);
   return row;
 }
 function renderItems() {
