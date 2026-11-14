@@ -87,6 +87,7 @@ function readLocalProfile() {
   $("cloud-local-password").value=state.localProfile.password;
 }
 function readRootSelections() {
+  try { localStorage.removeItem("frame-reader-cloud-root-selections-v1"); } catch (_) {}
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root":"cloud-comics-root";
     const candidate=normalizePath($(id).value||"/");
