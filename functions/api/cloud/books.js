@@ -11,29 +11,32 @@ async function scanStateKey(provider, library, rootPath) {
 }
 
 export async function onRequestGet({ request, env }) {
-  const denied = await requireAuth(request, env);
-  if (denied) return denied;
-  const db = getDatabase(env);
-  if (!db || typeof db.prepare !== "function") {
-    return json({ error: "FRAME_READER_DB 尚未綁定。請先設定 D1 binding。" }, 503);
-  }
-
-  const url = new URL(request.url);
-  const provider = url.searchParams.get("provider") || "vps";
-  const library = url.searchParams.get("library") === "comics" ? "comics" : "books";
-  const rootPath = normalizePath(url.searchParams.get("root_path") || "/");
-  const path = normalizePath(url.searchParams.get("path") || "/");
-  if (!PROVIDERS.has(provider)) return json({ error: "不支援的書庫來源。" }, 400);
-  if (!LIBRARIES.has(library) || !rootPath || !path || !isWithinRoot(path, rootPath)) {
-    return json({ error: "目錄路徑無效或超出目前書庫根目錄。" }, 400);
-  }
-
-  const page = Math.max(1, Math.min(100000, Number(url.searchParams.get("page")) || 1));
-  const perPage = Math.max(1, Math.min(100, Number(url.searchParams.get("per_page")) || 80));
-  const offset = (page - 1) * perPage;
-
-  let stage = "initialize";
+  let stage = "authenticate";
   try {
+    const denied = await requireAuth(request, env);
+    if (denied) return denied;
+
+    stage = "resolve_database";
+    const db = getDatabase(env);
+    if (!db || typeof db.prepare !== "function") {
+      return json({ error: "FRAME_READER_DB 尚未綁定。請先設定 D1 binding。" }, 503);
+    }
+
+    stage = "parse_request";
+    const url = new URL(request.url);
+    const provider = url.searchParams.get("provider") || "vps";
+    const library = url.searchParams.get("library") === "comics" ? "comics" : "books";
+    const rootPath = normalizePath(url.searchParams.get("root_path") || "/");
+    const path = normalizePath(url.searchParams.get("path") || "/");
+    if (!PROVIDERS.has(provider)) return json({ error: "不支援的書庫來源。" }, 400);
+    if (!LIBRARIES.has(library) || !rootPath || !path || !isWithinRoot(path, rootPath)) {
+      return json({ error: "目錄路徑無效或超出目前書庫根目錄。" }, 400);
+    }
+
+    const page = Math.max(1, Math.min(100000, Number(url.searchParams.get("page")) || 1));
+    const perPage = Math.max(1, Math.min(100, Number(url.searchParams.get("per_page")) || 80));
+    const offset = (page - 1) * perPage;
+
     stage = "prepare_queries";
     const recursiveShelf = url.searchParams.get("recursive") === "1" && path === rootPath;
     const prefix = rootPath === "/" ? "/" : rootPath + "/";
@@ -57,20 +60,23 @@ export async function onRequestGet({ request, env }) {
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
         ).bind(provider, library, rootPath, path, perPage, offset);
+
     stage = "count_and_rows";
     const [count, rows, scanKey] = await Promise.all([
       countStatement.first(),
       rowsStatement.all(),
       scanStateKey(provider, library, rootPath)
     ]);
+
     stage = "read_scan_state";
     const stateRow = await db.prepare(
       "SELECT state_json,updated_at FROM cloud_scan_state WHERE scan_key=?"
     ).bind(scanKey).first();
+
     stage = "parse_scan_state";
     const scanState = stateRow ? JSON.parse(stateRow.state_json) : null;
     const total = Number(count?.count || 0);
-    const items = (rows.results || []).map(row => ({
+    const items = (rows?.results || []).map(row => ({
       name: row.name,
       path: row.path,
       parentPath: row.parent_path,
@@ -84,6 +90,7 @@ export async function onRequestGet({ request, env }) {
       coverError: row.cover_error || null,
       supported: true
     }));
+
     return json({
       ok: true,
       indexed: !!scanState?.completed,
@@ -104,13 +111,12 @@ export async function onRequestGet({ request, env }) {
       items
     });
   } catch (error) {
-    // Keep diagnostics limited to the authenticated caller. D1 error messages
-    // identify missing schema objects or query stages, but never return row data.
-    const detail = String(error?.message || error?.name || "Unknown D1 error")
-      .replace(/[\\r\\n\\t]+/g, " ")
-      .slice(0, 220);
+    // Expose only a short stage/error description to the authenticated caller;
+    // never include SQL bindings, JWTs, cookies, or book contents.
+    const name = typeof error?.name === "string" ? error.name.slice(0, 40) : "Error";
+    const detail = String(error?.message || name).replace(/[\r\n\t]+/g, " ").slice(0, 180);
     return json({
-      error: "D1 書庫索引查詢失敗（" + stage + "）：" + detail
+      error: "D1 書庫索引 API 發生例外（" + stage + " / " + name + "）：" + detail
     }, 503);
   }
 }
