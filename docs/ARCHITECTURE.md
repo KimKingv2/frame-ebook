@@ -159,7 +159,7 @@ When signed in, the page attempts to read the same aggregates from D1. The serve
 
 The reading tracker batches up to 100 pending local events to POST /api/reading/events. Each D1 row uses event_id as the primary key and INSERT OR IGNORE so retrying a batch cannot double-count an event. The endpoint checks the signed session and same-origin POST, validates a small maximum duration per event, and stores no book file content.
 
-The /api/reading/stats endpoint is read-only and returns aggregate statistics for the requested day range. The database migration is migrations/0001_reading_events.sql.
+The /api/reading/stats endpoint is read-only and returns aggregate statistics for the requested day range. The database migration is migrations/0001_reading_events.sql. Cloudflare Access protects both endpoints at the edge; Pages Functions do not duplicate Access JWT verification.
 
 ### Pages Functions and OpenList trust boundary
 
@@ -170,7 +170,9 @@ Cloudflare Pages serves static content from pages/, but the Pages Functions sour
 - GET /api/cloud/file?library=books|comics&path=... for a protected file download constrained to the matching root and extension.
 - POST /api/reading/events and GET /api/reading/stats.
 
-The session cookie is named __Host-frame-reader and is signed with HMAC using FRAME_READER_SESSION_SECRET. It is Secure, HttpOnly and SameSite=Lax. Login checks FRAME_READER_ACCESS_PASSWORD and applies a D1-backed per-IP rate limit. The intended deployment is one private library owner, not public multi-user authentication.
+Cloudflare Zero Trust Access is the only website sign-in and authorization boundary. Its application must protect the complete Reader hostname, including every static page and `/api/*` route. Cloudflare Access rejects unauthenticated requests before they reach Pages Functions. The `/api/auth/session` endpoint only reports application/service readiness; it does not create a separate session or verify a second JWT. There is no Reader-specific password, session cookie, Access Team Domain Variable or AUD Variable.
+
+Pages Functions deliberately rely on the Access edge instead of independently verifying `Cf-Access-Jwt-Assertion`. This is safe only when the Access application covers the whole hostname without path exclusions. If any production hostname or API route is outside the Access application, it is not protected by an additional in-code authentication layer.
 
 OpenList configuration is read only from the Pages Function environment. VPS Alist, OpenList Worker and Mobile Device Alist use dedicated base URL Variables and username/password Secrets. Pages Functions obtain short-lived JWTs through `/api/auth/login` and cache them in the shared `MEDIA_AUTH_TOKEN_CACHE` KV binding plus isolate memory. The shared cache contract uses the `media-platform:provider-auth:v1` prefix, SHA-256 provider/base-URL/username keys, expiry-aware TTL, and `Client-Id: media-platform-server-{provider}`. The canonical provider IDs are `vps`, `worker` and `mobile-device`, allowing FRAME Reader and FRAME Audio to reuse a JWT when their provider URL and username match. A rejected JWT is invalidated and refreshed once. Passwords and JWTs are never returned to frontend code or stored in D1/R2. `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` define independent maximum directories for EPUB and CBZ access. All requested paths are normalized and constrained to the matching root; the browser may save a narrower preferred sub-root per device.
 
@@ -180,5 +182,5 @@ The cloud shelf currently downloads a selected file through this protected proxy
 
 ### Required deployment configuration
 
-Before private cloud features work, bind a D1 database as FRAME_READER_DB, apply migrations/0001_reading_events.sql, and configure the five environment variables/secrets described in docs/CLOUDFLARE-SETUP.md. Until then, /api/auth/session correctly reports that the database and OpenList are not configured. Local reading history remains available without those bindings.
+Before private cloud features work, bind D1 as FRAME_READER_DB, bind the shared token-cache KV as MEDIA_AUTH_TOKEN_CACHE, apply the required migrations, configure the server-side OpenList Variables/Secrets, and protect the complete hostname with Cloudflare Access as described in docs/CLOUDFLARE-SETUP.md. Until then, /api/auth/session correctly reports that the database and OpenList are not configured. Local reading history remains available without those bindings.
 
