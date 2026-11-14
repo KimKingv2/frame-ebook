@@ -15,14 +15,211 @@ export function getDatabase(env) {
   return env.FRAME_READER_DB || env.DB || null;
 }
 
-// Cloudflare Access protects the Pages hostname at the edge.
-// Match FRAME Audio: require its assertion header on private API requests.
-export async function isAuthenticated(request) {
-  return !!request.headers.get("Cf-Access-Jwt-Assertion");
+// Cloudflare Access authenticates users at the edge. Pages Functions also
+// verify the signed assertion so an unprotected hostname or a forged header
+// cannot be treated as an authenticated request.
+const ACCESS_JWKS_CACHE_TTL_MS = 60 * 60 * 1000;
+const ACCESS_JWKS_STALE_MAX_MS = 24 * 60 * 60 * 1000;
+const accessJwksCache = new Map();
+
+function getAccessVerifierConfig(env) {
+  const rawDomain = String(env.FRAME_READER_ACCESS_TEAM_DOMAIN || "").trim();
+  const audiences = String(env.FRAME_READER_ACCESS_AUD || "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (!rawDomain || !audiences.length) return null;
+
+  let domain;
+  try {
+    const candidate = /^https:\/\//i.test(rawDomain) ? rawDomain : "https://" + rawDomain;
+    const parsed = new URL(candidate);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) return null;
+    domain = parsed.origin;
+  } catch (_) {
+    return null;
+  }
+
+  return { teamDomain: domain, audiences };
+}
+
+export function isAccessVerifierConfigured(env) {
+  return !!getAccessVerifierConfig(env);
+}
+
+function decodeBase64UrlBytes(value) {
+  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  if (normalized.length % 4 === 1) throw new Error("Invalid base64url value");
+  const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+function decodeBase64UrlJson(value) {
+  return JSON.parse(new TextDecoder().decode(decodeBase64UrlBytes(value)));
+}
+
+async function getAccessJwks(teamDomain, forceRefresh = false) {
+  const now = Date.now();
+  const previous = accessJwksCache.get(teamDomain);
+
+  if (previous?.pending) return previous.pending;
+  if (!forceRefresh && previous?.keys && now - previous.fetchedAt < ACCESS_JWKS_CACHE_TTL_MS) {
+    return previous.keys;
+  }
+
+  const entry = {
+    keys: previous?.keys || null,
+    fetchedAt: previous?.fetchedAt || 0,
+    pending: null
+  };
+
+  const pending = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(teamDomain + "/cdn-cgi/access/certs", {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        redirect: "error",
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error("Unable to load Cloudflare Access JWKS");
+      const payload = await response.json();
+      if (!Array.isArray(payload?.keys) || !payload.keys.some(key => key?.kid && key?.kty === "RSA")) {
+        throw new Error("Cloudflare Access JWKS has no usable RSA signing keys");
+      }
+
+      const keys = payload.keys.filter(key =>
+        key &&
+        key.kty === "RSA" &&
+        typeof key.kid === "string" &&
+        typeof key.n === "string" &&
+        typeof key.e === "string" &&
+        (!key.alg || key.alg === "RS256") &&
+        (!key.use || key.use === "sig")
+      );
+      if (!keys.length) throw new Error("Cloudflare Access JWKS has no usable RS256 keys");
+
+      accessJwksCache.set(teamDomain, { keys, fetchedAt: Date.now(), pending: null });
+      return keys;
+    } catch (error) {
+      // A short-lived JWKS outage need not interrupt requests signed by a key
+      // that was fetched recently. Unknown key IDs still trigger a fresh fetch.
+      if (entry.keys && Date.now() - entry.fetchedAt <= ACCESS_JWKS_STALE_MAX_MS) {
+        return entry.keys;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  })();
+
+  entry.pending = pending;
+  accessJwksCache.set(teamDomain, entry);
+  try {
+    return await pending;
+  } finally {
+    const current = accessJwksCache.get(teamDomain);
+    if (current === entry) {
+      entry.pending = null;
+      if (!entry.keys) accessJwksCache.delete(teamDomain);
+    }
+  }
+}
+
+async function verifyCloudflareAccessJwt(token, config) {
+  if (typeof token !== "string" || token.length > 32768) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return false;
+
+  let header;
+  let payload;
+  let signature;
+  try {
+    header = decodeBase64UrlJson(parts[0]);
+    payload = decodeBase64UrlJson(parts[1]);
+    signature = decodeBase64UrlBytes(parts[2]);
+  } catch (_) {
+    return false;
+  }
+
+  // Cloudflare Access application tokens use RS256.
+  if (header?.alg !== "RS256" || typeof header?.kid !== "string") return false;
+  if (payload?.iss !== config.teamDomain) return false;
+
+  const tokenAudiences = typeof payload.aud === "string"
+    ? [payload.aud]
+    : Array.isArray(payload.aud) ? payload.aud : [];
+  if (!config.audiences.some(audience => tokenAudiences.includes(audience))) return false;
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const clockToleranceSeconds = 30;
+  if (!Number.isFinite(payload.exp) || payload.exp <= nowSeconds - clockToleranceSeconds) return false;
+  if (payload.nbf !== undefined && (!Number.isFinite(payload.nbf) || payload.nbf > nowSeconds + clockToleranceSeconds)) return false;
+  if (payload.iat !== undefined && (!Number.isFinite(payload.iat) || payload.iat > nowSeconds + clockToleranceSeconds)) return false;
+
+  let keys;
+  try {
+    keys = await getAccessJwks(config.teamDomain);
+  } catch (_) {
+    return false;
+  }
+
+  let signingJwk = keys.find(key => key.kid === header.kid);
+  if (!signingJwk) {
+    try {
+      keys = await getAccessJwks(config.teamDomain, true);
+      signingJwk = keys.find(key => key.kid === header.kid);
+    } catch (_) {
+      return false;
+    }
+  }
+  if (!signingJwk) return false;
+
+  try {
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      signingJwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const signingInput = new TextEncoder().encode(parts[0] + "." + parts[1]);
+    return await crypto.subtle.verify(
+      { name: "RSASSA-PKCS1-v1_5" },
+      publicKey,
+      signature,
+      signingInput
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+export async function isAuthenticated(request, env) {
+  const config = getAccessVerifierConfig(env);
+  if (!config) return false;
+  const token = request.headers.get("Cf-Access-Jwt-Assertion");
+  return verifyCloudflareAccessJwt(token, config);
 }
 
 export async function requireAuth(request, env) {
-  if (!(await isAuthenticated(request, env))) return json({ error: "需要先登入 FRAME Reader 私人書庫。" }, 401);
+  if (!isAccessVerifierConfigured(env)) {
+    return json({
+      error: "Cloudflare Access JWT 驗證尚未設定。請在 Pages Variables 新增 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。"
+    }, 503);
+  }
+  if (!(await isAuthenticated(request, env))) {
+    return json({ error: "Cloudflare Access 身分驗證失敗，請重新登入後再試。" }, 401);
+  }
   return null;
 }
 
