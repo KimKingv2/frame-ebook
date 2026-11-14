@@ -161,12 +161,12 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 ### Cloud architecture
 
 - The root-level functions directory is the Cloudflare Pages Functions source directory. It is separate from the static pages output directory.
-- /api/auth/* provides password-based private login and a signed HttpOnly, Secure, SameSite=Lax session cookie.
+- Cloudflare Access handles website sign-in; Pages Functions independently verify each protected request's signed Access JWT, including its signature, issuer, audience and expiry.
 - /api/cloud/books lists EPUB or CBZ files and folders below the corresponding mandatory OPENLIST_BOOKS_ROOT_PATH or OPENLIST_COMICS_ROOT_PATH.
 - /api/cloud/file proxies an authenticated OpenList download and forwards valid HTTP Range requests. The OpenList token and raw download URL remain server-side.
 - /api/reading/events stores unique short reading-time events in D1; duplicate retries do not double-count.
 - /api/reading/stats returns D1 daily totals, streak calendar source data, most-read books, time-of-day totals and recent events.
-- migrations/0001_reading_events.sql creates the D1 tables for reading events and login rate limiting.
+- migrations/0001_reading_events.sql creates the D1 tables for reading events and related sync data.
 
 The current cloud shelf imports a selected OpenList file through the protected proxy into this browser's IndexedDB. It does not yet mount a remote book directly into Foliate; very large books still download fully into browser storage before opening. The backend proxy is Range-capable so a later reader-loader integration can stream partial requests.
 
