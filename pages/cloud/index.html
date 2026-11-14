@@ -35,8 +35,9 @@
       <div class="cloud-auth-copy">
         <p class="section-kicker">PRIVATE ACCESS</p>
         <h2>登入你的雲端書庫</h2>
-        <p>使用你在 Cloudflare Pages Secrets 設定的 FRAME Reader 私人密碼。這不是 OpenList 密碼。</p>
+        <p>此網站使用 Cloudflare Zero Trust Access 保護。請先通過 Cloudflare Access 門禁，Reader 不再另外要求一組私人密碼。</p>
       </div>
+      <div id="cloud-access-required" hidden><p>尚未確認 Cloudflare Access 身分。請確認已登入 Access，且此網站的 Access 應用已正確保護目前網址。</p></div>
       <form id="cloud-login-form">
         <label for="cloud-password">FRAME Reader 私人密碼</label>
         <div class="cloud-password-row">
