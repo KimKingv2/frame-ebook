@@ -302,7 +302,8 @@ export async function isAuthenticated(request, env) {
   const config = getAccessVerifierConfig(env);
   if (!config) return false;
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  return verifyCloudflareAccessJwt(token, config);
+  const result = await inspectCloudflareAccessJwt(token, config);
+  return result.authenticated;
 }
 
 export async function requireAuth(request, env) {
