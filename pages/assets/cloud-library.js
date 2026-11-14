@@ -3,8 +3,7 @@ import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip
 
 const $ = id => document.getElementById(id);
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
-const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selection-v3";
-const LEGACY_ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v2";
+const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v4";
 const ACTIVE_LIBRARY_KEY = "frame-reader-active-library";
 const LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v2";
 const LEGACY_LOCAL_PROFILE_KEY = "frame-reader-local-openlist-profile-v1";
@@ -113,36 +112,36 @@ function readLocalProfile() {
   $("cloud-local-username").value=state.localProfile.username;
   $("cloud-local-password").value=state.localProfile.password;
 }
-function readRootSelections() {
+function readRootSelections(provider=state.activeProvider) {
   let saved={};
-  let legacy={};
   try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
-  try { legacy=JSON.parse(localStorage.getItem(LEGACY_ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
-
-  let candidate=saved.rootPath?normalizePath(saved.rootPath):null;
-  if(!candidate) {
-    const oldSource=legacy?.[state.activeProvider]||{};
-    const oldBooks=oldSource.books?normalizePath(oldSource.books):null;
-    const oldComics=oldSource.comics?normalizePath(oldSource.comics):null;
-    const preferred=state.activeLibrary==="comics"?oldComics:oldBooks;
-    candidate=preferred||oldBooks||oldComics||
-      normalizePath($("cloud-library-root").getAttribute("value")||"/");
+  const source=saved?.[provider]||{};
+  for(const library of ["books","comics"]) {
+    const id=library==="books"?"cloud-books-root":"cloud-comics-root";
+    const fallback=$(id).getAttribute("value")||"/";
+    const candidate=normalizePath(source[library]||fallback);
+    state.selectedRoots[library]=candidate||fallback;
+    $(id).value=state.selectedRoots[library];
   }
-  candidate=candidate||"/";
-  state.selectedRoots.books=candidate;
-  state.selectedRoots.comics=candidate;
-  $("cloud-library-root").value=candidate;
   renderRootStatus();
-  try { persistRootSelections(); } catch (_) {}
+  try { persistRootSelections(provider); } catch (_) {}
 }
-function persistRootSelections() {
-  const rootPath=state.selectedRoots.books||state.selectedRoots.comics||"/";
-  try { localStorage.setItem(ROOT_SELECTIONS_KEY,JSON.stringify({rootPath})); }
+function persistRootSelections(provider=state.activeProvider) {
+  let saved={};
+  try { saved=JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY)||"{}"); } catch (_) {}
+  saved[provider]={
+    books:state.selectedRoots.books||"/",
+    comics:state.selectedRoots.comics||"/"
+  };
+  try { localStorage.setItem(ROOT_SELECTIONS_KEY,JSON.stringify(saved)); }
   catch (_) { throw new Error("無法保存書庫根目錄，請檢查瀏覽器本機儲存空間權限。"); }
 }
 function renderRootStatus() {
-  const selected=state.selectedRoots.books||state.selectedRoots.comics||"/";
-  $("cloud-root-status").textContent="目前共用根目錄已保存於這台裝置："+selected;
+  for(const library of ["books","comics"]) {
+    const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
+    const selected=state.selectedRoots[library]||"/";
+    $(id).textContent="目前已保存於這台裝置："+selected;
+  }
 }
 function normalizeLocalBase(value) {
   const raw=String(value||"").trim();
@@ -201,15 +200,20 @@ function persistActiveProvider(provider) {
   clearListing();
 }
 function saveRootSelections() {
-  const candidate=normalizePath(String($("cloud-library-root").value||"").trim()||"/");
-  if(!candidate)throw new Error("書庫根目錄路徑無效，請使用絕對路徑且不要包含 ..。");
-  state.selectedRoots.books=candidate;
-  state.selectedRoots.comics=candidate;
-  $("cloud-library-root").value=candidate;
-  persistRootSelections();
+  const values={
+    books:String($("cloud-books-root").value||"").trim()||"/",
+    comics:String($("cloud-comics-root").value||"").trim()||"/"
+  };
+  for(const library of ["books","comics"]) {
+    const candidate=normalizePath(values[library]);
+    if(!candidate)throw new Error(LIBRARY_LABELS[library]+"路徑無效，請使用絕對路徑且不要包含 ..。");
+    state.selectedRoots[library]=candidate;
+    $(library==="books"?"cloud-books-root":"cloud-comics-root").value=candidate;
+  }
+  persistRootSelections(state.activeProvider);
   renderRootStatus();
-  clearListing("共用目錄設定已套用");
-  setSourceStatus("電子書與漫畫已共用同一條根目錄，並保存於這台裝置；重新進入或切換 OpenList 來源後仍會沿用。");
+  clearListing("書籍與漫畫目錄設定已套用");
+  setSourceStatus("電子書與漫畫已分別保存根目錄於這台裝置；重新進入或切換 OpenList 來源後仍會沿用各自路徑。");
 }
 function saveSourceSettings() {
   const provider=$("cloud-provider").value;
@@ -868,7 +872,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
   state.scanRunning=true;
   state.scanPauseRequested=false;
   scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=true;});
-  ["cloud-provider","cloud-library-type","cloud-library-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=true;});
+  ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=true;});
   if(pauseButton)pauseButton.disabled=false;
   const startedAt=Date.now();
 
@@ -1069,7 +1073,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false) {
     state.scanPauseRequested=false;
     if(pauseButton)pauseButton.disabled=true;
     if(!state.scanAllRunning)scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=false;});
-    if(!state.scanAllRunning)["cloud-provider","cloud-library-type","cloud-library-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{
+    if(!state.scanAllRunning)["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{
       const control=$(id);
       if(control)control.disabled=false;
     });
@@ -1106,7 +1110,7 @@ async function runLibraryScanContinuous(library) {
   } finally {
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
-    ["cloud-provider","cloud-library-type","cloud-library-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
   }
 }
 async function runAllIndexScans() {
@@ -1135,7 +1139,7 @@ async function runAllIndexScans() {
   } finally {
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
-    ["cloud-provider","cloud-library-type","cloud-library-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
   }
 }
 function pauseIndexScan() {
@@ -1371,14 +1375,15 @@ async function importCloudFile(item) {
     state.busy.delete(item.path);renderItems();
   }
 }
-function setCurrentFolderAsRoot() {
+function setCurrentFolderAsRoot(library) {
   const candidate=normalizePath(state.currentPath);
   if(!candidate) {
-    setSourceStatus("目前目錄路徑無效，無法設為共用書庫根目錄。",true);
+    setSourceStatus("目前目錄路徑無效，無法設為"+LIBRARY_LABELS[library]+"根目錄。",true);
     return;
   }
-  $("cloud-library-root").value=candidate;
-  setSourceStatus("已選擇共用書庫根目錄："+candidate+"。請按「保存共用根目錄」。");
+  const id=library==="books"?"cloud-books-root":"cloud-comics-root";
+  $(id).value=candidate;
+  setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「保存電子書／漫畫根目錄」。");
 }
 $("cloud-scan-books").addEventListener("click",()=>runLibraryScanContinuous("books"));
 $("cloud-scan-comics").addEventListener("click",()=>runLibraryScanContinuous("comics"));
@@ -1454,7 +1459,8 @@ $("cloud-save-roots").addEventListener("click",()=>{
   try { saveRootSelections(); }
   catch(error) { setSourceStatus(error.message||String(error),true); }
 });
-$("cloud-use-current-root").addEventListener("click",()=>setCurrentFolderAsRoot());
+$("cloud-use-current-books-root").addEventListener("click",()=>setCurrentFolderAsRoot("books"));
+$("cloud-use-current-comics-root").addEventListener("click",()=>setCurrentFolderAsRoot("comics"));
 $("cloud-test-source").addEventListener("click",async()=>{
   try {
     saveSourceSettings();
