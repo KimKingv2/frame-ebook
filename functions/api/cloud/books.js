@@ -33,15 +33,31 @@ export async function onRequestGet({ request, env }) {
   const offset = (page - 1) * perPage;
 
   try {
+    const recursiveShelf = url.searchParams.get("recursive") === "1" && path === rootPath;
+    const prefix = rootPath === "/" ? "/" : rootPath + "/";
+    const countStatement = recursiveShelf
+      ? db.prepare(
+          "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
+          "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?))"
+        ).bind(provider, library, rootPath, rootPath, prefix.length, prefix)
+      : db.prepare(
+          "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=?"
+        ).bind(provider, library, rootPath, path);
+    const rowsStatement = recursiveShelf
+      ? db.prepare(
+          "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
+          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
+          "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?)) " +
+          "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
+        ).bind(provider, library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
+      : db.prepare(
+          "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
+          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
+          "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
+        ).bind(provider, library, rootPath, path, perPage, offset);
     const [count, rows, scanKey] = await Promise.all([
-      db.prepare(
-        "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=?"
-      ).bind(provider, library, rootPath, path).first(),
-      db.prepare(
-        "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
-        "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
-        "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
-      ).bind(provider, library, rootPath, path, perPage, offset).all(),
+      countStatement.first(),
+      rowsStatement.all(),
       scanStateKey(provider, library, rootPath)
     ]);
     const stateRow = await db.prepare(
