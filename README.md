@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.6 Reading Insights + Cloud Library scaffold**. Local reading-time tracking and the reading insights dashboard are deployed. Pages Functions for private OpenList access and D1 sync are in the repository; Cloudflare D1 bindings and private environment variables still need to be configured before cloud login, OpenList browsing and cross-device aggregation become active.
+> Current status: **V0.8 Reading Insights + persistent Cloud Library index**. The cloud shelf uses a D1 metadata catalog with manual full scans, resumable D1 checkpoints, and D1-backed browsing between scans. Original EPUB / CBZ files remain in OpenList until explicitly added to a browser's local IndexedDB shelf.
 
 ## Product scope
 
@@ -27,7 +27,7 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 - `/` — local bookshelf with import, search, sort, recent reading, book details and grid/list views.
 - `/epub-lab/` — EPUB / CBZ Reading Room with per-book progress, appearance settings and foreground reading-time tracking.
 - `/reading-stats/` — daily goal, reading duration, active days, streaks, calendar, trends, top books, time-of-day preferences and local JSON / CSV export.
-- `/cloud/` — private OpenList directory browser; requires Pages Functions, D1 and server-side credentials to be configured.
+- `/cloud/` — private cloud shelf for VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct sources. Manually scan each source/library/root once; later browsing reads its persistent D1 index, and scans can resume after interruption.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
 
