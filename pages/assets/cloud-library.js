@@ -481,6 +481,11 @@ async function runIndexScan() {
     state.scanPauseRequested = false;
     startButton.disabled = true;
     pauseButton.disabled = false;
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root",
+      "cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id => {
+      const control = $(id);
+      if (control) control.disabled = true;
+    });
     const startedAt = Date.now();
     const maxEntriesPerBatch = 500;
     const maxFoldersPerBatch = 500;
@@ -600,6 +605,11 @@ async function runIndexScan() {
     state.scanPauseRequested = false;
     startButton.disabled = false;
     pauseButton.disabled = true;
+    ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root",
+      "cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id => {
+      const control = $(id);
+      if (control) control.disabled = false;
+    });
     try {
       const latest = await loadIndexScanState();
       renderIndexStatus(latest);
