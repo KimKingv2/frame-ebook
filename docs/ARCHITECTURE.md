@@ -103,7 +103,7 @@ The bookshelf supports title / author / filename search, recent / added / title 
 - The EPUB metadata adapter currently uses JSZip, which may require extra memory while inspecting large EPUB archives.
 - CBZ shelf indexing reads the archive directory and a cover image; the reader's existing image loading remains lazy.
 - No OpenList API key, user credential or private book metadata is embedded in frontend source.
-- OpenList path mapping, authenticated Worker access and D1 synchronization are intentionally deferred to a later version.
+- The metadata-only OpenList cloud catalog and resumable D1 scan state are described below. Book files remain in OpenList until a user explicitly adds one to the local IndexedDB shelf.
 
 ## Sync data model (future)
 
