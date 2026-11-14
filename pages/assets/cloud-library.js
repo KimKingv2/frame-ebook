@@ -15,7 +15,6 @@ const LIBRARY_LABELS = { books: "電子書", comics: "漫畫" };
 const state = {
   authenticated:false,
   accessEnabled:false,
-  accessTeamDomain:"",
   allowedRoots:{books:"/",comics:"/"},
   selectedRoots:{books:"/",comics:"/"},
   currentPath:"/",
@@ -283,7 +282,6 @@ async function checkSession() {
     const data=await response.json();
     state.authenticated=!!(response.ok&&data.authenticated);
     state.accessEnabled=!!data.accessEnabled;
-    state.accessTeamDomain=String(data.accessTeamDomain||"");
     state.serverProfiles=data.openListProfiles||{};
     state.allowedRoots={books:"/",comics:"/"};
     if(state.authenticated) {
@@ -320,19 +318,15 @@ async function checkSession() {
       $("cloud-browser").hidden=true;
       $("cloud-access-required").hidden=false;
       $("cloud-access-required").textContent=state.accessEnabled
-        ?"已設定 Cloudflare Access，但目前請求未通過 JWT 驗證。請確認此網域已套用 Access 政策，並核對 Team Domain、Application AUD。"
-        :"尚未設定 Cloudflare Access。請先建立 Access 應用，再設定 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。";
+        ?"目前請求沒有 Cloudflare Access 驗證資訊。請確認 Cloudflare Access 已保護整個網站主機，而不只是個別頁面。"
+        :"尚未通過 Cloudflare Access。請確認此網站主機已啟用 Access Policy，並使用允許的登入身分。";
     }
   } catch(error) {
     $("cloud-browser-status").textContent="無法確認登入狀態："+(error.message||String(error));
   }
 }
 async function logout() {
-  if(!state.accessTeamDomain) {
-    setSourceStatus("尚未取得 Cloudflare Access Team Domain，無法執行 Access 登出。",true);
-    return;
-  }
-  location.href=new URL("/cdn-cgi/access/logout",state.accessTeamDomain).href;
+  location.href=new URL("/cdn-cgi/access/logout",location.origin).href;
 }
 async function loadDirectory(path=getActiveRoot(),page=1) {
   state.page=Math.max(1,Number(page)||1);
