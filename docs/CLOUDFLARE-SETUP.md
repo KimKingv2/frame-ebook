@@ -45,20 +45,9 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. They call `getProviderToken()` before `/api/fs/list` and `/api/fs/get`: a valid short-lived JWT is reused from the shared `MEDIA_AUTH_TOKEN_CACHE` KV namespace, and a new `POST /api/auth/login` is made only on a cache miss or refresh. The record uses the common prefix `media-platform:provider-auth:v1`, expiry-aware TTL and the same SHA-256 key derivation as FRAME Audio. Provider identities and `Client-Id` values are exactly `vps`, `worker` and `mobile-device` (`media-platform-server-{provider}`), so matching provider URL and username allow Audio and Reader to reuse the same cached JWT. When an upstream API rejects a cached token with HTTP/API code 401, Reader invalidates it, logs in again and retries once. A per-isolate memory cache and single-flight login guard reduce repeated KV reads and concurrent logins. If KV is unavailable or not bound, Reader remains functional using isolate-memory caching, but cold starts may log in again. JWTs are never sent to the browser or stored in D1/R2; account passwords remain in Pages Secrets.
 
-FRAME Reader uses Cloudflare Zero Trust Access as its website login, and Pages Functions independently verify the signed `Cf-Access-Jwt-Assertion` JWT on every protected API request. This second check validates the RS256 signature against Cloudflare's live JWKS endpoint, as well as the issuer, audience and token time claims. Do not rely on the presence of the header alone.
+FRAME Reader uses Cloudflare Zero Trust Access as its **only** website authentication layer. Cloudflare Access must authenticate requests at the edge before they reach Pages, and its application must protect the complete hostname, including static pages and every `/api/*` route. Pages Functions intentionally do not independently inspect or verify `Cf-Access-Jwt-Assertion`; there is no second Reader password, custom session cookie, Team Domain Variable or AUD Variable. Do not add `FRAME_READER_ACCESS_TEAM_DOMAIN` or `FRAME_READER_ACCESS_AUD`.
 
-Add these two non-secret Variables to Production, and to Preview when Preview deployments are protected:
-
-| Name | Type | Purpose |
-|---|---|---|
-| `FRAME_READER_ACCESS_TEAM_DOMAIN` | Variable | Your Cloudflare Zero Trust team domain, for example `https://your-team.cloudflareaccess.com` |
-| `FRAME_READER_ACCESS_AUD` | Variable | Application Audience (AUD) tag for each Access application protecting this Reader |
-
-Find the Team Domain in Zero Trust settings. Find each AUD in Zero Trust → Access controls → Applications → select the application → Additional settings → Application Audience (AUD) Tag. The `FRAME_READER_ACCESS_AUD` value accepts one or more AUD tags separated by commas, with no quotes required. This supports separate Access applications for Production, Preview and custom hostnames. Use the same Team Domain for all applications in the same Zero Trust account.
-
-These are ordinary Variables, not Secrets. Do not add email addresses here. Adding or removing allowed email addresses in an existing Access policy does not change the Team Domain or AUD. An application's AUD changes only if that Access application is deleted and recreated; when that happens, replace the old AUD with the new one.
-
-Pages Functions fetch and cache the public signing keys automatically from `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`. If a JWT contains a previously unseen key ID, the verifier refreshes the JWKS. Cloudflare's signing-key rotation therefore does not require manual Variable updates or scheduled maintenance.
+This design relies on the Access edge policy. If the production hostname or any API route is left outside the Access application, the corresponding Reader content/API is not protected by an application-level JWT check. Confirm the hostname-wide Access application before deploying or changing its scope.
 
 D1 stores reading events/statistics, the metadata-only cloud catalog, resumable scan state and cover hashes/status. The private R2 bucket stores normalized cover thumbnails only; original EPUB / CBZ files remain in OpenList. Cover extraction uses bounded HTTP Range reads from ZIP archives and does not intentionally download the full book. The app converts extracted covers to small WebP (JPEG fallback) thumbnails and deduplicates them by SHA-256. It never stores OpenList credentials in D1 or R2. The old `auth_attempts` table may remain in D1 and is no longer used.
 
@@ -89,10 +78,11 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
-   - Under Public hostname, remove the wildcard `*` from the Subdomain field and save. This secures `frame-ebook.pages.dev`.
-   - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Confirm the two policies cover Production `frame-ebook.pages.dev` and Preview `*.frame-ebook.pages.dev`.
-   - If a custom domain is used, Cloudflare Pages requires a separate Access application for that hostname. Add its AUD tag to `FRAME_READER_ACCESS_AUD`, separated from the other AUD tags by a comma. The Team Domain stays the same.
-   This is configured in Cloudflare Access, not under Pages Variables or Secrets. Access must cover the whole hostname, including `/api/*`. Confirm at least one server-side source has its API URL, username and password configured.
+   - Under Public hostname, make sure the application covers `frame-ebook.pages.dev` as a whole host, not only `/cloud/*` or another individual page. Remove the wildcard `*` from the Subdomain field if it is being used as the Pages wildcard, then save the production hostname.
+   - Confirm the Access application/policy covers the entire hostname and therefore `/`, `/cloud/*`, `/reading-stats/*`, and `/api/*`. Do not add path exclusions for the API routes.
+   - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Preview uses a separate hostname/policy and must not be confused with Production.
+   - If a custom domain is used, create a separate Access application for that hostname and protect the complete hostname too.
+   **Security boundary:** Pages Functions trust the Cloudflare Access edge and do not perform a second JWT verification. No Reader-specific Access Team Domain or AUD Variables are required. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
