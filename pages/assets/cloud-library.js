@@ -310,7 +310,7 @@ function appendIndexLog(message, level="info") {
   if (state.scanLogEntries.length > 300) state.scanLogEntries.shift();
   const output = $("cloud-index-log");
   if (output) {
-    output.textContent = state.scanLogEntries.join("\\n");
+    output.textContent = state.scanLogEntries.join("\n");
     output.scrollTop = output.scrollHeight;
   }
   const count = $("cloud-index-log-count");
@@ -402,7 +402,7 @@ function indexScanProgressText(scanState, batch, finished=false) {
   else if (finished) lines.push("本批結束，進度已保存到 D1；可以關閉頁面，之後再續掃。");
   else if (state.scanPauseRequested) lines.push("已要求暫停，當前頁完成並保存後停止。");
   else lines.push("掃描進行中；每完成一頁都會將索引資料和續掃游標保存至 D1。");
-  return lines.join("\\n");
+  return lines.join("\n");
 }
 async function fetchScanDirectory(path, page, perPage) {
   if (state.activeProvider === "local") {
@@ -592,7 +592,7 @@ async function runIndexScan() {
         batch.folders >= maxFoldersPerBatch ? "達到每批 500 個資料夾上限" :
         "達到單批 4 分鐘安全時限";
       await saveIndexScanState(scanState);
-      setIndexProgress(indexScanProgressText(scanState, batch, true) + "\\n本批停止原因：" + reason, false);
+      setIndexProgress(indexScanProgressText(scanState, batch, true) + "\n本批停止原因：" + reason, false);
       appendIndexLog("本批結束：" + reason + "；進度已保存，可再次點擊續掃。", "warning");
     }
   } catch (error) {
@@ -602,7 +602,7 @@ async function runIndexScan() {
       try { await saveIndexScanState(scanState); } catch (_) {}
     }
     setIndexProgress((error.message || "索引失敗。") +
-      "\\n目前游標已盡可能保存；修復問題後可再次點擊續掃。", true);
+      "\n目前游標已盡可能保存；修復問題後可再次點擊續掃。", true);
   } finally {
     state.scanRunning = false;
     state.scanPauseRequested = false;
