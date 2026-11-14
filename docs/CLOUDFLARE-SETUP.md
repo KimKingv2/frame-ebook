@@ -2,7 +2,7 @@
 
 FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf keeps a metadata-only catalog and resumable scan state in D1; original EPUB / CBZ files remain in OpenList. Adding a cloud file copies its content into the current browser's IndexedDB.
 
-## 1. Create and bind the D1 database
+## 1. Create and bind D1 and private R2 cover storage
 
 Create a D1 database named `frame-reader-db` in Cloudflare Dashboard → Storage & Databases → D1, or use Wrangler:
 
@@ -16,9 +16,10 @@ Apply the schema from the repository root if it has not already been applied:
 ```sh
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0002_cloud_catalog.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_covers.sql
 ```
 
-In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Save and redeploy so the binding is available to Pages Functions. Do not recreate or reset an existing database.
+In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
 
 ## 2. Configure server-side OpenList accounts
 
@@ -57,7 +58,7 @@ These are ordinary Variables, not Secrets. Do not add email addresses here. Addi
 
 Pages Functions fetch and cache the public signing keys automatically from `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`. If a JWT contains a previously unseen key ID, the verifier refreshes the JWKS. Cloudflare's signing-key rotation therefore does not require manual Variable updates or scheduled maintenance.
 
-D1 stores reading events/statistics plus the metadata-only cloud catalog and resumable scan state. It never stores EPUB / CBZ file contents or OpenList credentials. The old `auth_attempts` table may remain in D1 and is no longer used.
+D1 stores reading events/statistics, the metadata-only cloud catalog, resumable scan state and cover hashes/status. The private R2 bucket stores normalized cover thumbnails only; original EPUB / CBZ files remain in OpenList. Cover extraction uses bounded HTTP Range reads from ZIP archives and does not intentionally download the full book. The app converts extracted covers to small WebP (JPEG fallback) thumbnails and deduplicates them by SHA-256. It never stores OpenList credentials in D1 or R2. The old `auth_attempts` table may remain in D1 and is no longer used.
 
 ## 4. Configure the LAN-direct source (optional)
 
@@ -82,7 +83,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 
 ## 6. Verify the configuration
 
-1. Confirm the D1 binding exists for reading-history synchronization, statistics and cloud catalog indexing. Apply both `migrations/0001_reading_events.sql` and `migrations/0002_cloud_catalog.sql` to the `frame-reader-db` database.
+1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. Apply `migrations/0001_reading_events.sql`, `migrations/0002_cloud_catalog.sql` and `migrations/0003_cloud_covers.sql` to the `frame-reader-db` database.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
