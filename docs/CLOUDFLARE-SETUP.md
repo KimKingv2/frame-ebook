@@ -99,6 +99,10 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 6. After the first completed scan, folder navigation reads D1. Re-run the scan when you want to synchronize new, modified or deleted OpenList files.
 7. Add a selected file to the local shelf. Only then is the original EPUB / CBZ downloaded to this browser's IndexedDB; the cloud original is not changed or deleted.
 
+## 8. Shared provider Token cache (2026-11-14)
+
+The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now use the same short-lived JWT cache contract as FRAME Audio. Bind the existing shared KV namespace as `MEDIA_AUTH_TOKEN_CACHE` in this Pages environment before relying on cross-project reuse. Use `frame-series-auth-cache-production` for Production and the separate `media-platform-auth-cache` namespace for Preview. Never share a KV namespace across Preview and Production. After changing the binding, trigger a new deployment so the Pages Functions receive it. Without the binding, Reader falls back to isolate memory and may authenticate again after a cold start.
+
 ## 7. Existing data and current behavior
 
 - Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. It is additive and does not alter existing reading events, local books, reading progress or appearance settings. The two Access verification Variables must be configured as described above.
