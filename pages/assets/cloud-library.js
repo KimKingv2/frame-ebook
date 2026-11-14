@@ -564,29 +564,39 @@ class HttpRangeReader {
   get readable() {
     const reader=this;
     let stream;
+    let chunkOffset=0;
     stream=new ReadableStream({
-      start() { this.chunkOffset=0; },
       async pull(controller) {
-        const offset=Math.max(0,Number(stream.offset)||0);
-        const size=Number(stream.size);
-        if(!Number.isSafeInteger(size)||size<0) {
-          controller.error(new Error("ZIP 封面串流缺少有效的壓縮資料長度。"));
-          return;
+        try {
+          const offset=Math.max(0,Number(stream.offset)||0);
+          const size=Number(stream.size);
+          if(!Number.isSafeInteger(size)||size<0) {
+            throw new Error("ZIP 封面串流缺少有效的壓縮資料長度。");
+          }
+          const remaining=size-chunkOffset;
+          if(remaining<=0) {
+            reader.onEvent("ZIP 解壓串流結束：已讀取 "+chunkOffset+"/"+size+" bytes。");
+            controller.close();
+            return;
+          }
+          const length=Math.min(65536,remaining);
+          const absoluteOffset=offset+chunkOffset;
+          reader.onEvent("ZIP 解壓串流讀取：offset="+absoluteOffset+"；本段 "+length+" bytes；進度 "+chunkOffset+"/"+size+"。");
+          const bytes=await reader.readUint8Array(absoluteOffset,length,Number(stream.diskNumberStart)||0);
+          if(!(bytes instanceof Uint8Array)||!bytes.byteLength) {
+            throw new Error("ZIP 封面資料 Range 回傳空資料，讀取中止。");
+          }
+          if(bytes.byteLength>length)throw new Error("ZIP 封面資料 Range 回傳長度超出要求。");
+          controller.enqueue(bytes);
+          chunkOffset+=bytes.byteLength;
+          if(chunkOffset>=size) {
+            reader.onEvent("ZIP 解壓串流結束：已讀取 "+chunkOffset+"/"+size+" bytes。");
+            controller.close();
+          }
+        } catch(error) {
+          reader.onEvent("ZIP 解壓串流失敗："+String(error?.message||error),"error");
+          controller.error(error);
         }
-        const remaining=size-this.chunkOffset;
-        if(remaining<=0) {
-          controller.close();
-          return;
-        }
-        const length=Math.min(65536,remaining);
-        const bytes=await reader.readUint8Array(offset+this.chunkOffset,length,Number(stream.diskNumberStart)||0);
-        if(!(bytes instanceof Uint8Array)||!bytes.byteLength) {
-          throw new Error("ZIP 封面資料 Range 回傳空資料，讀取中止。");
-        }
-        if(bytes.byteLength>length)throw new Error("ZIP 封面資料 Range 回傳長度超出要求。");
-        controller.enqueue(bytes);
-        this.chunkOffset+=bytes.byteLength;
-        if(this.chunkOffset>=size)controller.close();
       }
     });
     return stream;
@@ -681,20 +691,39 @@ async function readRangeResponse(response,start,end,totalSize) {
   if(!response.ok)throw new Error("讀取封面資料失敗：HTTP "+response.status);
   throw new Error("來源未支援 HTTP Range，為避免下載整本書，已停止封面擷取。");
 }
-async function findEpubCover(zipEntries) {
+async function findEpubCover(zipEntries,onEvent=()=>{}) {
   const byName=new Map(zipEntries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
   const container=byName.get("META-INF/container.xml");
-  if(!container)return null;
+  if(!container) {
+    onEvent("EPUB 封面解析：ZIP 中沒有 META-INF/container.xml。","warning");
+    return null;
+  }
+  const containerStarted=performance.now();
+  onEvent("EPUB 封面解析：container.xml 解壓開始；壓縮 "+Number(container.compressedSize||0)+" bytes，原始 "+Number(container.uncompressedSize||0)+" bytes。");
   const containerText=await container.getData(new TextWriter("utf-8"));
+  onEvent("EPUB 封面解析：container.xml 解壓完成；文字 "+String(containerText||"").length+" 字元；耗時 "+Math.round(performance.now()-containerStarted)+" ms。","success");
   const containerXml=new DOMParser().parseFromString(String(containerText),"application/xml");
   const rootfile=containerXml.getElementsByTagName("rootfile")[0];
   const opfPath=zipPath(rootfile?.getAttribute("full-path")||"");
-  if(!opfPath)return null;
+  if(!opfPath) {
+    onEvent("EPUB 封面解析：container.xml 沒有有效 rootfile 路徑。","warning");
+    return null;
+  }
+  onEvent("EPUB 封面解析：找到 OPF 路徑 "+opfPath+"。");
   const opfEntry=byName.get(opfPath);
-  if(!opfEntry)return null;
+  if(!opfEntry) {
+    onEvent("EPUB 封面解析：ZIP 中找不到 OPF 項目 "+opfPath+"。","warning");
+    return null;
+  }
+  const opfStarted=performance.now();
+  onEvent("EPUB 封面解析：OPF 解壓開始；壓縮 "+Number(opfEntry.compressedSize||0)+" bytes，原始 "+Number(opfEntry.uncompressedSize||0)+" bytes。");
   const opfText=await opfEntry.getData(new TextWriter("utf-8"));
+  onEvent("EPUB 封面解析：OPF 解壓完成；文字 "+String(opfText||"").length+" 字元；耗時 "+Math.round(performance.now()-opfStarted)+" ms。","success");
   const opfXml=new DOMParser().parseFromString(String(opfText),"application/xml");
-  if(opfXml.getElementsByTagName("parsererror").length)return null;
+  if(opfXml.getElementsByTagName("parsererror").length) {
+    onEvent("EPUB 封面解析：OPF XML 格式錯誤。","warning");
+    return null;
+  }
   const manifest=Array.from(opfXml.getElementsByTagName("item"));
   const metaItems=Array.from(opfXml.getElementsByTagName("meta"));
   let coverId="";
@@ -782,12 +811,15 @@ async function extractCloudCover(item,onEvent=()=>{}) {
   const zip=new ZipReader(rangeReader);
   const entries=await zip.getEntries();
   onEvent("ZIP 中央目錄解析完成："+entries.length+" 個項目；耗時 "+Math.round(performance.now()-started)+" ms");
-  const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries);
+  const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries,onEvent);
   if(!found) {
     onEvent("封面解析完成：沒有找到可用圖片；Range "+rangeReader.rangeCount+" 次／"+formatBytes(rangeReader.bytesRead),"warning");
     return null;
   }
+  onEvent("封面圖片讀取開始："+found.entry.filename+"；壓縮 "+Number(found.entry.compressedSize||0)+" bytes，原始 "+Number(found.entry.uncompressedSize||0)+" bytes。");
+  const imageStarted=performance.now();
   const sourceBlob=await found.entry.getData(new BlobWriter(found.mime));
+  onEvent("封面圖片資料解壓完成："+sourceBlob.size+" bytes；耗時 "+Math.round(performance.now()-imageStarted)+" ms。","success");
   const cover=await resizeCover(sourceBlob);
   onEvent("封面解析與縮圖完成："+cover.blob.size+" bytes；Range "+rangeReader.rangeCount+
     " 次／"+formatBytes(rangeReader.bytesRead)+"；總耗時 "+Math.round(performance.now()-started)+" ms","success");
