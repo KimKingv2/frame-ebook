@@ -21,6 +21,8 @@ npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_co
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
 
+Also add a **KV namespace binding** named `MEDIA_AUTH_TOKEN_CACHE`. Bind Reader Production to the same Production KV namespace already used by FRAME Audio: `frame-series-auth-cache-production`. For Preview, bind the separate shared Preview namespace used by FRAME Audio Preview (currently `media-platform-auth-cache`); never bind Preview to the Production namespace. Do not create another Reader-only namespace, because the purpose is to share provider JWTs between trusted FRAME media apps. The KV namespace contains only short-lived OpenList login JWT cache records, not passwords, book data or reading history.
+
 ## 2. Configure server-side OpenList accounts
 
 Under the Pages project's Settings → Variables and Secrets, add the following to Production. Add the same values to Preview only when you also intend to test private Preview deployments.
@@ -30,9 +32,9 @@ Under the Pages project's Settings → Variables and Secrets, add the following 
 | `ALIST_VPS_API_BASE_URL` | Variable | VPS Alist HTTPS API base URL |
 | `ALIST_VPS_USERNAME` | Variable | Read-only VPS Alist account name |
 | `ALIST_VPS_PASSWORD` | Secret | Password for the VPS Alist account |
-| `ALIST_WORKER_API_BASE_URL` | Variable | OpenList Worker HTTPS API base URL |
-| `ALIST_WORKER_USERNAME` | Variable | Read-only Worker account name |
-| `ALIST_WORKER_PASSWORD` | Secret | Password for the Worker account |
+| `OPENLIST_WORKER_API_BASE_URL` | Variable | OpenList Worker HTTPS API base URL (also accepts `ALIST_WORKER_API_BASE_URL`) |
+| `OPENLIST_WORKER_USERNAME` | Secret | Read-only Worker account name (also accepts `ALIST_WORKER_USERNAME`) |
+| `OPENLIST_WORKER_PASSWORD` | Secret | Password for the Worker account (also accepts `ALIST_WORKER_PASSWORD`) |
 | `ALIST_MOBILE_DEVICE_API_BASE_URL` | Variable | Mobile Device Alist API base URL |
 | `ALIST_MOBILE_DEVICE_USERNAME` | Variable | Read-only Mobile Device account name |
 | `ALIST_MOBILE_DEVICE_PASSWORD` | Secret | Password for the Mobile Device account |
@@ -41,7 +43,7 @@ The three server-side profiles are independent. Configure only the sources you i
 
 ### How Alist authentication works
 
-Pages Functions read each source's API URL, username and password from Cloudflare. Before each `/api/fs/list` or `/api/fs/get` operation, the server calls `POST /api/auth/login`, obtains the short-lived Alist Token, and immediately uses it for that operation. The Token is request-scoped: it is not stored in D1, browser storage, source settings or Git, and is never returned to the browser. This avoids manually replacing an expiring Token.
+Pages Functions read each source's API URL, username and password from Cloudflare. They call `getProviderToken()` before `/api/fs/list` and `/api/fs/get`: a valid short-lived JWT is reused from the shared `MEDIA_AUTH_TOKEN_CACHE` KV namespace, and a new `POST /api/auth/login` is made only on a cache miss or refresh. The record uses the common prefix `media-platform:provider-auth:v1`, expiry-aware TTL and the same SHA-256 key derivation as FRAME Audio. Provider identities and `Client-Id` values are exactly `vps`, `worker` and `mobile-device` (`media-platform-server-{provider}`), so matching provider URL and username allow Audio and Reader to reuse the same cached JWT. When an upstream API rejects a cached token with HTTP/API code 401, Reader invalidates it, logs in again and retries once. A per-isolate memory cache and single-flight login guard reduce repeated KV reads and concurrent logins. If KV is unavailable or not bound, Reader remains functional using isolate-memory caching, but cold starts may log in again. JWTs are never sent to the browser or stored in D1/R2; account passwords remain in Pages Secrets.
 
 FRAME Reader uses Cloudflare Zero Trust Access as its website login, and Pages Functions independently verify the signed `Cf-Access-Jwt-Assertion` JWT on every protected API request. This second check validates the RS256 signature against Cloudflare's live JWKS endpoint, as well as the issuer, audience and token time claims. Do not rely on the presence of the header alone.
 
