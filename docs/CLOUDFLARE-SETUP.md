@@ -87,7 +87,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically op
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
    - Under Public hostname, remove the wildcard `*` from the Subdomain field and save. This secures `frame-ebook.pages.dev`.
    - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Confirm the two policies cover Production `frame-ebook.pages.dev` and Preview `*.frame-ebook.pages.dev`.
-   - If a custom domain is used, add that hostname to its own Access application/policy too.
+   - If a custom domain is used, Cloudflare Pages requires a separate Access application for that hostname. Add its AUD tag to `FRAME_READER_ACCESS_AUD`, separated from the other AUD tags by a comma. The Team Domain stays the same.
    This is configured in Cloudflare Access, not under Pages Variables or Secrets. Access must cover the whole hostname, including `/api/*`. Confirm at least one server-side source has its API URL, username and password configured.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected, configured source should connect automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
