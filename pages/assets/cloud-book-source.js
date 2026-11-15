@@ -28,7 +28,7 @@ async function fetchLocalOpenListFile(source, record) {
     saved = JSON.parse(localStorage.getItem("frame-reader-local-openlist-profile-v2") || "{}");
     password = sessionStorage.getItem("frame-reader-local-openlist-password-v1") || "";
   } catch (_) {}
-  const baseUrl = String(saved.baseUrl || "").replace(/\\/+$/, "");
+  const baseUrl = String(saved.baseUrl || "").replace(/\/+$/, "");
   const username = String(saved.username || "").trim();
   if (!baseUrl || !username || !password) {
     throw new Error("區域網路 OpenList 密碼不在目前分頁工作階段中。請回到雲端書庫重新保存 LAN 來源連線，再開啟這本書。");
