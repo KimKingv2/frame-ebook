@@ -1552,7 +1552,7 @@ async function openCloudBook(item) {
   state.busy.add(item.path);renderItems();
   $("cloud-browser-status").textContent="正在準備 "+item.name+" 的本機書目記錄……";
   try {
-    const store=await import("/assets/library-store.js?v=20261115-cloud-annotations-r3");
+    const store=await import("/assets/library-store.js?v=20261115-folder-shelves-r1");
     const records=await store.upsertCloudBooks(scope,[item]);
     const record=records[0];
     if(!record)throw new Error("無法建立這本書的本機書目記錄。");
@@ -1683,8 +1683,8 @@ $("cloud-test-source").addEventListener("click",async()=>{
   const button=$("cloud-test-source");
   if(button)button.disabled=true;
   try {
-    saveSourceSettings();
     saveRootSelections();
+    saveSourceSettings();
     const root=getActiveRoot();
     if(!root)throw new Error("尚未設定目前"+LIBRARY_LABELS[state.activeLibrary]+"根目錄。");
     setSourceStatus("正在測試 "+PROVIDER_LABELS[state.activeProvider]+" 連線與目錄讀取……");
