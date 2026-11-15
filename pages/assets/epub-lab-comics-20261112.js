@@ -15,8 +15,9 @@
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
-  var libraryStorePromise = import('/assets/library-store.js');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261115-cloud-primary');
   var readingTrackerPromise = import('/assets/reading-tracker.js');
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261115-cloud-primary');
   var APPEARANCE_KEY = 'frame-reader-appearance-v1';
   currentAppearanceKey = APPEARANCE_KEY;
   var THEMES = {
@@ -424,7 +425,12 @@
     setText('book-author', (libraryRecord && libraryRecord.author) || titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : (name || 'EPUB 測試書')));
     populateTOC(parsedBook.toc || []);
     if (libraryRecord) {
-      await libraryStore.updateBook(currentBookId, { lastOpenedAt: Date.now() });
+      var metadataPatch = { lastOpenedAt: Date.now() };
+      if (!libraryRecord.manualTitle && titleText(metadata.title)) metadataPatch.title = titleText(metadata.title);
+      if (!libraryRecord.manualAuthor && titleText(metadata.author)) metadataPatch.author = titleText(metadata.author);
+      if (metadata.language) metadataPatch.language = String(metadata.language);
+      if (!Number(libraryRecord.pageCount) && parsedBook.sections) metadataPatch.pageCount = parsedBook.sections.length;
+      await libraryStore.updateBook(currentBookId, metadataPatch);
     }
 
     if (view.isFixedLayout) {
@@ -614,8 +620,16 @@
     if (bookId) {
       var store = await libraryStorePromise;
       var record = await store.getBook(bookId);
-      if (!record || !record.blob) throw new Error('找不到這本本機書籍。請回到書架確認檔案是否仍存在。');
-      await openEpub(record.blob, record.fileName, record.id);
+      if (!record) throw new Error('找不到這本書的本機書目記錄。請回到我的書架重新同步雲端書目。');
+      var source = record.blob || null;
+      if (!source && record.sourceType === 'cloud' && record.cloudSource) {
+        setText('reader-status', '正在從 OpenList 讀取原始書檔……');
+        setText('engine-status', '正在連接雲端書籍');
+        var sourceModule = await cloudBookSourcePromise;
+        source = await sourceModule.fetchCloudBookFile(record);
+      }
+      if (!source) throw new Error('找不到原始書檔。請確認雲端來源仍可連線，或重新匯入本機檔案。');
+      await openEpub(source, record.fileName, record.id);
     } else {
       loadDemo();
     }
