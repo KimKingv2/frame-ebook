@@ -366,11 +366,11 @@ async function syncCloudShelfToThisDevice(scope) {
     state.shelfSyncRunning.delete(key);
   }
 }
-function indexScope() {
+function indexScope(library=state.activeLibrary,provider=state.activeProvider) {
   return {
-    provider: state.activeProvider,
-    library: state.activeLibrary,
-    rootPath: getActiveRoot()
+    provider,
+    library,
+    rootPath: getActiveRoot(library)
   };
 }
 function setIndexProgress(message, isError=false) {
@@ -1254,9 +1254,11 @@ async function runLibraryScanContinuous(library,options={}) {
     } while(!result.completed);
     return result;
   } finally {
+    const resumeAfterClose=result?.paused&&state.scanPauseReason==="close"&&$("cloud-settings-dialog")?.open;
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all","cloud-retry-covers","cloud-scan-books-full","cloud-scan-comics-full"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
     ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
+    if(resumeAfterClose)void resumeSavedScanOnOpen();
   }
 }
 async function runAllIndexScans() {
@@ -1329,23 +1331,32 @@ function pauseIndexScan(reason="manual") {
     :"已關閉掃描視窗；目前工作完成後會保存 D1 游標，下次開啟可自動續掃。");
 }
 
-async function resumeSavedScanOnOpen() {
-  if(state.scanRunning||state.scanAllRunning||!state.authenticated||!isActiveSourceReady())return;
-  const scope=indexScope();
-  try {
-    const saved=await loadIndexScanState(scope);
-    if(!saved)return;
-    let coverPending=false;
-    if(saved.completed) {
-      try {
+async function findResumableScanScope() {
+  if(!state.authenticated||!isActiveSourceReady())return null;
+  for(const library of ["books","comics"]) {
+    const scope=indexScope(library);
+    try {
+      const saved=await loadIndexScanState(scope);
+      if(!saved||saved.pausedByUser)continue;
+      let coverPending=false;
+      if(saved.completed) {
         const pending=await fetchPendingCovers(scope,1);
         coverPending=Number(pending.total||0)>0;
-      } catch (_) {}
+      }
+      if(!saved.completed||coverPending)return {scope,saved};
+    } catch(error) {
+      appendIndexLog("檢查"+LIBRARY_LABELS[library]+"自動續掃狀態失敗："+String(error?.message||error),"error");
     }
-    const shouldResume=!saved.pausedByUser&&(!saved.completed||coverPending);
-    if(!shouldResume)return;
-    appendIndexLog("重新開啟索引管理：找到已保存的 D1 游標／封面佇列，開始自動續作。","warning");
-    void runLibraryScanContinuous(scope.library);
+  }
+  return null;
+}
+async function resumeSavedScanOnOpen() {
+  if(state.scanRunning||state.scanAllRunning)return;
+  try {
+    const resumable=await findResumableScanScope();
+    if(!resumable)return;
+    appendIndexLog("重新開啟索引管理："+LIBRARY_LABELS[resumable.scope.library]+" 已找到保存的 D1 游標／封面佇列，開始自動續作。","warning");
+    void runLibraryScanContinuous(resumable.scope.library);
   } catch(error) {
     appendIndexLog("檢查自動續掃狀態失敗："+String(error?.message||error),"error");
   }
@@ -1382,15 +1393,8 @@ async function checkSession() {
         state.currentPath=getActiveRoot();
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
         await loadDirectory(state.currentPath,1);
-        const savedScan=await loadIndexScanState(indexScope()).catch(()=>null);
-        let pendingCoverCount=0;
-        if(savedScan?.completed) {
-          try {
-            const pending=await fetchPendingCovers(indexScope(),1);
-            pendingCoverCount=Number(pending.total||0);
-          } catch (_) {}
-        }
-        if(savedScan&&!savedScan.pausedByUser&&(!savedScan.completed||pendingCoverCount>0))openCloudSettings();
+        const resumable=await findResumableScanScope();
+        if(resumable)openCloudSettings(resumable.scope.library);
       } else {
         setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
       }
@@ -1587,11 +1591,16 @@ function setCurrentFolderAsRoot(library) {
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「保存電子書／漫畫根目錄」。");
 }
 const settingsDialog=$("cloud-settings-dialog");
-function openCloudSettings() {
+function openCloudSettings(targetLibrary=state.activeLibrary) {
   if(!settingsDialog)return;
   if(!settingsDialog.open) {
     if(typeof settingsDialog.showModal==="function")settingsDialog.showModal();
     else settingsDialog.setAttribute("open","");
+  }
+  if(["books","comics"].includes(targetLibrary)) {
+    state.activeLibrary=targetLibrary;
+    $("cloud-library-type").value=targetLibrary;
+    try { localStorage.setItem(ACTIVE_LIBRARY_KEY,targetLibrary); } catch (_) {}
   }
   state.editProvider=state.activeProvider;
   readRootSelections(state.activeProvider);
