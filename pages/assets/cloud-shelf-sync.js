@@ -102,7 +102,7 @@ export async function syncSavedCloudShelves(options = {}) {
   let provider = "";
   let saved = {};
   try {
-    provider = String(localStorage.getItem(ACTIVE_PROVIDER_KEY) || "");
+    provider = String(localStorage.getItem(ACTIVE_PROVIDER_KEY) || "vps");
     saved = JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY) || "{}");
   } catch (_) {}
   if (!provider) return { changed: false, count: 0, skipped: true };
