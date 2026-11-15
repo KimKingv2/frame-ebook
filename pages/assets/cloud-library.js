@@ -1377,7 +1377,14 @@ async function checkSession() {
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
         await loadDirectory(state.currentPath,1);
         const savedScan=await loadIndexScanState(indexScope()).catch(()=>null);
-        if(savedScan&&!savedScan.completed&&!savedScan.pausedByUser)openCloudSettings();
+        let pendingCoverCount=0;
+        if(savedScan?.completed) {
+          try {
+            const pending=await fetchPendingCovers(indexScope(),1);
+            pendingCoverCount=Number(pending.total||0);
+          } catch (_) {}
+        }
+        if(savedScan&&((!savedScan.completed&&!savedScan.pausedByUser)||pendingCoverCount>0))openCloudSettings();
       } else {
         setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
       }
