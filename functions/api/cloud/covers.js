@@ -1,6 +1,6 @@
 import { json, requireAuth, getDatabase, isSameOrigin, normalizePath, isWithinRoot } from "../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const HASH_RE = /^[a-f0-9]{64}$/i;
 const MIME_TYPES = new Set(["image/webp", "image/jpeg"]);
