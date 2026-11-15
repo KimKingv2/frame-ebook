@@ -433,3 +433,27 @@ a { color: inherit; }
   .library-cover-stack img { width:74%; height:82%; }
   .library-cover-stack img:nth-child(2) { left:13%; }
 }
+
+
+.dialog-volumes { margin:14px 0 4px; }
+.dialog-volumes h3 { margin:0 0 9px; color:#d8cde8; font-size:13px; font-weight:600; }
+.dialog-volume-list { display:grid; gap:7px; }
+.dialog-volume-link {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:10px 12px;
+  border:1px solid rgba(205,188,239,.12);
+  border-radius:7px;
+  color:#e8e0f1;
+  background:rgba(255,255,255,.025);
+  text-decoration:none;
+}
+.dialog-volume-link:hover { border-color:rgba(190,160,230,.36); background:rgba(120,86,162,.12); }
+.dialog-volume-link.is-current { border-color:rgba(190,160,230,.46); background:rgba(120,86,162,.16); }
+.dialog-volume-link span { min-width:0; overflow-wrap:anywhere; font-size:12px; }
+.dialog-volume-link small { flex:none; color:#a99cb9; font-size:10px; }
+@media(max-width:640px) {
+  .dialog-volume-link { align-items:flex-start; flex-direction:column; gap:3px; }
+}
