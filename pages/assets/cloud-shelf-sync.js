@@ -105,11 +105,12 @@ export async function syncSavedCloudShelves(options = {}) {
     provider = String(localStorage.getItem(ACTIVE_PROVIDER_KEY) || "");
     saved = JSON.parse(localStorage.getItem(ROOT_SELECTIONS_KEY) || "{}");
   } catch (_) {}
-  if (!provider || !saved?.[provider]) return { changed: false, count: 0, skipped: true };
+  if (!provider) return { changed: false, count: 0, skipped: true };
 
+  const providerRoots = saved?.[provider] || {};
   const results = [];
   for (const library of ["books", "comics"]) {
-    const rootPath = normalizeRoot(saved[provider]?.[library] || DEFAULT_ROOTS[library]);
+    const rootPath = normalizeRoot(providerRoots[library] || DEFAULT_ROOTS[library]);
     if (!rootPath) continue;
     try {
       const result = await syncCloudShelf({ provider, library, rootPath }, options);
