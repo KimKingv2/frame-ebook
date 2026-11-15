@@ -1,9 +1,9 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js?v=20261114-shelf-classification1";
+} from "/assets/library-store.js?v=20261115-cloud-primary";
 
 const $ = id => document.getElementById(id);
-const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null };
+const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, cloudSyncPromise: null };
 const coverUrls = new Map();
 const readerUrl = id => "/epub-lab/?book=" + encodeURIComponent(id);
 
@@ -29,9 +29,30 @@ function formatDate(timestamp) {
 }
 
 function coverUrl(book) {
-  if (!book.coverBlob) return "";
-  if (!coverUrls.has(book.id)) coverUrls.set(book.id, URL.createObjectURL(book.coverBlob));
-  return coverUrls.get(book.id);
+  if (book.coverBlob) {
+    if (!coverUrls.has(book.id)) coverUrls.set(book.id, URL.createObjectURL(book.coverBlob));
+    return coverUrls.get(book.id);
+  }
+  if (book.sourceType === "cloud" && book.cloudCoverHash) {
+    return "/api/cloud/covers?hash=" + encodeURIComponent(book.cloudCoverHash);
+  }
+  return "";
+}
+const cloudCoverCacheTasks = new Map();
+function cacheCloudCover(book, url) {
+  if (!book || !book.id || cloudCoverCacheTasks.has(book.id)) return;
+  const task = fetch(url, { credentials: "same-origin", cache: "force-cache" })
+    .then(response => {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.blob();
+    })
+    .then(blob => {
+      if (blob && blob.size > 0) return updateBook(book.id, { coverBlob: blob });
+      return null;
+    })
+    .catch(() => null)
+    .finally(() => cloudCoverCacheTasks.delete(book.id));
+  cloudCoverCacheTasks.set(book.id, task);
 }
 
 function makeCover(book, compact) {
@@ -48,6 +69,9 @@ function makeCover(book, compact) {
       image.remove();
       frame.appendChild(makeFallback(book));
     };
+    if (book.sourceType === "cloud" && !book.coverBlob && book.cloudCoverHash) {
+      image.addEventListener("load", () => cacheCloudCover(book, url), { once: true });
+    }
     frame.appendChild(image);
   } else {
     frame.appendChild(makeFallback(book));
@@ -89,6 +113,12 @@ function createCard(book, compact) {
   const author = document.createElement("p");
   author.textContent = book.author || (getBookShelf(book) === "comics" ? "漫畫／圖像書" : "作者未提供");
   copy.append(title, author);
+  if (book.sourceType === "local" || (!book.sourceType && book.blob)) {
+    const origin = document.createElement("small");
+    origin.className = "library-origin-note";
+    origin.textContent = "本機";
+    copy.appendChild(origin);
+  }
   const kind = document.createElement("span");
   kind.className = "book-kind";
   kind.textContent = book.format;
@@ -187,17 +217,49 @@ async function refresh() {
   try {
     state.books = await listBooks();
     render();
-    const epubCount = state.books.filter(book => getBookShelf(book) === "books").length;
-    const comicCount = state.books.filter(book => getBookShelf(book) === "comics").length;
-    $("library-status").textContent = state.books.length
-      ? "本機書架已就緒：電子書 " + epubCount + " 本，漫畫 " + comicCount + " 部。"
-      : "電子書與漫畫書架都已就緒，匯入作品即可開始收藏。";
+    updateLibraryStatus();
+    startCloudShelfSync();
   } catch (error) {
     $("library-status").textContent = "無法開啟本機書庫：" + (error.message || String(error));
     document.querySelectorAll("[data-import-type]").forEach(button => { button.disabled = true; });
     $("books-files").disabled = true;
     $("comics-files").disabled = true;
   }
+}
+function updateLibraryStatus(extra = "") {
+  const cloudCount = state.books.filter(book => book.sourceType === "cloud").length;
+  const localCount = state.books.filter(book => book.sourceType === "local" || (!book.sourceType && book.blob)).length;
+  const epubCount = state.books.filter(book => getBookShelf(book) === "books").length;
+  const comicCount = state.books.filter(book => getBookShelf(book) === "comics").length;
+  $("library-status").textContent = extra || (
+    "書架已就緒：電子書 " + epubCount + " 本、漫畫 " + comicCount + " 部。" +
+    (cloudCount ? " 雲端書籍 " + cloudCount + " 本。" : "") +
+    (localCount ? " 本機匯入 " + localCount + " 本。" : "")
+  );
+}
+function startCloudShelfSync() {
+  if (state.cloudSyncPromise) return;
+  state.cloudSyncPromise = (async () => {
+    try {
+      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary");
+      const result = await module.syncSavedCloudShelves({
+        onProgress: progress => {
+          $("library-status").textContent =
+            "正在同步雲端書架至這台設備：" + progress.synced + " / " + progress.total + " 本……";
+        }
+      });
+      if (result.changed) {
+        state.books = await listBooks();
+        render();
+        updateLibraryStatus("已同步雲端書架：" + result.count + " 本書籍加入這台設備。閱讀資料仍保存在本機。");
+      }
+    } catch (_) {
+      // Access may not be configured on this hostname yet. Keep the local
+      // bookshelf usable and leave cloud synchronization for the next visit.
+    } finally {
+      state.cloudSyncPromise = null;
+    }
+  })();
 }
 
 async function importFiles(files, shelf) {
@@ -283,7 +345,9 @@ async function removeCurrentBook() {
   if (!state.dialogBookId) return;
   const book = await getBook(state.dialogBookId);
   if (!book) return;
-  const confirmed = window.confirm("確定從這台設備的書架移除「" + book.title + "」？這會刪除瀏覽器保存的書檔與閱讀位置，不會影響原始檔案。");
+  const confirmed = window.confirm(book.sourceType === "cloud"
+    ? "確定從這台設備的書架移除「" + book.title + "」？這會刪除本機保存的閱讀位置與個人筆記，不會刪除 OpenList 原始檔案。下次同步雲端書架時，這本書會再次加入。"
+    : "確定從這台設備的書架移除「" + book.title + "」？這會刪除瀏覽器保存的書檔與閱讀位置，不會影響其他檔案。");
   if (!confirmed) return;
   await deleteBook(state.dialogBookId);
   state.dialogBookId = null;
