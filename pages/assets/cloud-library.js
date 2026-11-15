@@ -341,7 +341,7 @@ async function syncIndexedFilesToShelf(scope,entries) {
   const files=(Array.isArray(entries)?entries:[]).filter(item=>item&&!item.isDir);
   if(!files.length)return;
   try {
-    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r4");
+    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r6");
     const records=await syncModule.syncCloudShelfItems(scope,files);
     if(records.length)appendIndexLog("本批已加入書架："+records.length+" 冊雲端書檔；相同資料夾會合併為一張作品卡。","success");
   } catch(error) {
@@ -353,7 +353,7 @@ async function syncCloudShelfToThisDevice(scope) {
   if(state.shelfSyncRunning.has(key))return;
   state.shelfSyncRunning.add(key);
   try {
-    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r4");
+    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r6");
     const result=await syncModule.syncCloudShelf(scope,{onProgress:progress=>{
       setSourceStatus("正在將雲端書目加入這台設備的書架："+progress.synced+" / "+progress.total);
     }});
@@ -1571,7 +1571,7 @@ async function openCloudBook(item) {
   state.busy.add(item.path);renderItems();
   $("cloud-browser-status").textContent="正在準備 "+item.name+" 的本機書目記錄……";
   try {
-    const shelfModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r4");
+    const shelfModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r6");
     const records=await shelfModule.syncCloudShelfItems(scope,[item]);
     const record=records[0];
     if(!record)throw new Error("無法建立這本書的本機書目記錄。");
