@@ -66,7 +66,7 @@ export function buildShelfEntries(scope, items) {
 
   for (const [folderPath, files] of groups) {
     files.sort((a, b) => String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
-    const folderName = folderPath.slice(prefix.length).replace(/^\\/+/, "");
+    const folderName = folderPath.slice(prefix.length).replace(/^\/+/, "");
     const summaries = files.map(fileSummary);
     const coverHashes = [...new Set(summaries
       .filter(file => file.coverStatus === "ready" && file.coverHash)
