@@ -300,7 +300,7 @@ async function cloudBookId(scope, path) {
   return "cloud:" + hash;
 }
 
-async function upsertCloudBooks(scope, items) {
+async function upsertCloudBooks(scope, items, options = {}) {
   const source = {
     provider: String(scope?.provider || ""),
     library: String(scope?.library || ""),
@@ -316,7 +316,9 @@ async function upsertCloudBooks(scope, items) {
   });
   if (!validItems.length) return [];
 
-  const ids = await Promise.all(validItems.map(item => cloudBookId(source, item.path)));
+  const identityPaths = validItems.map(item => normalizePath(item.groupPath || item.path));
+  if (identityPaths.some(path => !path)) throw new Error("雲端書架資料夾路徑無效。");
+  const ids = await Promise.all(identityPaths.map(path => cloudBookId(source, path)));
   const db = await openDatabase();
   const readTx = db.transaction(STORE_NAME, "readonly");
   const readDone = transactionDone(readTx);
@@ -326,40 +328,78 @@ async function upsertCloudBooks(scope, items) {
   await readDone;
 
   const now = Date.now();
+  const replaceGroups = options.replaceGroups === true;
   const records = validItems.map((item, index) => {
     const existing = existingRecords[index] || null;
-    const fileName = String(item.name || String(item.path).split("/").pop() || "未命名書籍");
-    const format = String(item.format || "").toUpperCase();
-    const fallbackTitle = basename(fileName) || "未命名書籍";
-    const coverHash = /^[a-f0-9]{64}$/i.test(String(item.coverHash || "")) ? String(item.coverHash).toLowerCase() : null;
+    const folderPath = normalizePath(item.groupPath || "");
+    const grouped = !!folderPath;
+    const incomingFiles = (Array.isArray(item.groupFiles) && item.groupFiles.length ? item.groupFiles : [item])
+      .filter(file => file && normalizePath(file.path))
+      .map(file => ({
+        path: normalizePath(file.path),
+        name: String(file.name || String(file.path).split("/").pop() || ""),
+        format: String(file.format || "").toUpperCase(),
+        size: Math.max(0, Number(file.size) || 0),
+        modified: file.modified ? String(file.modified) : null,
+        coverHash: /^[a-f0-9]{64}$/i.test(String(file.coverHash || "")) ? String(file.coverHash).toLowerCase() : null,
+        coverStatus: String(file.coverStatus || "")
+      }));
+    const oldFiles = !replaceGroups && Array.isArray(existing?.cloudSource?.files) ? existing.cloudSource.files : [];
+    const filesByPath = new Map();
+    for (const file of [...oldFiles, ...incomingFiles]) {
+      if (file?.path) filesByPath.set(normalizePath(file.path), file);
+    }
+    const mergedFiles = [...filesByPath.values()].sort((a, b) =>
+      String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
+    const oldPrimaryPath = !replaceGroups ? String(existing?.cloudSource?.path || "") : "";
+    const primary = mergedFiles.find(file => file.path === oldPrimaryPath) || mergedFiles[0] || incomingFiles[0] || item;
+    const fileName = String(primary.name || item.name || String(primary.path || item.path).split("/").pop() || "未命名書籍");
+    const format = String(primary.format || item.format || "").toUpperCase();
+    const fallbackTitle = grouped
+      ? String(item.groupTitle || folderPath.split("/").pop() || fileName)
+      : (basename(fileName) || "未命名書籍");
+    const coverHash = /^[a-f0-9]{64}$/i.test(String(primary.coverHash || "")) ? String(primary.coverHash).toLowerCase() : null;
     const coverBlob = existing && existing.cloudCoverHash === coverHash ? (existing.coverBlob || null) : null;
-    const modifiedAt = item.modified ? String(item.modified) : null;
+    const modifiedAt = primary.modified ? String(primary.modified) : (item.modified ? String(item.modified) : null);
     const parsedModified = modifiedAt ? Date.parse(modifiedAt) : NaN;
+    const incomingHashes = Array.isArray(item.groupCoverHashes)
+      ? item.groupCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))).map(hash => String(hash).toLowerCase())
+      : (coverHash ? [coverHash] : []);
+    const oldHashes = !replaceGroups && Array.isArray(existing?.cloudCoverHashes) ? existing.cloudCoverHashes : [];
+    const cloudCoverHashes = [...new Set([...oldHashes, ...incomingHashes])].slice(0, 8);
+
     return {
       ...(existing || {}),
       id: ids[index],
       sourceType: "cloud",
       fileName,
       title: existing?.manualTitle ? existing.title : fallbackTitle,
+      folderTitle: grouped ? fallbackTitle : "",
       author: existing?.manualAuthor ? existing.author : (existing?.author || ""),
       language: existing?.language || "",
       identifier: existing?.identifier || "",
       format,
       shelf: format === "CBZ" ? "comics" : source.library,
       pageCount: Number(existing?.pageCount) || 0,
-      size: Math.max(0, Number(item.size) || 0),
+      size: grouped
+        ? mergedFiles.reduce((sum, file) => sum + Math.max(0, Number(file.size) || 0), 0)
+        : Math.max(0, Number(primary.size || item.size) || 0),
       lastModified: Number.isFinite(parsedModified) ? parsedModified : (Number(existing?.lastModified) || 0),
       modifiedAt,
       blob: null,
       coverBlob,
       cloudCoverHash: coverHash,
-      cloudCoverType: String(item.coverType || ""),
-      cloudCoverStatus: String(item.coverStatus || (coverHash ? "ready" : "pending")),
+      cloudCoverHashes,
+      cloudCoverType: String(primary.coverType || item.coverType || ""),
+      cloudCoverStatus: cloudCoverHashes.length ? "ready" : String(item.coverStatus || (coverHash ? "ready" : "pending")),
       cloudSource: {
         provider: source.provider,
         library: source.library,
         rootPath: source.rootPath,
-        path: normalizePath(item.path),
+        path: normalizePath(primary.path || item.path),
+        bookPath: folderPath || normalizePath(item.path),
+        folderPath: folderPath || "",
+        files: mergedFiles.slice(0, 250),
         modifiedAt
       },
       addedAt: Number(existing?.addedAt) || now,
