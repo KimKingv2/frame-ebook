@@ -33,7 +33,7 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 
 ## Bookshelf and covers
 
-The homepage is the main bookshelf. Cloud books are synchronized as metadata-only records; original files stay in OpenList until opened. Optional local imports keep their original Blob in this browser's IndexedDB. Reading position, appearance preferences, and annotation records are stored locally. Only the small bundled test EPUB and original synthetic comic demo are public fixtures; private books are not committed to the repository.
+The homepage is the main bookshelf. Cloud books are synchronized as metadata-only records; original files stay in OpenList until opened. Optional local imports keep their original Blob in this browser's IndexedDB. Reading position and appearance preferences remain local. Cloud-book annotations are stored in D1 per verified Cloudflare Access identity; annotations for locally imported books stay in this browser's IndexedDB. Only the small bundled test EPUB and original synthetic comic demo are public fixtures; private books are not committed to the repository.
 
 Planned cover lookup order:
 1. Embedded EPUB cover image.
@@ -168,7 +168,7 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 - /api/reading/stats returns D1 daily totals, streak calendar source data, most-read books, time-of-day totals and recent events.
 - migrations/0001_reading_events.sql creates the D1 tables for reading events and related sync data.
 
-The main bookshelf synchronizes completed D1 catalog entries into IndexedDB as metadata-only cloud records. It does not copy their original Blob into IndexedDB. Opening a cloud book fetches the source from OpenList through the protected proxy (or directly from the selected LAN source) and passes it to Foliate in memory. Local imports continue to store their original Blob in IndexedDB. Per-book CFI/page progress and appearance remain browser-local; the local `annotations` store is ready for highlight, note and bookmark records. The existing reading-time statistics path still has its separate D1 event-sync behavior.
+The main bookshelf synchronizes completed D1 catalog entries into IndexedDB as metadata-only cloud records. It does not copy their original Blob into IndexedDB. Opening a cloud book fetches the source from OpenList through the protected proxy (or directly from the selected LAN source) and passes it to Foliate in memory. Local imports continue to store their original Blob in IndexedDB. Per-book CFI/page progress and appearance remain browser-local. Cloud-book highlights, notes and bookmarks are saved to D1 under the verified Cloudflare Access identity; annotations for local imports remain in IndexedDB and are never uploaded. The existing reading-time statistics path still has its separate D1 event-sync behavior.
 
 See docs/CLOUDFLARE-SETUP.md before enabling cloud features. Do not paste passwords or API tokens into chat or commit them to Git.
 
@@ -177,6 +177,6 @@ See docs/CLOUDFLARE-SETUP.md before enabling cloud features. Do not paste passwo
 
 - D1 binding: `FRAME_READER_DB` → `frame-reader-db`.
 - Private R2 binding: `FRAME_READER_COVERS` → `frame-reader-covers` (public access disabled).
-- Apply `migrations/0003_cloud_covers.sql` after the existing reading-events and cloud-catalog migrations.
+- Apply `migrations/0003_cloud_covers.sql` and `migrations/0004_cloud_annotations.sql` after the existing reading-events and cloud-catalog migrations.
 - EPUB covers are selected from OPF metadata; CBZ covers prefer `cover` / `front` images, otherwise the first image. Thumbnails are normalized to WebP (JPEG fallback), capped at 512 px on the longest edge, and SHA-256 deduplicated.
 - Cover extraction uses HTTP Range requests through the protected file API; it does not intentionally fetch complete EPUB / CBZ files. Missing or failed covers are recorded in D1 and can be retried independently.
