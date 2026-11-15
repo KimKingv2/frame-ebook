@@ -1,6 +1,9 @@
 import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip.js";
 
 const $ = id => document.getElementById(id);
+const isManagerEmbed = new URLSearchParams(window.location.search).get("manager") === "1" && window.parent !== window;
+let embeddedManagerVisible = false;
+if (isManagerEmbed) document.documentElement.classList.add("cloud-manager-embed");
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
 const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v4";
 const ACTIVE_LIBRARY_KEY = "frame-reader-active-library";
@@ -1394,6 +1397,7 @@ async function checkSession() {
       readRootSelections(selectedProvider);
       clearListing();
       await renderAllScanSummaries();
+      if(isManagerEmbed&&embeddedManagerVisible)openCloudSettings(selectedLibrary);
       if(isActiveSourceReady()) {
         state.currentPath=getActiveRoot();
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
@@ -1612,6 +1616,19 @@ function openCloudSettings(targetLibrary=state.activeLibrary) {
   $("cloud-provider").value=state.activeProvider;
   void renderAllScanSummaries(state.activeProvider,state.selectedRoots);
   void resumeSavedScanOnOpen();
+}
+if(isManagerEmbed) {
+  window.addEventListener("message",event=>{
+    if(event.origin!==location.origin||event.source!==window.parent||!event.data)return;
+    if(event.data.type==="frame-reader-cloud-manager-open") {
+      embeddedManagerVisible=true;
+      if(state.authenticated)openCloudSettings();
+    } else if(event.data.type==="frame-reader-cloud-manager-close") {
+      embeddedManagerVisible=false;
+      if(state.scanRunning||state.scanAllRunning)pauseIndexScan("close");
+      if(settingsDialog?.open)settingsDialog.close();
+    }
+  });
 }
 $("cloud-settings-open")?.addEventListener("click",openCloudSettings);
 $("cloud-settings-close")?.addEventListener("click",()=>{

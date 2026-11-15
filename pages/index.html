@@ -8,7 +8,8 @@
   <meta name="description" content="FRAME Reader，雲端書目優先的私人電子書書架；閱讀進度與個人資料保存在本機。">
   <title>FRAME Reader · My Library</title>
   <link rel="preload" as="image" href="/assets/covers/frame-sample.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/site.css?v=20261115-cloud-primary">
+  <link rel="stylesheet" href="/assets/site.css?v=20261116-cloud-manager-r1">
+  <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-cloud-manager-r1">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -25,6 +26,7 @@
         <a href="/cloud/">雲端書庫</a>
         <a href="/epub-lab/">閱讀室</a>
       </nav>
+      <button id="open-cloud-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-manager-dialog">連接與掃描</button>
       <span class="edition"><span class="edition-dot"></span> PRIVATE LIBRARY · 0.7</span>
     </header>
 
@@ -149,6 +151,13 @@
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>CLOUD CATALOG · LOCAL READING DATA</span></footer>
   </main>
 
+  <dialog id="cloud-manager-dialog" class="cloud-manager-dialog" aria-labelledby="cloud-manager-title">
+    <div class="cloud-manager-dialog-head">
+      <div><p class="section-kicker">PRIVATE CLOUD LIBRARY</p><h2 id="cloud-manager-title">連接與掃描</h2></div>
+      <button id="close-cloud-manager" class="cloud-manager-close" type="button" aria-label="關閉連接與掃描">×</button>
+    </div>
+    <iframe id="cloud-manager-frame" title="OpenList 連接與掃描管理" data-src="/cloud/?manager=1" loading="lazy"></iframe>
+  </dialog>
   <dialog id="book-dialog" class="book-dialog">
     <form id="detail-form" method="dialog">
       <div class="dialog-heading"><div><p class="section-kicker">BOOK DETAILS</p><h2 id="detail-heading">作品資訊</h2></div><button id="detail-cancel" class="dialog-close" type="button" aria-label="關閉">×</button></div>
@@ -177,6 +186,7 @@
   </dialog>
 
   <script src="/vendor/jszip/jszip.min.js"></script>
+  <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script type="module" src="/assets/library.js?v=20261115-folder-shelves-r8"></script>
 </body>
 </html>

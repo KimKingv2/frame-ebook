@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
   <link rel="stylesheet" href="/assets/epub-lab.css">
+  <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-cloud-manager-r1">
 </head>
 <body>
   <div class="app-shell">
@@ -14,6 +15,7 @@
       <a class="brand" href="/">FRAME <b>READER</b></a>
       <div class="reader-top-actions">
         <span class="lab-tag">READING ROOM · 0.6</span>
+        <button id="open-cloud-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-manager-dialog">連接與掃描</button>
         <a class="back-shelf-link" href="/reading-stats/">閱讀時光</a>
         <a class="back-shelf-link" href="/">← 我的書架</a>
       </div>
@@ -202,7 +204,15 @@
       <span>CLOUD BOOK ANNOTATIONS · LOCAL IMPORT DATA</span>
     </footer>
   </div>
+  <dialog id="cloud-manager-dialog" class="cloud-manager-dialog" aria-labelledby="cloud-manager-title">
+    <div class="cloud-manager-dialog-head">
+      <div><p class="section-kicker">PRIVATE CLOUD LIBRARY</p><h2 id="cloud-manager-title">連接與掃描</h2></div>
+      <button id="close-cloud-manager" class="cloud-manager-close" type="button" aria-label="關閉連接與掃描">×</button>
+    </div>
+    <iframe id="cloud-manager-frame" title="OpenList 連接與掃描管理" data-src="/cloud/?manager=1" loading="lazy"></iframe>
+  </dialog>
   <script src="/vendor/jszip/jszip.min.js"></script>
+  <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261115-folder-shelves-r8"></script>
 </body>

@@ -401,3 +401,86 @@
   .cloud-settings-dialog-body { max-height:calc(94vh - 64px); padding:10px; }
   .cloud-settings-dialog-head { padding:13px 15px; }
 }
+
+
+/* Embedded manager: rendered inside the current Reader page's Audio-style dialog. */
+.cloud-manager-embed,
+.cloud-manager-embed body {
+  width:100%;
+  min-width:0;
+  min-height:100%;
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  background:#171420;
+}
+.cloud-manager-embed .cloud-shell {
+  width:100%;
+  min-height:100%;
+  margin:0;
+  padding:0;
+}
+.cloud-manager-embed .topbar,
+.cloud-manager-embed .cloud-hero,
+.cloud-manager-embed .cloud-browser-heading,
+.cloud-manager-embed .cloud-library-select,
+.cloud-manager-embed .cloud-path-bar,
+.cloud-manager-embed .cloud-list-toolbar,
+.cloud-manager-embed .cloud-items,
+.cloud-manager-embed .cloud-pagination,
+.cloud-manager-embed .cloud-empty,
+.cloud-manager-embed .cloud-browser-status,
+.cloud-manager-embed .cloud-security-note,
+.cloud-manager-embed .footer {
+  display:none !important;
+}
+.cloud-manager-embed #cloud-login-panel {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin:16px;
+}
+.cloud-manager-embed #cloud-login-panel .cloud-auth-symbol { display:none; }
+.cloud-manager-embed #cloud-browser:not([hidden]) {
+  display:block;
+  min-height:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.cloud-manager-embed .cloud-settings-dialog[open] {
+  position:fixed;
+  inset:0;
+  display:block;
+  width:100%;
+  max-width:none;
+  height:100%;
+  max-height:none;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:#171420;
+  box-shadow:none;
+}
+.cloud-manager-embed .cloud-settings-dialog::backdrop {
+  background:transparent;
+  backdrop-filter:none;
+}
+.cloud-manager-embed .cloud-settings-dialog-head { display:none; }
+.cloud-manager-embed .cloud-settings-dialog-body {
+  width:100%;
+  height:100%;
+  max-height:100%;
+  overflow:auto;
+  padding:12px;
+}
+.cloud-manager-embed .cloud-settings-dialog .cloud-connection-panel,
+.cloud-manager-embed .cloud-settings-dialog .cloud-index-panel {
+  margin:0 0 12px;
+}
+@media(max-width:720px) {
+  .cloud-manager-embed .cloud-settings-dialog-body { padding:9px; }
+}

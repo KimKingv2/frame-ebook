@@ -1,0 +1,121 @@
+.cloud-manager-trigger {
+  display:inline-flex;
+  flex:0 0 auto;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:8px 12px;
+  border:1px solid rgba(185,157,230,.3);
+  border-radius:8px;
+  color:#e9ddfb;
+  background:rgba(110,82,158,.2);
+  font:600 10px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+  letter-spacing:.2px;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background .2s ease,border-color .2s ease,transform .2s ease;
+}
+.cloud-manager-trigger:hover {
+  border-color:rgba(198,173,244,.55);
+  background:rgba(125,94,181,.32);
+  transform:translateY(-1px);
+}
+.cloud-manager-trigger:focus-visible,
+.cloud-manager-close:focus-visible { outline:2px solid #c5adff; outline-offset:3px; }
+.cloud-manager-dialog {
+  display:none;
+  flex-direction:column;
+  width:min(1080px,calc(100vw - 28px));
+  height:min(920px,92vh);
+  max-width:none;
+  max-height:none;
+  margin:auto;
+  padding:0;
+  overflow:hidden;
+  border:1px solid rgba(205,188,239,.22);
+  border-radius:14px;
+  color:#f4f0fa;
+  background:#171420;
+  box-shadow:0 28px 100px rgba(0,0,0,.72);
+}
+.cloud-manager-dialog[open] { display:flex; }
+.cloud-manager-dialog::backdrop {
+  background:rgba(5,4,9,.8);
+  backdrop-filter:blur(6px);
+}
+.cloud-manager-dialog-head {
+  display:flex;
+  flex:0 0 58px;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:10px 18px;
+  border-bottom:1px solid rgba(205,188,239,.12);
+  background:#171420;
+}
+.cloud-manager-dialog-head .section-kicker {
+  margin:0;
+  color:#ae91db;
+  font-size:8px;
+  letter-spacing:2px;
+}
+.cloud-manager-dialog-head h2 {
+  margin:4px 0 0;
+  color:#eee7f5;
+  font-size:15px;
+  font-weight:600;
+}
+.cloud-manager-close {
+  display:grid;
+  flex:0 0 32px;
+  place-items:center;
+  width:32px;
+  height:32px;
+  border:1px solid rgba(205,188,239,.16);
+  border-radius:50%;
+  color:#b8adc7;
+  background:rgba(255,255,255,.04);
+  font:400 22px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+#cloud-manager-frame {
+  display:block;
+  flex:1 1 auto;
+  width:100%;
+  min-height:0;
+  border:0;
+  background:#171420;
+}
+@media(max-width:640px) {
+  .cloud-manager-dialog {
+    width:calc(100vw - 10px);
+    height:calc(100vh - 10px);
+    border-radius:10px;
+  }
+  .cloud-manager-dialog-head { flex-basis:52px; padding:8px 12px; }
+  .cloud-manager-trigger { min-height:30px; padding:7px 8px; font-size:9px; }
+}
+
+
+@media(max-width:900px) {
+  .main-nav { gap:18px; margin-left:24px; }
+  .cloud-manager-trigger { padding:7px 9px; }
+}
+@media(max-width:640px) {
+  .main-nav {
+    flex:1 1 auto;
+    min-width:0;
+    overflow-x:auto;
+    overflow-y:hidden;
+    margin-left:8px;
+    margin-right:8px;
+    gap:10px;
+    scrollbar-width:none;
+  }
+  .main-nav::-webkit-scrollbar { display:none; }
+  .main-nav a { flex:0 0 auto; white-space:nowrap; font-size:9px; }
+  .cloud-manager-trigger { padding:6px 7px; font-size:8px; }
+  .reader-top-actions { gap:7px !important; }
+  .reader-top-actions .lab-tag { display:none; }
+  .reader-top-actions .back-shelf-link { font-size:8px; white-space:nowrap; }
+}
