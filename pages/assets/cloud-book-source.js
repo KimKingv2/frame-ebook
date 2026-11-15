@@ -4,9 +4,9 @@ function localNetworkOptions(url) {
   if (host === "localhost" || host === "127.0.0.1" || host.startsWith("127.")) {
     return { targetAddressSpace: "loopback" };
   }
-  if (/^(10\\.|192\\.168\\.|169\\.254\\.)/.test(host) ||
-      /^172\\.(1[6-9]|2\\d|3[01])\\./.test(host) ||
-      /^100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\./.test(host)) {
+  if (/^(10\.|192\.168\.|169\.254\.)/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) {
     return { targetAddressSpace: "local" };
   }
   return {};
