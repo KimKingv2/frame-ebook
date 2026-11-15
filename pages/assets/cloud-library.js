@@ -1,4 +1,3 @@
-import { importBookFile } from "/assets/library-store.js?v=20261114-shelf-classification1";
 import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip.js";
 
 const $ = id => document.getElementById(id);
@@ -36,7 +35,8 @@ const state = {
   scanAllRunning:false,
   scanPauseRequested:false,
   scanState:null,
-  scanLogEntries:[]
+  scanLogEntries:[],
+  shelfSyncRunning:new Set()
 };
 
 function formatBytes(bytes) {
@@ -324,6 +324,24 @@ async function readJsonResponse(response, fallback) {
     throw new Error(data.error || fallback || ("HTTP " + response.status));
   }
   return data;
+}
+async function syncCloudShelfToThisDevice(scope) {
+  const key=[scope.provider,scope.library,scope.rootPath].join("\n");
+  if(state.shelfSyncRunning.has(key))return;
+  state.shelfSyncRunning.add(key);
+  try {
+    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary");
+    const result=await syncModule.syncCloudShelf(scope,{onProgress:progress=>{
+      setSourceStatus("正在將雲端書目加入這台設備的書架："+progress.synced+" / "+progress.total);
+    }});
+    if(result.changed) {
+      setSourceStatus("已自動加入書架："+result.count+" 本"+(scope.library==="comics"?"漫畫":"電子書")+"；原始檔案仍留在 OpenList。");
+    }
+  } catch(error) {
+    appendIndexLog("同步至本機書架失敗："+String(error?.message||error),"error");
+  } finally {
+    state.shelfSyncRunning.delete(key);
+  }
 }
 function indexScope() {
   return {
@@ -1361,8 +1379,9 @@ async function loadDirectory(path=getActiveRoot(),page=1) {
     $("cloud-next-page").disabled=state.page*state.perPage>=state.total;
     renderItems();
     if(data.indexed) {
-      $("cloud-browser-status").textContent="已從 D1 載入索引目錄。選擇書籍時才會讀取原始檔案；開啟此頁不會重新掃描 OpenList。";
+      $("cloud-browser-status").textContent="已從 D1 載入索引目錄。掃描完成的書籍會自動加入我的書架；只有開啟閱讀時才讀取原始檔案。";
       setSourceStatus("索引讀取成功："+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" · "+safePath);
+      if(safePath===selected) void syncCloudShelfToThisDevice({provider:state.activeProvider,library:state.activeLibrary,rootPath:selected});
     } else if(data.scanState) {
       $("cloud-browser-status").textContent="目前顯示已建立的部分索引。掃描尚未完成，點擊「手動掃描／續掃」可繼續。";
       setSourceStatus("已讀取部分 D1 索引；尚有目錄待掃描。",true);
@@ -1435,9 +1454,9 @@ function makeItem(item) {
   copy.append(title,meta);
   const actions=document.createElement("div");actions.className="cloud-item-actions";
   const add=document.createElement("button");add.type="button";add.className="cloud-import-button";
-  add.textContent=state.busy.has(item.path)?"正在加入……":"加入本機書架";
+  add.textContent=state.busy.has(item.path)?"正在準備閱讀……":"開啟閱讀室";
   add.disabled=state.busy.has(item.path);
-  add.addEventListener("click",()=>importCloudFile(item));
+  add.addEventListener("click",()=>openCloudBook(item));
   actions.append(add);
   row.append(cover,copy,actions);
   return row;
@@ -1450,37 +1469,26 @@ function renderItems() {
   items.forEach(item=>root.appendChild(makeItem(item)));
   $("cloud-empty").hidden=items.length>0;
 }
-async function importCloudFile(item) {
+async function openCloudBook(item) {
   if(state.busy.has(item.path))return;
-  const library=state.activeLibrary;
-  if(!isWithinRoot(item.path,getActiveRoot())) {
+  const scope=indexScope();
+  if(!isWithinRoot(item.path,scope.rootPath)) {
     $("cloud-browser-status").textContent="檔案路徑超出目前書庫根目錄。";
     return;
   }
-  if((library==="books"&&item.format!=="EPUB")||(library==="comics"&&item.format!=="EPUB"&&item.format!=="CBZ")) {
+  if((scope.library==="books"&&item.format!=="EPUB")||
+     (scope.library==="comics"&&item.format!=="EPUB"&&item.format!=="CBZ")) {
     $("cloud-browser-status").textContent="檔案格式與目前選擇的書庫分類不符。";
     return;
   }
   state.busy.add(item.path);renderItems();
-  $("cloud-browser-status").textContent="正在讀取 "+item.name+"……";
+  $("cloud-browser-status").textContent="正在準備 "+item.name+" 的本機書目記錄……";
   try {
-    let blob;
-    if(state.activeProvider==="local") {
-      blob=await downloadLocalFile(item.path);
-    } else {
-      const query=new URLSearchParams({path:item.path,root_path:getActiveRoot(),provider:state.activeProvider,library});
-      const response=await fetch("/api/cloud/file?"+query.toString(),{credentials:"same-origin"});
-      if(!response.ok) {
-        const data=await response.json().catch(()=>({}));
-        throw new Error(data.error||"下載失敗：HTTP "+response.status);
-      }
-      blob=await response.blob();
-    }
-    const mime=item.format==="EPUB"?"application/epub+zip":"application/vnd.comicbook+zip";
-    const modified=Date.parse(item.modified||"")||Date.now();
-    const file=new File([blob],item.name,{type:mime,lastModified:modified});
-    const record=await importBookFile(file,{shelf:library});
-    $("cloud-browser-status").textContent="已加入本機書架："+record.title+"。正在開啟閱讀室……";
+    const store=await import("/assets/library-store.js?v=20261115-cloud-primary");
+    const records=await store.upsertCloudBooks(scope,[item]);
+    const record=records[0];
+    if(!record)throw new Error("無法建立這本書的本機書目記錄。");
+    $("cloud-browser-status").textContent="書籍已在書架，正在開啟閱讀室。原始檔案只會在閱讀時讀取。";
     location.href="/epub-lab/?book="+encodeURIComponent(record.id);
   } catch(error) {
     $("cloud-browser-status").textContent=(error.message||String(error))+"。原始雲端檔案沒有被修改。";
