@@ -44,7 +44,9 @@ function cleanState(input) {
       author: cleanText(m.author || "", 240),
       shelf: ["books","comics"].includes(m.shelf) ? m.shelf : undefined,
       manualTitle: !!m.manualTitle,
-      manualAuthor: !!m.manualAuthor
+      manualAuthor: !!m.manualAuthor,
+      language: cleanText(m.language || "", 64),
+      pageCount: Math.max(0, Math.min(1000000, Number(m.pageCount) || 0))
     };
   }
   if (Object.prototype.hasOwnProperty.call(input, "lastOpenedAt")) {
