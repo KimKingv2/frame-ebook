@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
-  <meta name="description" content="FRAME Reader，本機私人電子書書架與閱讀空間。">
+  <meta name="description" content="FRAME Reader，雲端書目優先的私人電子書書架；閱讀進度與個人資料保存在本機。">
   <title>FRAME Reader · My Library</title>
   <link rel="preload" as="image" href="/assets/covers/frame-sample.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/site.css?v=20261114-shelf-classification1">
+  <link rel="stylesheet" href="/assets/site.css?v=20261115-cloud-primary">
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -25,14 +25,14 @@
         <a href="/cloud/">雲端書庫</a>
         <a href="/epub-lab/">閱讀室</a>
       </nav>
-      <span class="edition"><span class="edition-dot"></span> LOCAL EDITION · 0.6</span>
+      <span class="edition"><span class="edition-dot"></span> PRIVATE LIBRARY · 0.7</span>
     </header>
 
     <section class="hero library-hero">
       <div class="hero-copy">
         <p class="eyebrow"><span class="eyebrow-line"></span> YOUR PRIVATE READING ROOM</p>
         <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
-        <p class="hero-text">電子書與漫畫，各自安放在獨立書架。封面、閱讀位置與每本作品的外觀設定，都留存在目前這台設備。</p>
+        <p class="hero-text">以雲端書庫作為主要藏書來源，掃描完成便自動加入書架。閱讀位置、外觀、書籤與個人筆記保存在目前這台設備。</p>
         <div class="hero-actions library-hero-imports">
           <button class="primary-link library-import-button" data-import-type="books" type="button">匯入電子書 <span aria-hidden="true">＋</span></button>
           <button class="secondary-import-button" data-import-type="comics" type="button">匯入漫畫 <span aria-hidden="true">＋</span></button>
@@ -75,9 +75,9 @@
         <div>
           <p class="section-kicker">YOUR PERSONAL COLLECTION</p>
           <h2>兩種收藏，各自成架<span class="heading-period">.</span></h2>
-          <p class="section-subtitle">電子書與漫畫分開整理，閱讀記憶仍然完整保留。</p>
+          <p class="section-subtitle">雲端書目自動入架；閱讀記憶與個人資料留在這台設備。</p>
         </div>
-        <div class="shelf-count"><strong id="shelf-count-label">00 ITEMS</strong><span>ON THIS DEVICE</span></div>
+        <div class="shelf-count"><strong id="shelf-count-label">00 ITEMS</strong><span>IN YOUR LIBRARY</span></div>
       </div>
 
       <div class="library-toolbar">
@@ -132,13 +132,13 @@
         </section>
       </div>
       <p id="result-count" class="result-count"></p>
-      <p id="library-status" class="library-status" role="status" aria-live="polite">正在開啟本機書庫……</p>
+      <p id="library-status" class="library-status" role="status" aria-live="polite">正在開啟我的書架……</p>
     </section>
 
     <section class="library-privacy">
       <span class="privacy-mark">⌂</span>
-      <div><strong>你的書，只留在你的設備。</strong><p>目前使用瀏覽器 IndexedDB 保存原始檔案、封面、Metadata 與閱讀進度。沒有上傳到 GitHub、Cloudflare 或第三方伺服器。清除網站資料或更換瀏覽器會移除這份本機書庫；雲端同步已加入 V0.6，但需先完成 Cloudflare D1 與 OpenList 設定才會啟用。</p></div>
-      <span class="privacy-tag">LOCAL ONLY</span>
+      <div><strong>雲端保存原始書檔，個人閱讀資料留在本機。</strong><p>雲端書籍的書目會自動同步到這台設備；原始 EPUB／CBZ 仍留在 OpenList，只有開啟閱讀時才讀取。閱讀位置、個人外觀設定，以及後續書籤、螢光標記與筆記，使用瀏覽器 IndexedDB 本機保存。手動匯入的本機書籍也會保留，並以低調文字註明來源。清除網站資料會移除本機閱讀資料。</p></div>
+      <span class="privacy-tag">PRIVATE BY DESIGN</span>
     </section>
 
     <section class="bottom-banner library-bottom-banner">
@@ -146,7 +146,7 @@
       <a href="/epub-lab/">進入閱讀空間 <span aria-hidden="true">↗</span></a>
     </section>
 
-    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>LOCAL LIBRARY · EPUB · CBZ</span></footer>
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>CLOUD CATALOG · LOCAL READING DATA</span></footer>
   </main>
 
   <dialog id="book-dialog" class="book-dialog">
@@ -173,6 +173,6 @@
   </dialog>
 
   <script src="/vendor/jszip/jszip.min.js"></script>
-  <script type="module" src="/assets/library.js?v=20261114-shelf-classification1"></script>
+  <script type="module" src="/assets/library.js?v=20261115-cloud-primary"></script>
 </body>
 </html>
