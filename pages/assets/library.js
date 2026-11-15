@@ -1,6 +1,6 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js?v=20261115-cloud-primary";
+} from "/assets/library-store.js?v=20261115-cloud-primary-r2";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, cloudSyncPromise: null };
@@ -241,7 +241,7 @@ function startCloudShelfSync() {
   if (state.cloudSyncPromise) return;
   state.cloudSyncPromise = (async () => {
     try {
-      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary");
+      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary-r2");
       const result = await module.syncSavedCloudShelves({
         onProgress: progress => {
           $("library-status").textContent =
