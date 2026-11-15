@@ -1,6 +1,6 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js?v=20261115-cloud-annotations-r3";
+} from "/assets/library-store.js?v=20261115-folder-shelves-r1";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, cloudSyncPromise: null };
@@ -59,26 +59,45 @@ function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   frame.setAttribute("aria-label", book.title + " 封面");
-  const url = coverUrl(book);
-  if (url) {
-    const image = document.createElement("img");
-    image.src = url;
-    image.alt = book.title + " 封面";
-    image.loading = "lazy";
-    image.onerror = () => {
-      image.remove();
-      frame.appendChild(makeFallback(book));
-    };
-    if (book.sourceType === "cloud" && !book.coverBlob && book.cloudCoverHash) {
-      image.addEventListener("load", () => cacheCloudCover(book, url), { once: true });
-    }
-    frame.appendChild(image);
+  const hashes = book.sourceType === "cloud" && Array.isArray(book.cloudCoverHashes)
+    ? [...new Set(book.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 3)
+    : [];
+  if (hashes.length >= 2) {
+    const stack = document.createElement("div");
+    stack.className = "library-cover-stack";
+    stack.setAttribute("aria-label", "資料夾內 " + hashes.length + " 冊封面堆疊");
+    hashes.forEach((hash, index) => {
+      const image = document.createElement("img");
+      image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+      image.alt = (book.title || "作品") + " 第 " + (index + 1) + " 冊封面";
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.onerror = () => image.remove();
+      stack.appendChild(image);
+    });
+    frame.appendChild(stack);
   } else {
-    frame.appendChild(makeFallback(book));
+    const url = coverUrl(book);
+    if (url) {
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = book.title + " 封面";
+      image.loading = "lazy";
+      image.onerror = () => {
+        image.remove();
+        frame.appendChild(makeFallback(book));
+      };
+      if (book.sourceType === "cloud" && !book.coverBlob && book.cloudCoverHash) {
+        image.addEventListener("load", () => cacheCloudCover(book, url), { once: true });
+      }
+      frame.appendChild(image);
+    } else {
+      frame.appendChild(makeFallback(book));
+    }
   }
   const format = document.createElement("span");
   format.className = "library-format-badge";
-  format.textContent = book.format;
+  format.textContent = book.folderTitle ? (book.cloudSource?.files?.length || 1) + " VOLUMES" : book.format;
   frame.appendChild(format);
   return frame;
 }
