@@ -58,29 +58,32 @@ export function buildShelfEntries(scope, items) {
 
   const output = standalone.map(item => ({
     ...item,
+    groupPath: "",
+    groupTitle: "",
     groupFiles: [fileSummary(item)],
-    groupCoverHashes: item.coverHash ? [String(item.coverHash).toLowerCase()] : []
+    groupCoverHashes: item.coverStatus === "ready" && item.coverHash ? [String(item.coverHash).toLowerCase()] : []
   }));
 
   for (const [folderPath, files] of groups) {
     files.sort((a, b) => String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
-    const primary = files[0];
-    const folderName = folderPath.slice(prefix.length).replace(/^\/+/, "");
+    const folderName = folderPath.slice(prefix.length).replace(/^\\/+/, "");
     const summaries = files.map(fileSummary);
     const coverHashes = [...new Set(summaries
       .filter(file => file.coverStatus === "ready" && file.coverHash)
       .map(file => file.coverHash))].slice(0, 8);
-    output.push({
-      ...primary,
-      groupPath: folderPath,
-      groupTitle: folderName || primary.name,
-      groupFiles: summaries,
-      groupCoverHashes: coverHashes,
-      groupFileCount: files.length
-    });
+    for (const file of files) {
+      output.push({
+        ...file,
+        groupPath: folderPath,
+        groupTitle: folderName || file.name,
+        groupFiles: summaries,
+        groupCoverHashes: coverHashes,
+        groupFileCount: files.length
+      });
+    }
   }
 
-  return output.sort((a, b) => String(a.groupTitle || a.name).localeCompare(String(b.groupTitle || b.name), "zh-Hant", { numeric: true, sensitivity: "base" }));
+  return output.sort((a, b) => String(a.path || a.name).localeCompare(String(b.path || b.name), "zh-Hant", { numeric: true, sensitivity: "base" }));
 }
 
 async function fetchCatalogPage(scope, page) {
