@@ -314,7 +314,29 @@ async function upsertCloudBooks(scope, items, options = {}) {
     const format = String(item.format || "").toUpperCase();
     return source.library === "books" ? format === "EPUB" : format === "EPUB" || format === "CBZ";
   });
-  if (!validItems.length) return [];
+  if (!validItems.length) {
+    const empty = [];
+    if (options.replaceGroups !== true) return empty;
+    const db = await openDatabase();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const done = transactionDone(tx);
+    const objectStore = tx.objectStore(STORE_NAME);
+    let removedCount = 0;
+    const allRequest = objectStore.getAll();
+    allRequest.onsuccess = () => {
+      for (const record of allRequest.result || []) {
+        const current = record?.cloudSource;
+        if (record?.sourceType === "cloud" && current?.provider === source.provider &&
+            current?.library === source.library && current?.rootPath === source.rootPath) {
+          objectStore.delete(record.id);
+          removedCount++;
+        }
+      }
+    };
+    await done;
+    empty.removedCount = removedCount;
+    return empty;
+  }
 
   const identityPaths = validItems.map(item => normalizePath(item.path));
   if (identityPaths.some(path => !path)) throw new Error("雲端書架資料夾路徑無效。");
@@ -324,11 +346,21 @@ async function upsertCloudBooks(scope, items, options = {}) {
   const readDone = transactionDone(readTx);
   const store = readTx.objectStore(STORE_NAME);
   const existingRequests = ids.map(id => requestResult(store.get(id)));
-  const existingRecords = await Promise.all(existingRequests);
+  const allRecordsRequest = requestResult(store.getAll());
+  const [existingRecords, allRecords] = await Promise.all([
+    Promise.all(existingRequests),
+    allRecordsRequest
+  ]);
   await readDone;
 
   const now = Date.now();
   const replaceGroups = options.replaceGroups === true;
+  const validIds = new Set(ids);
+  const staleRecords = replaceGroups ? (allRecords || []).filter(record => {
+    const current = record?.cloudSource;
+    return record?.sourceType === "cloud" && current?.provider === source.provider &&
+      current?.library === source.library && current?.rootPath === source.rootPath && !validIds.has(record.id);
+  }) : [];
   const records = validItems.map((item, index) => {
     const existing = existingRecords[index] || null;
     const folderPath = normalizePath(item.groupPath || "");
@@ -411,7 +443,9 @@ async function upsertCloudBooks(scope, items, options = {}) {
   const writeDone = transactionDone(writeTx);
   const writeStore = writeTx.objectStore(STORE_NAME);
   records.forEach(record => writeStore.put(record));
+  staleRecords.forEach(record => writeStore.delete(record.id));
   await writeDone;
+  records.removedCount = staleRecords.length;
   return records;
 }
 
