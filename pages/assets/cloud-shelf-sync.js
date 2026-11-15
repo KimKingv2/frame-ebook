@@ -185,6 +185,7 @@ export async function syncSavedCloudShelves(options = {}) {
   return {
     changed: results.some(result => result.changed),
     count: results.reduce((sum, result) => sum + Number(result.count || 0), 0),
+    removedCount: results.reduce((sum, result) => sum + Number(result.removedCount || 0), 0),
     results
   };
 }
