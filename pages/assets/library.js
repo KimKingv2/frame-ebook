@@ -327,7 +327,7 @@ function startCloudShelfSync() {
       if (result.changed) {
         state.books = await listBooks();
         render();
-        updateLibraryStatus("已同步雲端書架：" + result.count + " 本書籍加入這台設備。閱讀資料仍保存在本機。");
+        updateLibraryStatus("雲端書架同步完成：更新 " + result.count + " 冊檔案，清除 " + (result.removedCount || 0) + " 冊已不存在的索引；資料夾作品已合併顯示。");
       }
     } catch (_) {
       // Access may not be configured on this hostname yet. Keep the local
