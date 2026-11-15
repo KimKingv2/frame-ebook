@@ -1,6 +1,6 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js?v=20261115-cloud-primary-r2";
+} from "/assets/library-store.js?v=20261115-cloud-annotations-r3";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, cloudSyncPromise: null };
@@ -241,7 +241,7 @@ function startCloudShelfSync() {
   if (state.cloudSyncPromise) return;
   state.cloudSyncPromise = (async () => {
     try {
-      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary-r2");
+      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-annotations-r3");
       const result = await module.syncSavedCloudShelves({
         onProgress: progress => {
           $("library-status").textContent =
@@ -346,7 +346,7 @@ async function removeCurrentBook() {
   const book = await getBook(state.dialogBookId);
   if (!book) return;
   const confirmed = window.confirm(book.sourceType === "cloud"
-    ? "確定從這台設備的書架移除「" + book.title + "」？這會刪除本機保存的閱讀位置與個人筆記，不會刪除 OpenList 原始檔案。下次同步雲端書架時，這本書會再次加入。"
+    ? "確定從這台設備的書架移除「" + book.title + "」？這只會移除本機書架項目與本機閱讀位置，不會刪除 OpenList 原始檔案或雲端筆記。下次同步雲端書架時，這本書會再次加入。"
     : "確定從這台設備的書架移除「" + book.title + "」？這會刪除瀏覽器保存的書檔與閱讀位置，不會影響其他檔案。");
   if (!confirmed) return;
   await deleteBook(state.dialogBookId);
