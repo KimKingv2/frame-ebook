@@ -97,7 +97,8 @@ function makeCover(book, compact) {
   }
   const format = document.createElement("span");
   format.className = "library-format-badge";
-  format.textContent = book.folderTitle ? (book.cloudSource?.files?.length || 1) + " VOLUMES" : book.format;
+  const volumeCount = book.folderTitle ? Math.max(1, Number(book.volumeCount) || book.cloudSource?.files?.length || 1) : 0;
+  format.textContent = volumeCount ? volumeCount + (volumeCount === 1 ? " VOLUME" : " VOLUMES") : book.format;
   frame.appendChild(format);
   return frame;
 }
