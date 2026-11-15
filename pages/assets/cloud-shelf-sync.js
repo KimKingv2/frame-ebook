@@ -1,4 +1,4 @@
-import { upsertCloudBooks, getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261115-cloud-primary";
+import { upsertCloudBooks, getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261115-cloud-primary-r2";
 
 const ACTIVE_PROVIDER_KEY = "frame-reader-active-openlist-provider";
 const ROOT_SELECTIONS_KEY = "frame-reader-cloud-root-selections-v4";
