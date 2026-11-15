@@ -1552,8 +1552,8 @@ async function openCloudBook(item) {
   state.busy.add(item.path);renderItems();
   $("cloud-browser-status").textContent="正在準備 "+item.name+" 的本機書目記錄……";
   try {
-    const store=await import("/assets/library-store.js?v=20261115-folder-shelves-r1");
-    const records=await store.upsertCloudBooks(scope,[item]);
+    const shelfModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r1");
+    const records=await shelfModule.syncCloudShelfItems(scope,[item]);
     const record=records[0];
     if(!record)throw new Error("無法建立這本書的本機書目記錄。");
     $("cloud-browser-status").textContent="書籍已在書架，正在開啟閱讀室。原始檔案只會在閱讀時讀取。";
