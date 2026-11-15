@@ -140,7 +140,7 @@ function createCard(book, compact) {
   }
   const kind = document.createElement("span");
   kind.className = "book-kind";
-  kind.textContent = book.format;
+  kind.textContent = Number(book.volumeCount) > 1 ? Number(book.volumeCount) + " 冊" : book.format;
   meta.append(copy, kind);
 
   const progress = document.createElement("div");
@@ -388,6 +388,32 @@ async function showBookDetails(id) {
   $("detail-progress").textContent = book.progress && book.progress.percent > 0
     ? Math.round(book.progress.percent) + "% · " + (book.progress.label || "閱讀中")
     : "尚未開始";
+  const volumeSection = $("detail-volumes-section");
+  const volumeList = $("detail-volume-list");
+  volumeList.replaceChildren();
+  const source = book.sourceType === "cloud" ? book.cloudSource : null;
+  const siblings = source?.folderPath ? state.books.filter(item => {
+    const itemSource = item.sourceType === "cloud" ? item.cloudSource : null;
+    return itemSource && itemSource.provider === source.provider &&
+      itemSource.library === source.library && itemSource.rootPath === source.rootPath &&
+      itemSource.folderPath === source.folderPath;
+  }).sort((a,b) => String(a.fileName).localeCompare(String(b.fileName),"zh-Hant",{numeric:true,sensitivity:"base"})) : [];
+  volumeSection.hidden = siblings.length < 2;
+  if (siblings.length > 1) {
+    $("detail-volumes-heading").textContent = "資料夾內冊數（" + siblings.length + "）";
+    siblings.forEach((volume,index) => {
+      const link = document.createElement("a");
+      link.className = "dialog-volume-link" + (volume.id === book.id ? " is-current" : "");
+      link.href = readerUrl(volume.id);
+      const name = document.createElement("span");
+      name.textContent = (index + 1) + ". " + (volume.fileName || volume.title || "未命名檔案");
+      const meta = document.createElement("small");
+      const percent = Math.max(0,Math.min(100,Number(volume.progress?.percent)||0));
+      meta.textContent = volume.format + (percent > 0 ? " · " + Math.round(percent) + "%" : "");
+      link.append(name,meta);
+      volumeList.appendChild(link);
+    });
+  }
   const dialog = $("book-dialog");
   if (typeof dialog.showModal === "function") dialog.showModal();
   else dialog.setAttribute("open", "");
@@ -420,18 +446,27 @@ async function removeCurrentBook() {
   if (!state.dialogBookId) return;
   const book = await getBook(state.dialogBookId);
   if (!book) return;
+  const source = book.sourceType === "cloud" ? book.cloudSource : null;
+  const group = source?.folderPath ? state.books.filter(item => {
+    const itemSource = item.sourceType === "cloud" ? item.cloudSource : null;
+    return itemSource && itemSource.provider === source.provider &&
+      itemSource.library === source.library && itemSource.rootPath === source.rootPath &&
+      itemSource.folderPath === source.folderPath;
+  }) : [book];
   const confirmed = window.confirm(book.sourceType === "cloud"
-    ? "確定從這台設備的書架移除「" + book.title + "」？這只會移除本機書架項目與本機閱讀位置，不會刪除 OpenList 原始檔案或雲端筆記。下次同步雲端書架時，這本書會再次加入。"
+    ? "確定從這台設備的書架移除「" + (book.folderTitle || book.title) + "」？共 " + group.length + " 冊。這只會移除本機書架項目與本機閱讀位置，不會刪除 OpenList 原始檔案或雲端筆記；下次同步時會重新加入。"
     : "確定從這台設備的書架移除「" + book.title + "」？這會刪除瀏覽器保存的書檔與閱讀位置，不會影響其他檔案。");
   if (!confirmed) return;
-  await deleteBook(state.dialogBookId);
+  for (const item of group) {
+    await deleteBook(item.id);
+    const objectUrl = coverUrls.get(item.id);
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    coverUrls.delete(item.id);
+  }
   state.dialogBookId = null;
   $("book-dialog").close();
-  const objectUrl = coverUrls.get(book.id);
-  if (objectUrl) URL.revokeObjectURL(objectUrl);
-  coverUrls.delete(book.id);
   await refresh();
-  $("library-status").textContent = "已從本機書架移除書籍，原始檔案不受影響。";
+  $("library-status").textContent = "已從本機書架移除作品，原始檔案不受影響。";
 }
 
 document.querySelectorAll("[data-import-type]").forEach(button => {
