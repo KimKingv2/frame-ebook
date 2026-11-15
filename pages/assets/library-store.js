@@ -430,7 +430,7 @@ function cloudAnnotationDescriptor(book) {
     provider: String(source.provider),
     library: String(source.library),
     rootPath: String(source.rootPath),
-    path: String(source.path)
+    path: String(source.bookPath || source.folderPath || source.path)
   };
 }
 
