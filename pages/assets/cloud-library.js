@@ -343,7 +343,7 @@ async function syncIndexedFilesToShelf(scope,entries) {
   try {
     const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r4");
     const records=await syncModule.syncCloudShelfItems(scope,files);
-    if(records.length)appendIndexLog("本批已同步到書架："+records.length+" 個資料夾作品／單檔。","success");
+    if(records.length)appendIndexLog("本批已加入書架："+records.length+" 冊雲端書檔；相同資料夾會合併為一張作品卡。","success");
   } catch(error) {
     appendIndexLog("本批加入書架失敗（索引已保存，之後可補齊）："+String(error?.message||error),"error");
   }
@@ -358,7 +358,7 @@ async function syncCloudShelfToThisDevice(scope) {
       setSourceStatus("正在將雲端書目加入這台設備的書架："+progress.synced+" / "+progress.total);
     }});
     if(result.changed) {
-      setSourceStatus("已自動加入書架："+result.count+" 個作品（資料夾內的 EPUB／CBZ 合併顯示）；原始檔案仍留在 OpenList。");
+      setSourceStatus("雲端書架已同步："+result.count+" 冊檔案，清除 "+(result.removedCount||0)+" 冊已不存在的項目；同一資料夾合併顯示。原始檔案仍留在 OpenList。");
     }
   } catch(error) {
     appendIndexLog("同步至本機書架失敗："+String(error?.message||error),"error");
