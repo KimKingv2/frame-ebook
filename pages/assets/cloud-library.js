@@ -1027,6 +1027,9 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
       const existingQueue=await fetchPendingCovers(scope,1);
       if(existingQueue.total) {
         appendIndexLog("目錄索引已完成；本次只續做尚未完成的封面，不重新遍歷 OpenList。","warning");
+        scanState.pausedByUser=false;
+        scanState.resumeOnNextOpen=false;
+        await saveIndexScanState(scanState,scope);
         const coverResult=await processPendingCovers(scope,180000,scanState);
         batch.coverProcessed=coverResult.processed;
         batch.coverMissing=coverResult.missing;
