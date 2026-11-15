@@ -301,10 +301,11 @@ async function refresh() {
   }
 }
 function updateLibraryStatus(extra = "") {
-  const cloudCount = state.books.filter(book => book.sourceType === "cloud").length;
-  const localCount = state.books.filter(book => book.sourceType === "local" || (!book.sourceType && book.blob)).length;
-  const epubCount = state.books.filter(book => getBookShelf(book) === "books").length;
-  const comicCount = state.books.filter(book => getBookShelf(book) === "comics").length;
+  const shelfBooks = groupedShelfBooks();
+  const cloudCount = shelfBooks.filter(book => book.sourceType === "cloud").length;
+  const localCount = shelfBooks.filter(book => book.sourceType === "local" || (!book.sourceType && book.blob)).length;
+  const epubCount = shelfBooks.filter(book => getBookShelf(book) === "books").length;
+  const comicCount = shelfBooks.filter(book => getBookShelf(book) === "comics").length;
   $("library-status").textContent = extra || (
     "書架已就緒：電子書 " + epubCount + " 本、漫畫 " + comicCount + " 部。" +
     (cloudCount ? " 雲端書籍 " + cloudCount + " 本。" : "") +
