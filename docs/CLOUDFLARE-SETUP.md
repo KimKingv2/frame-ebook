@@ -1,6 +1,6 @@
 # FRAME Reader V0.9 — Cloudflare setup
 
-FRAME Reader keeps local books, reading positions, appearance preferences and reading statistics. The cloud shelf keeps file metadata and resumable scan state in D1, with normalized cover thumbnails in a private R2 bucket. Original EPUB / CBZ files remain in OpenList. Adding a cloud file copies its content into the current browser's IndexedDB.
+FRAME Reader uses the D1 catalog as its primary cloud bookshelf and mirrors completed catalog entries into the current browser's IndexedDB as metadata-only records. Original EPUB / CBZ files remain in OpenList and are fetched only when opened; they are not copied into IndexedDB by scanning or automatic shelf sync. Local imports retain their Blob in IndexedDB. Reading position, appearance preferences and annotation records remain local to the browser.
 
 ## 1. Create and bind D1 and private R2 cover storage
 
@@ -87,7 +87,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
 6. After the first completed scan, folder navigation reads D1. Re-run the scan when you want to synchronize new, modified or deleted OpenList files.
-7. Add a selected file to the local shelf. Only then is the original EPUB / CBZ downloaded to this browser's IndexedDB; the cloud original is not changed or deleted.
+7. Open any cloud book from the main bookshelf. Its original EPUB / CBZ is fetched from OpenList for the active reading session and is not persisted as a second cloud-file copy in IndexedDB. The cloud original is never changed or deleted.
 
 ## 8. Shared provider Token cache (2026-11-14)
 
@@ -96,10 +96,10 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 ## 7. Existing data and current behavior
 
 - Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. It is additive and does not alter existing reading events, local books, reading progress or appearance settings. The two Access verification Variables must be configured as described above.
-- Existing local books, covers, reading progress and appearance settings remain in IndexedDB.
+- Existing local books, covers, reading progress and appearance settings remain in IndexedDB. The local store is version 3 and includes an `annotations` store for per-book highlights, notes and bookmarks. Cloud shelf sync stores metadata and source coordinates only, never the original cloud Blob.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device. D1 cloud catalog rows contain directory/file names, paths, formats, sizes and modified timestamps, not book contents or credentials.
-- Cloud browsing and file-info requests are read-only. The file proxy forwards valid HTTP Range headers, but the current cloud shelf downloads a selected EPUB / CBZ fully into IndexedDB before opening it. Range-backed reading is a later optimization.
+- Cloud browsing and file-info requests are read-only. The D1 catalog is automatically mirrored to the main bookshelf as metadata-only local records. The reader fetches a cloud original only when opened and keeps per-book reading position, appearance and annotations in local browser storage. The current Foliate adapter loads the opened archive in memory; it does not save that cloud archive Blob into IndexedDB.
 - Reading duration is tracked locally first. Once authenticated through Cloudflare Access, pending events sync to D1. Reading statistics aggregate across devices after they sync.
 - Cloud originals remain in OpenList. Removing a local copy does not delete the cloud original.
 
