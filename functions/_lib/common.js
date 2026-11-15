@@ -249,14 +249,24 @@ async function getAccessJwks(teamDomain, forceRefresh = false) {
   if (!forceRefresh && accessJwksCache && accessJwksCacheDomain === teamDomain && Date.now() < accessJwksExpiresAt) {
     return accessJwksCache;
   }
-  const response = await fetch(teamDomain + "/cdn-cgi/access/certs", {
-    headers: { Accept: "application/json" },
-    cf: { cacheTtl: 300, cacheEverything: true }
-  });
-  if (!response.ok) throw new Error("無法取得 Cloudflare Access 簽章公鑰（HTTP " + response.status + "）。");
-  const payload = await response.json();
+  let response;
+  let payload;
+  try {
+    response = await fetch(teamDomain + "/cdn-cgi/access/certs", {
+      headers: { Accept: "application/json" },
+      cf: { cacheTtl: 300, cacheEverything: true }
+    });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    payload = await response.json();
+  } catch (cause) {
+    const error = new Error("無法取得 Cloudflare Access 簽章公鑰：" + String(cause && cause.message || "網路錯誤").slice(0, 120));
+    error.status = 503;
+    throw error;
+  }
   if (!payload || !Array.isArray(payload.keys) || !payload.keys.length) {
-    throw new Error("Cloudflare Access 公鑰回應格式無效。");
+    const error = new Error("Cloudflare Access 公鑰回應格式無效。");
+    error.status = 503;
+    throw error;
   }
   accessJwksCache = payload.keys;
   accessJwksCacheDomain = teamDomain;
