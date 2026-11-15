@@ -33,26 +33,15 @@ async function resolveBook(db, raw) {
   if (expectedId !== bookId) return { error: json({ error: "雲端書籍識別碼不相符。" }, 400) };
 
   const indexed = await db.prepare(
-    "SELECT is_dir,format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=? LIMIT 1"
+    "SELECT format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
   ).bind(provider, library, rootPath, path).first();
   if (!indexed) return { error: json({ error: "這本書不在目前的 OpenList 書庫索引中。請先重新掃描書庫。" }, 404) };
 
-  if (Number(indexed.is_dir) === 1) {
-    const prefix = path.replace(/\\/+$/, "") + "/";
-    const descendants = await db.prepare(
-      "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 " +
-      "AND substr(path,1,?)=? AND ((?='books' AND format='EPUB') OR (?='comics' AND format IN ('EPUB','CBZ')))"
-    ).bind(provider, library, rootPath, prefix.length, prefix, library, library).first();
-    if (!Number(descendants?.count || 0)) {
-      return { error: json({ error: "這個資料夾內沒有可閱讀的 EPUB／CBZ 書檔。" }, 415) };
-    }
-  } else {
-    const format = String(indexed.format || "").toUpperCase();
-    const validFormat = library === "books"
-      ? format === "EPUB"
-      : format === "EPUB" || format === "CBZ";
-    if (!validFormat) return { error: json({ error: "這個檔案格式不屬於目前的書庫。" }, 415) };
-  }
+  const format = String(indexed.format || "").toUpperCase();
+  const validFormat = library === "books"
+    ? format === "EPUB"
+    : format === "EPUB" || format === "CBZ";
+  if (!validFormat) return { error: json({ error: "這個檔案格式不屬於目前的書庫。" }, 415) };
 
   return { provider, library, rootPath, path, bookId };
 }
