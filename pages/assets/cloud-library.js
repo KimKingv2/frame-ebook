@@ -513,6 +513,8 @@ function newIndexScanState(rootPath, provider, library) {
     coverReadyCount: 0,
     coverMissingCount: 0,
     coverFailedCount: 0,
+    pausedByUser: false,
+    resumeOnNextOpen: false,
     errors: [],
     completed: false,
     createdAt: new Date().toISOString(),
@@ -960,6 +962,10 @@ async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
   const remaining=await fetchPendingCovers(scope,1);
   if(scanState) {
     scanState.coverPendingCount=Number(remaining.total||0);
+    if(state.scanPauseRequested) {
+      scanState.pausedByUser=state.scanPauseReason==="manual";
+      scanState.resumeOnNextOpen=state.scanPauseReason!=="manual";
+    }
     await saveIndexScanState(scanState,scope);
   }
   appendIndexLog("封面索引本批完成：處理 "+processed+" 本，無封面 "+missing+" 本，失敗 "+failed+" 本，待處理 "+remaining.total+" 本。");
@@ -1329,7 +1335,6 @@ async function resumeSavedScanOnOpen() {
   try {
     const saved=await loadIndexScanState(scope);
     if(!saved)return;
-    const shouldResume=!saved.completed&&!saved.pausedByUser;
     let coverPending=false;
     if(saved.completed) {
       try {
@@ -1337,7 +1342,8 @@ async function resumeSavedScanOnOpen() {
         coverPending=Number(pending.total||0)>0;
       } catch (_) {}
     }
-    if(!shouldResume&&!coverPending)return;
+    const shouldResume=!saved.pausedByUser&&(!saved.completed||coverPending);
+    if(!shouldResume)return;
     appendIndexLog("重新開啟索引管理：找到已保存的 D1 游標／封面佇列，開始自動續作。","warning");
     void runLibraryScanContinuous(scope.library);
   } catch(error) {
@@ -1384,7 +1390,7 @@ async function checkSession() {
             pendingCoverCount=Number(pending.total||0);
           } catch (_) {}
         }
-        if(savedScan&&((!savedScan.completed&&!savedScan.pausedByUser)||pendingCoverCount>0))openCloudSettings();
+        if(savedScan&&!savedScan.pausedByUser&&(!savedScan.completed||pendingCoverCount>0))openCloudSettings();
       } else {
         setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
       }
