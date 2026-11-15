@@ -22,7 +22,7 @@
       <section class="intro">
         <p class="eyebrow">YOUR PRIVATE READING ROOM</p>
         <h1>把一本 EPUB，<em>真正打開。</em></h1>
-        <p>先用內建測試書驗證解析、章節、翻頁與閱讀位置保存。本機 EPUB / CBZ 只會在目前瀏覽器中讀取，不會上傳。</p>
+        <p>雲端書籍會在開啟時從 OpenList 讀取；閱讀位置、外觀設定與個人標註保存在目前這台設備，不會回寫原始雲端書檔。</p>
       </section>
       <section class="toolbar" aria-label="書籍操作">
         <button id="load-demo" type="button" class="primary-button">載入 EPUB 測試書</button>
@@ -193,17 +193,17 @@
       <p id="reader-status" class="reader-status" role="status">尚未載入 EPUB。</p>
       <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       <section class="notice">
-        <strong>原型限制</strong>
-        <p>目前 EPUB 原型使用 JSZip 讀取封裝；CBZ 使用 Zip.js 按頁載入，長卷模式只預載接近可視區的圖片。正式 OpenList 版本仍需改為 HTTP Range 分段讀取，並在桌面、平板與手機瀏覽器分別驗證容量與效能。</p>
+        <strong>閱讀資料保存</strong>
+        <p>開啟雲端作品時，原始 EPUB／CBZ 會載入目前瀏覽器記憶體供閱讀，但不會自動保存成整本本機副本。閱讀位置、外觀偏好、書籤與筆記由本機 IndexedDB／瀏覽器儲存保存。清除網站資料會移除這些個人資料。</p>
       </section>
     </main>
     <footer class="footer">
       <a href="/">FRAME READER</a>
-      <span>LOCAL TEST · NO BOOK UPLOAD · NO OPENLIST TOKEN</span>
+      <span>CLOUD ORIGINAL · LOCAL READING DATA</span>
     </footer>
   </div>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261115-cloud-primary"></script>
 </body>
 </html>
