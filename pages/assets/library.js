@@ -315,7 +315,7 @@ function startCloudShelfSync() {
   if (state.cloudSyncPromise) return;
   state.cloudSyncPromise = (async () => {
     try {
-      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-annotations-r3");
+      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r1");
       const result = await module.syncSavedCloudShelves({
         onProgress: progress => {
           $("library-status").textContent =
