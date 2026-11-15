@@ -111,7 +111,6 @@ async function fetchCatalogPage(scope, page) {
 
 export async function syncCloudShelfItems(scope, items, options = {}) {
   const records = buildShelfEntries(scope, items);
-  if (!records.length) return [];
   return upsertCloudBooks(scope, records, { replaceGroups: options.replaceGroups === true });
 }
 
@@ -150,10 +149,12 @@ export async function syncCloudShelf(scope, options = {}) {
 
   const records = await syncCloudShelfItems(normalizedScope, allItems, { replaceGroups: complete });
   if (complete) await setReadingSetting(syncKey, version);
+  const removedCount = Number(records.removedCount) || 0;
   return {
-    changed: records.length > 0,
+    changed: records.length > 0 || removedCount > 0,
     ready: complete,
     count: records.length,
+    removedCount,
     total,
     version,
     partial: !complete
