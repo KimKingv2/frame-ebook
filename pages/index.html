@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
-  <meta name="description" content="FRAME Reader，雲端書目優先的私人電子書書架；閱讀進度與個人資料保存在本機。">
+  <meta name="description" content="FRAME Reader，透過 Alist／OpenList 掃描索引的雲端電子書與漫畫書架。">
   <title>FRAME Reader · My Library</title>
   <link rel="preload" as="image" href="/assets/covers/frame-sample.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/site.css?v=20261116-cloud-manager-r1">
@@ -18,12 +18,12 @@
     <header class="topbar">
       <a class="brand" href="/" aria-label="FRAME Reader 首頁">
         <span class="brand-mark">F</span>
-        <span class="brand-name">FRAME <b>READER</b><small>PERSONAL LIBRARY</small></span>
+        <span class="brand-name">FRAME <b>READER</b><small>CLOUD LIBRARY</small></span>
       </a>
       <nav class="main-nav" aria-label="主要導覽">
         <a class="active" href="#library">我的書架</a>
         <a href="/reading-stats/">閱讀時光</a>
-        <a href="/cloud/">雲端書庫</a>
+        <a href="/cloud/">檔案瀏覽</a>
         <a href="/epub-lab/">閱讀室</a>
       </nav>
       <button id="open-cloud-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-manager-dialog">連接與掃描</button>
@@ -34,7 +34,7 @@
       <div class="hero-copy">
         <p class="eyebrow"><span class="eyebrow-line"></span> YOUR PRIVATE READING ROOM</p>
         <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
-        <p class="hero-text">以雲端書庫作為主要藏書來源，掃描完成便自動加入書架。雲端書籍的書籤、筆記與高亮保存在雲端；本機匯入書籍的標註保存在本機。閱讀位置與外觀設定目前仍保存在本機。</p>
+        <p class="hero-text">只從 Alist／OpenList 掃描索引導入書籍。書檔留在你的雲端儲存，書架、閱讀進度、外觀偏好、書籤與筆記均透過 Cloudflare D1／R2 保存，跨裝置自動同步。</p>
         <div class="hero-actions library-hero-imports">
           <button class="primary-link library-import-button" data-import-type="books" type="button">匯入電子書 <span aria-hidden="true">＋</span></button>
           <button class="secondary-import-button" data-import-type="comics" type="button">匯入漫畫 <span aria-hidden="true">＋</span></button>
@@ -77,7 +77,7 @@
         <div>
           <p class="section-kicker">YOUR PERSONAL COLLECTION</p>
           <h2>兩種收藏，各自成架<span class="heading-period">.</span></h2>
-          <p class="section-subtitle">雲端書目自動入架；閱讀記憶與個人資料留在這台設備。</p>
+          <p class="section-subtitle">掃描完成自動入架；書架與個人閱讀資料均保存在雲端。</p>
         </div>
         <div class="shelf-count"><strong id="shelf-count-label">00 ITEMS</strong><span>IN YOUR LIBRARY</span></div>
       </div>
@@ -139,7 +139,7 @@
 
     <section class="library-privacy">
       <span class="privacy-mark">⌂</span>
-      <div><strong>雲端保存原始書檔與雲端書籍標註，本機保存匯入檔與本機標註。</strong><p>雲端書籍的書目會自動同步到這台設備；原始 EPUB／CBZ 仍留在 OpenList，只有開啟閱讀時才讀取。閱讀位置與個人外觀設定使用瀏覽器本機保存。雲端書籍的書籤、螢光標記與筆記保存在 D1，依 Cloudflare Access 登入身分隔離；本機匯入書籍的同類標註只存 IndexedDB，不會上傳。手動匯入的本機書籍也會保留，並以低調文字註明來源。</p></div>
+      <div><strong>雲端保存書檔，Cloudflare 保存你的閱讀資料。</strong><p>原始 EPUB／CBZ 留在 Alist／OpenList；D1 保存索引、閱讀位置、閱讀統計、分類與外觀偏好，R2 保存索引封面。書籤、螢光標記與筆記也保存在 D1，依 Cloudflare Access 使用者身分隔離。瀏覽器只在閱讀時暫時載入書檔，不會建立本機書庫或持久化副本。</p></div>
       <span class="privacy-tag">PRIVATE BY DESIGN</span>
     </section>
 
@@ -148,7 +148,7 @@
       <a href="/epub-lab/">進入閱讀空間 <span aria-hidden="true">↗</span></a>
     </section>
 
-    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>CLOUD CATALOG · LOCAL READING DATA</span></footer>
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>MADE FOR THE LOVE OF READING</span><span>CLOUD CATALOG · CLOUD READING DATA</span></footer>
   </main>
 
   <dialog id="cloud-manager-dialog" class="cloud-manager-dialog" aria-labelledby="cloud-manager-title">
@@ -177,7 +177,7 @@
         <div id="detail-volume-list" class="dialog-volume-list"></div>
       </section>
       <div class="dialog-actions">
-        <button id="detail-delete" type="button" class="dialog-danger">從本機書架移除</button>
+        
         <span></span>
         <button id="detail-open" type="button" class="dialog-secondary">開啟閱讀</button>
         <button type="submit" class="primary-link">儲存資訊</button>
@@ -187,6 +187,6 @@
 
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
-  <script type="module" src="/assets/library.js?v=20261115-folder-shelves-r8"></script>
+  <script type="module" src="/assets/library.js?v=20261116-cloud-only-r1"></script>
 </body>
 </html>
