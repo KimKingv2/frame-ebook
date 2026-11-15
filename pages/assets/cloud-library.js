@@ -808,7 +808,14 @@ async function resizeCover(blob) {
 async function extractCloudCover(item,onEvent=()=>{}) {
   const started=performance.now();
   const rangeReader=await makeCoverRangeReader(item,onEvent);
-  const zip=new ZipReader(rangeReader);
+  // zip.js defaults to Web Workers and resolves its worker URI relative to
+  // vendor/zip.js. This project vendors zip.js but does not ship
+  // vendor/core/web-worker-wasm.js or its WASM assets. A Worker can therefore
+  // fail to load while zip.js waits forever for a worker response.
+  // Run extraction on the main thread using the browser's native
+  // DecompressionStream instead.
+  onEvent("ZIP 解壓模式：停用未隨專案部署的 Web Worker，使用瀏覽器內建解壓串流。");
+  const zip=new ZipReader(rangeReader,{useWebWorkers:false,useCompressionStream:true});
   const entries=await zip.getEntries();
   onEvent("ZIP 中央目錄解析完成："+entries.length+" 個項目；耗時 "+Math.round(performance.now()-started)+" ms");
   const found=item.format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries,onEvent);
