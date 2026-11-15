@@ -379,20 +379,74 @@ async function upsertCloudBooks(scope, items) {
   return records;
 }
 
+function cloudAnnotationDescriptor(book) {
+  const source = book && book.cloudSource;
+  if (!book || book.sourceType !== "cloud" || !source ||
+      !source.provider || !source.library || !source.rootPath || !source.path) {
+    throw new Error("這本雲端書籍缺少有效的 OpenList 來源資訊。");
+  }
+  return {
+    id: String(book.id),
+    provider: String(source.provider),
+    library: String(source.library),
+    rootPath: String(source.rootPath),
+    path: String(source.path)
+  };
+}
+
+function cloudAnnotationUrl(book) {
+  const source = cloudAnnotationDescriptor(book);
+  const params = new URLSearchParams({
+    book_id: source.id,
+    provider: source.provider,
+    library: source.library,
+    root_path: source.rootPath,
+    path: source.path
+  });
+  return "/api/reading/annotations?" + params.toString();
+}
+
+async function requestCloudAnnotations(method, book, payload = null) {
+  const response = await fetch(cloudAnnotationUrl(book), {
+    method,
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: payload ? { "Content-Type": "application/json" } : undefined,
+    body: payload ? JSON.stringify(Object.assign({ book: cloudAnnotationDescriptor(book) }, payload)) : undefined
+  });
+  let result;
+  try { result = await response.json(); } catch (_) {
+    throw new Error("雲端標註 API 回應格式無效（HTTP " + response.status + "）。");
+  }
+  if (!response.ok || !result || result.ok !== true) {
+    throw new Error(String(result && result.error || "雲端標註同步失敗（HTTP " + response.status + "）。"));
+  }
+  return result;
+}
+
 async function saveAnnotation(annotation) {
   if (!annotation || !annotation.bookId) throw new Error("筆記缺少所屬書籍識別碼。");
+  const bookId = String(annotation.bookId);
+  const book = await getBook(bookId);
+  if (!book) throw new Error("找不到這本書，無法保存標註。");
   const now = Date.now();
   const record = {
     id: String(annotation.id || makeId()),
-    bookId: String(annotation.bookId),
+    bookId,
     type: ["highlight", "note", "bookmark"].includes(annotation.type) ? annotation.type : "note",
-    cfi: String(annotation.cfi || ""),
+    cfi: String(annotation.cfi || "").slice(0, 4000),
     quote: String(annotation.quote || "").slice(0, 12000),
     text: String(annotation.text || "").slice(0, 20000),
     color: String(annotation.color || "yellow").slice(0, 32),
     createdAt: Number(annotation.createdAt) || now,
     updatedAt: now
   };
+
+  if (book.sourceType === "cloud") {
+    const result = await requestCloudAnnotations("POST", book, { annotation: record });
+    return result.annotation;
+  }
+
   const db = await openDatabase();
   const tx = db.transaction("annotations", "readwrite");
   const done = transactionDone(tx);
@@ -402,18 +456,44 @@ async function saveAnnotation(annotation) {
 }
 
 async function listAnnotations(bookId) {
+  const id = String(bookId || "");
+  const book = await getBook(id);
+  if (!book) throw new Error("找不到這本書，無法讀取標註。");
+
+  if (book.sourceType === "cloud") {
+    const result = await requestCloudAnnotations("GET", book);
+    return Array.isArray(result.annotations) ? result.annotations : [];
+  }
+
   const db = await openDatabase();
   const tx = db.transaction("annotations", "readonly");
   const index = tx.objectStore("annotations").index("bookId");
-  const rows = await requestResult(index.getAll(String(bookId)));
+  const rows = await requestResult(index.getAll(id));
   return rows.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 }
 
-async function deleteAnnotation(id) {
+async function deleteAnnotation(id, bookId = "") {
+  const annotationId = String(id || "");
+  if (!annotationId) return false;
+  let book = bookId ? await getBook(String(bookId)) : null;
+
+  if (!book) {
+    const lookupDb = await openDatabase();
+    const lookupTx = lookupDb.transaction("annotations", "readonly");
+    const localAnnotation = await requestResult(lookupTx.objectStore("annotations").get(annotationId));
+    if (localAnnotation) book = await getBook(localAnnotation.bookId);
+  }
+  if (!book) throw new Error("刪除標註時找不到所屬書籍，請傳入 bookId。");
+
+  if (book.sourceType === "cloud") {
+    await requestCloudAnnotations("DELETE", book, { id: annotationId });
+    return true;
+  }
+
   const db = await openDatabase();
   const tx = db.transaction("annotations", "readwrite");
   const done = transactionDone(tx);
-  tx.objectStore("annotations").delete(String(id));
+  tx.objectStore("annotations").delete(annotationId);
   await done;
   return true;
 }

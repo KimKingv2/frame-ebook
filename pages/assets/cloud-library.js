@@ -330,7 +330,7 @@ async function syncCloudShelfToThisDevice(scope) {
   if(state.shelfSyncRunning.has(key))return;
   state.shelfSyncRunning.add(key);
   try {
-    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-primary-r2");
+    const syncModule=await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-annotations-r3");
     const result=await syncModule.syncCloudShelf(scope,{onProgress:progress=>{
       setSourceStatus("正在將雲端書目加入這台設備的書架："+progress.synced+" / "+progress.total);
     }});
@@ -1484,7 +1484,7 @@ async function openCloudBook(item) {
   state.busy.add(item.path);renderItems();
   $("cloud-browser-status").textContent="正在準備 "+item.name+" 的本機書目記錄……";
   try {
-    const store=await import("/assets/library-store.js?v=20261115-cloud-primary-r2");
+    const store=await import("/assets/library-store.js?v=20261115-cloud-annotations-r3");
     const records=await store.upsertCloudBooks(scope,[item]);
     const record=records[0];
     if(!record)throw new Error("無法建立這本書的本機書目記錄。");

@@ -22,7 +22,7 @@
       <section class="intro">
         <p class="eyebrow">YOUR PRIVATE READING ROOM</p>
         <h1>把一本 EPUB，<em>真正打開。</em></h1>
-        <p>雲端書籍會在開啟時從 OpenList 讀取；閱讀位置、外觀設定與個人標註保存在目前這台設備，不會回寫原始雲端書檔。</p>
+        <p>雲端書籍會在開啟時從 OpenList 讀取；雲端書籍的書籤、筆記與高亮保存在 D1，會隨登入帳號跨裝置使用。本機匯入書籍的標註則保存在這台設備，不會上傳。閱讀位置與外觀設定目前仍保存在本機。</p>
       </section>
       <section class="toolbar" aria-label="書籍操作">
         <button id="load-demo" type="button" class="primary-button">載入 EPUB 測試書</button>
@@ -194,16 +194,16 @@
       <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       <section class="notice">
         <strong>閱讀資料保存</strong>
-        <p>開啟雲端作品時，原始 EPUB／CBZ 會載入目前瀏覽器記憶體供閱讀，但不會自動保存成整本本機副本。閱讀位置、外觀偏好、書籤與筆記由本機 IndexedDB／瀏覽器儲存保存。清除網站資料會移除這些個人資料。</p>
+        <p>開啟雲端作品時，原始 EPUB／CBZ 會載入目前瀏覽器記憶體供閱讀，不會保存成整本本機副本。雲端書籍的書籤、筆記與高亮保存在 D1，依 Cloudflare Access 登入身分隔離；本機匯入書籍的標註保存在 IndexedDB。閱讀位置與外觀偏好目前仍是本機資料。清除網站資料會移除本機匯入書籍的檔案與本機標註。</p>
       </section>
     </main>
     <footer class="footer">
       <a href="/">FRAME READER</a>
-      <span>CLOUD ORIGINAL · LOCAL READING DATA</span>
+      <span>CLOUD BOOK ANNOTATIONS · LOCAL IMPORT DATA</span>
     </footer>
   </div>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261115-cloud-primary-r2"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261115-cloud-annotations-r3"></script>
 </body>
 </html>
