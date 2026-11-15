@@ -1,6 +1,6 @@
 # FRAME Reader V0.9 — Cloudflare setup
 
-FRAME Reader uses the D1 catalog as its primary cloud bookshelf and mirrors completed catalog entries into the current browser's IndexedDB as metadata-only records. Original EPUB / CBZ files remain in OpenList and are fetched only when opened; they are not copied into IndexedDB by scanning or automatic shelf sync. Local imports retain their Blob in IndexedDB. Reading position, appearance preferences and annotation records remain local to the browser.
+FRAME Reader uses the D1 catalog as its primary cloud bookshelf and mirrors completed catalog entries into the current browser's IndexedDB as metadata-only records. Original EPUB / CBZ files remain in OpenList and are fetched only when opened; they are not copied into IndexedDB by scanning or automatic shelf sync. Local imports retain their Blob in IndexedDB. Reading position and appearance preferences remain local to the browser. Cloud-book bookmarks, notes and highlights are stored in D1; annotations for locally imported books stay in this browser's IndexedDB.
 
 ## 1. Create and bind D1 and private R2 cover storage
 
@@ -17,6 +17,7 @@ Apply the schema from the repository root if it has not already been applied:
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0002_cloud_catalog.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_covers.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0004_cloud_annotations.sql
 ```
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
@@ -51,6 +52,22 @@ This design relies on the Access edge policy. If the production hostname or any 
 
 D1 stores reading events/statistics, the metadata-only cloud catalog, resumable scan state and cover hashes/status. The private R2 bucket stores normalized cover thumbnails only; original EPUB / CBZ files remain in OpenList. Cover extraction uses bounded HTTP Range reads from ZIP archives and does not intentionally download the full book. The app converts extracted covers to small WebP (JPEG fallback) thumbnails and deduplicates them by SHA-256. It never stores OpenList credentials in D1 or R2. The old `auth_attempts` table may remain in D1 and is no longer used.
 
+
+## 3. Configure Cloudflare Access identity for cloud annotations
+
+Cloud-book annotations are partitioned by the verified Cloudflare Access subject. Add these two **Variables** under Workers & Pages → `frame-ebook` → Settings → Variables and Secrets → Production:
+
+| Name | Type | Value |
+|---|---|---|
+| `FRAME_READER_ACCESS_TEAM_DOMAIN` | Variable | Your Cloudflare Zero Trust team domain, for example `https://your-team.cloudflareaccess.com` |
+| `FRAME_READER_ACCESS_AUD` | Variable | The Application Audience (AUD) tag of the Access application protecting the complete production hostname `frame-ebook.pages.dev` |
+
+Find the team domain in the Cloudflare Zero Trust dashboard. Find the AUD tag in Zero Trust → Access → Applications → the Reader production application → Additional settings → Application Audience (AUD) Tag. Enter the full HTTPS team domain without a trailing slash. These values are not passwords or secrets, but the AUD must match the exact Access application protecting this hostname.
+
+Add the same variables to Preview only if you test cloud annotations on Preview. Use the Preview Access application's AUD if it has a separate application. A missing or mismatched value makes the cloud annotation API fail closed; it never falls back to local storage for a cloud-origin book.
+
+The annotation API verifies the `Cf-Access-Jwt-Assertion` signature against the team's published Access signing keys, checks the issuer, expiry and AUD, then stores only a SHA-256-derived owner ID. Raw email addresses and Access tokens are not stored in D1. The existing Access edge policy must still protect the full hostname and all `/api/*` routes.
+
 ## 4. Configure the LAN-direct source (optional)
 
 The fourth source is the OpenList instance reachable directly from the current device, such as a Mac or phone on the home network. On the cloud page, enter its URL, account name and password. The URL and username are saved in that browser's local storage. The password is kept only in the current tab's `sessionStorage`, so a page reload in that tab can reconnect, but closing the tab clears it. The credentials are sent directly to the LAN OpenList login and file-list endpoints; they do not pass through Pages, D1 or Worker APIs.
@@ -74,7 +91,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 
 ## 6. Verify the configuration
 
-1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. Apply `migrations/0001_reading_events.sql`, `migrations/0002_cloud_catalog.sql` and `migrations/0003_cloud_covers.sql` to the `frame-reader-db` database.
+1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. Apply `migrations/0001_reading_events.sql`, `migrations/0002_cloud_catalog.sql`, `migrations/0003_cloud_covers.sql` and `migrations/0004_cloud_annotations.sql` to the `frame-reader-db` database.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
@@ -82,7 +99,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
    - Confirm the Access application/policy covers the entire hostname and therefore `/`, `/cloud/*`, `/reading-stats/*`, and `/api/*`. Do not add path exclusions for the API routes.
    - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Preview uses a separate hostname/policy and must not be confused with Production.
    - If a custom domain is used, create a separate Access application for that hostname and protect the complete hostname too.
-   **Security boundary:** Pages Functions trust the Cloudflare Access edge and do not perform a second JWT verification. No Reader-specific Access Team Domain or AUD Variables are required. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
+   **Security boundary:** Cloudflare Access must protect the complete hostname. The cloud-annotation endpoint additionally verifies the Access JWT signature, issuer, expiry and application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. The other existing APIs continue to rely on the Access edge. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
 4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; for LAN-direct, enter its URL, username and password first.
 5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
@@ -96,12 +113,12 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 ## 7. Existing data and current behavior
 
 - Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. It is additive and does not alter existing reading events, local books, reading progress or appearance settings. The two Access verification Variables must be configured as described above.
-- Existing local books, covers, reading progress and appearance settings remain in IndexedDB. The local store is version 3 and includes an `annotations` store for per-book highlights, notes and bookmarks. Cloud shelf sync stores metadata and source coordinates only, never the original cloud Blob.
+- Existing local books, covers, reading progress and appearance settings remain in IndexedDB. The local store is version 3 and includes an `annotations` store for highlights, notes and bookmarks on locally imported books. Cloud-origin annotations are stored in D1 through `/api/reading/annotations`, keyed by the verified Access identity and stable cloud book ID. Cloud annotations are not copied into IndexedDB.
 - Books root supports EPUB. Comics root supports EPUB and CBZ. MOBI is not supported directly; convert it to EPUB before importing.
 - Server-side account passwords remain in Cloudflare Variables / Secrets. The browser receives only source labels and configured-status flags. Only the optional LAN-direct URL, username and current-tab password are stored on the device. D1 cloud catalog rows contain directory/file names, paths, formats, sizes and modified timestamps, not book contents or credentials.
-- Cloud browsing and file-info requests are read-only. The D1 catalog is automatically mirrored to the main bookshelf as metadata-only local records. The reader fetches a cloud original only when opened and keeps per-book reading position, appearance and annotations in local browser storage. The current Foliate adapter loads the opened archive in memory; it does not save that cloud archive Blob into IndexedDB.
+- Cloud browsing and file-info requests are read-only. The D1 catalog is automatically mirrored to the main bookshelf as metadata-only local records. The reader fetches a cloud original only when opened. Per-book reading position and appearance stay in local browser storage. Cloud-book annotations (bookmarks, highlights and notes) are stored in D1; local-import annotations remain in IndexedDB. The current Foliate adapter loads the opened archive in memory; it does not save that cloud archive Blob into IndexedDB.
 - Reading duration is tracked locally first. Once authenticated through Cloudflare Access, pending events sync to D1. Reading statistics aggregate across devices after they sync.
-- Cloud originals remain in OpenList. Removing a local copy does not delete the cloud original.
+- Cloud originals remain in OpenList. Removing a book's metadata entry from this device does not delete the cloud original or its D1 annotations.
 
 ## References
 
