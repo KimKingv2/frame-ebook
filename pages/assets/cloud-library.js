@@ -1287,9 +1287,11 @@ async function runAllIndexScans() {
     if(!stopped)appendIndexLog("========== 電子書與漫畫兩個書庫均已完成 ==========","success");
     else appendIndexLog("連續掃描已停止；已完成項目及 D1 進度保留，可稍後續作。","warning");
   } finally {
+    const resumeAfterClose=stopped&&state.scanPauseReason==="close"&&$("cloud-settings-dialog")?.open;
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all","cloud-retry-covers"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
     ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
+    if(resumeAfterClose)void resumeSavedScanOnOpen();
   }
 }
 async function retryCurrentLibraryCovers() {
