@@ -76,7 +76,7 @@ The current browser prototype is only a compatibility baseline. Test the actual 
 
 ## Local library store (V0.5)
 
-The homepage at \`/\` is backed by \`pages/assets/library-store.js\`, a same-origin IndexedDB store named \`frame-reader-library\`.
+The homepage at \`/\` is the primary bookshelf and is backed by \`pages/assets/library-store.js\`, a same-origin IndexedDB store named \`frame-reader-library\`. D1 remains the authoritative cloud catalog; completed cloud records are mirrored locally as metadata-only bookshelf entries.
 
 Each local book record uses a browser-generated stable \`id\` and stores:
 
@@ -92,7 +92,7 @@ Import is local-only. The browser parses the archive to obtain its metadata and 
 
 EPUB metadata is read from the OPF package metadata and manifest. The current implementation extracts the declared cover image (with format-specific fallbacks), title, creator, language, identifier and spine count. CBZ indexing enumerates supported image entries, sorts naturally, counts pages and selects a cover/front image candidate or the first image.
 
-The Reading Room opens a shelf book by ID using \`/epub-lab/?book=<id>\`. It fetches the Blob from IndexedDB and passes it to the existing Foliate adapter. The same book ID scopes CFI / image-index persistence and the per-book appearance key (\`frame-reader-appearance-v1:<id>\`). A book opened from a direct local-file picker is first imported into the same store. The active book ID remains in the address bar so browser reload can reopen it.
+The Reading Room opens a shelf book by ID using \`/epub-lab/?book=<id>\`. A local import is read from its Blob in IndexedDB; a cloud record resolves its saved OpenList source and fetches the original only when opened, without persisting a second copy in IndexedDB. The same stable book ID scopes CFI / image-index progress and the per-book appearance key (\`frame-reader-appearance-v1:<id>\`). The active book ID remains in the address bar so browser reload can reopen it.
 
 The bookshelf supports title / author / filename search, recent / added / title / progress sorting, cover grid / list layout, recently opened books, metadata editing and local removal. Removing a book deletes only the browser's stored copy; it does not touch the original file on disk.
 
@@ -103,7 +103,7 @@ The bookshelf supports title / author / filename search, recent / added / title 
 - The EPUB metadata adapter currently uses JSZip, which may require extra memory while inspecting large EPUB archives.
 - CBZ shelf indexing reads the archive directory and a cover image; the reader's existing image loading remains lazy.
 - No OpenList API key, user credential or private book metadata is embedded in frontend source.
-- The metadata-only OpenList cloud catalog and resumable D1 scan state are described below. Book files remain in OpenList until a user explicitly adds one to the local IndexedDB shelf.
+- The D1 OpenList cloud catalog and resumable scan state are the source of cloud book metadata. A completed scan synchronizes metadata-only records into the main bookshelf automatically. Original cloud book files remain in OpenList and are fetched only when opened.
 
 ## Sync data model (future)
 
@@ -123,6 +123,17 @@ Use server timestamps and conflict resolution based on the latest valid update. 
 
 Never expose a long-lived OpenList administrator token in browser JavaScript. A future Worker should authenticate the reader and issue narrowly scoped, short-lived access to one file or range request. Validate the sign-in flow on desktop, tablet and mobile before enabling private-library access.
 
+
+### Cloud-first bookshelf and local personal data
+
+The main bookshelf combines two record types in the same local IndexedDB store:
+
+- **Cloud catalog records:** stable IDs derived from provider, library, root path and OpenList file path; title/file name, format, size, modified time, source coordinates, cover hash and local reading progress. Their `blob` field stays null. Scanning or syncing metadata never downloads the original EPUB / CBZ.
+- **Local imports:** user-selected files retain their original Blob in IndexedDB and are marked subtly as `本機` in the bookshelf.
+
+When a cloud book is opened, the Reading Room resolves the saved source. VPS, Worker and Mobile Device files are fetched through the protected Pages Function proxy; LAN-direct files are fetched from the device's configured OpenList after a fresh account/password login. The downloaded File is passed to Foliate in memory and is not written back as a cloud-book Blob in IndexedDB.
+
+Per-book reading position, page index, appearance settings, and annotation records belong to the local browser profile. IndexedDB version 3 adds the `annotations` object store with `bookId` and `updatedAt` indexes and local CRUD functions for highlights, notes and bookmarks. The annotation persistence layer is ready; the current Reading Room does not yet expose the complete highlight/note editing UI. Clearing this site's browser data removes local personal reading data. The separate reading-time statistics feature retains its existing D1 event-sync path.
 
 ### Fixed-layout and comic reading
 
