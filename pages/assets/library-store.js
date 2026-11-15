@@ -286,7 +286,7 @@ async function listBooks() {
     (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
 }
 
-function cloudBookId(scope, path) {
+async function cloudBookId(scope, path) {
   const provider = String(scope?.provider || "");
   const library = String(scope?.library || "");
   const rootPath = normalizePath(scope?.rootPath || "");
@@ -294,7 +294,10 @@ function cloudBookId(scope, path) {
   if (!provider || !["books", "comics"].includes(library) || !rootPath || !filePath) {
     throw new Error("雲端書籍識別資訊無效。");
   }
-  return "cloud:" + [provider, library, rootPath, filePath].map(encodeURIComponent).join(":");
+  const identity = [provider, library, rootPath, filePath].join("\\n");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  return "cloud:" + hash;
 }
 
 async function upsertCloudBooks(scope, items) {
@@ -313,7 +316,7 @@ async function upsertCloudBooks(scope, items) {
   });
   if (!validItems.length) return [];
 
-  const ids = validItems.map(item => cloudBookId(source, item.path));
+  const ids = await Promise.all(validItems.map(item => cloudBookId(source, item.path)));
   const db = await openDatabase();
   const readTx = db.transaction(STORE_NAME, "readonly");
   const readDone = transactionDone(readTx);
