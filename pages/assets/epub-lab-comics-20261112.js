@@ -15,9 +15,9 @@
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261115-cloud-primary');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261115-cloud-primary-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js');
-  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261115-cloud-primary');
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261115-cloud-primary-r2');
   var APPEARANCE_KEY = 'frame-reader-appearance-v1';
   currentAppearanceKey = APPEARANCE_KEY;
   var THEMES = {
