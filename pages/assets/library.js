@@ -173,11 +173,65 @@ function createCard(book, compact) {
   return article;
 }
 
+function groupedShelfBooks() {
+  const groups = new Map();
+  const output = [];
+  for (const book of state.books) {
+    const source = book.sourceType === "cloud" ? book.cloudSource : null;
+    const folderPath = String(source && source.folderPath || "");
+    if (!folderPath) {
+      output.push(book);
+      continue;
+    }
+    const key = [source.provider, source.library, source.rootPath, folderPath].join("\n");
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        ...book,
+        title: book.manualTitle ? book.title : (book.folderTitle || folderPath.split("/").pop() || book.title),
+        folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
+        cloudCoverHashes: [],
+        cloudSource: { ...source, files: [] },
+        _groupMembers: [],
+        volumeCount: 0,
+        size: 0
+      };
+      groups.set(key, group);
+      output.push(group);
+    }
+    group._groupMembers.push(book);
+    group.volumeCount += 1;
+    group.size += Math.max(0, Number(book.size) || 0);
+    group.lastOpenedAt = Math.max(Number(group.lastOpenedAt) || 0, Number(book.lastOpenedAt) || 0);
+    group.cloudCoverHashes.push(...(Array.isArray(book.cloudCoverHashes) ? book.cloudCoverHashes : []));
+    if (book.cloudCoverHash && book.cloudCoverStatus === "ready") group.cloudCoverHashes.push(book.cloudCoverHash);
+    group.cloudSource.files.push({
+      path: String(source.path || ""),
+      name: String(book.fileName || ""),
+      format: String(book.format || ""),
+      size: Math.max(0, Number(book.size) || 0),
+      coverHash: book.cloudCoverHash || null,
+      coverStatus: book.cloudCoverStatus || "pending"
+    });
+  }
+  for (const group of groups.values()) {
+    group.cloudCoverHashes = [...new Set(group.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 8);
+    const fileMap = new Map();
+    for (const file of group.cloudSource.files) if (file.path) fileMap.set(file.path, file);
+    group.cloudSource.files = [...fileMap.values()].sort((a, b) =>
+      String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
+  }
+  return output;
+}
+
 function filteredBooks() {
   const query = state.query.trim().toLocaleLowerCase();
-  let books = state.books.filter(book => {
+  let books = groupedShelfBooks().filter(book => {
     if (!query) return true;
-    return [book.title, book.author, book.fileName, book.format].join(" ").toLocaleLowerCase().includes(query);
+    const memberText = Array.isArray(book._groupMembers)
+      ? book._groupMembers.map(item => [item.fileName, item.title, item.format].join(" ")).join(" ")
+      : "";
+    return [book.title, book.author, book.fileName, book.format, memberText].join(" ").toLocaleLowerCase().includes(query);
   });
   books = books.slice();
   if (state.sort === "title") books.sort((a, b) => (a.title || "").localeCompare(b.title || "", "zh-Hant"));
@@ -201,18 +255,19 @@ function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmpt
 }
 
 function render() {
-  const total = state.books.length;
-  const started = state.books.filter(book => Number(book.progress && book.progress.percent) > 0).length;
-  const allBooks = state.books.filter(book => getBookShelf(book) === "books");
-  const allComics = state.books.filter(book => getBookShelf(book) === "comics");
-  const epubFiles = state.books.filter(book => book.format === "EPUB");
-  const cbzFiles = state.books.filter(book => book.format === "CBZ");
+  const shelfBooks = groupedShelfBooks();
+  const total = shelfBooks.length;
+  const started = shelfBooks.filter(book => Number(book.progress && book.progress.percent) > 0).length;
+  const allBooks = shelfBooks.filter(book => getBookShelf(book) === "books");
+  const allComics = shelfBooks.filter(book => getBookShelf(book) === "comics");
+  const epubFiles = allBooks;
+  const cbzFiles = allComics;
   $("book-count").textContent = String(total).padStart(2, "0");
   $("started-count").textContent = String(started).padStart(2, "0");
   $("epub-count").textContent = String(epubFiles.length).padStart(2, "0");
   $("comic-count").textContent = String(cbzFiles.length).padStart(2, "0");
 
-  const recent = state.books.filter(book => Number(book.lastOpenedAt) > 0)
+  const recent = shelfBooks.filter(book => Number(book.lastOpenedAt) > 0)
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 3);
   const recentSection = $("recent-section");
   const recentGrid = $("recent-grid");
