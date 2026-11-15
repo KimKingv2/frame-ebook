@@ -316,7 +316,7 @@ async function upsertCloudBooks(scope, items, options = {}) {
   });
   if (!validItems.length) return [];
 
-  const identityPaths = validItems.map(item => normalizePath(item.groupPath || item.path));
+  const identityPaths = validItems.map(item => normalizePath(item.path));
   if (identityPaths.some(path => !path)) throw new Error("雲端書架資料夾路徑無效。");
   const ids = await Promise.all(identityPaths.map(path => cloudBookId(source, path)));
   const db = await openDatabase();
@@ -351,20 +351,19 @@ async function upsertCloudBooks(scope, items, options = {}) {
     }
     const mergedFiles = [...filesByPath.values()].sort((a, b) =>
       String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
-    const oldPrimaryPath = !replaceGroups ? String(existing?.cloudSource?.path || "") : "";
-    const primary = mergedFiles.find(file => file.path === oldPrimaryPath) || mergedFiles[0] || incomingFiles[0] || item;
-    const fileName = String(primary.name || item.name || String(primary.path || item.path).split("/").pop() || "未命名書籍");
-    const format = String(primary.format || item.format || "").toUpperCase();
+    const fileName = String(item.name || String(item.path || "").split("/").pop() || "未命名書籍");
+    const format = String(item.format || "").toUpperCase();
     const fallbackTitle = grouped
       ? String(item.groupTitle || folderPath.split("/").pop() || fileName)
       : (basename(fileName) || "未命名書籍");
-    const coverHash = /^[a-f0-9]{64}$/i.test(String(primary.coverHash || "")) ? String(primary.coverHash).toLowerCase() : null;
+    const coverHash = /^[a-f0-9]{64}$/i.test(String(item.coverHash || "")) ? String(item.coverHash).toLowerCase() : null;
     const coverBlob = existing && existing.cloudCoverHash === coverHash ? (existing.coverBlob || null) : null;
-    const modifiedAt = primary.modified ? String(primary.modified) : (item.modified ? String(item.modified) : null);
+    const modifiedAt = item.modified ? String(item.modified) : null;
     const parsedModified = modifiedAt ? Date.parse(modifiedAt) : NaN;
     const incomingHashes = Array.isArray(item.groupCoverHashes)
       ? item.groupCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))).map(hash => String(hash).toLowerCase())
       : (coverHash ? [coverHash] : []);
+    if (coverHash && item.coverStatus === "ready") incomingHashes.push(coverHash);
     const oldHashes = !replaceGroups && Array.isArray(existing?.cloudCoverHashes) ? existing.cloudCoverHashes : [];
     const cloudCoverHashes = [...new Set([...oldHashes, ...incomingHashes])].slice(0, 8);
 
@@ -379,25 +378,22 @@ async function upsertCloudBooks(scope, items, options = {}) {
       language: existing?.language || "",
       identifier: existing?.identifier || "",
       format,
-      shelf: format === "CBZ" ? "comics" : source.library,
+      shelf: source.library,
       pageCount: Number(existing?.pageCount) || 0,
-      size: grouped
-        ? mergedFiles.reduce((sum, file) => sum + Math.max(0, Number(file.size) || 0), 0)
-        : Math.max(0, Number(primary.size || item.size) || 0),
+      size: Math.max(0, Number(item.size) || 0),
       lastModified: Number.isFinite(parsedModified) ? parsedModified : (Number(existing?.lastModified) || 0),
       modifiedAt,
       blob: null,
       coverBlob,
       cloudCoverHash: coverHash,
       cloudCoverHashes,
-      cloudCoverType: String(primary.coverType || item.coverType || ""),
+      cloudCoverType: String(item.coverType || ""),
       cloudCoverStatus: cloudCoverHashes.length ? "ready" : String(item.coverStatus || (coverHash ? "ready" : "pending")),
       cloudSource: {
         provider: source.provider,
         library: source.library,
         rootPath: source.rootPath,
-        path: normalizePath(primary.path || item.path),
-        bookPath: folderPath || normalizePath(item.path),
+        path: normalizePath(item.path),
         folderPath: folderPath || "",
         files: mergedFiles.slice(0, 250),
         modifiedAt
@@ -430,7 +426,7 @@ function cloudAnnotationDescriptor(book) {
     provider: String(source.provider),
     library: String(source.library),
     rootPath: String(source.rootPath),
-    path: String(source.bookPath || source.folderPath || source.path)
+    path: String(source.path)
   };
 }
 
