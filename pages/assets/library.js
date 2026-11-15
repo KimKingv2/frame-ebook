@@ -59,10 +59,10 @@ function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   frame.setAttribute("aria-label", book.title + " 封面");
-  const hashes = book.sourceType === "cloud" && Array.isArray(book.cloudCoverHashes)
+  const hashes = book.sourceType === "cloud" && book.folderTitle && Array.isArray(book.cloudCoverHashes)
     ? [...new Set(book.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 3)
     : [];
-  if (hashes.length >= 2) {
+  if (hashes.length >= 1) {
     const stack = document.createElement("div");
     stack.className = "library-cover-stack";
     stack.setAttribute("aria-label", "資料夾內 " + hashes.length + " 冊封面堆疊");
@@ -72,7 +72,13 @@ function makeCover(book, compact) {
       image.alt = (book.title || "作品") + " 第 " + (index + 1) + " 冊封面";
       image.loading = "lazy";
       image.decoding = "async";
-      image.onerror = () => image.remove();
+      image.onerror = () => {
+        image.remove();
+        if (!stack.querySelector("img")) {
+          stack.remove();
+          frame.appendChild(makeFallback(book));
+        }
+      };
       stack.appendChild(image);
     });
     frame.appendChild(stack);
