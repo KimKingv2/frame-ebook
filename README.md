@@ -3,7 +3,7 @@
 **Your Personal Digital Library**  
 A private, multi-device ebook library for desktop, tablet and mobile.
 
-> Current status: **V0.9 Reading Insights + persistent Cloud Library index and cover shelf**. The cloud shelf uses a D1 metadata catalog with manual full scans, resumable D1 checkpoints, and D1-backed browsing between scans. Original EPUB / CBZ files remain in OpenList; cover thumbnails are extracted with HTTP Range reads, deduplicated in private R2, and displayed from the indexed shelf.
+> Current status: **V0.9 Cloud-first bookshelf + local reading data**. The D1 cloud catalog is the primary book list. Completed scans automatically synchronize book metadata into this browser's IndexedDB without copying original EPUB / CBZ files. Covers are extracted with bounded HTTP Range reads, deduplicated in private R2, and shown on the main bookshelf. Original files remain in OpenList and are fetched only when a book is opened.
 
 ## Product scope
 
@@ -24,16 +24,16 @@ Kindle is outside the online reader's support scope. If used later, treat it as 
 
 ## Current routes
 
-- `/` — local bookshelf with import, search, sort, recent reading, book details and grid/list views.
+- `/` — primary bookshelf combining cloud-catalog books with optional local imports, search, sort, recent reading, book details and grid/list views.
 - `/epub-lab/` — EPUB / CBZ Reading Room with per-book progress, appearance settings and foreground reading-time tracking.
 - `/reading-stats/` — daily goal, reading duration, active days, streaks, calendar, trends, top books, time-of-day preferences and local JSON / CSV export.
-- `/cloud/` — private cloud shelf for VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct sources. Manually scan each source/library/root once; later browsing reads its persistent D1 index, and scans can resume after interruption.
+- `/cloud/` — private OpenList source management and recursive scanning for VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct sources. Completed catalog items automatically join the main bookshelf as metadata-only IndexedDB records; scans resume from D1 checkpoints.
 - `/demo/frame-reader-sample.epub` — small, original Traditional Chinese test book.
 - `/health.json` — same-origin connectivity endpoint.
 
 ## Bookshelf and covers
 
-The homepage is now a functional local bookshelf. Imported book files, extracted covers, Metadata and progress are stored in this browser's IndexedDB. Only the small bundled test EPUB and the original synthetic comic demo are used as public test fixtures; private books are not committed to the repository.
+The homepage is the main bookshelf. Cloud books are synchronized as metadata-only records; original files stay in OpenList until opened. Optional local imports keep their original Blob in this browser's IndexedDB. Reading position, appearance preferences, and annotation records are stored locally. Only the small bundled test EPUB and original synthetic comic demo are public fixtures; private books are not committed to the repository.
 
 Planned cover lookup order:
 1. Embedded EPUB cover image.
@@ -168,7 +168,7 @@ The Reading Room starts a local foreground timer for the active book. It counts 
 - /api/reading/stats returns D1 daily totals, streak calendar source data, most-read books, time-of-day totals and recent events.
 - migrations/0001_reading_events.sql creates the D1 tables for reading events and related sync data.
 
-The current cloud shelf imports a selected OpenList file through the protected proxy into this browser's IndexedDB. It does not yet mount a remote book directly into Foliate; very large books still download fully into browser storage before opening. The backend proxy is Range-capable so a later reader-loader integration can stream partial requests.
+The main bookshelf synchronizes completed D1 catalog entries into IndexedDB as metadata-only cloud records. It does not copy their original Blob into IndexedDB. Opening a cloud book fetches the source from OpenList through the protected proxy (or directly from the selected LAN source) and passes it to Foliate in memory. Local imports continue to store their original Blob in IndexedDB. Per-book CFI/page progress and appearance remain browser-local; the local `annotations` store is ready for highlight, note and bookmark records. The existing reading-time statistics path still has its separate D1 event-sync behavior.
 
 See docs/CLOUDFLARE-SETUP.md before enabling cloud features. Do not paste passwords or API tokens into chat or commit them to Git.
 
