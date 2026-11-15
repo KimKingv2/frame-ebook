@@ -13,6 +13,7 @@ export async function onRequestGet({ env }) {
     openListConfigured: anyServerProfileConfigured,
     openListProfiles: profiles,
     rootPaths: getOpenListRootPaths(env),
-    databaseConfigured: !!(env.FRAME_READER_DB || env.DB)
+    databaseConfigured: !!(env.FRAME_READER_DB || env.DB),
+    cloudAnnotationsConfigured: !!(env.FRAME_READER_ACCESS_TEAM_DOMAIN && env.FRAME_READER_ACCESS_AUD)
   });
 }
