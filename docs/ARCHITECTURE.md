@@ -103,7 +103,7 @@ The bookshelf supports title / author / filename search, recent / added / title 
 - The EPUB metadata adapter currently uses JSZip, which may require extra memory while inspecting large EPUB archives.
 - CBZ shelf indexing reads the archive directory and a cover image; the reader's existing image loading remains lazy.
 - No OpenList API key, user credential or private book metadata is embedded in frontend source.
-- The D1 OpenList cloud catalog and resumable scan state are the source of cloud book metadata. A completed scan synchronizes metadata-only records into the main bookshelf automatically. Original cloud book files remain in OpenList and are fetched only when opened.
+- The D1 OpenList cloud catalog and resumable scan state are the source of cloud book metadata. A completed scan synchronizes metadata-only records into the main bookshelf automatically. Original cloud book files remain in OpenList and are fetched only when opened. Migration `0004_cloud_annotations.sql` stores cloud-origin annotations with a composite owner/book/annotation key.
 
 ## Sync data model (future)
 
@@ -133,7 +133,7 @@ The main bookshelf combines two record types in the same local IndexedDB store:
 
 When a cloud book is opened, the Reading Room resolves the saved source. VPS, Worker and Mobile Device files are fetched through the protected Pages Function proxy; LAN-direct files are fetched from the device's configured OpenList after a fresh account/password login. The downloaded File is passed to Foliate in memory and is not written back as a cloud-book Blob in IndexedDB.
 
-Per-book reading position, page index, appearance settings, and annotation records belong to the local browser profile. IndexedDB version 3 adds the `annotations` object store with `bookId` and `updatedAt` indexes and local CRUD functions for highlights, notes and bookmarks. The annotation persistence layer is ready; the current Reading Room does not yet expose the complete highlight/note editing UI. Clearing this site's browser data removes local personal reading data. The separate reading-time statistics feature retains its existing D1 event-sync path.
+Per-book reading position, page index and appearance settings remain local to the browser profile. IndexedDB version 3 keeps an `annotations` object store for highlights, notes and bookmarks belonging to locally imported books. For cloud-origin books, the same `saveAnnotation`, `listAnnotations` and `deleteAnnotation` APIs route to `/api/reading/annotations`; D1 is authoritative and the records are partitioned by the verified Cloudflare Access subject plus stable cloud book ID. Cloud annotations are not duplicated in IndexedDB. The current Reading Room still does not expose the complete highlight/note editing UI; this change establishes the correct persistence boundary for that UI. Clearing this site's browser data removes local book files and local-import annotations, but does not erase cloud annotations.
 
 ### Fixed-layout and comic reading
 
@@ -180,8 +180,9 @@ Cloudflare Pages serves static content from pages/, but the Pages Functions sour
 - GET /api/cloud/books?library=books|comics&path=... for a directory listing scoped to the separate EPUB or CBZ root.
 - GET /api/cloud/file?library=books|comics&path=... for a protected file download constrained to the matching root and extension.
 - POST /api/reading/events and GET /api/reading/stats.
+- GET /api/reading/annotations, POST /api/reading/annotations and DELETE /api/reading/annotations for cloud-book bookmarks, highlights and notes. Each request validates the exact cloud book descriptor against `cloud_catalog` and the stable cloud book ID.
 
-Cloudflare Zero Trust Access is the only website sign-in and authorization boundary. Its application must protect the complete Reader hostname, including every static page and `/api/*` route. Cloudflare Access rejects unauthenticated requests before they reach Pages Functions. The `/api/auth/session` endpoint only reports application/service readiness; it does not create a separate session or verify a second JWT. There is no Reader-specific password, session cookie, Access Team Domain Variable or AUD Variable.
+Cloudflare Zero Trust Access is the website sign-in and first authorization boundary. Its application must protect the complete Reader hostname, including every static page and `/api/*` route. Cloudflare Access rejects unauthenticated requests before they reach Pages Functions. The cloud-annotation endpoint additionally validates the `Cf-Access-Jwt-Assertion` signature against the configured team JWKS and checks issuer, expiry and the exact application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. It derives a non-reversible owner key from the verified subject; neither raw email nor JWT is stored in D1. Other existing Pages Functions continue to rely on the Access edge as documented.
 
 Pages Functions deliberately rely on the Access edge instead of independently verifying `Cf-Access-Jwt-Assertion`. This is safe only when the Access application covers the whole hostname without path exclusions. If any production hostname or API route is outside the Access application, it is not protected by an additional in-code authentication layer.
 
