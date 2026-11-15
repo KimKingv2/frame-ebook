@@ -402,3 +402,7 @@ a { color: inherit; }
   .category-shelf-heading h3 { font-size:20px; }
   .category-empty { min-height:190px; }
 }
+
+
+/* Quiet provenance note for manually imported local-only books. */
+.library-origin-note { display: block; margin-top: 3px; color: #665f70; font-size: 7px; line-height: 1.2; letter-spacing: .15px; }
