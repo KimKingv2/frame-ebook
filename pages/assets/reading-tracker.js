@@ -1,6 +1,4 @@
-import {
-  recordReadingEvent, getPendingReadingEvents, markReadingEventsSynced, localDayKey
-} from "/assets/library-store.js";
+import { recordReadingEvent, localDayKey } from "/assets/library-store.js";
 
 const HEARTBEAT_MS = 15000;
 const IDLE_LIMIT_MS = 5 * 60 * 1000;
@@ -26,57 +24,37 @@ function makeId() {
 }
 
 async function persistInterval(startAt, endAt) {
-  let cursor = startAt;
-  while (cursor < endAt) {
-    const date = new Date(cursor);
-    const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
-    const segmentEnd = Math.min(endAt, midnight);
-    const seconds = Math.floor((segmentEnd - cursor) / 1000);
-    if (seconds > 0) {
-      const event = {
-        id: makeId(),
-        dayKey: localDayKey(cursor),
-        bookId: activeBook.id,
-        bookTitle: activeBook.title,
-        format: activeBook.format,
-        localHour: new Date(cursor).getHours(),
-        seconds: Math.min(30, seconds),
-        startedAt: cursor,
-        endedAt: Math.min(segmentEnd, cursor + 30000)
-      };
-      try {
-        await recordReadingEvent(event);
-      } catch (error) {
-        console.warn("FRAME Reader could not save a reading-time segment:", error);
-      }
-    }
-    cursor = segmentEnd;
-  }
-  syncPending();
-}
-
-async function syncPending(force = false) {
-  if (syncing || (!force && Date.now() < cloudBackoffUntil)) return;
+  if (!activeBook || syncing || Date.now() < cloudBackoffUntil) return;
   syncing = true;
   try {
-    const pending = await getPendingReadingEvents(100);
-    if (!pending.length) return;
-    const response = await fetch("/api/reading/events", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ events: pending.map(({ id, dayKey, bookId, bookTitle, format, localHour, seconds, startedAt, endedAt }) => ({
-        id, dayKey, bookId, bookTitle, format, localHour, seconds, startedAt, endedAt
-      })) })
-    });
-    if (response.status === 401 || response.status === 404 || response.status === 503) {
-      cloudBackoffUntil = Date.now() + 5 * 60 * 1000;
-      return;
+    let cursor = startAt;
+    while (cursor < endAt) {
+      const date = new Date(cursor);
+      const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+      const segmentEnd = Math.min(endAt, midnight);
+      const seconds = Math.floor((segmentEnd - cursor) / 1000);
+      if (seconds > 0) {
+        const event = {
+          id: makeId(),
+          dayKey: localDayKey(cursor),
+          bookId: activeBook.id,
+          bookTitle: activeBook.title,
+          format: activeBook.format,
+          localHour: new Date(cursor).getHours(),
+          seconds: Math.min(30, seconds),
+          startedAt: cursor,
+          endedAt: Math.min(segmentEnd, cursor + 30000)
+        };
+        await recordReadingEvent(event);
+      }
+      cursor = segmentEnd;
     }
-    if (!response.ok) return;
-    await markReadingEventsSynced(pending.map(item => item.id));
-  } catch (_) {
-    cloudBackoffUntil = Date.now() + 60 * 1000;
+  } catch (error) {
+    console.warn("FRAME Reader could not save cloud reading history:", error);
+    cloudBackoffUntil = Date.now() + 60000;
+    window.dispatchEvent(new CustomEvent("frame-reader-cloud-save-error", {
+      detail: { message: String(error?.message || error) }
+    }));
   } finally {
     syncing = false;
   }
@@ -88,7 +66,7 @@ function tick(now = Date.now()) {
     const elapsed = Math.min(now - lastTickAt, HEARTBEAT_MS * 2);
     if (elapsed > 0) {
       sessionSeconds += Math.round(elapsed / 1000);
-      persistInterval(lastTickAt, now);
+      void persistInterval(lastTickAt, now);
       window.dispatchEvent(new CustomEvent("frame-reader-reading-time", {
         detail: { seconds: sessionSeconds, bookId: activeBook.id, title: activeBook.title }
       }));
@@ -153,8 +131,12 @@ function detachListeners() {
 
 async function start(book) {
   await stop();
+  const id = String(book && book.id || "");
+  if (!/^cloud:[a-f0-9]{64}$/.test(id)) {
+    throw new Error("只能為已掃描索引的雲端書籍記錄閱讀時間。");
+  }
   activeBook = {
-    id: String(book && book.id || "standalone:" + (book && book.title || "untitled")),
+    id,
     title: String(book && book.title || "未命名書籍").slice(0, 240),
     format: String(book && book.format || "EPUB").toUpperCase()
   };
@@ -165,7 +147,6 @@ async function start(book) {
   tickWasActive = isForegroundActive(now);
   attachListeners();
   timer = window.setInterval(() => tick(Date.now()), HEARTBEAT_MS);
-  syncPending();
   return true;
 }
 
@@ -177,8 +158,12 @@ async function stop() {
   detachListeners();
   activeBook = null;
   lastTickAt = 0;
-  window.dispatchEvent(new CustomEvent("frame-reader-reading-time", { detail: { stopped: true, seconds: sessionSeconds } }));
-  await syncPending();
+  window.dispatchEvent(new CustomEvent("frame-reader-reading-time", {
+    detail: { stopped: true, seconds: sessionSeconds }
+  }));
+  return true;
 }
+
+async function syncPending() { return true; }
 
 export { start, stop, activity, syncPending, isForegroundActive };
