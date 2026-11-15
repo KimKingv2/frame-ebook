@@ -227,3 +227,130 @@ export async function sha256Hex(value) {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
   return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }
+
+let accessJwksCache = null;
+let accessJwksCacheDomain = "";
+let accessJwksExpiresAt = 0;
+
+function decodeBase64Url(value) {
+  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function decodeJwtJson(value) {
+  return JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
+}
+
+async function getAccessJwks(teamDomain, forceRefresh = false) {
+  if (!forceRefresh && accessJwksCache && accessJwksCacheDomain === teamDomain && Date.now() < accessJwksExpiresAt) {
+    return accessJwksCache;
+  }
+  const response = await fetch(teamDomain + "/cdn-cgi/access/certs", {
+    headers: { Accept: "application/json" },
+    cf: { cacheTtl: 300, cacheEverything: true }
+  });
+  if (!response.ok) throw new Error("無法取得 Cloudflare Access 簽章公鑰（HTTP " + response.status + "）。");
+  const payload = await response.json();
+  if (!payload || !Array.isArray(payload.keys) || !payload.keys.length) {
+    throw new Error("Cloudflare Access 公鑰回應格式無效。");
+  }
+  accessJwksCache = payload.keys;
+  accessJwksCacheDomain = teamDomain;
+  accessJwksExpiresAt = Date.now() + 5 * 60 * 1000;
+  return accessJwksCache;
+}
+
+/**
+ * Verify the Cloudflare Access application JWT before using its subject as the
+ * private annotation owner. The Access edge remains the first access gate;
+ * this second check protects the D1 identity boundary from forged headers.
+ */
+export async function getAccessIdentity(request, env) {
+  const rawDomain = String(env.FRAME_READER_ACCESS_TEAM_DOMAIN || "").trim().replace(/\/+$/, "");
+  const audience = String(env.FRAME_READER_ACCESS_AUD || "").trim();
+  if (!rawDomain || !audience) {
+    const error = new Error("雲端標註尚未設定 Access 身分驗證。請新增 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。");
+    error.status = 503;
+    throw error;
+  }
+
+  let teamDomain;
+  try {
+    const parsed = new URL(rawDomain);
+    if (parsed.protocol !== "https:" || parsed.pathname !== "/" || parsed.search || parsed.hash ||
+        !parsed.hostname.endsWith(".cloudflareaccess.com")) {
+      throw new Error("Cloudflare Access Team Domain 格式無效。");
+    }
+    teamDomain = parsed.origin;
+  } catch (_) {
+    const error = new Error("Cloudflare Access Team Domain 格式無效。請使用 https://你的團隊.cloudflareaccess.com。");
+    error.status = 503;
+    throw error;
+  }
+
+  const token = request.headers.get("cf-access-jwt-assertion");
+  if (!token) {
+    const error = new Error("缺少 Cloudflare Access 身分憑證，請重新登入後再試。");
+    error.status = 401;
+    throw error;
+  }
+
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    const error = new Error("Cloudflare Access 身分憑證格式無效。");
+    error.status = 401;
+    throw error;
+  }
+
+  try {
+    const header = decodeJwtJson(parts[0]);
+    const claims = decodeJwtJson(parts[1]);
+    if (!header || header.alg !== "RS256" || !header.kid) throw new Error("JWT 簽章演算法或金鑰識別資訊無效。");
+    if (!claims || claims.iss !== teamDomain) throw new Error("JWT 簽發來源不符合目前 Access Team Domain。");
+    const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (!aud.includes(audience)) throw new Error("JWT 不屬於目前 FRAME Reader Access 應用程式。");
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= now) throw new Error("Cloudflare Access 登入憑證已過期。");
+    if (claims.nbf != null && Number(claims.nbf) > now + 60) throw new Error("Cloudflare Access 登入憑證尚未生效。");
+    if (claims.iat != null && Number(claims.iat) > now + 60) throw new Error("Cloudflare Access 登入憑證簽發時間無效。");
+
+    let keys = await getAccessJwks(teamDomain);
+    let jwk = keys.find(key => key && key.kid === header.kid && key.kty === "RSA");
+    if (!jwk) {
+      keys = await getAccessJwks(teamDomain, true);
+      jwk = keys.find(key => key && key.kid === header.kid && key.kty === "RSA");
+    }
+    if (!jwk) throw new Error("找不到對應的 Cloudflare Access 簽章公鑰。");
+
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const validSignature = await crypto.subtle.verify(
+      { name: "RSASSA-PKCS1-v1_5" },
+      publicKey,
+      decodeBase64Url(parts[2]),
+      new TextEncoder().encode(parts[0] + "." + parts[1])
+    );
+    if (!validSignature) throw new Error("Cloudflare Access 簽章驗證失敗。");
+
+    const subject = String(claims.sub || claims.email || "").trim();
+    if (!subject) throw new Error("Cloudflare Access 憑證沒有使用者識別資訊。");
+    return {
+      userId: await sha256Hex(teamDomain + "\\n" + subject.toLowerCase()),
+      email: String(claims.email || "").slice(0, 320)
+    };
+  } catch (cause) {
+    const error = new Error("Cloudflare Access 身分驗證失敗：" + String(cause && cause.message ? cause.message : "無效憑證").slice(0, 180));
+    error.status = cause && cause.status ? cause.status : 401;
+    throw error;
+  }
+}
+
