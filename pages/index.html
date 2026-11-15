@@ -32,7 +32,7 @@
       <div class="hero-copy">
         <p class="eyebrow"><span class="eyebrow-line"></span> YOUR PRIVATE READING ROOM</p>
         <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
-        <p class="hero-text">以雲端書庫作為主要藏書來源，掃描完成便自動加入書架。閱讀位置、外觀、書籤與個人筆記保存在目前這台設備。</p>
+        <p class="hero-text">以雲端書庫作為主要藏書來源，掃描完成便自動加入書架。雲端書籍的書籤、筆記與高亮保存在雲端；本機匯入書籍的標註保存在本機。閱讀位置與外觀設定目前仍保存在本機。</p>
         <div class="hero-actions library-hero-imports">
           <button class="primary-link library-import-button" data-import-type="books" type="button">匯入電子書 <span aria-hidden="true">＋</span></button>
           <button class="secondary-import-button" data-import-type="comics" type="button">匯入漫畫 <span aria-hidden="true">＋</span></button>
@@ -137,7 +137,7 @@
 
     <section class="library-privacy">
       <span class="privacy-mark">⌂</span>
-      <div><strong>雲端保存原始書檔，個人閱讀資料留在本機。</strong><p>雲端書籍的書目會自動同步到這台設備；原始 EPUB／CBZ 仍留在 OpenList，只有開啟閱讀時才讀取。閱讀位置、個人外觀設定，以及後續書籤、螢光標記與筆記，使用瀏覽器 IndexedDB 本機保存。手動匯入的本機書籍也會保留，並以低調文字註明來源。清除網站資料會移除本機閱讀資料。</p></div>
+      <div><strong>雲端保存原始書檔與雲端書籍標註，本機保存匯入檔與本機標註。</strong><p>雲端書籍的書目會自動同步到這台設備；原始 EPUB／CBZ 仍留在 OpenList，只有開啟閱讀時才讀取。閱讀位置與個人外觀設定使用瀏覽器本機保存。雲端書籍的書籤、螢光標記與筆記保存在 D1，依 Cloudflare Access 登入身分隔離；本機匯入書籍的同類標註只存 IndexedDB，不會上傳。手動匯入的本機書籍也會保留，並以低調文字註明來源。</p></div>
       <span class="privacy-tag">PRIVATE BY DESIGN</span>
     </section>
 
