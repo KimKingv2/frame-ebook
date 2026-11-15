@@ -3,7 +3,7 @@
  * Nothing in this module uploads book content to a remote service.
  */
 const DB_NAME = "frame-reader-library";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = "books";
 let databasePromise;
 
@@ -32,6 +32,11 @@ function openDatabase() {
       }
       if (!db.objectStoreNames.contains("reading_settings")) {
         db.createObjectStore("reading_settings", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("annotations")) {
+        const annotations = db.createObjectStore("annotations", { keyPath: "id" });
+        annotations.createIndex("bookId", "bookId", { unique: false });
+        annotations.createIndex("updatedAt", "updatedAt", { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -207,7 +212,10 @@ async function importBookFile(file, options = {}) {
   if (file.size <= 0) throw new Error("這個檔案是空的。");
 
   const existing = (await readAll()).find(book =>
-    book.fileName === file.name && book.size === file.size && Number(book.lastModified || 0) === Number(file.lastModified || 0)
+    book.sourceType !== "cloud" &&
+    book.fileName === file.name &&
+    book.size === file.size &&
+    Number(book.lastModified || 0) === Number(file.lastModified || 0)
   );
   const metadata = extension === "epub" ? await inspectEpub(file) : await inspectCbz(file);
   const now = Date.now();
@@ -215,6 +223,7 @@ async function importBookFile(file, options = {}) {
   const shelf = extension === "cbz" ? "comics" : (requestedShelf || (existing && existing.shelf === "comics" ? "comics" : "books"));
   const record = {
     id: existing ? existing.id : makeId(),
+    sourceType: "local",
     fileName: file.name,
     title: existing && existing.manualTitle ? existing.title : (metadata.title || basename(file.name)),
     author: existing && existing.manualAuthor ? existing.author : (metadata.author || ""),
@@ -255,9 +264,18 @@ async function updateBook(id, patch) {
 
 async function deleteBook(id) {
   const db = await openDatabase();
-  const tx = db.transaction(STORE_NAME, "readwrite");
+  const tx = db.transaction([STORE_NAME, "annotations"], "readwrite");
   const completed = transactionDone(tx);
-  await requestResult(tx.objectStore(STORE_NAME).delete(String(id)));
+  tx.objectStore(STORE_NAME).delete(String(id));
+  const annotationStore = tx.objectStore("annotations");
+  const annotationIndex = annotationStore.index("bookId");
+  const annotationRequest = annotationIndex.openKeyCursor(IDBKeyRange.only(String(id)));
+  annotationRequest.onsuccess = () => {
+    const cursor = annotationRequest.result;
+    if (!cursor) return;
+    annotationStore.delete(cursor.primaryKey);
+    cursor.continue();
+  };
   await completed;
   return true;
 }
@@ -267,6 +285,136 @@ async function listBooks() {
   return books.sort((a, b) => (Number(b.lastOpenedAt) || 0) - (Number(a.lastOpenedAt) || 0) ||
     (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
 }
+
+function cloudBookId(scope, path) {
+  const provider = String(scope?.provider || "");
+  const library = String(scope?.library || "");
+  const rootPath = normalizePath(scope?.rootPath || "");
+  const filePath = normalizePath(path || "");
+  if (!provider || !["books", "comics"].includes(library) || !rootPath || !filePath) {
+    throw new Error("雲端書籍識別資訊無效。");
+  }
+  return "cloud:" + [provider, library, rootPath, filePath].map(encodeURIComponent).join(":");
+}
+
+async function upsertCloudBooks(scope, items) {
+  const source = {
+    provider: String(scope?.provider || ""),
+    library: String(scope?.library || ""),
+    rootPath: normalizePath(scope?.rootPath || "")
+  };
+  if (!source.provider || !["books", "comics"].includes(source.library) || !source.rootPath) {
+    throw new Error("雲端書架來源設定無效。");
+  }
+  const validItems = (Array.isArray(items) ? items : []).filter(item => {
+    if (!item || item.isDir) return false;
+    const format = String(item.format || "").toUpperCase();
+    return source.library === "books" ? format === "EPUB" : format === "EPUB" || format === "CBZ";
+  });
+  if (!validItems.length) return [];
+
+  const ids = validItems.map(item => cloudBookId(source, item.path));
+  const db = await openDatabase();
+  const readTx = db.transaction(STORE_NAME, "readonly");
+  const readDone = transactionDone(readTx);
+  const store = readTx.objectStore(STORE_NAME);
+  const existingRequests = ids.map(id => requestResult(store.get(id)));
+  const existingRecords = await Promise.all(existingRequests);
+  await readDone;
+
+  const now = Date.now();
+  const records = validItems.map((item, index) => {
+    const existing = existingRecords[index] || null;
+    const fileName = String(item.name || String(item.path).split("/").pop() || "未命名書籍");
+    const format = String(item.format || "").toUpperCase();
+    const fallbackTitle = basename(fileName) || "未命名書籍";
+    const coverHash = /^[a-f0-9]{64}$/i.test(String(item.coverHash || "")) ? String(item.coverHash).toLowerCase() : null;
+    const coverBlob = existing && existing.cloudCoverHash === coverHash ? (existing.coverBlob || null) : null;
+    const modifiedAt = item.modified ? String(item.modified) : null;
+    const parsedModified = modifiedAt ? Date.parse(modifiedAt) : NaN;
+    return {
+      ...(existing || {}),
+      id: ids[index],
+      sourceType: "cloud",
+      fileName,
+      title: existing?.manualTitle ? existing.title : fallbackTitle,
+      author: existing?.manualAuthor ? existing.author : (existing?.author || ""),
+      language: existing?.language || "",
+      identifier: existing?.identifier || "",
+      format,
+      shelf: format === "CBZ" ? "comics" : source.library,
+      pageCount: Number(existing?.pageCount) || 0,
+      size: Math.max(0, Number(item.size) || 0),
+      lastModified: Number.isFinite(parsedModified) ? parsedModified : (Number(existing?.lastModified) || 0),
+      modifiedAt,
+      blob: null,
+      coverBlob,
+      cloudCoverHash: coverHash,
+      cloudCoverType: String(item.coverType || ""),
+      cloudCoverStatus: String(item.coverStatus || (coverHash ? "ready" : "pending")),
+      cloudSource: {
+        provider: source.provider,
+        library: source.library,
+        rootPath: source.rootPath,
+        path: normalizePath(item.path),
+        modifiedAt
+      },
+      addedAt: Number(existing?.addedAt) || now,
+      updatedAt: now,
+      lastOpenedAt: Number(existing?.lastOpenedAt) || 0,
+      progress: existing?.progress || { percent: 0, label: "尚未閱讀", cfi: "", index: null },
+      manualTitle: !!existing?.manualTitle,
+      manualAuthor: !!existing?.manualAuthor
+    };
+  });
+
+  const writeTx = db.transaction(STORE_NAME, "readwrite");
+  const writeDone = transactionDone(writeTx);
+  const writeStore = writeTx.objectStore(STORE_NAME);
+  records.forEach(record => writeStore.put(record));
+  await writeDone;
+  return records;
+}
+
+async function saveAnnotation(annotation) {
+  if (!annotation || !annotation.bookId) throw new Error("筆記缺少所屬書籍識別碼。");
+  const now = Date.now();
+  const record = {
+    id: String(annotation.id || makeId()),
+    bookId: String(annotation.bookId),
+    type: ["highlight", "note", "bookmark"].includes(annotation.type) ? annotation.type : "note",
+    cfi: String(annotation.cfi || ""),
+    quote: String(annotation.quote || "").slice(0, 12000),
+    text: String(annotation.text || "").slice(0, 20000),
+    color: String(annotation.color || "yellow").slice(0, 32),
+    createdAt: Number(annotation.createdAt) || now,
+    updatedAt: now
+  };
+  const db = await openDatabase();
+  const tx = db.transaction("annotations", "readwrite");
+  const done = transactionDone(tx);
+  tx.objectStore("annotations").put(record);
+  await done;
+  return record;
+}
+
+async function listAnnotations(bookId) {
+  const db = await openDatabase();
+  const tx = db.transaction("annotations", "readonly");
+  const index = tx.objectStore("annotations").index("bookId");
+  const rows = await requestResult(index.getAll(String(bookId)));
+  return rows.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+}
+
+async function deleteAnnotation(id) {
+  const db = await openDatabase();
+  const tx = db.transaction("annotations", "readwrite");
+  const done = transactionDone(tx);
+  tx.objectStore("annotations").delete(String(id));
+  await done;
+  return true;
+}
+
 
 
 
@@ -352,4 +500,4 @@ async function setReadingSetting(key, value) {
   return value;
 }
 
-export { openDatabase, importBookFile, getBook, updateBook, deleteBook, listBooks, localDayKey, recordReadingEvent, getReadingEvents, getPendingReadingEvents, markReadingEventsSynced, getReadingSetting, setReadingSetting };
+export { openDatabase, importBookFile, getBook, updateBook, deleteBook, listBooks, cloudBookId, upsertCloudBooks, saveAnnotation, listAnnotations, deleteAnnotation, localDayKey, recordReadingEvent, getReadingEvents, getPendingReadingEvents, markReadingEventsSynced, getReadingSetting, setReadingSetting };
