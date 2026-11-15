@@ -1,6 +1,6 @@
 import {
   importBookFile, listBooks, getBook, updateBook, deleteBook
-} from "/assets/library-store.js?v=20261115-cloud-annotations-r3";
+} from "/assets/library-store.js?v=20261115-folder-shelves-r8";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, cloudSyncPromise: null };
@@ -59,26 +59,52 @@ function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   frame.setAttribute("aria-label", book.title + " 封面");
-  const url = coverUrl(book);
-  if (url) {
-    const image = document.createElement("img");
-    image.src = url;
-    image.alt = book.title + " 封面";
-    image.loading = "lazy";
-    image.onerror = () => {
-      image.remove();
-      frame.appendChild(makeFallback(book));
-    };
-    if (book.sourceType === "cloud" && !book.coverBlob && book.cloudCoverHash) {
-      image.addEventListener("load", () => cacheCloudCover(book, url), { once: true });
-    }
-    frame.appendChild(image);
+  const hashes = book.sourceType === "cloud" && book.folderTitle && Array.isArray(book.cloudCoverHashes)
+    ? [...new Set(book.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 3)
+    : [];
+  if (hashes.length >= 1) {
+    const stack = document.createElement("div");
+    stack.className = "library-cover-stack";
+    stack.setAttribute("aria-label", "資料夾內 " + hashes.length + " 冊封面堆疊");
+    hashes.forEach((hash, index) => {
+      const image = document.createElement("img");
+      image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+      image.alt = (book.title || "作品") + " 第 " + (index + 1) + " 冊封面";
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.onerror = () => {
+        image.remove();
+        if (!stack.querySelector("img")) {
+          stack.remove();
+          frame.appendChild(makeFallback(book));
+        }
+      };
+      stack.appendChild(image);
+    });
+    frame.appendChild(stack);
   } else {
-    frame.appendChild(makeFallback(book));
+    const url = coverUrl(book);
+    if (url) {
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = book.title + " 封面";
+      image.loading = "lazy";
+      image.onerror = () => {
+        image.remove();
+        frame.appendChild(makeFallback(book));
+      };
+      if (book.sourceType === "cloud" && !book.coverBlob && book.cloudCoverHash) {
+        image.addEventListener("load", () => cacheCloudCover(book, url), { once: true });
+      }
+      frame.appendChild(image);
+    } else {
+      frame.appendChild(makeFallback(book));
+    }
   }
   const format = document.createElement("span");
   format.className = "library-format-badge";
-  format.textContent = book.format;
+  const volumeCount = book.folderTitle ? Math.max(1, Number(book.volumeCount) || book.cloudSource?.files?.length || 1) : 0;
+  format.textContent = volumeCount ? volumeCount + (volumeCount === 1 ? " VOLUME" : " VOLUMES") : book.format;
   frame.appendChild(format);
   return frame;
 }
@@ -121,7 +147,7 @@ function createCard(book, compact) {
   }
   const kind = document.createElement("span");
   kind.className = "book-kind";
-  kind.textContent = book.format;
+  kind.textContent = Number(book.volumeCount) > 1 ? Number(book.volumeCount) + " 冊" : book.format;
   meta.append(copy, kind);
 
   const progress = document.createElement("div");
@@ -154,11 +180,65 @@ function createCard(book, compact) {
   return article;
 }
 
+function groupedShelfBooks() {
+  const groups = new Map();
+  const output = [];
+  for (const book of state.books) {
+    const source = book.sourceType === "cloud" ? book.cloudSource : null;
+    const folderPath = String(source && source.folderPath || "");
+    if (!folderPath) {
+      output.push(book);
+      continue;
+    }
+    const key = [source.provider, source.library, source.rootPath, folderPath].join("\n");
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        ...book,
+        title: book.manualTitle ? book.title : (book.folderTitle || folderPath.split("/").pop() || book.title),
+        folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
+        cloudCoverHashes: [],
+        cloudSource: { ...source, files: [] },
+        _groupMembers: [],
+        volumeCount: 0,
+        size: 0
+      };
+      groups.set(key, group);
+      output.push(group);
+    }
+    group._groupMembers.push(book);
+    group.volumeCount += 1;
+    group.size += Math.max(0, Number(book.size) || 0);
+    group.lastOpenedAt = Math.max(Number(group.lastOpenedAt) || 0, Number(book.lastOpenedAt) || 0);
+    group.cloudCoverHashes.push(...(Array.isArray(book.cloudCoverHashes) ? book.cloudCoverHashes : []));
+    if (book.cloudCoverHash && book.cloudCoverStatus === "ready") group.cloudCoverHashes.push(book.cloudCoverHash);
+    group.cloudSource.files.push({
+      path: String(source.path || ""),
+      name: String(book.fileName || ""),
+      format: String(book.format || ""),
+      size: Math.max(0, Number(book.size) || 0),
+      coverHash: book.cloudCoverHash || null,
+      coverStatus: book.cloudCoverStatus || "pending"
+    });
+  }
+  for (const group of groups.values()) {
+    group.cloudCoverHashes = [...new Set(group.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 8);
+    const fileMap = new Map();
+    for (const file of group.cloudSource.files) if (file.path) fileMap.set(file.path, file);
+    group.cloudSource.files = [...fileMap.values()].sort((a, b) =>
+      String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
+  }
+  return output;
+}
+
 function filteredBooks() {
   const query = state.query.trim().toLocaleLowerCase();
-  let books = state.books.filter(book => {
+  let books = groupedShelfBooks().filter(book => {
     if (!query) return true;
-    return [book.title, book.author, book.fileName, book.format].join(" ").toLocaleLowerCase().includes(query);
+    const memberText = Array.isArray(book._groupMembers)
+      ? book._groupMembers.map(item => [item.fileName, item.title, item.format].join(" ")).join(" ")
+      : "";
+    return [book.title, book.author, book.fileName, book.format, memberText].join(" ").toLocaleLowerCase().includes(query);
   });
   books = books.slice();
   if (state.sort === "title") books.sort((a, b) => (a.title || "").localeCompare(b.title || "", "zh-Hant"));
@@ -182,18 +262,19 @@ function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmpt
 }
 
 function render() {
-  const total = state.books.length;
-  const started = state.books.filter(book => Number(book.progress && book.progress.percent) > 0).length;
-  const allBooks = state.books.filter(book => getBookShelf(book) === "books");
-  const allComics = state.books.filter(book => getBookShelf(book) === "comics");
-  const epubFiles = state.books.filter(book => book.format === "EPUB");
-  const cbzFiles = state.books.filter(book => book.format === "CBZ");
+  const shelfBooks = groupedShelfBooks();
+  const total = shelfBooks.length;
+  const started = shelfBooks.filter(book => Number(book.progress && book.progress.percent) > 0).length;
+  const allBooks = shelfBooks.filter(book => getBookShelf(book) === "books");
+  const allComics = shelfBooks.filter(book => getBookShelf(book) === "comics");
+  const epubFiles = allBooks;
+  const cbzFiles = allComics;
   $("book-count").textContent = String(total).padStart(2, "0");
   $("started-count").textContent = String(started).padStart(2, "0");
   $("epub-count").textContent = String(epubFiles.length).padStart(2, "0");
   $("comic-count").textContent = String(cbzFiles.length).padStart(2, "0");
 
-  const recent = state.books.filter(book => Number(book.lastOpenedAt) > 0)
+  const recent = shelfBooks.filter(book => Number(book.lastOpenedAt) > 0)
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 3);
   const recentSection = $("recent-section");
   const recentGrid = $("recent-grid");
@@ -227,10 +308,11 @@ async function refresh() {
   }
 }
 function updateLibraryStatus(extra = "") {
-  const cloudCount = state.books.filter(book => book.sourceType === "cloud").length;
-  const localCount = state.books.filter(book => book.sourceType === "local" || (!book.sourceType && book.blob)).length;
-  const epubCount = state.books.filter(book => getBookShelf(book) === "books").length;
-  const comicCount = state.books.filter(book => getBookShelf(book) === "comics").length;
+  const shelfBooks = groupedShelfBooks();
+  const cloudCount = shelfBooks.filter(book => book.sourceType === "cloud").length;
+  const localCount = shelfBooks.filter(book => book.sourceType === "local" || (!book.sourceType && book.blob)).length;
+  const epubCount = shelfBooks.filter(book => getBookShelf(book) === "books").length;
+  const comicCount = shelfBooks.filter(book => getBookShelf(book) === "comics").length;
   $("library-status").textContent = extra || (
     "書架已就緒：電子書 " + epubCount + " 本、漫畫 " + comicCount + " 部。" +
     (cloudCount ? " 雲端書籍 " + cloudCount + " 本。" : "") +
@@ -241,7 +323,7 @@ function startCloudShelfSync() {
   if (state.cloudSyncPromise) return;
   state.cloudSyncPromise = (async () => {
     try {
-      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-cloud-annotations-r3");
+      const module = await import("/assets/cloud-shelf-sync.js?v=20261115-folder-shelves-r8");
       const result = await module.syncSavedCloudShelves({
         onProgress: progress => {
           $("library-status").textContent =
@@ -251,7 +333,7 @@ function startCloudShelfSync() {
       if (result.changed) {
         state.books = await listBooks();
         render();
-        updateLibraryStatus("已同步雲端書架：" + result.count + " 本書籍加入這台設備。閱讀資料仍保存在本機。");
+        updateLibraryStatus("雲端書架同步完成：更新 " + result.count + " 冊檔案，清除 " + (result.removedCount || 0) + " 冊已不存在的索引；資料夾作品已合併顯示。");
       }
     } catch (_) {
       // Access may not be configured on this hostname yet. Keep the local
@@ -313,6 +395,32 @@ async function showBookDetails(id) {
   $("detail-progress").textContent = book.progress && book.progress.percent > 0
     ? Math.round(book.progress.percent) + "% · " + (book.progress.label || "閱讀中")
     : "尚未開始";
+  const volumeSection = $("detail-volumes-section");
+  const volumeList = $("detail-volume-list");
+  volumeList.replaceChildren();
+  const source = book.sourceType === "cloud" ? book.cloudSource : null;
+  const siblings = source?.folderPath ? state.books.filter(item => {
+    const itemSource = item.sourceType === "cloud" ? item.cloudSource : null;
+    return itemSource && itemSource.provider === source.provider &&
+      itemSource.library === source.library && itemSource.rootPath === source.rootPath &&
+      itemSource.folderPath === source.folderPath;
+  }).sort((a,b) => String(a.fileName).localeCompare(String(b.fileName),"zh-Hant",{numeric:true,sensitivity:"base"})) : [];
+  volumeSection.hidden = siblings.length < 2;
+  if (siblings.length > 1) {
+    $("detail-volumes-heading").textContent = "資料夾內冊數（" + siblings.length + "）";
+    siblings.forEach((volume,index) => {
+      const link = document.createElement("a");
+      link.className = "dialog-volume-link" + (volume.id === book.id ? " is-current" : "");
+      link.href = readerUrl(volume.id);
+      const name = document.createElement("span");
+      name.textContent = (index + 1) + ". " + (volume.fileName || volume.title || "未命名檔案");
+      const meta = document.createElement("small");
+      const percent = Math.max(0,Math.min(100,Number(volume.progress?.percent)||0));
+      meta.textContent = volume.format + (percent > 0 ? " · " + Math.round(percent) + "%" : "");
+      link.append(name,meta);
+      volumeList.appendChild(link);
+    });
+  }
   const dialog = $("book-dialog");
   if (typeof dialog.showModal === "function") dialog.showModal();
   else dialog.setAttribute("open", "");
@@ -345,18 +453,27 @@ async function removeCurrentBook() {
   if (!state.dialogBookId) return;
   const book = await getBook(state.dialogBookId);
   if (!book) return;
+  const source = book.sourceType === "cloud" ? book.cloudSource : null;
+  const group = source?.folderPath ? state.books.filter(item => {
+    const itemSource = item.sourceType === "cloud" ? item.cloudSource : null;
+    return itemSource && itemSource.provider === source.provider &&
+      itemSource.library === source.library && itemSource.rootPath === source.rootPath &&
+      itemSource.folderPath === source.folderPath;
+  }) : [book];
   const confirmed = window.confirm(book.sourceType === "cloud"
-    ? "確定從這台設備的書架移除「" + book.title + "」？這只會移除本機書架項目與本機閱讀位置，不會刪除 OpenList 原始檔案或雲端筆記。下次同步雲端書架時，這本書會再次加入。"
+    ? "確定從這台設備的書架移除「" + (book.folderTitle || book.title) + "」？共 " + group.length + " 冊。這只會移除本機書架項目與本機閱讀位置，不會刪除 OpenList 原始檔案或雲端筆記；下次同步時會重新加入。"
     : "確定從這台設備的書架移除「" + book.title + "」？這會刪除瀏覽器保存的書檔與閱讀位置，不會影響其他檔案。");
   if (!confirmed) return;
-  await deleteBook(state.dialogBookId);
+  for (const item of group) {
+    await deleteBook(item.id);
+    const objectUrl = coverUrls.get(item.id);
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    coverUrls.delete(item.id);
+  }
   state.dialogBookId = null;
   $("book-dialog").close();
-  const objectUrl = coverUrls.get(book.id);
-  if (objectUrl) URL.revokeObjectURL(objectUrl);
-  coverUrls.delete(book.id);
   await refresh();
-  $("library-status").textContent = "已從本機書架移除書籍，原始檔案不受影響。";
+  $("library-status").textContent = "已從本機書架移除作品，原始檔案不受影響。";
 }
 
 document.querySelectorAll("[data-import-type]").forEach(button => {

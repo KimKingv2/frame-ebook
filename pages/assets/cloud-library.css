@@ -345,3 +345,59 @@
   .cloud-index-summary-grid { grid-template-columns:1fr; }
   .cloud-index-log-toolbar { align-items:flex-start; flex-direction:column; }
 }
+
+
+/* Audio-style connection and indexing manager */
+.cloud-settings-dialog {
+  width:min(1080px,calc(100vw - 24px));
+  max-width:none;
+  max-height:min(92vh,980px);
+  padding:0;
+  border:1px solid rgba(205,188,239,.2);
+  border-radius:14px;
+  color:var(--text,#f2edf8);
+  background:#171420;
+  box-shadow:0 30px 100px rgba(0,0,0,.72);
+}
+.cloud-settings-dialog::backdrop { background:rgba(5,4,9,.78); backdrop-filter:blur(6px); }
+.cloud-settings-dialog-head {
+  position:sticky;
+  top:0;
+  z-index:4;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 20px;
+  border-bottom:1px solid rgba(205,188,239,.12);
+  background:rgba(23,20,32,.97);
+}
+.cloud-settings-dialog-head h2 { margin:5px 0 0; color:#eee7f5; font-size:17px; font-weight:600; }
+.cloud-settings-close {
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  border:1px solid rgba(205,188,239,.16);
+  border-radius:50%;
+  color:#b8adc7;
+  background:rgba(255,255,255,.04);
+  font-size:22px;
+  cursor:pointer;
+}
+.cloud-settings-dialog-body {
+  max-height:calc(92vh - 68px);
+  overflow:auto;
+  padding:16px clamp(12px,2.5vw,22px) 22px;
+}
+.cloud-settings-dialog .cloud-connection-panel,
+.cloud-settings-dialog .cloud-index-panel { margin:0 0 14px; }
+.cloud-settings-dialog .cloud-index-panel { border-radius:12px; }
+.cloud-settings-dialog .cloud-index-scan-actions { gap:8px; }
+.cloud-settings-dialog .cloud-index-scan-actions button { min-height:34px; }
+.cloud-browser-actions #cloud-settings-open { color:#dfd2f0; border-color:rgba(185,157,230,.28); background:rgba(110,82,158,.2); }
+@media(max-width:720px) {
+  .cloud-settings-dialog { width:calc(100vw - 14px); max-height:94vh; border-radius:11px; }
+  .cloud-settings-dialog-body { max-height:calc(94vh - 64px); padding:10px; }
+  .cloud-settings-dialog-head { padding:13px 15px; }
+}

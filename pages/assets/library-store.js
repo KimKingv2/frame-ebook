@@ -300,7 +300,7 @@ async function cloudBookId(scope, path) {
   return "cloud:" + hash;
 }
 
-async function upsertCloudBooks(scope, items) {
+async function upsertCloudBooks(scope, items, options = {}) {
   const source = {
     provider: String(scope?.provider || ""),
     library: String(scope?.library || ""),
@@ -314,38 +314,103 @@ async function upsertCloudBooks(scope, items) {
     const format = String(item.format || "").toUpperCase();
     return source.library === "books" ? format === "EPUB" : format === "EPUB" || format === "CBZ";
   });
-  if (!validItems.length) return [];
+  if (!validItems.length) {
+    const empty = [];
+    if (options.replaceGroups !== true) return empty;
+    const db = await openDatabase();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const done = transactionDone(tx);
+    const objectStore = tx.objectStore(STORE_NAME);
+    let removedCount = 0;
+    const allRequest = objectStore.getAll();
+    allRequest.onsuccess = () => {
+      for (const record of allRequest.result || []) {
+        const current = record?.cloudSource;
+        if (record?.sourceType === "cloud" && current?.provider === source.provider &&
+            current?.library === source.library && current?.rootPath === source.rootPath) {
+          objectStore.delete(record.id);
+          removedCount++;
+        }
+      }
+    };
+    await done;
+    empty.removedCount = removedCount;
+    return empty;
+  }
 
-  const ids = await Promise.all(validItems.map(item => cloudBookId(source, item.path)));
+  const identityPaths = validItems.map(item => normalizePath(item.path));
+  if (identityPaths.some(path => !path)) throw new Error("雲端書架資料夾路徑無效。");
+  const ids = await Promise.all(identityPaths.map(path => cloudBookId(source, path)));
   const db = await openDatabase();
   const readTx = db.transaction(STORE_NAME, "readonly");
   const readDone = transactionDone(readTx);
   const store = readTx.objectStore(STORE_NAME);
   const existingRequests = ids.map(id => requestResult(store.get(id)));
-  const existingRecords = await Promise.all(existingRequests);
+  const allRecordsRequest = requestResult(store.getAll());
+  const [existingRecords, allRecords] = await Promise.all([
+    Promise.all(existingRequests),
+    allRecordsRequest
+  ]);
   await readDone;
 
   const now = Date.now();
+  const replaceGroups = options.replaceGroups === true;
+  const validIds = new Set(ids);
+  const staleRecords = replaceGroups ? (allRecords || []).filter(record => {
+    const current = record?.cloudSource;
+    return record?.sourceType === "cloud" && current?.provider === source.provider &&
+      current?.library === source.library && current?.rootPath === source.rootPath && !validIds.has(record.id);
+  }) : [];
   const records = validItems.map((item, index) => {
     const existing = existingRecords[index] || null;
-    const fileName = String(item.name || String(item.path).split("/").pop() || "未命名書籍");
+    const folderPath = normalizePath(item.groupPath || "");
+    const grouped = !!folderPath;
+    const incomingFiles = (Array.isArray(item.groupFiles) && item.groupFiles.length ? item.groupFiles : [item])
+      .filter(file => file && normalizePath(file.path))
+      .map(file => ({
+        path: normalizePath(file.path),
+        name: String(file.name || String(file.path).split("/").pop() || ""),
+        format: String(file.format || "").toUpperCase(),
+        size: Math.max(0, Number(file.size) || 0),
+        modified: file.modified ? String(file.modified) : null,
+        coverHash: /^[a-f0-9]{64}$/i.test(String(file.coverHash || "")) ? String(file.coverHash).toLowerCase() : null,
+        coverStatus: String(file.coverStatus || "")
+      }));
+    const oldFiles = !replaceGroups && Array.isArray(existing?.cloudSource?.files) ? existing.cloudSource.files : [];
+    const filesByPath = new Map();
+    for (const file of [...oldFiles, ...incomingFiles]) {
+      if (file?.path) filesByPath.set(normalizePath(file.path), file);
+    }
+    const mergedFiles = [...filesByPath.values()].sort((a, b) =>
+      String(a.path).localeCompare(String(b.path), "zh-Hant", { numeric: true, sensitivity: "base" }));
+    const fileName = String(item.name || String(item.path || "").split("/").pop() || "未命名書籍");
     const format = String(item.format || "").toUpperCase();
-    const fallbackTitle = basename(fileName) || "未命名書籍";
+    const fallbackTitle = grouped
+      ? String(item.groupTitle || folderPath.split("/").pop() || fileName)
+      : (basename(fileName) || "未命名書籍");
     const coverHash = /^[a-f0-9]{64}$/i.test(String(item.coverHash || "")) ? String(item.coverHash).toLowerCase() : null;
     const coverBlob = existing && existing.cloudCoverHash === coverHash ? (existing.coverBlob || null) : null;
     const modifiedAt = item.modified ? String(item.modified) : null;
     const parsedModified = modifiedAt ? Date.parse(modifiedAt) : NaN;
+    const incomingHashes = Array.isArray(item.groupCoverHashes)
+      ? item.groupCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))).map(hash => String(hash).toLowerCase())
+      : (coverHash ? [coverHash] : []);
+    if (coverHash && item.coverStatus === "ready") incomingHashes.push(coverHash);
+    const oldHashes = !replaceGroups && Array.isArray(existing?.cloudCoverHashes) ? existing.cloudCoverHashes : [];
+    const cloudCoverHashes = [...new Set([...oldHashes, ...incomingHashes])].slice(0, 8);
+
     return {
       ...(existing || {}),
       id: ids[index],
       sourceType: "cloud",
       fileName,
       title: existing?.manualTitle ? existing.title : fallbackTitle,
+      folderTitle: grouped ? fallbackTitle : "",
       author: existing?.manualAuthor ? existing.author : (existing?.author || ""),
       language: existing?.language || "",
       identifier: existing?.identifier || "",
       format,
-      shelf: format === "CBZ" ? "comics" : source.library,
+      shelf: source.library,
       pageCount: Number(existing?.pageCount) || 0,
       size: Math.max(0, Number(item.size) || 0),
       lastModified: Number.isFinite(parsedModified) ? parsedModified : (Number(existing?.lastModified) || 0),
@@ -353,13 +418,16 @@ async function upsertCloudBooks(scope, items) {
       blob: null,
       coverBlob,
       cloudCoverHash: coverHash,
+      cloudCoverHashes,
       cloudCoverType: String(item.coverType || ""),
-      cloudCoverStatus: String(item.coverStatus || (coverHash ? "ready" : "pending")),
+      cloudCoverStatus: cloudCoverHashes.length ? "ready" : String(item.coverStatus || (coverHash ? "ready" : "pending")),
       cloudSource: {
         provider: source.provider,
         library: source.library,
         rootPath: source.rootPath,
         path: normalizePath(item.path),
+        folderPath: folderPath || "",
+        files: mergedFiles.slice(0, 250),
         modifiedAt
       },
       addedAt: Number(existing?.addedAt) || now,
@@ -375,7 +443,9 @@ async function upsertCloudBooks(scope, items) {
   const writeDone = transactionDone(writeTx);
   const writeStore = writeTx.objectStore(STORE_NAME);
   records.forEach(record => writeStore.put(record));
+  staleRecords.forEach(record => writeStore.delete(record.id));
   await writeDone;
+  records.removedCount = staleRecords.length;
   return records;
 }
 
