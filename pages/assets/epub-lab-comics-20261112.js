@@ -15,7 +15,7 @@
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261115-folder-shelves-r2');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261115-folder-shelves-r3');
   var readingTrackerPromise = import('/assets/reading-tracker.js');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261115-cloud-annotations-r3');
   var APPEARANCE_KEY = 'frame-reader-appearance-v1';
