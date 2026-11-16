@@ -533,3 +533,151 @@
   .cloud-directory-panel { padding:11px; }
   .cloud-directory-panel .cloud-browser-heading { align-items:flex-start; }
 }
+
+
+/* FRAME Audio-aligned typography scale for the unified Reader manager.
+   Keep one clear hierarchy across connection, scan and cloud-library tabs. */
+#cloud-settings-dialog {
+  font-size:11px;
+  line-height:1.65;
+}
+#cloud-settings-dialog .cloud-settings-dialog-head h2 {
+  font-size:16px;
+  line-height:1.3;
+}
+#cloud-settings-dialog .cloud-manager-tab {
+  font-size:11px;
+  line-height:1.3;
+}
+#cloud-settings-dialog .cloud-connection-heading h3,
+#cloud-settings-dialog .cloud-index-copy h3,
+#cloud-settings-dialog .cloud-browser-heading h2 {
+  font-size:15px;
+  line-height:1.4;
+  font-weight:600;
+}
+#cloud-settings-dialog .cloud-connection-heading p:last-child,
+#cloud-settings-dialog .cloud-index-copy > p:last-child,
+#cloud-settings-dialog .cloud-directory-panel .cloud-browser-heading > div:first-child > p:last-child {
+  font-size:10px;
+  line-height:1.7;
+}
+#cloud-settings-dialog .cloud-provider-select label,
+#cloud-settings-dialog .cloud-root-field label,
+#cloud-settings-dialog .cloud-library-select label {
+  font-size:10px;
+  line-height:1.5;
+  font-weight:600;
+}
+#cloud-settings-dialog .cloud-provider-select select,
+#cloud-settings-dialog .cloud-root-field input,
+#cloud-settings-dialog .cloud-library-select select {
+  min-height:38px;
+  font-size:12px;
+  line-height:1.4;
+}
+#cloud-settings-dialog .cloud-provider-card strong,
+#cloud-settings-dialog .cloud-root-settings-heading strong,
+#cloud-settings-dialog .cloud-index-summary-card strong {
+  font-size:11px;
+  line-height:1.5;
+  font-weight:600;
+}
+#cloud-settings-dialog .cloud-provider-card > div span,
+#cloud-settings-dialog .cloud-root-settings-heading span {
+  font-size:9px;
+  line-height:1.4;
+}
+#cloud-settings-dialog .cloud-provider-card p,
+#cloud-settings-dialog .cloud-provider-card small,
+#cloud-settings-dialog .cloud-provider-card code,
+#cloud-settings-dialog .cloud-root-settings > p,
+#cloud-settings-dialog .cloud-root-field small,
+#cloud-settings-dialog .cloud-root-save-row span {
+  font-size:9px;
+  line-height:1.7;
+}
+#cloud-settings-dialog .cloud-root-field button,
+#cloud-settings-dialog .cloud-root-save-row button,
+#cloud-settings-dialog .cloud-connection-actions button,
+#cloud-settings-dialog .cloud-index-scan-actions button,
+#cloud-settings-dialog .cloud-item-actions button,
+#cloud-settings-dialog .cloud-pagination button {
+  min-height:34px;
+  font-size:10px;
+  line-height:1.4;
+}
+#cloud-settings-dialog .cloud-source-status,
+#cloud-settings-dialog .cloud-index-progress,
+#cloud-settings-dialog .cloud-browser-status {
+  font-size:10px;
+  line-height:1.7;
+}
+#cloud-settings-dialog .cloud-status-pill,
+#cloud-settings-dialog .cloud-index-status {
+  font-size:10px;
+  line-height:1.4;
+}
+#cloud-settings-dialog .cloud-index-summary-card span {
+  font-size:10px;
+  line-height:1.5;
+}
+#cloud-settings-dialog .cloud-index-summary-card pre {
+  font-size:10px;
+  line-height:1.65;
+}
+#cloud-settings-dialog .cloud-index-log summary {
+  font-size:11px;
+  line-height:1.5;
+}
+#cloud-settings-dialog .cloud-index-log summary span,
+#cloud-settings-dialog .cloud-index-log-toolbar {
+  font-size:9px;
+  line-height:1.65;
+}
+#cloud-settings-dialog .cloud-index-log-toolbar button {
+  min-height:32px;
+  font-size:9px;
+}
+#cloud-settings-dialog .cloud-index-log pre {
+  font-size:10px;
+  line-height:1.75;
+}
+#cloud-settings-dialog .cloud-path-bar span,
+#cloud-settings-dialog .cloud-item-copy strong,
+#cloud-settings-dialog .cloud-item-actions button {
+  font-size:11px;
+  line-height:1.5;
+}
+#cloud-settings-dialog .cloud-item-copy span,
+#cloud-settings-dialog .cloud-pagination span {
+  font-size:9px;
+  line-height:1.5;
+}
+#cloud-settings-dialog .cloud-empty strong {
+  font-size:12px;
+  line-height:1.5;
+}
+#cloud-settings-dialog .cloud-empty p {
+  font-size:10px;
+  line-height:1.7;
+}
+#cloud-settings-dialog .cloud-root-field input,
+#cloud-settings-dialog .cloud-provider-select select,
+#cloud-settings-dialog .cloud-library-select select {
+  padding-top:8px;
+  padding-bottom:8px;
+}
+@media(max-width:720px) {
+  #cloud-settings-dialog .cloud-provider-card small,
+  #cloud-settings-dialog .cloud-provider-card code,
+  #cloud-settings-dialog .cloud-root-field small,
+  #cloud-settings-dialog .cloud-root-save-row span {
+    font-size:9px;
+  }
+  #cloud-settings-dialog .cloud-index-progress,
+  #cloud-settings-dialog .cloud-source-status,
+  #cloud-settings-dialog .cloud-browser-status {
+    font-size:10px;
+  }
+}
