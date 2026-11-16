@@ -59,12 +59,17 @@ function remember(book) {
 async function cloudBookId(scope, path) {
   const provider = String(scope?.provider || "");
   const library = String(scope?.library || "");
-  const rootPath = String(scope?.rootPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   const filePath = String(path || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  if (!["vps", "worker", "mobile"].includes(provider) || !["books", "comics"].includes(library) || !rootPath || !filePath) {
+  const fileName = filePath.split("/").pop() || "";
+  if (!["vps", "worker", "mobile"].includes(provider) ||
+      !["books", "comics"].includes(library) || !fileName) {
     throw new Error("雲端書籍識別資訊無效。");
   }
-  const identity = [provider, library, rootPath, filePath].join("\\n");
+  let identity = fileName.trim();
+  try { identity = identity.normalize("NFC"); } catch (_) {}
+  if (!identity || identity.includes("/") || identity.includes("\\") || identity.includes("\0")) {
+    throw new Error("書籍檔名無效，無法生成 Book ID。");
+  }
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   return "cloud:" + hash;
