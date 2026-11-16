@@ -1620,8 +1620,8 @@ $("cloud-save-source").addEventListener("click", async () => {
     const provider = await saveSourceSettings();
     if (isActiveSourceReady()) {
       state.currentPath = getActiveRoot();
-      await loadDirectory(state.currentPath, 1);
       await renderAllScanSummaries(provider, state.selectedRoots);
+      await loadDirectory(state.currentPath, 1);
     }
   } catch (error) { setSourceStatus(error.message || String(error), true); }
 });
