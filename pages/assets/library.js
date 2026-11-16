@@ -46,11 +46,13 @@ function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   const isFolderCard = Array.isArray(book._groupMembers) && book._groupMembers.length > 0;
+
   if (isFolderCard) {
     frame.classList.add("library-folder-cover");
     frame.setAttribute("aria-label", (book.folderTitle || book.title || "資料夾") + " 封面");
     const members = book._groupMembers.slice().sort(compareFolderFiles);
     const first = members[0] || book;
+
     const face = document.createElement("div");
     face.className = "library-folder-cover-face";
 
@@ -58,27 +60,15 @@ function makeCover(book, compact) {
     spine.className = "library-folder-cover-spine";
     spine.setAttribute("aria-hidden", "true");
 
-    const header = document.createElement("div");
-    header.className = "library-folder-cover-header";
-    const brand = document.createElement("span");
-    brand.className = "library-folder-cover-brand";
-    brand.textContent = "FRAME READER";
-    const edition = document.createElement("span");
-    edition.className = "library-folder-cover-edition";
-    edition.textContent = "PRIVATE ARCHIVE";
-    header.append(brand, edition);
-
-    const title = document.createElement("div");
-    title.className = "library-folder-cover-title";
-    title.textContent = book.folderTitle || book.title || "未命名收藏";
-
-    const rule = document.createElement("span");
-    rule.className = "library-folder-cover-rule";
+    const ornament = document.createElement("span");
+    ornament.className = "library-folder-cover-ornament";
+    ornament.setAttribute("aria-hidden", "true");
 
     const feature = document.createElement("div");
     feature.className = "library-folder-cover-feature";
     const hash = first.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(first.cloudCoverHash || ""))
       ? first.cloudCoverHash : "";
+
     if (hash) {
       const image = document.createElement("img");
       image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
@@ -86,26 +76,15 @@ function makeCover(book, compact) {
       image.loading = "lazy";
       image.decoding = "async";
       image.addEventListener("error", () => {
-        feature.replaceChildren(makeFallback(first));
-        feature.classList.add("is-fallback");
+        feature.replaceChildren();
+        feature.classList.add("has-no-cover");
       }, { once: true });
       feature.appendChild(image);
     } else {
-      feature.classList.add("is-fallback");
-      feature.appendChild(makeFallback(first));
+      feature.classList.add("has-no-cover");
     }
 
-    const footer = document.createElement("div");
-    footer.className = "library-folder-cover-footer";
-    const firstName = document.createElement("span");
-    firstName.className = "library-folder-cover-first";
-    firstName.textContent = first.fileName || first.title || "COLLECTION";
-    const count = document.createElement("span");
-    count.className = "library-folder-cover-count";
-    count.textContent = String(members.length).padStart(2, "0") + " VOLUMES";
-    footer.append(firstName, count);
-
-    face.append(spine, header, title, rule, feature, footer);
+    face.append(spine, ornament, feature);
     frame.appendChild(face);
   } else {
     frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
