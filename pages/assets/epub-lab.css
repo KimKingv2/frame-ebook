@@ -2892,3 +2892,15 @@ body.reader-settings-open .reader-quick-actions {
     animation:none !important;
   }
 }
+
+
+@media(max-width:820px) {
+  #reading-workspace #reader-quick-actions > #reader-sidebar-toggle,
+  #reading-workspace #reader-quick-actions > #reader-appearance-toggle,
+  #reading-workspace #reader-quick-actions > #reader-fullscreen {
+    flex:1 1 0 !important;
+    width:0 !important;
+    min-width:0 !important;
+    max-width:none !important;
+  }
+}
