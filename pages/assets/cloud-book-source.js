@@ -10,8 +10,13 @@ function makeFile(blob, record) {
 export async function fetchCloudBookFile(record) {
   if (!record || !record.cloudSource) throw new Error("這筆書籍沒有 Alist／OpenList 雲端來源資訊。");
   const source = record.cloudSource;
+  if (String(source.provider || "") === "local") {
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const blob = await local.fetchLocalFileBlob(String(source.path || ""));
+    return makeFile(blob, record);
+  }
   if (!["vps", "worker", "mobile"].includes(String(source.provider || ""))) {
-    throw new Error("FRAME Reader 只允許透過已設定的伺服器端 Alist／OpenList 來源讀取書籍。");
+    throw new Error("FRAME Reader 不支援這個 Alist／OpenList 來源。");
   }
   const query = new URLSearchParams({
     provider: String(source.provider),
