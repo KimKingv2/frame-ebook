@@ -2904,3 +2904,152 @@ body.reader-settings-open .reader-quick-actions {
     max-width:none !important;
   }
 }
+
+
+/* Footnotes are previewed in a floating reading overlay instead of navigating
+   away from the current passage. */
+.reader-footnote-popover {
+  position:absolute;
+  z-index:2147482100;
+  width:min(480px,calc(100% - 28px));
+  max-height:min(48vh,380px);
+  padding:0 16px 14px;
+  overflow:auto;
+  border:1px solid rgba(193,170,238,.34);
+  border-radius:15px;
+  color:#eee8f7;
+  background:rgba(28,23,39,.97);
+  box-shadow:0 20px 60px rgba(0,0,0,.58),inset 0 1px 0 rgba(255,255,255,.055);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  animation:reader-footnote-in .2s cubic-bezier(.22,1,.36,1) both;
+}
+.reader-footnote-popover[hidden] { display:none !important; }
+.reader-footnote-popover-head {
+  position:sticky;
+  top:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  min-height:42px;
+  margin:0 -2px 9px;
+  border-bottom:1px solid rgba(193,170,238,.16);
+  color:#cbb9ef;
+  font-size:11px;
+  letter-spacing:.5px;
+  background:rgba(28,23,39,.97);
+}
+.reader-footnote-popover-head button {
+  display:grid;
+  place-items:center;
+  width:30px;
+  min-width:30px;
+  height:30px;
+  min-height:30px;
+  padding:0;
+  border:1px solid rgba(193,170,238,.18);
+  border-radius:9px;
+  color:#e8def6;
+  background:rgba(255,255,255,.05);
+  font-size:18px;
+}
+.reader-footnote-content {
+  color:#e4dceb;
+  font-size:12px;
+  line-height:1.8;
+  overflow-wrap:anywhere;
+}
+.reader-footnote-content p { margin:0 0 9px; }
+.reader-footnote-content p:last-child { margin-bottom:0; }
+.reader-footnote-content ol,
+.reader-footnote-content ul { padding-left:1.5em; }
+.reader-footnote-content blockquote {
+  margin:8px 0;
+  padding-left:12px;
+  border-left:2px solid rgba(167,139,250,.5);
+  color:#cfc2df;
+}
+@keyframes reader-footnote-in {
+  from { opacity:0; transform:translate(-50%,7px) scale(.985); }
+  to { opacity:1; transform:translate(-50%,0) scale(1); }
+}
+
+/* Current-page bookmark control floats above the reading paper. */
+.reader-bookmark-toggle {
+  position:absolute;
+  z-index:2147482000;
+  top:17px;
+  right:18px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:32px;
+  padding:0 11px;
+  border:1px solid rgba(167,139,250,.42);
+  border-radius:9px;
+  color:#eee5ff;
+  background:rgba(34,27,49,.88);
+  box-shadow:0 5px 18px rgba(0,0,0,.25);
+  font-size:10px;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+.reader-bookmark-toggle[aria-pressed="true"] {
+  border-color:rgba(204,177,255,.66);
+  color:#fff;
+  background:linear-gradient(135deg,rgba(100,76,148,.96),rgba(55,42,79,.96));
+}
+.reader-bookmark-toggle:disabled { opacity:.5; cursor:not-allowed; }
+.bookmark-list { max-height:min(48vh,560px); }
+.bookmark-marker {
+  display:grid;
+  place-items:start center;
+  padding-top:7px;
+  color:#c5a6ff;
+  font-size:13px;
+}
+.bookmark-item .annotation-item-content { min-width:0; }
+
+/* The sidebar has a dedicated bookmark view on mobile, alongside contents
+   and notes. Desktop keeps all three sections together. */
+.reader-sidebar .bookmark-list { display:grid; }
+@media(max-width:820px) {
+  .reader-sidebar-mobile-tabs { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+  .reader-sidebar-mobile-tabs button {
+    min-width:0;
+    padding:0 4px;
+    font-size:11px;
+    white-space:nowrap;
+  }
+  .reader-sidebar.mobile-pane-toc #reader-notes-section,
+  .reader-sidebar.mobile-pane-toc #reader-bookmarks-section,
+  .reader-sidebar.mobile-pane-notes #reader-toc-section,
+  .reader-sidebar.mobile-pane-notes #reader-bookmarks-section,
+  .reader-sidebar.mobile-pane-bookmarks #reader-toc-section,
+  .reader-sidebar.mobile-pane-bookmarks #reader-notes-section {
+    display:none !important;
+  }
+  .reader-sidebar #reader-bookmarks-section { min-height:0; gap:12px; }
+  .reader-sidebar.mobile-pane-bookmarks .bookmark-list {
+    max-height:calc(100dvh - 230px);
+    overflow:auto;
+  }
+  .reader-bookmark-toggle {
+    top:9px;
+    right:10px;
+    min-height:29px;
+    padding:0 8px;
+    font-size:9px;
+  }
+  .reader-footnote-popover {
+    width:calc(100% - 20px);
+    max-height:min(52vh,390px);
+    padding:0 13px 12px;
+    border-radius:13px;
+  }
+  .reader-footnote-content { font-size:11px; line-height:1.75; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .reader-footnote-popover { animation:none !important; }
+}
