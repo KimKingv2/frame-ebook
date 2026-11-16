@@ -1,7 +1,7 @@
 import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261116-metadata-r2";
 
 const $ = id => document.getElementById(id);
-const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, linkTargetBookId: null };
+const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, linkTargetBookId: null, activeFolderKey: null };
 const readerUrl = book => {
   const source = book?.cloudSource || {};
   const query = new URLSearchParams({
@@ -75,11 +75,13 @@ function makeCover(book, compact) {
 }
 function createCard(book, compact) {
   const article = document.createElement("article");
-  article.className = "book-card library-card" + (compact ? " library-card-compact" : "");
+  const folderGroup = Array.isArray(book._groupMembers) && book._groupMembers.length > 0;
+  article.className = "book-card library-card" + (compact ? " library-card-compact" : "") + (folderGroup ? " library-folder-card" : "");
   const open = document.createElement("a");
   open.className = "library-card-open";
-  open.href = readerUrl(book);
-  open.setAttribute("aria-label", "開啟 " + book.title);
+  open.href = folderGroup ? "#folder-detail" : readerUrl(book);
+  open.setAttribute("aria-label", folderGroup ? "開啟資料夾 " + book.title : "開啟 " + book.title);
+  if (folderGroup) open.addEventListener("click", event => { event.preventDefault(); openFolderDetails(book); });
   open.appendChild(makeCover(book, compact));
 
   const meta = document.createElement("div"); meta.className = "book-meta library-book-meta";
@@ -88,7 +90,7 @@ function createCard(book, compact) {
   const author = document.createElement("p"); author.textContent = book.author || (getBookShelf(book) === "comics" ? "漫畫／圖像書" : "作者未提供");
   copy.append(title, author);
   const kind = document.createElement("span"); kind.className = "book-kind";
-  kind.textContent = Number(book.volumeCount) > 1 ? Number(book.volumeCount) + " 冊" : book.format;
+  kind.textContent = folderGroup ? (Number(book.volumeCount) || book._groupMembers.length) + " 冊" : book.format;
   meta.append(copy, kind);
 
   const progress = document.createElement("div"); progress.className = "library-progress";
@@ -97,19 +99,29 @@ function createCard(book, compact) {
   const percent = Math.max(0, Math.min(100, Number(book.progress?.percent) || 0));
   fill.style.width = percent + "%"; track.appendChild(fill);
   const label = document.createElement("small");
-  label.textContent = percent > 0 ? Math.round(percent) + "% · " + (book.progress.label || "閱讀中") : "尚未開始";
+  if (folderGroup) track.hidden = true;
+  label.textContent = folderGroup
+    ? (Number(book.volumeCount) || book._groupMembers.length) + " 本作品，點擊查看資料夾"
+    : percent > 0 ? Math.round(percent) + "% · " + (book.progress.label || "閱讀中") : "尚未開始";
   progress.append(track, label);
 
   const actions = document.createElement("div"); actions.className = "library-card-actions";
   const continueLink = document.createElement("a");
-  continueLink.href = readerUrl(book); continueLink.className = "library-open-link";
-  continueLink.textContent = percent > 0 ? "繼續閱讀 ↗" : "開始閱讀 ↗";
+  continueLink.href = folderGroup ? "#folder-detail" : readerUrl(book); continueLink.className = "library-open-link";
+  continueLink.textContent = folderGroup ? "開啟資料夾 ↗" : percent > 0 ? "繼續閱讀 ↗" : "開始閱讀 ↗";
+  if (folderGroup) continueLink.addEventListener("click", event => { event.preventDefault(); openFolderDetails(book); });
   const details = document.createElement("button");
   details.type = "button"; details.className = "library-details-button";
-  details.textContent = "作品資訊"; details.addEventListener("click", () => showBookDetails(book.id));
+  details.textContent = folderGroup ? "查看卷冊" : "作品資訊";
+  details.addEventListener("click", () => folderGroup ? openFolderDetails(book) : showBookDetails(book.id));
   actions.append(continueLink, details);
   article.append(open, meta, progress, actions);
   return article;
+}
+function folderGroupKey(book) {
+  const source = book?.cloudSource || {};
+  const folderPath = String(source.folderPath || "");
+  return folderPath ? [source.provider, source.library, source.rootPath, folderPath].join("\n") : "";
 }
 function groupedShelfBooks() {
   const groups = new Map(), output = [];
@@ -117,11 +129,12 @@ function groupedShelfBooks() {
     const source = book.cloudSource || {};
     const folderPath = String(source.folderPath || "");
     if (!folderPath) { output.push(book); continue; }
-    const key = [source.provider, source.library, source.rootPath, folderPath].join("\n");
+    const key = folderGroupKey(book);
     let group = groups.get(key);
     if (!group) {
       group = {
         ...book,
+        _folderKey: key,
         title: book.manualTitle ? book.title :
           (book.comicMetadata?.nameCn || book.comicMetadata?.name || book.bookTitle || book.title || book.folderTitle || folderPath.split("/").pop()),
         folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
@@ -167,6 +180,40 @@ function filteredBooks() {
   else books.sort((a,b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0));
   return books;
 }
+function openFolderDetails(book) {
+  const key = book?._folderKey || folderGroupKey(book);
+  if (!key || !Array.isArray(book?._groupMembers)) return;
+  state.activeFolderKey = key;
+  render();
+  $("folder-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function renderFolderDetail() {
+  const shelves = groupedShelfBooks();
+  const folder = state.activeFolderKey ? shelves.find(item => item._folderKey === state.activeFolderKey) : null;
+  if (state.activeFolderKey && !folder) state.activeFolderKey = null;
+  const active = !!folder;
+  $("library-hero").hidden = active;
+  $("library-stats").hidden = active;
+  $("recent-section").hidden = active || $("recent-grid").childElementCount === 0;
+  $("library").hidden = active;
+  $("library-privacy").hidden = active;
+  $("library-bottom-banner").hidden = active;
+  $("folder-detail").hidden = !active;
+  if (!active) return;
+
+  const source = folder.cloudSource || {};
+  const volumes = [...folder._groupMembers].sort((a, b) =>
+    String(a.fileName || a.title || "").localeCompare(String(b.fileName || b.title || ""), "zh-Hant", { numeric: true, sensitivity: "base" }));
+  const totalSize = volumes.reduce((sum, volume) => sum + Math.max(0, Number(volume.size) || 0), 0);
+  $("folder-detail-title").textContent = folder.title || folder.folderTitle || "未命名資料夾";
+  $("folder-detail-path").textContent = source.folderPath || "雲端資料夾";
+  $("folder-detail-count").textContent = volumes.length + " 冊 · " + formatSize(totalSize);
+  $("folder-detail-status").textContent = "這個資料夾共有 " + volumes.length + " 個可閱讀檔案。選擇下方任一本作品即可進入閱讀室。";
+  const grid = $("folder-books-grid");
+  grid.replaceChildren();
+  volumes.forEach(volume => grid.appendChild(createCard(volume, false)));
+  $("folder-detail-empty").hidden = volumes.length > 0;
+}
 function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmptyId, countId) {
   const grid = $(gridId), empty = $(emptyId), searchEmpty = $(searchEmptyId);
   grid.classList.toggle("is-list", state.view === "list");
@@ -199,6 +246,7 @@ function render() {
     " 本電子書 · " + visible.filter(book => getBookShelf(book) === "comics").length + " 部漫畫";
   $("view-grid").setAttribute("aria-pressed", state.view === "grid" ? "true" : "false");
   $("view-list").setAttribute("aria-pressed", state.view === "list" ? "true" : "false");
+  renderFolderDetail();
 }
 async function refresh() {
   $("library-status").textContent = "正在讀取雲端書架索引……";
@@ -563,6 +611,11 @@ async function saveDetails(event) {
 }
 
 $("open-cloud-manager-hero")?.addEventListener("click", () => $("open-cloud-manager")?.click());
+$("folder-detail-back").addEventListener("click", () => {
+  state.activeFolderKey = null;
+  render();
+  $("library").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 $("search-books").addEventListener("input", event => { state.query = event.target.value || ""; render(); });
 $("sort-books").addEventListener("change", event => { state.sort = event.target.value; render(); });
 $("view-grid").addEventListener("click", () => { state.view = "grid"; render(); });
