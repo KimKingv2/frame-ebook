@@ -1463,3 +1463,64 @@ button:disabled { opacity: .38; cursor: default; }
   .reader-settings-backdrop:not([hidden]),
   .reader-sidebar-backdrop:not([hidden]) { pointer-events:auto !important; }
 }
+
+
+/* Reading settings overlay order and fullscreen containment fix.
+   The veil must stay behind the settings sheet, never blur its own content. */
+@media(min-width:821px) {
+  .reader-settings-backdrop:not([hidden]) {
+    z-index:1790 !important;
+  }
+  .appearance-panel[open] {
+    z-index:1800 !important;
+  }
+  .reader-quick-actions {
+    position:relative;
+    z-index:1810;
+  }
+}
+
+/* Fullscreen is a browser top-layer element: keep both settings elements
+   inside it and anchor them to the fullscreen workspace. */
+.reading-workspace:fullscreen {
+  position:relative;
+}
+.reading-workspace:fullscreen .reader-settings-backdrop:not([hidden]) {
+  position:absolute;
+  inset:0;
+  z-index:1800 !important;
+}
+.reading-workspace:fullscreen .appearance-panel[open] {
+  position:absolute;
+  top:12px;
+  right:12px;
+  bottom:auto;
+  left:auto;
+  z-index:1810 !important;
+  max-height:calc(100% - 24px);
+}
+.reading-workspace:fullscreen .reader-quick-actions {
+  position:relative;
+  z-index:1820;
+}
+
+@media(max-width:820px) {
+  .reading-workspace:fullscreen .reader-settings-backdrop:not([hidden]) {
+    position:absolute;
+    inset:0;
+    z-index:9910 !important;
+  }
+  .reading-workspace:fullscreen .appearance-panel[open] {
+    position:absolute;
+    top:auto;
+    right:9px;
+    bottom:calc(68px + env(safe-area-inset-bottom, 0px));
+    left:9px;
+    z-index:9920 !important;
+    width:auto;
+    max-height:min(78dvh,720px);
+  }
+  .reading-workspace:fullscreen .reader-quick-actions {
+    z-index:9900 !important;
+  }
+}
