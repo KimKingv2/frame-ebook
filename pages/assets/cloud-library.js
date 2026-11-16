@@ -196,7 +196,7 @@ async function saveRootSelections() {
   if (provider === state.activeProvider) state.selectedRoots = { ...values };
   renderRootStatus();
   if (provider === state.activeProvider) clearListing("書籍與漫畫目錄設定已套用");
-  setSourceStatus("已將 " + PROVIDER_LABELS[provider] + " 的電子書與漫畫根目錄保存至雲端 D1。");
+  setSourceStatus("電子書與漫畫根目錄已保存至雲端 D1；所有端口共用同一組路徑。");
 }
 async function saveSourceSettings() {
   const provider = state.editProvider || $("cloud-provider").value;
