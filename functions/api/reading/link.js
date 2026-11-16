@@ -251,11 +251,16 @@ export async function onRequestPost({ request, env }) {
       if (!String(error?.message || error).toLowerCase().includes("no such table: reader_comic_metadata")) throw error;
     }
     if (oldComicMetadata) {
+      const linkedMetadata = parseJson(oldComicMetadata.metadataJson, {});
+      linkedMetadata.provider = target.provider;
+      linkedMetadata.library = target.library;
+      linkedMetadata.rootPath = target.rootPath;
+      linkedMetadata.folderPath = target.path.slice(0, target.path.lastIndexOf("/")) || "/";
       statements.push(context.db.prepare(
         "INSERT OR IGNORE INTO reader_comic_metadata " +
         "(user_id,book_id,subject_id,metadata_json,source_url,fetched_at,updated_at) VALUES (?,?,?,?,?,?,?)"
       ).bind(
-        context.userId,newBookId,oldComicMetadata.subjectId,oldComicMetadata.metadataJson,
+        context.userId,newBookId,oldComicMetadata.subjectId,JSON.stringify(linkedMetadata),
         oldComicMetadata.sourceUrl,Number(oldComicMetadata.fetchedAt)||Date.now(),Date.now()
       ));
       statements.push(context.db.prepare(
