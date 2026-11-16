@@ -1,25 +1,20 @@
 /* FRAME Reader Reading Room — Foliate.js adapter.
- * The archive is loaded fully into memory by JSZip for this small prototype.
- * Reading appearance settings are local to this browser.
+ * Source archives are fetched from the configured Alist/OpenList server proxy.
+ * Reading state and appearance are persisted in user-scoped Cloudflare D1.
  */
 (function () {
   'use strict';
   var view = null;
-  var currentStorageKey = null;
-  var currentIndexStorageKey = null;
   var restoreCfi = null;
   var restorePageIndex = null;
   var restoring = false;
   var currentBookId = null;
-  var currentAppearanceKey = null;
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261115-folder-shelves-r8');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261116-cloud-only-r1');
   var readingTrackerPromise = import('/assets/reading-tracker.js');
-  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261115-cloud-annotations-r3');
-  var APPEARANCE_KEY = 'frame-reader-appearance-v1';
-  currentAppearanceKey = APPEARANCE_KEY;
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-cloud-only-r1');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
     sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
@@ -44,8 +39,6 @@
   };
   var el = function (id) { return document.getElementById(id); };
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
-  var safeGet = function (key) { try { return localStorage.getItem(key); } catch (e) { return null; } };
-  var safeSet = function (key, value) { try { localStorage.setItem(key, value); return true; } catch (e) { return false; } };
 
   function titleText(value) {
     if (typeof value === 'string') return value;
@@ -102,7 +95,8 @@
         });
       }
     } catch (error) {
-      console.warn('FRAME Reader could not save local progress:', error);
+      console.warn('FRAME Reader could not save cloud progress:', error);
+      setText('reader-status', '雲端閱讀位置保存失敗，請檢查連線後重新載入。');
     }
   }
   function queueLibraryProgress(patch) {
@@ -115,7 +109,7 @@
     }, 350);
   }
   function updateLocation(detail) {
-    if (!detail) return;
+    if (!detail || restoring) return;
     var progressPatch = {};
     if (typeof detail.fraction === 'number' && isFinite(detail.fraction)) {
       var percent = Math.max(0, Math.min(100, Math.round(detail.fraction * 100)));
@@ -128,15 +122,11 @@
       progressPatch.percent = percent;
       progressPatch.label = label;
     }
-    if (detail.cfi && currentStorageKey && !restoring) {
-      if (safeSet(currentStorageKey, detail.cfi)) setText('reader-status', '閱讀位置已保存在這台設備。跨設備同步尚未啟用。');
-      else setText('reader-status', '瀏覽器不允許保存本機閱讀位置。');
+    if (detail.cfi) {
       progressPatch.cfi = detail.cfi;
+      setText('reader-status', '閱讀位置正在保存至雲端 D1……');
     }
-    if (typeof detail.index === 'number' && currentIndexStorageKey && !restoring) {
-      safeSet(currentIndexStorageKey, String(detail.index));
-      progressPatch.index = detail.index;
-    }
+    if (typeof detail.index === 'number') progressPatch.index = detail.index;
     if (Object.keys(progressPatch).length) queueLibraryProgress(progressPatch);
   }
   function makeLoader(zip) {
@@ -158,40 +148,34 @@
       }
     };
   }
-  function loadAppearance() {
+  function loadAppearance(savedValue) {
     Object.assign(appearance, {
       fontScale: '1', lineHeight: '1.65', verticalMargin: '16', horizontalMargin: '7',
       fontFamily: 'original', fontWeight: 'original', paragraphSpacing: 'original', textAlign: 'original',
       readingMode: 'paginated', pageLayout: '2', comicReadingMode: 'paginated',
       comicPageLayout: '2', comicImageFit: 'fit-page', backdrop: 'wood', theme: 'paper'
     });
-    var saved = safeGet(currentAppearanceKey || APPEARANCE_KEY);
-    if (saved) {
-      try {
-        var value = JSON.parse(saved);
-        if (value && typeof value === 'object') {
-          if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
-          if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
-          if (['8', '16', '24'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
-          if (['4', '7', '10'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
-          if (['original', 'serif', 'sans'].indexOf(String(value.fontFamily)) !== -1) appearance.fontFamily = String(value.fontFamily);
-          if (['original', 'normal', 'medium'].indexOf(String(value.fontWeight)) !== -1) appearance.fontWeight = String(value.fontWeight);
-          if (['original', 'compact', 'standard', 'loose'].indexOf(String(value.paragraphSpacing)) !== -1) appearance.paragraphSpacing = String(value.paragraphSpacing);
-          if (['original', 'left', 'justify'].indexOf(String(value.textAlign)) !== -1) appearance.textAlign = String(value.textAlign);
-          if (['paginated', 'scrolled'].indexOf(String(value.readingMode)) !== -1) appearance.readingMode = String(value.readingMode);
-          if (['1', '2'].indexOf(String(value.pageLayout)) !== -1) appearance.pageLayout = String(value.pageLayout);
-          if (['paginated', 'scrolled'].indexOf(String(value.comicReadingMode)) !== -1) appearance.comicReadingMode = String(value.comicReadingMode);
-          if (['1', '2'].indexOf(String(value.comicPageLayout)) !== -1) appearance.comicPageLayout = String(value.comicPageLayout);
-          if (['fit-page', 'fit-width'].indexOf(String(value.comicImageFit)) !== -1) appearance.comicImageFit = String(value.comicImageFit);
-          if (['wood', 'linen', 'slate'].indexOf(String(value.backdrop)) !== -1) appearance.backdrop = String(value.backdrop);
-          // Migrate the previous combined control and preserve its selected scale.
-          if (!value.verticalMargin && !value.horizontalMargin && ['8', '16', '24'].indexOf(String(value.margin)) !== -1) {
-            appearance.verticalMargin = String(value.margin);
-            appearance.horizontalMargin = ({ '8': '4', '16': '7', '24': '10' })[String(value.margin)];
-          }
-          if (Object.prototype.hasOwnProperty.call(THEMES, value.theme)) appearance.theme = value.theme;
-        }
-      } catch (e) {}
+    var value = savedValue && typeof savedValue === 'object' ? savedValue : {};
+    if (value && typeof value === 'object') {
+      if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
+      if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
+      if (['8', '16', '24'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
+      if (['4', '7', '10'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
+      if (['original', 'serif', 'sans'].indexOf(String(value.fontFamily)) !== -1) appearance.fontFamily = String(value.fontFamily);
+      if (['original', 'normal', 'medium'].indexOf(String(value.fontWeight)) !== -1) appearance.fontWeight = String(value.fontWeight);
+      if (['original', 'compact', 'standard', 'loose'].indexOf(String(value.paragraphSpacing)) !== -1) appearance.paragraphSpacing = String(value.paragraphSpacing);
+      if (['original', 'left', 'justify'].indexOf(String(value.textAlign)) !== -1) appearance.textAlign = String(value.textAlign);
+      if (['paginated', 'scrolled'].indexOf(String(value.readingMode)) !== -1) appearance.readingMode = String(value.readingMode);
+      if (['1', '2'].indexOf(String(value.pageLayout)) !== -1) appearance.pageLayout = String(value.pageLayout);
+      if (['paginated', 'scrolled'].indexOf(String(value.comicReadingMode)) !== -1) appearance.comicReadingMode = String(value.comicReadingMode);
+      if (['1', '2'].indexOf(String(value.comicPageLayout)) !== -1) appearance.comicPageLayout = String(value.comicPageLayout);
+      if (['fit-page', 'fit-width'].indexOf(String(value.comicImageFit)) !== -1) appearance.comicImageFit = String(value.comicImageFit);
+      if (['wood', 'linen', 'slate'].indexOf(String(value.backdrop)) !== -1) appearance.backdrop = String(value.backdrop);
+      if (!value.verticalMargin && !value.horizontalMargin && ['8', '16', '24'].indexOf(String(value.margin)) !== -1) {
+        appearance.verticalMargin = String(value.margin);
+        appearance.horizontalMargin = ({ '8': '4', '16': '7', '24': '10' })[String(value.margin)];
+      }
+      if (Object.prototype.hasOwnProperty.call(THEMES, value.theme)) appearance.theme = value.theme;
     }
     el('font-scale').value = appearance.fontScale;
     el('line-height').value = appearance.lineHeight;
@@ -211,10 +195,19 @@
     updateLayoutControlState();
   }
   function saveAppearance() {
-    var ok = safeSet(currentAppearanceKey || APPEARANCE_KEY, JSON.stringify(appearance));
-    setText('appearance-status', ok
-      ? '外觀設定已保存在這台設備；其他設備尚未同步。'
-      : '瀏覽器未允許本機儲存，這次設定不會保留。');
+    if (!currentBookId) {
+      setText('appearance-status', '請從雲端書架開啟已索引的書籍。');
+      return;
+    }
+    setText('appearance-status', '外觀設定正在保存至雲端 D1……');
+    libraryStorePromise.then(function (store) {
+      return store.updateBook(currentBookId, { appearance: Object.assign({}, appearance) });
+    }).then(function () {
+      setText('appearance-status', '外觀設定已保存至雲端，可在其他裝置繼續使用。');
+    }).catch(function (error) {
+      setText('appearance-status', '雲端保存失敗：' + (error && error.message ? error.message : String(error)));
+      console.error(error);
+    });
   }
   function updateThemeButtons() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-theme]'), function (button) {
@@ -361,7 +354,7 @@
     applyAppearance();
     updateLayoutControlState();
   }
-  async function openEpub(source, name, bookId) {
+  async function openEpub(source, name, bookId, initialRecord) {
     await flushLibraryProgress();
     await readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
@@ -397,64 +390,47 @@
     parsedBook = view.book;
 
     var metadata = parsedBook.metadata || {};
-    currentBookId = bookId || ('standalone:' + String(name || 'untitled'));
-    currentAppearanceKey = currentBookId ? APPEARANCE_KEY + ':' + currentBookId : APPEARANCE_KEY;
-    if (currentBookId) {
-      window.history.replaceState(null, '', '/epub-lab/?book=' + encodeURIComponent(currentBookId));
-    } else {
-      window.history.replaceState(null, '', '/epub-lab/');
+    currentBookId = String(bookId || '');
+    if (!/^cloud:[a-f0-9]{64}$/.test(currentBookId)) {
+      throw new Error('閱讀室只接受從 Alist／OpenList 掃描索引導入的雲端書籍。');
     }
-    loadAppearance();
     var libraryStore = await libraryStorePromise;
-    var libraryRecord = currentBookId ? await libraryStore.getBook(currentBookId) : null;
-    var identifier = currentBookId || metadata.identifier || name || 'sample';
-    currentStorageKey = view.isFixedLayout ? null : 'frame-reader-epub-cfi:' + String(identifier);
-    currentIndexStorageKey = view.isFixedLayout
-      ? 'frame-reader-fixed-index:' + String(identifier)
-      : null;
-    restoreCfi = currentStorageKey ? safeGet(currentStorageKey) : null;
-    var storedIndex = currentIndexStorageKey ? Number(safeGet(currentIndexStorageKey)) : NaN;
-    var savedProgress = libraryRecord && libraryRecord.progress ? libraryRecord.progress : {};
-    if (!restoreCfi && !view.isFixedLayout && savedProgress.cfi) restoreCfi = savedProgress.cfi;
-    if ((!Number.isInteger(storedIndex) || storedIndex < 0) && Number.isInteger(savedProgress.index)) {
-      storedIndex = savedProgress.index;
-    }
-    restorePageIndex = Number.isInteger(storedIndex) && storedIndex >= 0 ? storedIndex : null;
+    var libraryRecord = initialRecord || await libraryStore.getBook(currentBookId);
+    if (!libraryRecord) throw new Error('無法讀取這本書的雲端索引與閱讀資料，請返回書架重新開啟。');
+    loadAppearance(libraryRecord.appearance || {});
+    var savedProgress = libraryRecord.progress || {};
+    restoreCfi = !view.isFixedLayout && savedProgress.cfi ? savedProgress.cfi : null;
+    restorePageIndex = view.isFixedLayout && Number.isInteger(savedProgress.index) && savedProgress.index >= 0
+      ? savedProgress.index : null;
     restoring = !!restoreCfi || restorePageIndex !== null;
-    setText('book-title', (libraryRecord && libraryRecord.title) || titleText(metadata.title) || name);
-    setText('book-author', (libraryRecord && libraryRecord.author) || titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : (name || 'EPUB 測試書')));
+    setText('book-title', libraryRecord.title || titleText(metadata.title) || name);
+    setText('book-author', libraryRecord.author || titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : name));
     populateTOC(parsedBook.toc || []);
-    if (libraryRecord) {
-      var metadataPatch = { lastOpenedAt: Date.now() };
-      if (!libraryRecord.manualTitle && titleText(metadata.title)) metadataPatch.title = titleText(metadata.title);
-      if (!libraryRecord.manualAuthor && titleText(metadata.author)) metadataPatch.author = titleText(metadata.author);
-      if (metadata.language) metadataPatch.language = String(metadata.language);
-      if (!Number(libraryRecord.pageCount) && parsedBook.sections) metadataPatch.pageCount = parsedBook.sections.length;
-      await libraryStore.updateBook(currentBookId, metadataPatch);
-    }
+    var metadataPatch = { lastOpenedAt: Date.now() };
+    if (!libraryRecord.manualTitle && titleText(metadata.title)) metadataPatch.title = titleText(metadata.title);
+    if (!libraryRecord.manualAuthor && titleText(metadata.author)) metadataPatch.author = titleText(metadata.author);
+    if (metadata.language) metadataPatch.language = String(metadata.language);
+    if (!Number(libraryRecord.pageCount) && parsedBook.sections) metadataPatch.pageCount = parsedBook.sections.length;
+    await libraryStore.updateBook(currentBookId, metadataPatch);
 
     if (view.isFixedLayout) {
-      if (typeof view.renderer.setPageLayout === 'function') {
-        await view.renderer.setPageLayout(appearance.comicPageLayout);
-      }
+      if (typeof view.renderer.setPageLayout === 'function') await view.renderer.setPageLayout(appearance.comicPageLayout);
       view.renderer.setAttribute('zoom', appearance.comicImageFit);
-      if (typeof view.renderer.setFlow === 'function') {
-        view.renderer.setFlow(appearance.comicReadingMode);
-      }
+      if (typeof view.renderer.setFlow === 'function') view.renderer.setFlow(appearance.comicReadingMode);
     }
 
     var locationMessage = isCbz
-      ? 'CBZ 漫畫已載入。可使用翻頁按鈕、章節目錄或直式長卷模式。'
-      : 'EPUB 已載入。可使用翻頁按鈕或章節目錄。';
+      ? 'CBZ 漫畫已載入。閱讀位置會自動保存至雲端。'
+      : 'EPUB 已載入。閱讀位置會自動保存至雲端。';
     try {
       if (restoreCfi) {
         await view.init({ lastLocation: restoreCfi, showTextStart: true });
-        locationMessage = '已恢復這本書上次的閱讀位置。此位置目前只存在本機。';
+        locationMessage = '已從雲端恢復上次的閱讀位置。';
       } else {
         await view.init({ showTextStart: true });
-        if (restorePageIndex !== null && view.isFixedLayout) {
+        if (restorePageIndex !== null && view.isFixedLayout && parsedBook.sections?.length) {
           await view.goTo(Math.min(restorePageIndex, parsedBook.sections.length - 1));
-          locationMessage = '已恢復圖像書籍上次的閱讀頁面。此位置目前只存在本機。';
+          locationMessage = '已從雲端恢復漫畫上次的閱讀頁面。';
         }
       }
     } catch (navigationError) {
@@ -480,59 +456,10 @@
     setText('engine-status', isCbz
       ? 'CBZ 漫畫閱讀引擎已就緒'
       : (view.isFixedLayout ? '固定版面 EPUB 已載入' : 'EPUB 閱讀引擎已就緒'));
-    var trackerTitle = (libraryRecord && libraryRecord.title) || titleText(metadata.title) || name || '未命名書籍';
+    var trackerTitle = libraryRecord.title || titleText(metadata.title) || name || '未命名書籍';
     await readingTrackerPromise.then(function (tracker) {
       return tracker.start({ id: currentBookId, title: trackerTitle, format: isCbz ? 'CBZ' : 'EPUB' });
     });
-  }
-  async function loadComicDemo() {
-    try {
-      setText('reader-status', '正在製作原創漫畫測試檔……');
-      var zip = new window.JSZip();
-      var pages = [
-        { name: '00-cover.svg', title: '紙上星河', subtitle: 'FRAME READER · COMIC TEST', mood: '#27213a', accent: '#c6a4ff' },
-        { name: '01-page.svg', title: '第一頁 · 夜色', subtitle: '城市的燈，逐格亮起。', mood: '#24394a', accent: '#9dd7e6' },
-        { name: '02-page.svg', title: '第二頁 · 回聲', subtitle: '有些故事，從翻頁才開始。', mood: '#453044', accent: '#f3b5c8' },
-        { name: '03-page.svg', title: '第三頁 · 清晨', subtitle: '天亮以前，還有一頁。', mood: '#66503b', accent: '#f4d28c' }
-      ];
-      pages.forEach(function (page, index) {
-        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1280" viewBox="0 0 900 1280">' +
-          '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="' + page.mood + '"/><stop offset="1" stop-color="#11101b"/></linearGradient></defs>' +
-          '<rect width="900" height="1280" fill="#f5efe5"/><rect x="34" y="34" width="832" height="1212" rx="9" fill="url(#g)"/>' +
-          '<path d="M80 240 C240 120 330 360 470 220 S700 100 820 270" fill="none" stroke="' + page.accent + '" stroke-width="5" opacity=".65"/>' +
-          '<circle cx="' + (230 + index * 120) + '" cy="' + (450 + index * 35) + '" r="' + (112 + index * 8) + '" fill="' + page.accent + '" opacity=".13"/>' +
-          '<rect x="105" y="610" width="690" height="390" rx="12" fill="#11101b" opacity=".34" stroke="' + page.accent + '" stroke-width="3"/>' +
-          '<path d="M145 910 L300 740 L440 875 L580 690 L750 900" fill="none" stroke="' + page.accent + '" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<text x="105" y="155" fill="' + page.accent + '" font-size="24" letter-spacing="6" font-family="sans-serif">' + page.subtitle + '</text>' +
-          '<text x="105" y="1100" fill="#fffaf2" font-size="' + (index === 0 ? '72' : '54') + '" font-weight="700" font-family="sans-serif">' + page.title + '</text>' +
-          '<text x="105" y="1170" fill="#d9cce9" font-size="20" letter-spacing="5" font-family="sans-serif">FRAME · ORIGINAL DEMO PAGE ' + (index + 1) + '</text>' +
-          '</svg>';
-        zip.file(page.name, svg);
-      });
-      var blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-      var file = new File([blob], 'FRAME Reader Comic Demo.cbz', { type: 'application/vnd.comicbook+zip' });
-      var store = await libraryStorePromise;
-      var record = await store.importBookFile(file);
-      await openEpub(file, file.name, record.id);
-      setText('reader-status', '原創漫畫示範已加入本機書架。可切換單頁、雙頁與直式長卷。');
-    } catch (error) {
-      setText('engine-status', '漫畫示範載入失敗');
-      setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
-      console.error(error);
-    }
-  }
-
-  async function loadDemo() {
-    try {
-      setText('reader-status', '正在載入內建測試 EPUB……');
-      var response = await fetch('/demo/frame-reader-sample.epub', { cache: 'no-store' });
-      if (!response.ok) throw new Error('測試書讀取失敗：HTTP ' + response.status);
-      await openEpub(await response.blob(), 'FRAME Reader 測試小書');
-    } catch (error) {
-      setText('engine-status', '載入失敗');
-      setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
-      console.error(error);
-    }
   }
   function featureSummary() {
     var features = [
@@ -560,7 +487,7 @@
     setText('reading-live-label', detail.stopped ? '本次閱讀已暫停' : '正在記錄本次閱讀');
   });
 
-  loadAppearance();
+  loadAppearance({});
   el('font-scale').addEventListener('change', function (event) { setAppearance('fontScale', event.target.value); });
   el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
   el('vertical-margin').addEventListener('change', function (event) { setAppearance('verticalMargin', event.target.value); });
@@ -579,23 +506,6 @@
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-backdrop]'), function (button) {
     button.addEventListener('click', function () { setAppearance('backdrop', button.getAttribute('data-backdrop')); });
-  });
-  el('load-demo').addEventListener('click', loadDemo);
-  el('load-comic-demo').addEventListener('click', loadComicDemo);
-  el('epub-file').addEventListener('change', function (event) {
-    var file = event.target.files && event.target.files[0];
-    if (!file) return;
-    (async function () {
-      var store = await libraryStorePromise;
-      var record = await store.importBookFile(file);
-      await openEpub(file, file.name, record.id);
-      setText('engine-status', '本機書籍已加入書架');
-      setText('reader-status', '已加入本機書架。檔案與閱讀記錄只保存在這台設備。');
-    }()).catch(function (error) {
-      setText('engine-status', '解析或匯入失敗');
-      setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
-      console.error(error);
-    });
   });
   el('prev-page').addEventListener('click', function () {
     if (view) view.prev().catch(function (error) { console.error(error); });
@@ -616,23 +526,24 @@
   setText('engine-status', featureSummary());
   import('/vendor/foliate-js/view.js').then(async function () {
     setText('engine-status', featureSummary() + ' · Foliate ready');
-    var bookId = new URLSearchParams(window.location.search).get('book');
-    if (bookId) {
-      var store = await libraryStorePromise;
-      var record = await store.getBook(bookId);
-      if (!record) throw new Error('找不到這本書的本機書目記錄。請回到我的書架重新同步雲端書目。');
-      var source = record.blob || null;
-      if (!source && record.sourceType === 'cloud' && record.cloudSource) {
-        setText('reader-status', '正在從 OpenList 讀取原始書檔……');
-        setText('engine-status', '正在連接雲端書籍');
-        var sourceModule = await cloudBookSourcePromise;
-        source = await sourceModule.fetchCloudBookFile(record);
-      }
-      if (!source) throw new Error('找不到原始書檔。請確認雲端來源仍可連線，或重新匯入本機檔案。');
-      await openEpub(source, record.fileName, record.id);
-    } else {
-      loadDemo();
-    }
+    var params = new URLSearchParams(window.location.search);
+    var bookId = params.get('book');
+    if (!bookId) throw new Error('請回到我的書架，從已掃描索引的雲端書籍開啟閱讀室。');
+    var descriptor = {
+      id: bookId,
+      provider: params.get('provider'),
+      library: params.get('library'),
+      rootPath: params.get('root_path'),
+      path: params.get('path')
+    };
+    var store = await libraryStorePromise;
+    var record = await store.getBook(descriptor);
+    if (!record) throw new Error('找不到這本書的雲端索引與閱讀資料。請確認 Alist／OpenList 索引仍存在。');
+    setText('reader-status', '正在透過伺服器端連接 Alist／OpenList 讀取書檔……');
+    setText('engine-status', '正在載入雲端書籍');
+    var sourceModule = await cloudBookSourcePromise;
+    var source = await sourceModule.fetchCloudBookFile(record);
+    await openEpub(source, record.fileName, record.id, record);
   }).catch(function (error) {
     setText('engine-status', '書籍或閱讀引擎載入失敗');
     setText('reader-status', '錯誤：' + (error && error.message ? error.message : String(error)));
