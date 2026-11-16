@@ -37,38 +37,108 @@ function makeFallback(book) {
   node.append(top, title, bottom);
   return node;
 }
+function compareFolderFiles(a, b) {
+  const nameA = String(a?.fileName || a?.name || "");
+  const nameB = String(b?.fileName || b?.name || "");
+  return nameA.localeCompare(nameB, "zh-Hant", { numeric: true, sensitivity: "base" });
+}
+function folderStackPlacements(book, count) {
+  const key = String(book._folderKey || book.folderTitle || book.title || "");
+  let seed = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    seed ^= key.charCodeAt(index);
+    seed = Math.imul(seed, 16777619);
+  }
+  const layouts = {
+    2: [
+      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }],
+      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }],
+      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }]
+    ],
+    3: [
+      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -10 }],
+      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }, { x: 36, y: 45.5, rotation: 10 }],
+      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 10 }]
+    ],
+    4: [
+      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -10 }, { x: 36, y: 54.5, rotation: 10 }],
+      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }, { x: 36, y: 45.5, rotation: 10 }, { x: 64, y: 54.5, rotation: -10 }],
+      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 10 }, { x: 36, y: 45.5, rotation: -10 }]
+    ]
+  };
+  const choices = layouts[Math.min(4, Math.max(2, count))] || layouts[4];
+  return choices[(seed >>> 0) % choices.length];
+}
 function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
   const isFolderCard = Array.isArray(book._groupMembers) && book._groupMembers.length > 0;
-  const sourceHashes = isFolderCard
-    ? (book.cloudCoverHashes || [])
-    : (book.cloudCoverHash ? [book.cloudCoverHash] : (book.cloudCoverHashes || []).slice(0, 1));
-  const hashes = [...new Set(sourceHashes
-    .filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 3);
-  if (hashes.length > 1) {
-    const stack = document.createElement("div");
-    stack.className = "library-cover-stack";
-    stack.setAttribute("aria-label", "資料夾內 " + hashes.length + " 冊封面堆疊");
-    hashes.forEach((hash, index) => {
+  if (isFolderCard) {
+    const members = book._groupMembers.slice().sort(compareFolderFiles).slice(0, 4);
+    if (members.length > 1) {
+      const stack = document.createElement("div");
+      stack.className = "library-cover-stack";
+      stack.setAttribute("aria-label", "依檔名排序的前 " + members.length + " 本書，隨意堆疊展示");
+      const placements = folderStackPlacements(book, members.length);
+      members.forEach((member, index) => {
+        const sheet = document.createElement("div");
+        sheet.className = "library-cover-stack-book";
+        const point = placements[index] || placements[placements.length - 1];
+        sheet.style.left = (point.x - 27.5) + "%";
+        sheet.style.top = (point.y - 39.5) + "%";
+        sheet.style.width = "55%";
+        sheet.style.height = "79%";
+        sheet.style.transform = "rotate(" + point.rotation + "deg)";
+        sheet.style.zIndex = String(members.length - index + 1);
+        const hash = member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
+          ? member.cloudCoverHash : "";
+        if (hash) {
+          const image = document.createElement("img");
+          image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+          image.alt = member.fileName || member.title || "書籍封面";
+          image.loading = "lazy"; image.decoding = "async";
+          image.addEventListener("error", () => {
+            sheet.replaceChildren(makeFallback(member));
+            sheet.classList.add("is-fallback");
+          }, { once: true });
+          sheet.appendChild(image);
+        } else {
+          sheet.classList.add("is-fallback");
+          sheet.appendChild(makeFallback(member));
+        }
+        stack.appendChild(sheet);
+      });
+      frame.appendChild(stack);
+    } else {
+      const member = members[0];
+      const hash = member?.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
+        ? member.cloudCoverHash : "";
+      if (hash) {
+        const image = document.createElement("img");
+        image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+        image.alt = member.fileName || member.title || "書籍封面";
+        image.loading = "lazy"; image.decoding = "async";
+        image.addEventListener("error", () => { image.remove(); frame.appendChild(makeFallback(member)); }, { once: true });
+        frame.appendChild(image);
+      } else {
+        frame.appendChild(makeFallback(member || book));
+      }
+    }
+  } else {
+    const hash = book.cloudCoverHash && book.cloudCoverStatus === "ready"
+      ? book.cloudCoverHash
+      : (book.cloudCoverHashes || []).find(value => /^[a-f0-9]{64}$/i.test(String(value))) || "";
+    if (hash) {
       const image = document.createElement("img");
       image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
-      image.alt = (book.title || "作品") + " 第 " + (index + 1) + " 冊封面";
+      image.alt = (book.title || "作品") + " 封面";
       image.loading = "lazy"; image.decoding = "async";
-      image.addEventListener("error", () => image.remove(), { once: true });
-      stack.appendChild(image);
-    });
-    frame.appendChild(stack);
-  } else if (hashes.length === 1) {
-    const image = document.createElement("img");
-    image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hashes[0]);
-    image.alt = (book.title || "作品") + " 封面";
-    image.loading = "lazy"; image.decoding = "async";
-    image.addEventListener("error", () => { image.remove(); frame.appendChild(makeFallback(book)); }, { once: true });
-    frame.appendChild(image);
-  } else {
-    frame.appendChild(makeFallback(book));
+      image.addEventListener("error", () => { image.remove(); frame.appendChild(makeFallback(book)); }, { once: true });
+      frame.appendChild(image);
+    } else {
+      frame.appendChild(makeFallback(book));
+    }
   }
   const format = document.createElement("span");
   format.className = "library-format-badge";
@@ -158,8 +228,6 @@ function groupedShelfBooks() {
     group.volumeCount += 1;
     group.size += Math.max(0, Number(book.size) || 0);
     group.lastOpenedAt = Math.max(Number(group.lastOpenedAt) || 0, Number(book.lastOpenedAt) || 0);
-    group.cloudCoverHashes.push(...(book.cloudCoverHashes || []));
-    if (book.cloudCoverHash && book.cloudCoverStatus === "ready") group.cloudCoverHashes.push(book.cloudCoverHash);
     group.cloudSource.files.push({
       path: String(source.path || ""), name: String(book.fileName || ""), format: String(book.format || ""),
       size: Math.max(0, Number(book.size) || 0), coverHash: book.cloudCoverHash || null,
@@ -167,10 +235,14 @@ function groupedShelfBooks() {
     });
   }
   for (const group of groups.values()) {
-    group.cloudCoverHashes = [...new Set(group.cloudCoverHashes.filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 8);
+    group._groupMembers.sort(compareFolderFiles);
+    group.cloudCoverHashes = [...new Set(group._groupMembers
+      .filter(member => member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || "")))
+      .map(member => member.cloudCoverHash))].slice(0, 8);
     const fileMap = new Map();
     for (const file of group.cloudSource.files) if (file.path) fileMap.set(file.path, file);
-    group.cloudSource.files = [...fileMap.values()].sort((a,b) => a.path.localeCompare(b.path,"zh-Hant",{numeric:true,sensitivity:"base"}));
+    group.cloudSource.files = [...fileMap.values()].sort((a,b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant", { numeric: true, sensitivity: "base" }));
   }
   return output;
 }
