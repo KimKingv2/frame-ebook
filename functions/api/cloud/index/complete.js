@@ -24,8 +24,8 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const result = await db.prepare(
-      "DELETE FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND scan_id<>?"
-    ).bind(CATALOG_PROVIDER, library, rootPath, scanId).run();
+      "DELETE FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND scan_id<>?"
+    ).bind(library, rootPath, scanId).run();
     return json({
       ok: true,
       removed: Number(result?.meta?.changes || 0),
