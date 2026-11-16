@@ -92,7 +92,7 @@ export async function migrateLegacyReaderBookIds(db, userId) {
     annotationRows = annotationResult.results || [];
   } catch (error) {
     const message = String(error?.message || error);
-    if (!/no such table:\\s*reader_annotations/i.test(message)) throw error;
+    if (!message.toLowerCase().includes("no such table: reader_annotations")) throw error;
   }
 
   const mapping = new Map();
