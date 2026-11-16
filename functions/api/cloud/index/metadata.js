@@ -4,6 +4,7 @@ import {
 
 const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const MAX_ITEMS = 50;
+const CATALOG_PROVIDER = "vps";
 
 function clean(value, max) {
   return String(value == null ? "" : value).replace(/\0/g, "").trim().slice(0, max);
@@ -37,7 +38,7 @@ export async function onRequestPost({ request, env }) {
     }
     const row = await db.prepare(
       "SELECT name,format,is_dir FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=?"
-    ).bind(provider, library, rootPath, path).first();
+    ).bind(CATALOG_PROVIDER, library, rootPath, path).first();
     if (!row || Number(row.is_dir) !== 0 || String(row.format || "").toUpperCase() !== "EPUB") {
       return json({ error: "EPUB metadata 目標不在目前電子書索引中：" + path.slice(-120) }, 404);
     }
@@ -62,7 +63,7 @@ export async function onRequestPost({ request, env }) {
       "WHERE provider=? AND library=? AND root_path=? AND path=?"
     ).bind(
       title, creator, language, description, publisher, date, identifier,
-      JSON.stringify(subjects), Date.now(), provider, library, rootPath, path
+      JSON.stringify(subjects), Date.now(), CATALOG_PROVIDER, library, rootPath, path
     ));
   }
 
