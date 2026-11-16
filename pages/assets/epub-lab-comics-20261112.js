@@ -106,7 +106,7 @@
     if (progressSaveTimer) clearTimeout(progressSaveTimer);
     progressSaveTimer = setTimeout(function () {
       flushLibraryProgress();
-    }, 350);
+    }, 1200);
   }
   function updateLocation(detail) {
     if (!detail || restoring) return;
