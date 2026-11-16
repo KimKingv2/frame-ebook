@@ -31,7 +31,7 @@
         <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
       </section>
 
-      <details class="appearance-panel" open>
+      <details class="appearance-panel">
         <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
         <div class="appearance-controls">
           <section class="appearance-group typography-group" aria-label="文字排版">
@@ -161,36 +161,39 @@
         <p id="appearance-status" class="appearance-status">外觀設定會保存至雲端 D1，其他裝置可自動還原。</p>
       </details>
 
-      <section class="book-heading">
-        <div>
-          <p class="book-kicker">NOW READING</p>
-          <h2 id="book-title">尚未載入書籍</h2>
-          <p id="book-author" class="book-author">從雲端書架開啟已掃描索引的書籍。</p>
-        </div>
-        <div class="book-progress">
-          <strong id="progress-percent">0%</strong>
-          <span id="progress-detail">等待閱讀</span>
-        </div>
-      </section>
-      <section class="reader-frame">
-        <div id="reader-viewport" class="reader-viewport">
-          <div id="reader-placeholder" class="reader-placeholder">
-            <div class="placeholder-mark">F</div>
-            <h3>準備好開始閱讀</h3>
-            <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
+      <section id="reading-workspace" class="reading-workspace" aria-label="閱讀工作區">
+        <section class="book-heading">
+          <div>
+            <p class="book-kicker">NOW READING</p>
+            <h2 id="book-title">尚未載入書籍</h2>
+            <p id="book-author" class="book-author">從雲端書架開啟已掃描索引的書籍。</p>
           </div>
-        </div>
+          <div class="book-progress">
+            <strong id="progress-percent">0%</strong>
+            <span id="progress-detail">等待閱讀</span>
+            <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
+          </div>
+        </section>
+        <section class="reader-frame">
+          <div id="reader-viewport" class="reader-viewport">
+            <div id="reader-placeholder" class="reader-placeholder">
+              <div class="placeholder-mark">F</div>
+              <h3>準備好開始閱讀</h3>
+              <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
+            </div>
+          </div>
+        </section>
+        <section class="reader-controls">
+          <button id="prev-page" type="button" disabled>← 上一頁</button>
+          <div class="toc-wrap">
+            <label for="toc-select">章節目錄</label>
+            <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
+          </div>
+          <button id="next-page" type="button" disabled>下一頁 →</button>
+        </section>
+        <p id="reader-status" class="reader-status" role="status">尚未載入 EPUB。</p>
+        <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       </section>
-      <section class="reader-controls">
-        <button id="prev-page" type="button" disabled>← 上一頁</button>
-        <div class="toc-wrap">
-          <label for="toc-select">章節目錄</label>
-          <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
-        </div>
-        <button id="next-page" type="button" disabled>下一頁 →</button>
-      </section>
-      <p id="reader-status" class="reader-status" role="status">尚未載入 EPUB。</p>
-      <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       <section class="notice">
         <strong>閱讀資料保存</strong>
         <p>原始 EPUB／CBZ 留在 Alist／OpenList，閱讀時才透過伺服器端讀取。D1 保存每本書的 CFI／頁碼、閱讀外觀、自訂書名作者與閱讀統計；書籤、筆記與高亮的資料接口已預留，閱讀器介面尚未啟用。所有資料依 Cloudflare Access 登入身分隔離。瀏覽器只在當前閱讀工作階段使用記憶體，不建立本機書庫或持久化閱讀資料。</p>
