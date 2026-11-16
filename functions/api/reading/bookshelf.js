@@ -32,8 +32,12 @@ export async function onRequestGet({ request, env }) {
     await migrateLegacyReaderBookIds(db, identity.userId);
     const preferences = await loadPreferences(db, identity.userId);
     const provider = READER_PROVIDERS.has(preferences.activeProvider) ? preferences.activeProvider : "vps";
-    const savedRoots = preferences.roots?.shared || preferences.roots?.[provider] ||
-      Object.values(preferences.roots || {}).find(value => value && (value.books || value.comics)) || {};
+    const rootsConfig = preferences.roots || {};
+    const savedRoots = rootsConfig.shared && (rootsConfig.shared.books || rootsConfig.shared.comics)
+      ? rootsConfig.shared
+      : (rootsConfig[provider] && (rootsConfig[provider].books || rootsConfig[provider].comics)
+        ? rootsConfig[provider]
+        : Object.values(rootsConfig).find(value => value && (value.books || value.comics)) || {});
     const envRoots = getOpenListRootPaths(env);
     const roots = {
       books: normalizePath(savedRoots.books || envRoots.books || DEFAULT_ROOTS.books),
@@ -46,18 +50,27 @@ export async function onRequestGet({ request, env }) {
       let rows;
       try {
         rows = await db.prepare(
+          "WITH ranked AS (" +
+          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
+          "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status,indexed_at," +
+          "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
+          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
           "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
           "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status " +
-          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 " +
-          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+") ORDER BY path LIMIT 10000"
-        ).bind(CATALOG_PROVIDER, library, rootPath).all();
+          "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
+        ).bind(library, rootPath).all();
       } catch (error) {
         if (!String(error?.message || error).toLowerCase().includes("no such column: book_title")) throw error;
         rows = await db.prepare(
+          "WITH ranked AS (" +
+          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at," +
+          "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
+          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
           "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status " +
-          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 " +
-          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+") ORDER BY path LIMIT 10000"
-        ).bind(CATALOG_PROVIDER, library, rootPath).all();
+          "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
+        ).bind(library, rootPath).all();
       }
       for (const row of rows.results || []) rawRows.push({
         book_title:"",book_creator:"",book_language:"",book_description:"",
