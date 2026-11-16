@@ -9,7 +9,7 @@
   border-radius:8px;
   color:#e9ddfb;
   background:rgba(110,82,158,.2);
-  font:600 10px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+  font:600 11px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   letter-spacing:.2px;
   white-space:nowrap;
   cursor:pointer;
@@ -114,7 +114,7 @@
   }
   .main-nav::-webkit-scrollbar { display:none; }
   .main-nav a { flex:0 0 auto; white-space:nowrap; font-size:9px; }
-  .cloud-manager-trigger { padding:6px 7px; font-size:8px; }
+  .cloud-manager-trigger { padding:6px 7px; font-size:9px; }
   .reader-top-actions { gap:7px !important; }
   .reader-top-actions .lab-tag { display:none; }
   .reader-top-actions .back-shelf-link { font-size:8px; white-space:nowrap; }
