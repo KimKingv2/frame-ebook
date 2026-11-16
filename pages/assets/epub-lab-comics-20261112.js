@@ -606,9 +606,11 @@
   function renderBookmarkList() {
     var list = el('bookmark-list');
     var count = el('bookmark-count');
+    var tabCount = el('bookmark-tab-count');
     if (!list || !count) return;
     var bookmarks = activeAnnotations.filter(function (item) { return item.type === 'bookmark'; });
     count.textContent = String(bookmarks.length);
+    if (tabCount) tabCount.textContent = String(bookmarks.length);
     list.textContent = '';
     if (!bookmarks.length) {
       var empty = document.createElement('p');
@@ -1401,7 +1403,7 @@
       window.setTimeout(function () {
         if (!view || !Array.isArray(activeAnnotations)) return;
         activeAnnotations.forEach(function (annotation) {
-          if (Number(annotation.sectionIndex) === index) drawAnnotation(annotation);
+          if (annotation.type !== 'bookmark' && Number(annotation.sectionIndex) === index) drawAnnotation(annotation);
         });
       }, 0);
     });
@@ -1492,6 +1494,7 @@
       }
     }
     restoring = false;
+    if (view && view.lastLocation) updateLocation(view.lastLocation);
     restoreCfi = null;
     restorePageIndex = null;
     updateLayoutControlState();
