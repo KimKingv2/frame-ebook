@@ -1,4 +1,4 @@
-import { getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261116-cloud-only-r1";
+import { getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261116-filename-id-r1";
 
 const $ = id => document.getElementById(id);
 const state = { period:"month", calendarDate:new Date(), goalMinutes:30, authenticated:false, databaseConfigured:false };
