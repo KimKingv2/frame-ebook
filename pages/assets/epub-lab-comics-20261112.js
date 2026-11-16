@@ -573,6 +573,42 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) flushLibraryProgress();
   });
+  async function ensureLocalReaderLogin() {
+    var local = await import('/assets/local-openlist.js?v=20261116-local-r2');
+    if (local.isLocalOpenListReady()) return;
+    var panel = el('local-reader-login');
+    var baseInput = el('reader-local-base-url');
+    var userInput = el('reader-local-username');
+    var passwordInput = el('reader-local-password');
+    var button = el('reader-local-login');
+    var status = el('reader-local-login-status');
+    baseInput.value = local.getSavedLocalOpenListBaseUrl();
+    panel.hidden = false;
+    status.textContent = '請登入本地 OpenList。登入 Token 只會保留在目前閱讀頁面的記憶體。';
+    await new Promise(function (resolve) {
+      button.onclick = async function () {
+        button.disabled = true;
+        status.textContent = '正在登入本地 OpenList……';
+        try {
+          await local.loginLocalOpenList({
+            baseUrl: baseInput.value,
+            username: userInput.value,
+            password: passwordInput.value
+          });
+          passwordInput.value = '';
+          status.textContent = '登入成功，正在載入書籍……';
+          button.onclick = null;
+          panel.hidden = true;
+          resolve();
+        } catch (error) {
+          status.textContent = '登入失敗：' + (error && error.message ? error.message : String(error));
+        } finally {
+          button.disabled = false;
+        }
+      };
+    });
+  }
+
   setText('engine-status', featureSummary());
   import('/vendor/foliate-js/view.js').then(async function () {
     setText('engine-status', featureSummary() + ' · Foliate ready');
@@ -589,7 +625,13 @@
     var store = await libraryStorePromise;
     var record = await store.getBook(descriptor);
     if (!record) throw new Error('找不到這本書的雲端索引與閱讀資料。請確認 Alist／OpenList 索引仍存在。');
-    setText('reader-status', '正在透過伺服器端連接 Alist／OpenList 讀取書檔……');
+    if (record.cloudSource && record.cloudSource.provider === 'local') {
+      setText('reader-status', '本地端口需在閱讀室重新登入一次。');
+      await ensureLocalReaderLogin();
+    }
+    setText('reader-status', record.cloudSource && record.cloudSource.provider === 'local'
+      ? '正在透過本地 OpenList 讀取書檔……'
+      : '正在透過伺服器端 Alist／OpenList 讀取書檔……');
     setText('engine-status', '正在載入雲端書籍');
     var sourceModule = await cloudBookSourcePromise;
     var source = await sourceModule.fetchCloudBookFile(record);
