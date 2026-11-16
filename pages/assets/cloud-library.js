@@ -1227,7 +1227,7 @@ async function checkSession() {
       readRootSelections(selectedProvider);
       clearListing();
       await renderAllScanSummaries();
-      if(isManagerEmbed&&embeddedManagerVisible)openCloudSettings(selectedLibrary);
+      if(!isManagerEmbed||embeddedManagerVisible)openCloudSettings(selectedLibrary);
       if(isActiveSourceReady()) {
         state.currentPath=getActiveRoot();
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
@@ -1433,7 +1433,22 @@ function setCurrentFolderAsRoot(library) {
   setSourceStatus("已選擇"+LIBRARY_LABELS[library]+"根目錄："+candidate+"。請按「保存電子書／漫畫根目錄」。");
 }
 const settingsDialog=$("cloud-settings-dialog");
+function selectCloudManagerTab(name="connection") {
+  const selected=name==="library"?"library":"connection";
+  document.querySelectorAll("[data-cloud-manager-tab]").forEach(button=>{
+    const active=button.dataset.cloudManagerTab===selected;
+    button.setAttribute("aria-selected",active?"true":"false");
+  });
+  const connectionPanel=$("cloud-manager-tab-connection");
+  const libraryPanel=$("cloud-manager-tab-library");
+  if(connectionPanel)connectionPanel.hidden=selected!=="connection";
+  if(libraryPanel)libraryPanel.hidden=selected!=="library";
+}
+document.querySelectorAll("[data-cloud-manager-tab]").forEach(button=>{
+  button.addEventListener("click",()=>selectCloudManagerTab(button.dataset.cloudManagerTab));
+});
 function openCloudSettings(targetLibrary=state.activeLibrary) {
+  selectCloudManagerTab("connection");
   if(!settingsDialog)return;
   if(!settingsDialog.open) {
     if(typeof settingsDialog.showModal==="function")settingsDialog.showModal();
