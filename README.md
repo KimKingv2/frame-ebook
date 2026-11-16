@@ -50,6 +50,7 @@ Apply migrations in order for a new database. For an existing installation that 
 
 ```sh
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0006_remove_legacy_reader_tables.sql
 ```
 
 See [Cloudflare setup](docs/CLOUDFLARE-SETUP.md) for the full binding, Access and provider configuration.
