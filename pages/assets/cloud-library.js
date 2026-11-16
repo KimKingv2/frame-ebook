@@ -11,7 +11,8 @@ const DEFAULT_ROOTS = {
 const PROVIDER_LABELS = {
   vps: "VPS Alist",
   worker: "OpenList Worker",
-  mobile: "Mobile Device Alist"
+  mobile: "Mobile Device Alist",
+  local: "本地 OpenList"
 };
 const LIBRARY_LABELS = { books: "電子書", comics: "漫畫" };
 const state = {
@@ -27,6 +28,7 @@ const state = {
   perPage:80,
   total:0,
   serverProfiles:{},
+  localConnectionReady:false,
   activeProvider:"vps",
   editProvider:"vps",
   editRoots:{books:"/",comics:"/"},
@@ -116,7 +118,11 @@ async function saveRemotePreference(key, value) {
 }
 function readRootSelections(provider=state.activeProvider) {
   const saved = state.remotePreferences.roots || {};
-  const source = saved?.shared || saved?.[provider] || Object.values(saved).find(value => value && (value.books || value.comics)) || {};
+  const source = saved?.shared && (saved.shared.books || saved.shared.comics)
+    ? saved.shared
+    : saved?.[provider] && (saved[provider].books || saved[provider].comics)
+      ? saved[provider]
+      : Object.values(saved).find(value => value && (value.books || value.comics)) || {};
   const roots = {};
   for (const library of ["books", "comics"]) {
     const id = library === "books" ? "cloud-books-root" : "cloud-comics-root";
@@ -156,6 +162,12 @@ function renderProfileStatus() {
     $(id).textContent=configured?"已設定，可供選用":"尚未設定";
     $(id).classList.toggle("is-ready",configured);
     $(id).classList.toggle("is-missing",!configured);
+  }
+  const localStatus=$("cloud-local-status");
+  if(localStatus) {
+    localStatus.textContent=state.localConnectionReady?"已登入，可直接連線": "需在目前瀏覽器登入";
+    localStatus.classList.toggle("is-ready",state.localConnectionReady);
+    localStatus.classList.toggle("is-missing",!state.localConnectionReady);
   }
 }
 function clearListing(message="尚未連線") {
@@ -201,16 +213,37 @@ async function saveRootSelections() {
 async function saveSourceSettings() {
   const provider = state.editProvider || $("cloud-provider").value;
   if (!Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, provider)) throw new Error("請選擇有效的 Alist／OpenList 來源。");
+  if(provider==="local") {
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const baseUrl = String($("cloud-local-base-url").value || "").trim();
+    const username = String($("cloud-local-username").value || "").trim();
+    const password = String($("cloud-local-password").value || "");
+    const savedBase = local.getSavedLocalOpenListBaseUrl();
+    if(!(local.isLocalOpenListReady() && local.normalizeLocalOpenListUrl(baseUrl)===savedBase)) {
+      await local.loginLocalOpenList({baseUrl,username,password});
+    }
+    $("cloud-local-password").value = "";
+    state.localConnectionReady = true;
+    await persistActiveProvider(provider);
+    state.editProvider = provider;
+    readRootSelections(provider);
+    renderProfileStatus();
+    setSourceStatus("已登入並切換至本地 OpenList。檔案由目前瀏覽器直接讀取，索引仍與其他端口共用。");
+    return provider;
+  }
   if (!state.serverProfiles[provider]?.configured) {
     throw new Error(PROVIDER_LABELS[provider] + " 尚未在 Cloudflare Pages Variables／Secrets 完成伺服器端設定。");
   }
+  state.localConnectionReady = false;
   await persistActiveProvider(provider);
   state.editProvider = provider;
   readRootSelections(provider);
+  renderProfileStatus();
   setSourceStatus("已保存並切換雲端來源：" + PROVIDER_LABELS[provider] + "。帳號密碼只由 Pages Functions 使用。");
   return provider;
 }
 function isActiveSourceReady() {
+  if(state.activeProvider==="local") return !!state.localConnectionReady;
   return !!state.serverProfiles[state.activeProvider]?.configured;
 }
 async function readJsonResponse(response, fallback) {
