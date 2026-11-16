@@ -36,13 +36,10 @@
         <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
         <p class="hero-text">只從 Alist／OpenList 掃描索引導入書籍。書檔留在你的雲端儲存，書架、閱讀進度、外觀偏好、書籤與筆記均透過 Cloudflare D1／R2 保存，跨裝置自動同步。</p>
         <div class="hero-actions library-hero-imports">
-          <button class="primary-link library-import-button" data-import-type="books" type="button">匯入電子書 <span aria-hidden="true">＋</span></button>
-          <button class="secondary-import-button" data-import-type="comics" type="button">匯入漫畫 <span aria-hidden="true">＋</span></button>
+          <button class="primary-link library-import-button" id="open-cloud-manager-hero" type="button">連接與掃描 <span aria-hidden="true">↗</span></button>
           <a class="text-link" href="/epub-lab/">前往閱讀室 <span aria-hidden="true">↗</span></a>
-          <input id="books-files" type="file" accept=".epub,application/epub+zip" multiple hidden>
-          <input id="comics-files" type="file" accept=".epub,.cbz,application/epub+zip,application/vnd.comicbook+zip" multiple hidden>
         </div>
-        <div class="device-caption"><span>BOOKS · EPUB</span><i></i><span>COMICS · EPUB / CBZ</span><i></i><span>LOCAL STORAGE</span></div>
+        <div class="device-caption"><span>ALIST · OPENLIST</span><i></i><span>BOOKS · EPUB</span><i></i><span>COMICS · CBZ</span></div>
       </div>
       <div class="hero-art" aria-label="FRAME Reader 私人書庫示意">
         <div class="orbit orbit-a"></div>
@@ -105,14 +102,11 @@
             <div class="category-shelf-count"><strong id="books-shelf-count">00</strong><span>BOOKS</span></div>
           </div>
           <div class="category-shelf-toolbar">
-            <span>BOOK COLLECTION</span>
-            <button class="category-add-button" data-import-type="books" type="button">＋ 匯入電子書</button>
+            <span>BOOK COLLECTION · CLOUD INDEX</span>
           </div>
           <div id="books-grid" class="book-grid library-book-grid library-category-grid" hidden></div>
           <div id="books-empty" class="category-empty">
-            <span class="category-empty-mark">E</span><strong>電子書架尚未收藏作品</strong><p>匯入 EPUB，建立你的文字閱讀空間。</p>
-            <button class="category-add-button" data-import-type="books" type="button">匯入 EPUB <span>↗</span></button>
-            <button id="load-sample" class="sample-link" type="button">或先看看內建示範書</button>
+            <span class="category-empty-mark">E</span><strong>電子書架尚未收藏作品</strong><p>先從「連接與掃描」選擇 Alist／OpenList，設定電子書目錄並執行掃描。</p>
           </div>
           <div id="books-search-empty" class="category-search-empty" hidden>沒有符合條件的電子書。</div>
         </section>
@@ -122,13 +116,11 @@
             <div class="category-shelf-count"><strong id="comics-shelf-count">00</strong><span>COMICS</span></div>
           </div>
           <div class="category-shelf-toolbar">
-            <span>COMIC COLLECTION</span>
-            <button class="category-add-button" data-import-type="comics" type="button">＋ 匯入漫畫</button>
+            <span>COMIC COLLECTION · CLOUD INDEX</span>
           </div>
           <div id="comics-grid" class="book-grid library-book-grid library-category-grid" hidden></div>
           <div id="comics-empty" class="category-empty">
-            <span class="category-empty-mark comic-empty-mark">▧</span><strong>漫畫書架尚未收藏作品</strong><p>匯入 EPUB 或 CBZ，讓每一格畫面都有自己的位置。</p>
-            <button class="category-add-button" data-import-type="comics" type="button">匯入 EPUB／CBZ <span>↗</span></button>
+            <span class="category-empty-mark comic-empty-mark">▧</span><strong>漫畫書架尚未收藏作品</strong><p>從「連接與掃描」設定漫畫目錄，掃描 EPUB／CBZ 後便會自動加入書架。</p>
           </div>
           <div id="comics-search-empty" class="category-search-empty" hidden>沒有符合條件的漫畫。</div>
         </section>
