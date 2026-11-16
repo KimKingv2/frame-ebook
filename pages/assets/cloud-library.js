@@ -116,7 +116,7 @@ async function saveRemotePreference(key, value) {
 }
 function readRootSelections(provider=state.activeProvider) {
   const saved = state.remotePreferences.roots || {};
-  const source = saved?.[provider] || {};
+  const source = saved?.shared || saved?.[provider] || {};
   const roots = {};
   for (const library of ["books", "comics"]) {
     const id = library === "books" ? "cloud-books-root" : "cloud-comics-root";
@@ -132,7 +132,7 @@ function readRootSelections(provider=state.activeProvider) {
 }
 async function persistRootSelections(provider=state.editProvider || state.activeProvider, roots=state.editRoots) {
   const saved = { ...(state.remotePreferences.roots || {}) };
-  saved[provider] = {
+  saved.shared = {
     books: normalizePath(roots?.books) || DEFAULT_ROOTS.books,
     comics: normalizePath(roots?.comics) || DEFAULT_ROOTS.comics
   };
@@ -142,7 +142,7 @@ function renderRootStatus() {
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
     const selected=state.editRoots[library]||"/";
-    $(id).textContent="目前已保存至雲端 D1："+selected;
+    $(id).textContent="目前所有端口共用此路徑："+selected;
   }
 }
 function setSourceStatus(message,isError=false) {
