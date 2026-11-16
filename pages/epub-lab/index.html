@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-annotations-r2">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r1">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -43,7 +43,7 @@
         </div>
       </section>
 
-      <details class="appearance-panel">
+      <details class="appearance-panel" id="reader-appearance-panel">
         <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
         <div class="appearance-controls">
           <section class="appearance-group typography-group" aria-label="文字排版">
@@ -190,46 +190,73 @@
           <div class="book-progress">
             <strong id="progress-percent">0%</strong>
             <span id="progress-detail">等待閱讀</span>
-            <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
-          </div>
-        </section>
-        <section id="reader-frame" class="reader-frame">
-          <div id="reader-viewport" class="reader-viewport">
-            <div id="reader-placeholder" class="reader-placeholder">
-              <div class="placeholder-mark">F</div>
-              <h3>準備好開始閱讀</h3>
-              <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
+            <div class="reader-quick-actions">
+              <button id="reader-sidebar-toggle" type="button" aria-expanded="true" aria-controls="reader-sidebar" title="顯示或隱藏目錄與筆記">☷ 導覽</button>
+              <button id="reader-appearance-toggle" type="button" aria-haspopup="true" aria-controls="reader-appearance-panel">Aa 閱讀設定</button>
+              <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
             </div>
           </div>
-        <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
-          <span class="annotation-toolbar-label">標記</span>
-          <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
-          <button type="button" class="annotation-color-button is-violet" data-highlight-color="violet" title="紫色高亮" aria-label="紫色高亮"></button>
-          <button type="button" class="annotation-color-button is-mint" data-highlight-color="mint" title="綠色高亮" aria-label="綠色高亮"></button>
-          <button type="button" class="annotation-color-button is-rose" data-highlight-color="rose" title="粉色高亮" aria-label="粉色高亮"></button>
-          <button type="button" id="selection-add-underline" class="annotation-underline-action" title="為選取文字加上下劃線"><span>U</span> 下劃線</button>
-          <button type="button" id="selection-add-note" class="annotation-note-action">寫筆記</button>
-          <button type="button" id="selection-dismiss" class="annotation-dismiss" aria-label="關閉選取工具列">×</button>
-        </div>
         </section>
-        <section class="reader-controls">
-          <button id="prev-page" type="button" disabled>← 上一頁</button>
+        <div class="reader-layout" id="reader-layout">
+          <aside class="reader-sidebar" id="reader-sidebar" aria-label="閱讀導覽">
+            <div class="reader-sidebar-head">
+              <div>
+                <p class="reader-sidebar-kicker">IN THIS BOOK</p>
+                <h3>閱讀導覽</h3>
+              </div>
+              <span class="reader-sidebar-mark">F</span>
+            </div>
+            <section class="reader-sidebar-section" aria-label="章節目錄">
+              <div class="reader-sidebar-section-title"><span>章節目錄</span><small>CONTENTS</small></div>
           <div class="toc-wrap">
-            <label for="toc-select">章節目錄</label>
-            <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
+              <label for="toc-select">章節目錄</label>
+              <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
+            </div>
+            </section>
+            <section class="reader-sidebar-section reader-sidebar-annotations" aria-label="個人筆記與標註">
+              <div class="reader-sidebar-section-title"><span>個人筆記</span><small>MY NOTES</small></div>
+              <button id="annotation-list-toggle" class="annotation-list-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">筆記與標註 <span id="annotation-count">0</span></button>
+          <section id="annotation-panel" class="annotation-panel" hidden aria-label="本書筆記與標註">
+            <div class="annotation-panel-heading">
+              <div><p class="eyebrow">YOUR ANNOTATIONS</p><h3>筆記與標註</h3></div>
+              <button id="annotation-refresh" type="button" class="annotation-refresh">重新整理</button>
+            </div>
+            <div id="annotation-list" class="annotation-list">
+              <p class="annotation-empty">載入書籍後顯示本書的筆記與高亮。</p>
+            </div>
+          </section>
+
+            </section>
+            <p class="reader-sidebar-footnote">閱讀位置與標註會同步保存至雲端</p>
+          </aside>
+          <div class="reader-main-column">
+            <section id="reader-frame" class="reader-frame">
+              <div id="reader-viewport" class="reader-viewport">
+                <div id="reader-placeholder" class="reader-placeholder">
+                  <div class="placeholder-mark">F</div>
+                  <h3>準備好開始閱讀</h3>
+                  <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
+                </div>
+              </div>
+            <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
+              <span class="annotation-toolbar-label">標記</span>
+              <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
+              <button type="button" class="annotation-color-button is-violet" data-highlight-color="violet" title="紫色高亮" aria-label="紫色高亮"></button>
+              <button type="button" class="annotation-color-button is-mint" data-highlight-color="mint" title="綠色高亮" aria-label="綠色高亮"></button>
+              <button type="button" class="annotation-color-button is-rose" data-highlight-color="rose" title="粉色高亮" aria-label="粉色高亮"></button>
+              <button type="button" id="selection-add-underline" class="annotation-underline-action" title="為選取文字加上下劃線"><span>U</span> 下劃線</button>
+              <button type="button" id="selection-add-note" class="annotation-note-action">寫筆記</button>
+              <button type="button" id="selection-dismiss" class="annotation-dismiss" aria-label="關閉選取工具列">×</button>
+            </div>
+            </section>
+
+            <section class="reader-controls" aria-label="頁面導覽">
+              <button id="prev-page" type="button" disabled>← 上一頁</button>
+              <span class="reader-controls-hint">翻頁也可以使用鍵盤方向鍵</span>
+              <button id="next-page" type="button" disabled>下一頁 →</button>
+            </section>
           </div>
-          <button id="next-page" type="button" disabled>下一頁 →</button>
-          <button id="annotation-list-toggle" class="annotation-list-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">筆記與標註 <span id="annotation-count">0</span></button>
-        </section>
-        <section id="annotation-panel" class="annotation-panel" hidden aria-label="本書筆記與標註">
-          <div class="annotation-panel-heading">
-            <div><p class="eyebrow">YOUR ANNOTATIONS</p><h3>筆記與標註</h3></div>
-            <button id="annotation-refresh" type="button" class="annotation-refresh">重新整理</button>
-          </div>
-          <div id="annotation-list" class="annotation-list">
-            <p class="annotation-empty">載入書籍後顯示本書的筆記與高亮。</p>
-          </div>
-        </section>
+        </div>
         <dialog id="annotation-note-dialog" class="annotation-note-dialog" aria-labelledby="annotation-note-title">
           <div class="annotation-note-dialog-head">
             <div><p class="eyebrow">PRIVATE READING NOTE</p><h3 id="annotation-note-title">為這段文字寫筆記</h3></div>
@@ -264,6 +291,57 @@
     </div>
     <iframe id="cloud-manager-frame" title="OpenList 連接與掃描管理" data-src="/cloud/?manager=1" loading="lazy"></iframe>
   </dialog>
+  <script>
+  (function () {
+    var workspace = document.getElementById('reading-workspace');
+    var sidebar = document.getElementById('reader-sidebar');
+    var sidebarToggle = document.getElementById('reader-sidebar-toggle');
+    var appearance = document.getElementById('reader-appearance-panel');
+    var appearanceToggle = document.getElementById('reader-appearance-toggle');
+    var toc = document.getElementById('toc-select');
+    if (sidebar && sidebarToggle && workspace) {
+      sidebarToggle.addEventListener('click', function () {
+        if (window.matchMedia('(max-width: 820px)').matches) {
+          sidebar.classList.toggle('is-open');
+          sidebarToggle.setAttribute('aria-expanded', sidebar.classList.contains('is-open') ? 'true' : 'false');
+        } else {
+          workspace.classList.toggle('reader-sidebar-collapsed');
+          sidebarToggle.setAttribute('aria-expanded', workspace.classList.contains('reader-sidebar-collapsed') ? 'false' : 'true');
+        }
+      });
+      sidebar.addEventListener('click', function (event) {
+        if (event.target === sidebar && window.matchMedia('(max-width: 820px)').matches) {
+          sidebar.classList.remove('is-open');
+          sidebarToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && sidebar.classList.contains('is-open')) {
+          sidebar.classList.remove('is-open');
+          sidebarToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+    if (appearance && appearanceToggle) {
+      appearanceToggle.addEventListener('click', function () {
+        appearance.open = true;
+        var summary = appearance.querySelector('summary');
+        if (summary) summary.focus({ preventScroll: true });
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && appearance.open) appearance.open = false;
+      });
+    }
+    if (toc && sidebar && sidebarToggle) {
+      toc.addEventListener('change', function () {
+        if (window.matchMedia('(max-width: 820px)').matches) {
+          sidebar.classList.remove('is-open');
+          sidebarToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  }());
+  </script>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
