@@ -39,10 +39,7 @@ export async function onRequestPost({ request }) {
       nameCn: text(item.name_cn, 240),
       summary: text(item.summary, 500),
       date: text(item.date, 40),
-      platform: text(item.platform, 80),
-      category: Number(item.platform) || 0,
-      categoryLabel: Number(item.platform) === 1001 ? "漫畫" :
-        Number(item.platform) === 1002 ? "小說" : Number(item.platform) === 1003 ? "畫集" : "類型未提供",
+      categoryLabel: "Bangumi 書籍候選",
       image: text(item.images?.medium || item.images?.common || item.images?.small, 1000),
       score: Number(item.rating?.score) || 0,
       ratingCount: Number(item.rating?.total) || 0,
