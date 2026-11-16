@@ -2,7 +2,7 @@ import {
   json, getDatabase, requireAuth, normalizePath, isWithinRoot, sha256Hex, getAccessIdentity
 } from "./common.js";
 
-export const READER_PROVIDERS = new Set(["vps", "worker", "mobile"]);
+export const READER_PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 export const READER_LIBRARIES = new Set(["books", "comics"]);
 const IDENTITY_MIGRATION_KEY = "system_book_identity_filename_v1";
 
@@ -175,7 +175,7 @@ export async function resolveReaderBook(db, raw) {
   }
 
   const indexed = await db.prepare(
-    "SELECT name,format FROM cloud_catalog WHERE provider='vps' AND library=? AND root_path=? AND path=? AND is_dir=0"
+    "SELECT name,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND path=? AND is_dir=0 ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC LIMIT 1"
   ).bind(library, rootPath, path).first();
   if (!indexed) return { error: json({ error: "這本書不在目前的 Alist／OpenList 書庫索引中。請先掃描書庫。" }, 404) };
 
