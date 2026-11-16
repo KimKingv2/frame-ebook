@@ -20,7 +20,12 @@ npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_co
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0004_cloud_annotations.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0006_remove_legacy_reader_tables.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0007_book_metadata_and_bangumi.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0008_shared_provider_catalog.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0009_ensure_reader_annotations.sql
 ```
+
+For an existing Production database, apply only migrations that are still missing, in numeric order. In particular, if the Reading Room shows `D1_ERROR: no such table: reader_annotations`, run migration `0009_ensure_reader_annotations.sql` against the Production database `frame-reader-db`. It uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, so an already existing annotation table and its saved rows are left untouched. Do not reset or recreate the database.
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
 
@@ -85,7 +90,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 
 ## 5. Verify the configuration
 
-1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. For a new database, apply migrations 0001 through 0007 in order. For an existing database, apply whichever migrations are still missing, in numeric order. A Production database that already has migrations 0001 through 0006 only needs `migrations/0007_book_metadata_and_bangumi.sql` for this release. Apply it once to the Production D1 database `frame-reader-db`, not to Preview.
+1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. For a new database, apply migrations 0001 through 0009 in order. For an existing database, apply whichever migrations are still missing, in numeric order. Apply migration `0009_ensure_reader_annotations.sql` to Production if the annotation table is missing; this migration is safe to re-run and preserves existing annotation rows. Run migrations against the Production D1 database `frame-reader-db`, not Preview.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
