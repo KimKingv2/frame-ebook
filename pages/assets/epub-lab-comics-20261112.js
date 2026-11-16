@@ -14,7 +14,7 @@
   var pendingProgressBookId = null;
   var libraryStorePromise = import('/assets/library-store.js?v=20261116-shared-local-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
-  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-local-r2');
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-stream-reader-r1');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
     sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
