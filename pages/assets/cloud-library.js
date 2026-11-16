@@ -100,10 +100,27 @@ function breadcrumb(path) {
   return rel?root.replace(/\/$/,"")+" / "+rel.replace(/\//g," / "):root;
 }
 async function loadRemotePreferences() {
-  const response = await fetch("/api/reading/preferences", { credentials: "same-origin", cache: "no-store" });
-  const data = await readJsonResponse(response, "無法讀取雲端偏好設定。請先套用 0005 雲端資料 migration。");
-  state.remotePreferences = data.preferences || {};
-  return state.remotePreferences;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 12000);
+  try {
+    const response = await fetch("/api/reading/preferences", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const data = await readJsonResponse(response, "無法讀取雲端偏好設定。請先確認 Access 身分驗證與 D1 migration。");
+    state.remotePreferences = data.preferences || {};
+    return state.remotePreferences;
+  } catch (error) {
+    if (timedOut) throw new Error("讀取雲端偏好設定逾時（12 秒）。請檢查 Cloudflare Access 與網路連線。");
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 async function saveRemotePreference(key, value) {
   const response = await fetch("/api/reading/preferences", {
@@ -1314,18 +1331,50 @@ function pauseIndexScan(reason="manual") {
 }
 
 async function checkSession() {
+  let profilesLoaded = false;
   try {
-    const response=await fetch("/api/auth/session",{credentials:"same-origin"});
-    const data=await response.json();
-    state.authenticated=!!(response.ok&&data.authenticated);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 12000);
+    let response;
+    try {
+      response = await fetch("/api/auth/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (timedOut) throw new Error("讀取伺服器設定逾時（12 秒）。請檢查 Cloudflare Access 登入與網路連線。");
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (!response.ok) throw new Error("伺服器設定 API 回應 HTTP " + response.status + "。");
+    const data = await response.json();
+    state.authenticated=!!data.authenticated;
     state.accessEnabled=!!data.accessEnabled;
     state.serverProfiles=data.openListProfiles||{};
     state.allowedRoots={books:"/",comics:"/"};
+    profilesLoaded = true;
+
+    // Render the three server-side provider states immediately. Their display
+    // must not wait for the separate per-user D1 preferences request.
+    renderProfileStatus();
+
     if(state.authenticated) {
       $("cloud-login-panel").hidden=true;
       $("cloud-browser").hidden=false;
-      await loadRemotePreferences();
-      renderProfileStatus();
+      let preferenceWarning = "";
+      try {
+        await loadRemotePreferences();
+      } catch (error) {
+        state.remotePreferences = {};
+        preferenceWarning = "雲端偏好設定讀取失敗：" + (error.message || String(error));
+        console.warn("[FRAME Reader] " + preferenceWarning);
+      }
       const savedProvider = state.remotePreferences.activeProvider;
       const savedLibrary = state.remotePreferences.activeLibrary;
       const selectedProvider = Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, savedProvider) ? savedProvider : "vps";
@@ -1346,10 +1395,18 @@ async function checkSession() {
       if(!isManagerEmbed||embeddedManagerVisible)openCloudSettings(selectedLibrary);
       if(isActiveSourceReady()) {
         state.currentPath=getActiveRoot();
-        setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
+        setSourceStatus(
+          "私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……" +
+          (preferenceWarning ? " " + preferenceWarning : ""),
+          !!preferenceWarning
+        );
         await loadDirectory(state.currentPath,1);
       } else {
-        setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
+        setSourceStatus(
+          "私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。" +
+          (preferenceWarning ? " " + preferenceWarning : ""),
+          true
+        );
       }
     } else {
       $("cloud-login-panel").hidden=false;
@@ -1360,7 +1417,24 @@ async function checkSession() {
         :"尚未通過 Cloudflare Access。請確認此網站主機已啟用 Access Policy，並使用允許的登入身分。";
     }
   } catch(error) {
-    $("cloud-browser-status").textContent="無法確認登入狀態："+(error.message||String(error));
+    const message = error.message || String(error);
+    if (!profilesLoaded) {
+      const map = {
+        vps: "cloud-vps-status",
+        worker: "cloud-worker-status",
+        mobile: "cloud-mobile-status"
+      };
+      for (const id of Object.values(map)) {
+        const node = $(id);
+        if (!node) continue;
+        node.textContent = "讀取失敗";
+        node.title = message;
+        node.classList.remove("is-ready");
+        node.classList.add("is-missing");
+      }
+    }
+    $("cloud-browser-status").textContent="無法確認登入狀態："+message;
+    setSourceStatus("無法讀取伺服器設定："+message, true);
   }
 }
 async function logout() {
