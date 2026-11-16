@@ -116,7 +116,7 @@ async function saveRemotePreference(key, value) {
 }
 function readRootSelections(provider=state.activeProvider) {
   const saved = state.remotePreferences.roots || {};
-  const source = saved?.shared || saved?.[provider] || {};
+  const source = saved?.shared || saved?.[provider] || Object.values(saved).find(value => value && (value.books || value.comics)) || {};
   const roots = {};
   for (const library of ["books", "comics"]) {
     const id = library === "books" ? "cloud-books-root" : "cloud-comics-root";
