@@ -436,49 +436,162 @@ a { color: inherit; }
 .library-origin-note { display: block; margin-top: 3px; color: #665f70; font-size: 7px; line-height: 1.2; letter-spacing: .15px; }
 
 
-/* Folder stacks: casually scattered full book covers, with no crop or edge clipping. */
-.library-cover-stack {
+/* Premium editorial folder sleeve: a single designed cover with the first volume as its artwork. */
+.library-folder-cover {
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(197,174,137,.38);
+  border-radius:5px;
+  background:#292631;
+  box-shadow:0 13px 30px rgba(0,0,0,.26);
+}
+.library-folder-cover .library-format-badge { display:none; }
+.library-folder-cover-face {
   position:absolute;
   inset:0;
-  isolation:isolate;
-  overflow:hidden;
-  background:#211b2e;
-}
-.library-cover-stack::before,
-.library-cover-stack::after {
-  content:none;
-}
-.library-cover-stack-book {
-  position:absolute;
   display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:10px 10px 9px 17px;
+  color:#eee8dc;
+  background:#292631;
+}
+.library-folder-cover-face::after {
+  position:absolute;
+  inset:7px;
+  border:1px solid rgba(198,174,136,.24);
+  border-radius:2px;
+  content:"";
+  pointer-events:none;
+}
+.library-folder-cover-spine {
+  position:absolute;
+  z-index:1;
+  top:0;
+  bottom:0;
+  left:0;
+  width:8px;
+  border-right:1px solid rgba(202,179,143,.6);
+  background:#393440;
+}
+.library-folder-cover-header {
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:5px;
+  min-height:14px;
+  color:#b9a887;
+  white-space:nowrap;
+}
+.library-folder-cover-brand {
+  font-size:6px;
+  font-weight:650;
+  letter-spacing:1.25px;
+}
+.library-folder-cover-edition {
+  color:#887f77;
+  font-size:5px;
+  letter-spacing:.7px;
+}
+.library-folder-cover-title {
+  position:relative;
+  z-index:1;
+  display:-webkit-box;
+  overflow:hidden;
+  margin:12px 0 7px;
+  color:#f0eade;
+  font:500 clamp(13px,1.55vw,18px)/1.28 Georgia,"Noto Serif TC",serif;
+  letter-spacing:.15px;
+  overflow-wrap:anywhere;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:3;
+}
+.library-folder-cover-rule {
+  position:relative;
+  z-index:1;
+  display:block;
+  flex:none;
+  width:32px;
+  height:1px;
+  margin-bottom:7px;
+  background:#aa9471;
+}
+.library-folder-cover-feature {
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex:1;
   align-items:center;
   justify-content:center;
-  overflow:visible;
-  border:1px solid rgba(245,240,250,.58);
-  border-radius:3px;
-  background:#f4f1f6;
-  box-shadow:0 8px 18px rgba(0,0,0,.28);
-  transform-origin:center center;
+  min-height:0;
+  padding:2px 4px 5px;
 }
-.library-cover-stack-book > img {
+.library-folder-cover-feature > img {
   display:block;
-  width:100%;
-  height:100%;
+  max-width:76%;
+  max-height:100%;
+  width:auto;
+  height:auto;
   object-fit:contain;
-  background:#f4f1f6;
-}
-.library-cover-stack-book.is-fallback {
-  background:transparent;
-}
-.library-cover-stack-book .library-cover-fallback {
-  width:100%;
-  height:100%;
-  padding:8px 7px;
+  border:1px solid rgba(236,225,205,.42);
   border-radius:2px;
+  background:#f5f1e9;
+  box-shadow:0 7px 15px rgba(0,0,0,.3);
 }
-.library-cover-stack-book .library-cover-fallback strong {
-  font-size:clamp(8px,1.5vw,15px);
+.library-folder-cover-feature.is-fallback {
+  padding:0 10px 5px;
 }
+.library-folder-cover-feature .library-cover-fallback {
+  width:70%;
+  height:100%;
+  min-height:0;
+  padding:8px 7px;
+  border:1px solid rgba(236,225,205,.42);
+  border-radius:2px;
+  background:#383440;
+  box-shadow:0 7px 15px rgba(0,0,0,.25);
+}
+.library-folder-cover-feature .library-cover-fallback span {
+  font-size:5px;
+  letter-spacing:1px;
+}
+.library-folder-cover-feature .library-cover-fallback strong {
+  font-size:clamp(8px,1vw,12px);
+  line-height:1.4;
+}
+.library-folder-cover-feature .library-cover-fallback small {
+  font-size:5px;
+}
+.library-folder-cover-footer {
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  min-height:18px;
+  padding-top:6px;
+  border-top:1px solid rgba(198,174,136,.24);
+  color:#a99d8a;
+}
+.library-folder-cover-first {
+  min-width:0;
+  overflow:hidden;
+  color:#b7aea1;
+  font-size:6px;
+  letter-spacing:.1px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.library-folder-cover-count {
+  flex:none;
+  color:#c7b28d;
+  font-size:6px;
+  letter-spacing:.75px;
+}
+
 
 
 .dialog-volumes { margin:14px 0 4px; }
