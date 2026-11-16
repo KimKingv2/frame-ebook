@@ -144,6 +144,7 @@ async function updateBook(id, patch = {}) {
   const descriptor = normalizeDescriptor(book);
   const result = await api("/api/reading/state", {
     method: "POST",
+    keepalive: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       book: descriptor,
@@ -210,6 +211,7 @@ async function recordReadingEvent(event) {
   if (!event || !event.id || !event.dayKey || !String(event.bookId || "").startsWith("cloud:")) return false;
   const result = await api("/api/reading/events", {
     method: "POST",
+    keepalive: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ events: [event] })
   }, "雲端閱讀紀錄保存失敗。");
