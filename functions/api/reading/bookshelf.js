@@ -72,11 +72,11 @@ export async function onRequestGet({ request, env }) {
     }
 
     const comicMetadataMap = new Map();
+    const comicSeriesMetadataMap = new Map();
     try {
       const comicRows = await db.prepare(
         "SELECT book_id AS bookId,metadata_json AS metadataJson FROM reader_comic_metadata WHERE user_id=?"
       ).bind(identity.userId).all();
-      var comicSeriesMetadataMap = new Map();
       for (const row of comicRows.results || []) {
         try {
           const metadata = JSON.parse(row.metadataJson);
