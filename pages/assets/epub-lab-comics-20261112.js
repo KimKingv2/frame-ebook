@@ -13,7 +13,7 @@
   var pendingProgress = null;
   var pendingProgressBookId = null;
   var libraryStorePromise = import('/assets/library-store.js?v=20261116-cloud-only-r1');
-  var readingTrackerPromise = import('/assets/reading-tracker.js');
+  var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r1');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-cloud-only-r1');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
