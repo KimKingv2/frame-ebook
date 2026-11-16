@@ -243,7 +243,10 @@
   }
 
   async function saveNoteFromComposer() {
-    if (annotationBusy) return;
+    if (annotationBusy) {
+      setText('annotation-note-status', '上一筆標註仍在保存，請稍候。');
+      return;
+    }
     var text = String(el('annotation-note-text').value || '').trim();
     if (!text) {
       setText('annotation-note-status', '請先輸入筆記內容。');
@@ -285,7 +288,18 @@
   }
 
   async function addHighlight(color, asUnderline) {
-    if (annotationBusy || !selectedTextState || !currentBookId) return;
+    if (annotationBusy) {
+      setText('reader-status', '上一筆標註仍在保存，請稍候。');
+      return;
+    }
+    if (!selectedTextState || !selectedTextState.cfi) {
+      setText('reader-status', '沒有取得選取文字的位置。請重新選取 EPUB 正文後再試。');
+      return;
+    }
+    if (!currentBookId) {
+      setText('reader-status', '書籍尚未載入完成，暫時無法保存標註。');
+      return;
+    }
     annotationBusy = true;
     var toolbar = annotationToolbar();
     if (toolbar) toolbar.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
@@ -336,7 +350,10 @@
   function bindAnnotationControls() {
     var toolbar = annotationToolbar();
     if (!toolbar) return;
-    toolbar.addEventListener('pointerdown', function (event) { event.preventDefault(); });
+    // Do not cancel pointerdown here: cancelling it suppresses compatibility
+    // mouse events and can prevent the buttons' click handlers from firing.
+    // Selection CFI/quote are already captured before the toolbar is shown.
+    toolbar.addEventListener('pointerdown', function (event) { event.stopPropagation(); });
     toolbar.querySelectorAll('[data-highlight-color]').forEach(function (button) {
       button.addEventListener('click', function () { addHighlight(button.getAttribute('data-highlight-color')); });
     });
@@ -379,33 +396,141 @@
     }
     return '未命名書籍';
   }
-  function flattenTOC(items, output) {
+  function tocChildren(item) {
+    if (!item || typeof item !== 'object') return [];
+    if (Array.isArray(item.subitems)) return item.subitems;
+    if (Array.isArray(item.children)) return item.children;
+    return [];
+  }
+  function flattenTOC(items, output, depth) {
     output = output || [];
+    depth = Number(depth) || 0;
     (items || []).forEach(function (item) {
-      if (item && item.href) output.push({ label: titleText(item.label), href: item.href });
-      if (item && item.subitems) flattenTOC(item.subitems, output);
+      if (!item || typeof item !== 'object') return;
+      if (item.href) output.push({ label: titleText(item.label), href: String(item.href), depth: depth });
+      flattenTOC(tocChildren(item), output, depth + 1);
     });
     return output;
   }
   function populateTOC(items) {
     var select = el('toc-select');
+    var tree = el('toc-tree');
+    if (!select || !tree) return;
     select.innerHTML = '';
-    var list = flattenTOC(items);
-    if (!list.length) {
-      var empty = document.createElement('option');
-      empty.value = '';
-      empty.appendChild(document.createTextNode('這本書沒有可用目錄'));
-      select.appendChild(empty);
+    tree.textContent = '';
+    var roots = Array.isArray(items) ? items : [];
+    var flat = flattenTOC(roots);
+    if (!flat.length) {
+      var empty = document.createElement('p');
+      empty.className = 'toc-tree-empty';
+      empty.textContent = '這本書沒有可用目錄';
+      tree.appendChild(empty);
+      var option = document.createElement('option');
+      option.value = '';
+      option.textContent = '這本書沒有可用目錄';
+      select.appendChild(option);
       select.disabled = true;
       return;
     }
-    list.forEach(function (item) {
+
+    flat.forEach(function (item) {
       var option = document.createElement('option');
       option.value = item.href;
-      option.appendChild(document.createTextNode(item.label));
+      option.textContent = item.label;
       select.appendChild(option);
     });
     select.disabled = false;
+
+    function appendItems(source, parent, depth) {
+      (source || []).forEach(function (item, itemIndex) {
+        if (!item || typeof item !== 'object') return;
+        var children = tocChildren(item);
+        var href = item.href ? String(item.href) : '';
+        var label = titleText(item.label);
+        var entry = document.createElement('li');
+        entry.className = 'toc-tree-item';
+        entry.dataset.depth = String(depth);
+
+        var row = document.createElement('div');
+        row.className = 'toc-tree-row';
+
+        if (children.length) {
+          var disclosure = document.createElement('button');
+          disclosure.type = 'button';
+          disclosure.className = 'toc-tree-disclosure';
+          disclosure.textContent = '›';
+          disclosure.setAttribute('aria-expanded', 'false');
+          disclosure.setAttribute('aria-label', '展開「' + label + '」子目錄');
+          disclosure.addEventListener('click', function () {
+            var expanded = entry.classList.toggle('is-expanded');
+            disclosure.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            disclosure.textContent = expanded ? '⌄' : '›';
+            disclosure.setAttribute('aria-label', (expanded ? '收合「' : '展開「') + label + '」子目錄');
+          });
+          row.appendChild(disclosure);
+        } else {
+          var spacer = document.createElement('span');
+          spacer.className = 'toc-tree-disclosure-spacer';
+          row.appendChild(spacer);
+        }
+
+        var chapter = href ? document.createElement('button') : document.createElement('span');
+        if (href) {
+          chapter.type = 'button';
+          chapter.className = 'toc-tree-link';
+          chapter.addEventListener('click', function () {
+            tree.querySelectorAll('.toc-tree-link.is-current').forEach(function (node) {
+              node.classList.remove('is-current');
+              node.removeAttribute('aria-current');
+            });
+            chapter.classList.add('is-current');
+            chapter.setAttribute('aria-current', 'location');
+            select.value = href;
+            if (view) {
+              view.goTo(href).catch(function (error) {
+                setText('reader-status', '無法開啟這個章節：' + (error.message || String(error)));
+              });
+            }
+            if (window.matchMedia('(max-width: 820px)').matches) {
+              var sidebar = el('reader-sidebar');
+              var toggle = el('reader-sidebar-toggle');
+              if (sidebar) sidebar.classList.remove('is-open');
+              if (toggle) toggle.setAttribute('aria-expanded', 'false');
+            }
+          });
+        } else {
+          chapter.className = 'toc-tree-label';
+        }
+        chapter.textContent = label;
+        chapter.title = label;
+        row.appendChild(chapter);
+        entry.appendChild(row);
+
+        if (children.length) {
+          var nested = document.createElement('ul');
+          nested.className = 'toc-tree-children';
+          var expandAtStart = depth === 0 && roots.length === 1 && itemIndex === 0;
+          nested.hidden = !expandAtStart;
+          if (expandAtStart) {
+            entry.classList.add('is-expanded');
+            var button = row.querySelector('.toc-tree-disclosure');
+            if (button) {
+              button.textContent = '⌄';
+              button.setAttribute('aria-expanded', 'true');
+              button.setAttribute('aria-label', '收合「' + label + '」子目錄');
+            }
+          }
+          appendItems(children, nested, depth + 1);
+          entry.appendChild(nested);
+        }
+        parent.appendChild(entry);
+      });
+    }
+
+    var list = document.createElement('ul');
+    list.className = 'toc-tree-list';
+    appendItems(roots, list, 0);
+    tree.appendChild(list);
   }
   async function flushLibraryProgress() {
     if (progressSaveTimer) {
