@@ -69,14 +69,6 @@ Add the same variables to Preview if you test the cloud-only reader on Preview. 
 
 The reading-data APIs verify the `Cf-Access-Jwt-Assertion` signature against the team's published Access signing keys, check the issuer, expiry and AUD, then store only a SHA-256-derived owner ID in D1. Raw email addresses and Access tokens are not stored. The existing Access edge policy must still protect the full hostname and all `/api/*` routes.
 
-## 4. Configure the LAN-direct source (optional)
-
-The fourth source is the OpenList instance reachable directly from the current device, such as a Mac or phone on the home network. On the cloud page, enter its URL, account name and password. The URL and username are saved in that browser's local storage. The password is kept only in the current tab's `sessionStorage`, so a page reload in that tab can reconnect, but closing the tab clears it. The credentials are sent directly to the LAN OpenList login and file-list endpoints; they do not pass through Pages, D1 or Worker APIs.
-
-Use a separate read-only account. Plain HTTP does not encrypt the username/password or Authorization header over Wi-Fi. Use HTTPS when available, or a trusted private LAN / encrypted VPN such as Tailscale. Allow the exact FRAME Reader origin in the LAN OpenList CORS settings. The browser needs `Content-Type` and `Authorization` request headers permitted for the login and file API calls. The final file host returned in `raw_url` must also permit browser CORS.
-
-Legacy local Token settings are not reused. On first open after this update, the old saved local Token is discarded; enter the LAN account and password once and save the source again.
-
 ## 4. Set the two library paths
 
 The cloud page has two independent path fields:
@@ -84,7 +76,7 @@ The cloud page has two independent path fields:
 - **Books root:** EPUB electronic books.
 - **Comics root:** EPUB and CBZ comics.
 
-You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. The two HTML input `value` attributes are the defaults. Each server-side provider has independent Books and Comics roots. Saved paths are stored in the current Access user's D1 preferences and are restored after refresh or on another device.
+You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. The HTML input `value` attributes provide first-use defaults. Each server-side provider has independent Books and Comics roots. Saved paths are stored in the current Access user's D1 preferences and are restored after refresh or on another device.
 
 The first-use default paths are seeded from `pages/cloud/index.html`. Once saved, the active provider, Books/Comics selection and each provider's root paths are stored in D1 under the Access user identity. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
@@ -102,7 +94,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
    - If a custom domain is used, create a separate Access application for that hostname and protect the complete hostname too.
    **Security boundary:** Cloudflare Access must protect the complete hostname. All user-owned reading-data endpoints verify the Access JWT signature, issuer, expiry and application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. Cloud catalog scan/file endpoints rely on Access at the edge. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
-4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; Only server-side Alist／OpenList sources are supported: VPS Alist, OpenList Worker or Mobile Device Alist.
+4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it. Only server-side Alist／OpenList sources are supported: VPS Alist, OpenList Worker or Mobile Device Alist.
 5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
 6. After the first completed scan, folder navigation reads D1. Re-run the scan when you want to synchronize new, modified or deleted OpenList files.
 7. Open any scanned cloud book from the main bookshelf. Its original EPUB / CBZ is fetched from Alist／OpenList for the active reading session and remains in memory only. The cloud original is never changed or deleted.
