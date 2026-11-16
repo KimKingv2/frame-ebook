@@ -84,6 +84,8 @@ export async function onRequestGet({ request, env }) {
         lastModified: row.modified_at ? (Date.parse(row.modified_at) || 0) : 0,
         addedAt: 0,
         lastOpenedAt: Number(state.lastOpenedAt) || 0,
+        pageCount: Number(metadata.pageCount) || 0,
+        language: String(metadata.language || ""),
         progress: state.progress || { percent: 0, label: "尚未閱讀", cfi: "", index: null },
         manualTitle: !!metadata.manualTitle,
         manualAuthor: !!metadata.manualAuthor,
