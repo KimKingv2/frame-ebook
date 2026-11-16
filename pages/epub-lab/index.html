@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-mobile-ui-r5">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-settings-drawer-r1">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -58,145 +58,146 @@
               <button id="reader-appearance-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="reader-appearance-panel">Aa 閱讀設定</button>
               <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
             </div>
-                <button id="reader-settings-backdrop" class="reader-modal-backdrop reader-settings-backdrop" type="button" aria-label="關閉閱讀設定" hidden></button>
-                <details class="appearance-panel" id="reader-appearance-panel">
-                  <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
-                  <div class="appearance-controls">
-                    <section class="appearance-group typography-group" aria-label="文字排版">
-                      <div class="appearance-group-heading"><span>文字排版</span><small>TYPE & RHYTHM</small></div>
-                      <div class="setting-grid setting-grid--three">
-                        <label class="setting-control" for="font-scale"><span>字級</span>
-                          <select id="font-scale">
-                            <option value="0.9">偏小</option>
-                            <option value="1" selected>標準</option>
-                            <option value="1.1">稍大</option>
-                            <option value="1.2">大字</option>
-                            <option value="1.3">特大</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="line-height"><span>行距</span>
-                          <select id="line-height">
-                            <option value="1.45">緊湊</option>
-                            <option value="1.65" selected>舒適</option>
-                            <option value="1.85">寬鬆</option>
-                            <option value="2">特寬</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="font-family"><span>字體</span>
-                          <select id="font-family">
-                            <option value="original" selected>原書字體</option>
-                            <option value="serif">明體</option>
-                            <option value="sans">黑體</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="font-weight"><span>字重</span>
-                          <select id="font-weight">
-                            <option value="original" selected>原書設定</option>
-                            <option value="normal">標準（400）</option>
-                            <option value="medium">稍厚（500）</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="paragraph-spacing"><span>段落間距</span>
-                          <select id="paragraph-spacing">
-                            <option value="original" selected>原書設定</option>
-                            <option value="compact">緊湊</option>
-                            <option value="standard">舒適</option>
-                            <option value="loose">寬鬆</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="text-align"><span>文字對齊</span>
-                          <select id="text-align">
-                            <option value="original" selected>原書設定</option>
-                            <option value="left">靠左對齊</option>
-                            <option value="justify">左右對齊</option>
-                          </select>
-                        </label>
-                      </div>
-                    </section>
-                    <section class="appearance-group layout-group" aria-label="頁面佈局">
-                      <div class="appearance-group-heading"><span>頁面佈局</span><small>PAGE LAYOUT</small></div>
-                      <div class="setting-grid setting-grid--two">
-                        <label class="setting-control" for="reading-mode"><span>閱讀模式</span>
-                          <select id="reading-mode">
-                            <option value="paginated" selected>分頁翻頁</option>
-                            <option value="scrolled">連續捲動</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="page-layout"><span>分頁版面</span>
-                          <select id="page-layout">
-                            <option value="1">單頁</option>
-                            <option value="2" selected>雙頁優先</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="vertical-margin"><span>上下留白</span>
-                          <select id="vertical-margin">
-                            <option value="8">窄（8 px）</option>
-                            <option value="16" selected>標準（16 px）</option>
-                            <option value="24">寬（24 px）</option>
-                            <option value="32">更寬（32 px）</option>
-                            <option value="40">寬裕（40 px）</option>
-                            <option value="48">大留白（48 px）</option>
-                            <option value="64">極寬（64 px）</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="horizontal-margin"><span>左右留白</span>
-                          <select id="horizontal-margin">
-                            <option value="4">窄（4%）</option>
-                            <option value="7" selected>標準（7%）</option>
-                            <option value="10">寬（10%）</option>
-                            <option value="13">更寬（13%）</option>
-                            <option value="16">寬裕（16%）</option>
-                            <option value="20">大留白（20%）</option>
-                          </select>
-                        </label>
-                      </div>
-                      <p id="reading-mode-note" class="layout-note">雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。左右留白也會同步調整雙頁中央的頁縫。</p>
-                    </section>
-                    <section class="appearance-group comic-group" aria-label="漫畫與圖像閱讀">
-                      <div class="appearance-group-heading"><span>漫畫與圖像</span><small>COMIC READING</small></div>
-                      <div class="setting-grid setting-grid--two">
-                        <label class="setting-control" for="comic-reading-mode"><span>閱讀模式</span>
-                          <select id="comic-reading-mode">
-                            <option value="paginated" selected>分頁翻頁</option>
-                            <option value="scrolled">直式長卷</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="comic-page-layout"><span>頁面編排</span>
-                          <select id="comic-page-layout">
-                            <option value="1">單頁</option>
-                            <option value="2" selected>雙頁優先</option>
-                          </select>
-                        </label>
-                        <label class="setting-control" for="comic-image-fit"><span>圖片縮放</span>
-                          <select id="comic-image-fit">
-                            <option value="fit-page" selected>適合整頁</option>
-                            <option value="fit-width">適合寬度</option>
-                          </select>
-                        </label>
-                      </div>
-                      <p id="comic-mode-note" class="layout-note">圖像閱讀設定會在載入 CBZ 或固定版面 EPUB 後啟用。</p>
-                    </section>
-                    <div class="theme-control" role="group" aria-label="閱讀主題">
-                      <span>紙張主題</span>
-                      <div class="theme-buttons">
-                        <button type="button" class="theme-button" data-theme="paper" aria-pressed="true"><i class="swatch swatch-paper"></i>紙白</button>
-                        <button type="button" class="theme-button" data-theme="sepia" aria-pressed="false"><i class="swatch swatch-sepia"></i>暖紙</button>
-                        <button type="button" class="theme-button" data-theme="night" aria-pressed="false"><i class="swatch swatch-night"></i>夜讀</button>
-                      </div>
-                    </div>
-                    <div class="theme-control backdrop-control" role="group" aria-label="閱讀背景">
-                      <span>閱讀背景</span>
-                      <div class="theme-buttons">
-                        <button type="button" class="theme-button" data-backdrop="wood" aria-pressed="true">木質桌面</button>
-                        <button type="button" class="theme-button" data-backdrop="linen" aria-pressed="false">亞麻暖灰</button>
-                        <button type="button" class="theme-button" data-backdrop="slate" aria-pressed="false">深色石板</button>
-                      </div>
-                    </div>
-                  </div>
-                  <p id="appearance-status" class="appearance-status">外觀設定會保存至雲端 D1，其他裝置可自動還原。</p>
-                </details>
+
           </div>
         </section>
+        <button id="reader-settings-backdrop" class="reader-modal-backdrop reader-settings-backdrop" type="button" aria-label="關閉閱讀設定" hidden></button>
+        <details class="appearance-panel" id="reader-appearance-panel">
+        <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
+        <div class="appearance-controls">
+        <section class="appearance-group typography-group" aria-label="文字排版">
+        <div class="appearance-group-heading"><span>文字排版</span><small>TYPE & RHYTHM</small></div>
+        <div class="setting-grid setting-grid--three">
+        <label class="setting-control" for="font-scale"><span>字級</span>
+        <select id="font-scale">
+        <option value="0.9">偏小</option>
+        <option value="1" selected>標準</option>
+        <option value="1.1">稍大</option>
+        <option value="1.2">大字</option>
+        <option value="1.3">特大</option>
+        </select>
+        </label>
+        <label class="setting-control" for="line-height"><span>行距</span>
+        <select id="line-height">
+        <option value="1.45">緊湊</option>
+        <option value="1.65" selected>舒適</option>
+        <option value="1.85">寬鬆</option>
+        <option value="2">特寬</option>
+        </select>
+        </label>
+        <label class="setting-control" for="font-family"><span>字體</span>
+        <select id="font-family">
+        <option value="original" selected>原書字體</option>
+        <option value="serif">明體</option>
+        <option value="sans">黑體</option>
+        </select>
+        </label>
+        <label class="setting-control" for="font-weight"><span>字重</span>
+        <select id="font-weight">
+        <option value="original" selected>原書設定</option>
+        <option value="normal">標準（400）</option>
+        <option value="medium">稍厚（500）</option>
+        </select>
+        </label>
+        <label class="setting-control" for="paragraph-spacing"><span>段落間距</span>
+        <select id="paragraph-spacing">
+        <option value="original" selected>原書設定</option>
+        <option value="compact">緊湊</option>
+        <option value="standard">舒適</option>
+        <option value="loose">寬鬆</option>
+        </select>
+        </label>
+        <label class="setting-control" for="text-align"><span>文字對齊</span>
+        <select id="text-align">
+        <option value="original" selected>原書設定</option>
+        <option value="left">靠左對齊</option>
+        <option value="justify">左右對齊</option>
+        </select>
+        </label>
+        </div>
+        </section>
+        <section class="appearance-group layout-group" aria-label="頁面佈局">
+        <div class="appearance-group-heading"><span>頁面佈局</span><small>PAGE LAYOUT</small></div>
+        <div class="setting-grid setting-grid--two">
+        <label class="setting-control" for="reading-mode"><span>閱讀模式</span>
+        <select id="reading-mode">
+        <option value="paginated" selected>分頁翻頁</option>
+        <option value="scrolled">連續捲動</option>
+        </select>
+        </label>
+        <label class="setting-control" for="page-layout"><span>分頁版面</span>
+        <select id="page-layout">
+        <option value="1">單頁</option>
+        <option value="2" selected>雙頁優先</option>
+        </select>
+        </label>
+        <label class="setting-control" for="vertical-margin"><span>上下留白</span>
+        <select id="vertical-margin">
+        <option value="8">窄（8 px）</option>
+        <option value="16" selected>標準（16 px）</option>
+        <option value="24">寬（24 px）</option>
+        <option value="32">更寬（32 px）</option>
+        <option value="40">寬裕（40 px）</option>
+        <option value="48">大留白（48 px）</option>
+        <option value="64">極寬（64 px）</option>
+        </select>
+        </label>
+        <label class="setting-control" for="horizontal-margin"><span>左右留白</span>
+        <select id="horizontal-margin">
+        <option value="4">窄（4%）</option>
+        <option value="7" selected>標準（7%）</option>
+        <option value="10">寬（10%）</option>
+        <option value="13">更寬（13%）</option>
+        <option value="16">寬裕（16%）</option>
+        <option value="20">大留白（20%）</option>
+        </select>
+        </label>
+        </div>
+        <p id="reading-mode-note" class="layout-note">雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。左右留白也會同步調整雙頁中央的頁縫。</p>
+        </section>
+        <section class="appearance-group comic-group" aria-label="漫畫與圖像閱讀">
+        <div class="appearance-group-heading"><span>漫畫與圖像</span><small>COMIC READING</small></div>
+        <div class="setting-grid setting-grid--two">
+        <label class="setting-control" for="comic-reading-mode"><span>閱讀模式</span>
+        <select id="comic-reading-mode">
+        <option value="paginated" selected>分頁翻頁</option>
+        <option value="scrolled">直式長卷</option>
+        </select>
+        </label>
+        <label class="setting-control" for="comic-page-layout"><span>頁面編排</span>
+        <select id="comic-page-layout">
+        <option value="1">單頁</option>
+        <option value="2" selected>雙頁優先</option>
+        </select>
+        </label>
+        <label class="setting-control" for="comic-image-fit"><span>圖片縮放</span>
+        <select id="comic-image-fit">
+        <option value="fit-page" selected>適合整頁</option>
+        <option value="fit-width">適合寬度</option>
+        </select>
+        </label>
+        </div>
+        <p id="comic-mode-note" class="layout-note">圖像閱讀設定會在載入 CBZ 或固定版面 EPUB 後啟用。</p>
+        </section>
+        <div class="theme-control" role="group" aria-label="閱讀主題">
+        <span>紙張主題</span>
+        <div class="theme-buttons">
+        <button type="button" class="theme-button" data-theme="paper" aria-pressed="true"><i class="swatch swatch-paper"></i>紙白</button>
+        <button type="button" class="theme-button" data-theme="sepia" aria-pressed="false"><i class="swatch swatch-sepia"></i>暖紙</button>
+        <button type="button" class="theme-button" data-theme="night" aria-pressed="false"><i class="swatch swatch-night"></i>夜讀</button>
+        </div>
+        </div>
+        <div class="theme-control backdrop-control" role="group" aria-label="閱讀背景">
+        <span>閱讀背景</span>
+        <div class="theme-buttons">
+        <button type="button" class="theme-button" data-backdrop="wood" aria-pressed="true">木質桌面</button>
+        <button type="button" class="theme-button" data-backdrop="linen" aria-pressed="false">亞麻暖灰</button>
+        <button type="button" class="theme-button" data-backdrop="slate" aria-pressed="false">深色石板</button>
+        </div>
+        </div>
+        </div>
+        <p id="appearance-status" class="appearance-status">外觀設定會保存至雲端 D1，其他裝置可自動還原。</p>
+        </details>
         <button id="reader-sidebar-backdrop" class="reader-modal-backdrop reader-sidebar-backdrop" type="button" aria-label="關閉目錄與筆記" hidden></button>
         <div class="reader-layout" id="reader-layout">
           <aside class="reader-sidebar" id="reader-sidebar" aria-label="閱讀導覽">
@@ -306,6 +307,6 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-mobile-ui-r4"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-settings-drawer-r1"></script>
 </body>
 </html>
