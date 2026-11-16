@@ -12,7 +12,7 @@
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261116-filename-id-r1');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261116-metadata-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-cloud-only-r2');
   var THEMES = {
