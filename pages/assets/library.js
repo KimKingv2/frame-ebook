@@ -268,6 +268,7 @@ async function saveDetails(event) {
   await refresh();
 }
 
+$("open-cloud-manager-hero")?.addEventListener("click", () => $("open-cloud-manager")?.click());
 $("search-books").addEventListener("input", event => { state.query = event.target.value || ""; render(); });
 $("sort-books").addEventListener("change", event => { state.sort = event.target.value; render(); });
 $("view-grid").addEventListener("click", () => { state.view = "grid"; render(); });
