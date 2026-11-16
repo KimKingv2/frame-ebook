@@ -1,3 +1,5 @@
+> **舊版資料已退役**：本次 cloud-only 更新會在首次載入時自動刪除舊版 `frame-reader-library` IndexedDB 資料庫，以及 `frame-reader-*` 的 localStorage/sessionStorage 設定。舊版本機匯入書籍和閱讀進度不再保留。現行資料架構請以 `docs/ARCHITECTURE.md` 為準。
+
 > **歷史測試紀錄**：本文件包含 FRAME Reader 早期本機原型的測試紀錄，當中的 IndexedDB、localStorage、檔案匯入和本機閱讀流程已於 cloud-only 架構中停用。目前資料設計請以 `docs/ARCHITECTURE.md` 和 `docs/CLOUDFLARE-SETUP.md` 為準。
 
 # EPUB Compatibility Test Log
