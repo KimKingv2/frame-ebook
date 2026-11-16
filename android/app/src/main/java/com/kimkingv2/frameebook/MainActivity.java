@@ -131,7 +131,7 @@ public final class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 if (progressBar.getProgress() >= 100) progressBar.setVisibility(View.GONE);
-                setStatus("已連線 · 漫畫 302 原生直連已就緒");
+                setStatus("已連線 · Android 原生 302 通道已啟用");
             }
 
             @Override
