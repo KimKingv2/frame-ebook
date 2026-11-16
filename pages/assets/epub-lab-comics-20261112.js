@@ -12,9 +12,16 @@
   var progressSaveTimer = null;
   var pendingProgress = null;
   var pendingProgressBookId = null;
+  var activeAnnotations = [];
+  var selectedTextState = null;
+  var editingAnnotation = null;
+  var Overlayer = null;
+  var annotationBusy = false;
   var libraryStorePromise = import('/assets/library-store.js?v=20261116-shared-local-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-stream-reader-r1');
+  var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
+  var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
     sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
@@ -39,6 +46,328 @@
   };
   var el = function (id) { return document.getElementById(id); };
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
+
+  var ANNOTATION_COLORS = {
+    yellow: '#F2C94C',
+    violet: '#A78BFA',
+    mint: '#65C9A5',
+    rose: '#E88EAF',
+    sky: '#6FB9E8'
+  };
+
+  function annotationColor(name) {
+    return ANNOTATION_COLORS[String(name || '')] || ANNOTATION_COLORS.yellow;
+  }
+
+  function makeAnnotationId() {
+    return window.crypto && typeof window.crypto.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : 'ann-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function annotationToolbar() {
+    return el('annotation-selection-toolbar');
+  }
+
+  function hideSelectionToolbar(clearSelection) {
+    var toolbar = annotationToolbar();
+    if (toolbar) toolbar.hidden = true;
+    if (clearSelection) {
+      selectedTextState = null;
+      if (view && typeof view.deselect === 'function') view.deselect();
+    }
+  }
+
+  function captureTextSelection(doc, index) {
+    if (!view || view.isFixedLayout || annotationBusy) return;
+    var win = doc && doc.defaultView;
+    var selection = win && win.getSelection ? win.getSelection() : null;
+    if (!selection || !selection.rangeCount || selection.isCollapsed) {
+      hideSelectionToolbar(false);
+      return;
+    }
+    var quote = String(selection.toString() || '').replace(/\\s+/g, ' ').trim();
+    if (!quote || quote.length > 12000) {
+      hideSelectionToolbar(false);
+      return;
+    }
+    var range;
+    var cfi;
+    try {
+      range = selection.getRangeAt(0).cloneRange();
+      cfi = view.getCFI(index, range);
+    } catch (error) {
+      console.warn('FRAME Reader could not create a CFI for this selection:', error);
+      hideSelectionToolbar(false);
+      return;
+    }
+    var rect = range.getBoundingClientRect();
+    if ((!rect || (!rect.width && !rect.height)) && range.getClientRects().length) {
+      rect = range.getClientRects()[0];
+    }
+    if (!rect) return;
+    var frame = win.frameElement;
+    var frameRect = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
+    var left = frameRect.left + rect.left + Math.max(0, rect.width / 2);
+    var top = frameRect.top + rect.top - 48;
+    var toolbar = annotationToolbar();
+    if (!toolbar) return;
+    toolbar.hidden = false;
+    var toolbarWidth = toolbar.offsetWidth || 270;
+    var toolbarHeight = toolbar.offsetHeight || 46;
+    left = Math.max(12 + toolbarWidth / 2, Math.min(window.innerWidth - 12 - toolbarWidth / 2, left));
+    top = Math.max(10, Math.min(window.innerHeight - toolbarHeight - 10, top));
+    toolbar.style.left = left + 'px';
+    toolbar.style.top = top + 'px';
+    selectedTextState = {
+      cfi: cfi,
+      quote: quote,
+      range: range,
+      index: index,
+      doc: doc,
+      createdAt: Date.now()
+    };
+  }
+
+  function bindSelectionEvents(doc, index) {
+    if (!doc || doc.documentElement.dataset.frameReaderSelectionBound === '1') return;
+    doc.documentElement.dataset.frameReaderSelectionBound = '1';
+    var schedule = function (delay) {
+      window.setTimeout(function () { captureTextSelection(doc, index); }, delay);
+    };
+    doc.addEventListener('mouseup', function () { schedule(20); });
+    doc.addEventListener('keyup', function () { schedule(20); });
+    doc.addEventListener('touchend', function () { schedule(100); }, { passive: true });
+  }
+
+  function renderAnnotationList() {
+    var list = el('annotation-list');
+    var count = el('annotation-count');
+    if (!list || !count) return;
+    count.textContent = String(activeAnnotations.length);
+    list.textContent = '';
+    if (!activeAnnotations.length) {
+      var empty = document.createElement('p');
+      empty.className = 'annotation-empty';
+      empty.textContent = '這本書還沒有筆記或高亮。選取正文中的文字即可新增。';
+      list.appendChild(empty);
+      return;
+    }
+    activeAnnotations.slice().sort(function (a, b) {
+      return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
+    }).forEach(function (annotation) {
+      var item = document.createElement('article');
+      item.className = 'annotation-item';
+      var marker = document.createElement('span');
+      marker.className = 'annotation-marker ' + (annotation.type === 'note' ? 'is-note' : 'is-highlight');
+      marker.style.setProperty('--annotation-color', annotationColor(annotation.color));
+      marker.setAttribute('aria-hidden', 'true');
+
+      var content = document.createElement('button');
+      content.type = 'button';
+      content.className = 'annotation-item-content';
+      content.title = '跳回這段文字';
+      var kind = document.createElement('span');
+      kind.className = 'annotation-kind';
+      kind.textContent = annotation.type === 'note' ? '筆記' : '高亮';
+      var quote = document.createElement('span');
+      quote.className = 'annotation-quote';
+      quote.textContent = annotation.quote || '未附選取文字';
+      content.append(kind, quote);
+      if (annotation.text) {
+        var note = document.createElement('span');
+        note.className = 'annotation-note-preview';
+        note.textContent = annotation.text;
+        content.appendChild(note);
+      }
+      content.addEventListener('click', async function () {
+        if (!view) return;
+        try {
+          await view.goTo(annotation.cfi);
+          if (annotation.type === 'note') openNoteComposer(annotation);
+        } catch (error) {
+          setText('reader-status', '無法跳回這筆標註：' + (error.message || String(error)));
+        }
+      });
+
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'annotation-delete';
+      remove.textContent = '刪除';
+      remove.setAttribute('aria-label', '刪除這筆標註');
+      remove.addEventListener('click', function () { deleteAnnotationRecord(annotation); });
+      item.append(marker, content, remove);
+      list.appendChild(item);
+    });
+  }
+
+  function upsertAnnotation(annotation) {
+    var index = activeAnnotations.findIndex(function (item) { return item.id === annotation.id; });
+    if (index >= 0) activeAnnotations[index] = annotation;
+    else activeAnnotations.push(annotation);
+    renderAnnotationList();
+  }
+
+  function drawAnnotation(annotation) {
+    if (!view || !annotation || !annotation.cfi) return Promise.resolve();
+    return view.addAnnotation({
+      value: annotation.cfi,
+      type: annotation.type,
+      color: annotation.color,
+      id: annotation.id
+    }).catch(function (error) {
+      console.warn('FRAME Reader could not draw annotation:', error);
+    });
+  }
+
+  function openNoteComposer(annotation) {
+    var dialog = el('annotation-note-dialog');
+    if (!dialog) return;
+    editingAnnotation = annotation || null;
+    var quote = annotation ? annotation.quote : (selectedTextState && selectedTextState.quote || '');
+    setText('annotation-note-quote', quote || '未取得選取文字');
+    el('annotation-note-text').value = annotation ? String(annotation.text || '') : '';
+    setText('annotation-note-title', annotation ? '編輯筆記' : '為這段文字寫筆記');
+    el('annotation-note-delete').hidden = !annotation;
+    hideSelectionToolbar(false);
+    if (!dialog.open) dialog.showModal();
+    if (!annotation) window.setTimeout(function () { el('annotation-note-text').focus(); }, 20);
+  }
+
+  function closeNoteComposer() {
+    var dialog = el('annotation-note-dialog');
+    if (dialog && dialog.open) dialog.close();
+    editingAnnotation = null;
+  }
+
+  async function saveNoteFromComposer() {
+    if (annotationBusy) return;
+    var text = String(el('annotation-note-text').value || '').trim();
+    if (!text) {
+      setText('annotation-note-status', '請先輸入筆記內容。');
+      return;
+    }
+    var base = editingAnnotation || selectedTextState;
+    if (!base || !base.cfi || !currentBookId) {
+      setText('annotation-note-status', '找不到原文定位，請重新選取文字後再新增筆記。');
+      return;
+    }
+    annotationBusy = true;
+    el('annotation-note-save').disabled = true;
+    setText('annotation-note-status', '正在保存至雲端 D1……');
+    try {
+      var store = await libraryStorePromise;
+      var saved = await store.saveAnnotation({
+        id: editingAnnotation ? editingAnnotation.id : makeAnnotationId(),
+        bookId: currentBookId,
+        type: 'note',
+        cfi: base.cfi,
+        quote: base.quote || '',
+        text: text,
+        color: editingAnnotation ? editingAnnotation.color : 'violet',
+        createdAt: editingAnnotation ? editingAnnotation.createdAt : Date.now()
+      });
+      var navigation = view.resolveNavigation(saved.cfi);
+      saved.sectionIndex = navigation && navigation.index;
+      upsertAnnotation(saved);
+      await drawAnnotation(saved);
+      setText('reader-status', '筆記已保存至雲端 D1。');
+      closeNoteComposer();
+      hideSelectionToolbar(true);
+    } catch (error) {
+      setText('annotation-note-status', '保存失敗：' + (error.message || String(error)));
+    } finally {
+      annotationBusy = false;
+      el('annotation-note-save').disabled = false;
+    }
+  }
+
+  async function addHighlight(color) {
+    if (annotationBusy || !selectedTextState || !currentBookId) return;
+    annotationBusy = true;
+    var toolbar = annotationToolbar();
+    if (toolbar) toolbar.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+    try {
+      var store = await libraryStorePromise;
+      var saved = await store.saveAnnotation({
+        id: makeAnnotationId(),
+        bookId: currentBookId,
+        type: 'highlight',
+        cfi: selectedTextState.cfi,
+        quote: selectedTextState.quote,
+        text: '',
+        color: color,
+        createdAt: Date.now()
+      });
+      var navigation = view.resolveNavigation(saved.cfi);
+      saved.sectionIndex = navigation && navigation.index;
+      upsertAnnotation(saved);
+      await drawAnnotation(saved);
+      setText('reader-status', '已新增高亮，並保存至雲端 D1。');
+      hideSelectionToolbar(true);
+    } catch (error) {
+      setText('reader-status', '高亮保存失敗：' + (error.message || String(error)));
+    } finally {
+      annotationBusy = false;
+      if (toolbar) toolbar.querySelectorAll('button').forEach(function (button) { button.disabled = false; });
+    }
+  }
+
+  async function deleteAnnotationRecord(annotation) {
+    if (!annotation || annotationBusy || !currentBookId) return;
+    if (!window.confirm('確定刪除這筆標註嗎？')) return;
+    annotationBusy = true;
+    try {
+      var store = await libraryStorePromise;
+      await store.deleteAnnotation(annotation.id, currentBookId);
+      activeAnnotations = activeAnnotations.filter(function (item) { return item.id !== annotation.id; });
+      if (view) await view.deleteAnnotation({ value: annotation.cfi });
+      renderAnnotationList();
+      setText('reader-status', '標註已從雲端 D1 刪除。');
+    } catch (error) {
+      setText('reader-status', '刪除標註失敗：' + (error.message || String(error)));
+    } finally {
+      annotationBusy = false;
+    }
+  }
+
+  function bindAnnotationControls() {
+    var toolbar = annotationToolbar();
+    if (!toolbar) return;
+    toolbar.addEventListener('pointerdown', function (event) { event.preventDefault(); });
+    toolbar.querySelectorAll('[data-highlight-color]').forEach(function (button) {
+      button.addEventListener('click', function () { addHighlight(button.getAttribute('data-highlight-color')); });
+    });
+    el('selection-add-note').addEventListener('click', function () { openNoteComposer(null); });
+    el('selection-dismiss').addEventListener('click', function () { hideSelectionToolbar(true); });
+    el('annotation-note-cancel').addEventListener('click', closeNoteComposer);
+    el('annotation-note-save').addEventListener('click', saveNoteFromComposer);
+    el('annotation-note-delete').addEventListener('click', function () {
+      var item = editingAnnotation;
+      closeNoteComposer();
+      if (item) deleteAnnotationRecord(item);
+    });
+    el('annotation-list-toggle').addEventListener('click', function () {
+      var panel = el('annotation-panel');
+      panel.hidden = !panel.hidden;
+      el('annotation-list-toggle').setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+    });
+    el('annotation-refresh').addEventListener('click', async function () {
+      if (!currentBookId) return;
+      try {
+        var store = await libraryStorePromise;
+        activeAnnotations = await store.listAnnotations(currentBookId);
+        activeAnnotations.forEach(function (annotation) {
+          var nav = view && view.resolveNavigation(annotation.cfi);
+          annotation.sectionIndex = nav && nav.index;
+        });
+        renderAnnotationList();
+        setText('reader-status', '已重新整理本書標註。');
+      } catch (error) {
+        setText('reader-status', '讀取標註失敗：' + (error.message || String(error)));
+      }
+    });
+  }
 
   function titleText(value) {
     if (typeof value === 'string') return value;
@@ -389,6 +718,44 @@
     await view.open(isCbz ? source : parsedBook);
     parsedBook = view.book;
 
+    var overlayModule = await overlayerModulePromise;
+    Overlayer = overlayModule.Overlayer;
+    view.addEventListener('draw-annotation', function (event) {
+      var detail = event.detail || {};
+      var annotation = detail.annotation || {};
+      if (annotation.type === 'highlight') {
+        detail.draw(Overlayer.highlight, { color: annotationColor(annotation.color) });
+      } else if (annotation.type === 'note') {
+        var writingMode = 'horizontal-tb';
+        try { writingMode = detail.doc.defaultView.getComputedStyle(detail.doc.documentElement).writingMode || writingMode; } catch (error) {}
+        detail.draw(Overlayer.squiggly, {
+          color: '#9873D6',
+          width: 1.5,
+          writingMode: writingMode
+        });
+      }
+    });
+    view.addEventListener('load', function (event) {
+      var detail = event.detail || {};
+      bindSelectionEvents(detail.doc, detail.index);
+    });
+    view.addEventListener('create-overlay', function (event) {
+      var index = Number(event.detail && event.detail.index);
+      window.setTimeout(function () {
+        if (!view || !Array.isArray(activeAnnotations)) return;
+        activeAnnotations.forEach(function (annotation) {
+          if (Number(annotation.sectionIndex) === index) drawAnnotation(annotation);
+        });
+      }, 0);
+    });
+    view.addEventListener('show-annotation', function (event) {
+      var value = event.detail && event.detail.value;
+      var annotation = activeAnnotations.find(function (item) { return item.cfi === value; });
+      if (!annotation) return;
+      if (annotation.type === 'note') openNoteComposer(annotation);
+      else setText('reader-status', '高亮原文：' + (annotation.quote || '已定位到標記文字'));
+    });
+
     var metadata = parsedBook.metadata || {};
     currentBookId = String(bookId || '');
     if (!/^cloud:[a-f0-9]{64}$/.test(currentBookId)) {
@@ -398,6 +765,12 @@
     var libraryRecord = initialRecord || await libraryStore.getBook(currentBookId);
     if (!libraryRecord) throw new Error('無法讀取這本書的雲端索引與閱讀資料，請返回書架重新開啟。');
     loadAppearance(libraryRecord.appearance || {});
+    activeAnnotations = await libraryStore.listAnnotations(currentBookId);
+    activeAnnotations.forEach(function (annotation) {
+      var navigation = view.resolveNavigation(annotation.cfi);
+      annotation.sectionIndex = navigation && navigation.index;
+    });
+    renderAnnotationList();
     var savedProgress = libraryRecord.progress || {};
     restoreCfi = !view.isFixedLayout && savedProgress.cfi ? savedProgress.cfi : null;
     restorePageIndex = view.isFixedLayout && Number.isInteger(savedProgress.index) && savedProgress.index >= 0
@@ -490,6 +863,7 @@
   });
 
   loadAppearance({});
+  bindAnnotationControls();
   window.addEventListener('frame-reader-cloud-save-error', function (event) {
     var message = event && event.detail && event.detail.message;
     setText('reader-status', '雲端閱讀統計保存失敗：' + String(message || '請檢查網路連線。'));
