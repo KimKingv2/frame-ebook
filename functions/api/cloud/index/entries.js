@@ -2,6 +2,7 @@ import { json, requireAuth, getDatabase, isSameOrigin, normalizePath, isWithinRo
 
 const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
+const CATALOG_PROVIDER = "vps";
 const INSERT_SQL = [
   "INSERT INTO cloud_catalog",
   "(provider,library,root_path,path,parent_path,name,is_dir,format,size_bytes,modified_at,scan_id,indexed_at,cover_hash,cover_type,cover_status,cover_error,cover_updated_at)",
@@ -67,7 +68,7 @@ export async function onRequestPost({ request, env }) {
       return json({ error: "索引項目的父目錄或檔名與完整路徑不一致；整批未寫入。" }, 400);
     }
     statements.push(db.prepare(INSERT_SQL).bind(
-      provider, library, rootPath, path, parentPath, name,
+      CATALOG_PROVIDER, library, rootPath, path, parentPath, name,
       isDir ? 1 : 0, format, size, modified, scanId, now,
       isDir ? "none" : "pending"
     ));
