@@ -445,6 +445,7 @@ a { color: inherit; }
   background:#292631;
   box-shadow:0 13px 30px rgba(0,0,0,.26);
 }
+.library-folder-cover::after { content:none; }
 .library-folder-cover .library-format-badge { display:none; }
 .library-folder-cover-face {
   position:absolute;
