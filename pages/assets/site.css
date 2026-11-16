@@ -436,45 +436,54 @@ a { color: inherit; }
 .library-origin-note { display: block; margin-top: 3px; color: #665f70; font-size: 7px; line-height: 1.2; letter-spacing: .15px; }
 
 
-/* Folder-based editions show several embedded covers as a compact stack. */
+/* Folder stacks are full-bleed layers of real covers, not a small fan on a blank tile. */
 .library-cover-stack {
   position:absolute;
   inset:0;
   isolation:isolate;
   overflow:hidden;
-  background:#f1eff3;
+  background:#211b2e;
 }
-.library-cover-stack::before {
+.library-cover-stack::before,
+.library-cover-stack::after {
   content:none;
 }
-.library-cover-stack::after {
-  content:"";
-  position:absolute;
-  z-index:0;
-  inset:8px;
-  pointer-events:none;
-  border:1px solid rgba(76,66,88,.2);
-  border-radius:4px;
-}
-
-
 .library-cover-stack img {
   position:absolute;
-  width:70%;
-  height:82%;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
   object-fit:cover;
-  border:1px solid rgba(238,225,255,.3);
-  border-radius:4px;
-  box-shadow:0 9px 22px rgba(0,0,0,.42);
+  border:1px solid rgba(245,240,250,.46);
+  border-radius:2px;
+  box-shadow:none;
   background:#241d31;
 }
-.library-cover-stack img:nth-child(1) { left:1%; top:13%; z-index:1; transform:rotate(-11deg); }
-.library-cover-stack img:nth-child(2) { left:15%; top:7%; z-index:3; transform:rotate(0); }
-.library-cover-stack img:nth-child(3) { right:1%; top:13%; z-index:2; transform:rotate(11deg); }
-.library-cover-stack img:only-child { left:15%; top:7%; width:70%; height:86%; transform:none; }
-@media(max-width:640px) {
-  .library-cover-stack img { width:74%; height:82%; }
-  .library-cover-stack img:nth-child(2) { left:13%; }
+.library-cover-stack img:nth-child(1) {
+  left:0;
+  top:0;
+  z-index:1;
+}
+.library-cover-stack img:nth-child(2) {
+  left:4%;
+  top:4%;
+  width:96%;
+  height:96%;
+  z-index:2;
+}
+.library-cover-stack img:nth-child(3) {
+  left:8%;
+  top:8%;
+  width:92%;
+  height:92%;
+  z-index:3;
+}
+.library-cover-stack img:only-child {
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
 }
 
 
