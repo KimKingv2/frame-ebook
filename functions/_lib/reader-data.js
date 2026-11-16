@@ -175,7 +175,7 @@ export async function resolveReaderBook(db, raw) {
   }
 
   const indexed = await db.prepare(
-    "SELECT name,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND path=? AND is_dir=0 ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC LIMIT 1"
+    "SELECT name,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND path=? AND is_dir=0 ORDER BY indexed_at DESC,CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC LIMIT 1"
   ).bind(library, rootPath, path).first();
   if (!indexed) return { error: json({ error: "這本書不在目前的 Alist／OpenList 書庫索引中。請先掃描書庫。" }, 404) };
 
