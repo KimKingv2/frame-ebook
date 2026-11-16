@@ -113,6 +113,10 @@ async function getBook(bookOrId) {
     return remember({
       ...base,
       ...metadata,
+      title: metadata.manualTitle && metadata.title ? metadata.title :
+        (base.title || metadata.title || "未命名書籍"),
+      author: metadata.manualAuthor && metadata.author ? metadata.author :
+        (base.author || metadata.author || ""),
       id: descriptor.id,
       sourceType: "cloud",
       progress: remote.progress || base.progress,
