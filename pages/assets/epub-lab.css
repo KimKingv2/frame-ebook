@@ -2129,3 +2129,186 @@ body.reader-settings-open .reader-quick-actions {
     z-index:2147483001 !important;
   }
 }
+
+
+/* Immersive fullscreen toggle and edge-tap page navigation. */
+.reader-immersive-toggle {
+  display:inline-grid;
+  place-items:center;
+  width:25px;
+  height:28px;
+  margin:0 0 0 2px;
+  padding:0;
+  border:1px solid rgba(190,168,232,.3);
+  border-radius:7px;
+  color:#e7dcfa;
+  background:rgba(48,39,65,.88);
+  font-size:13px;
+  line-height:1;
+  cursor:pointer;
+  touch-action:manipulation;
+  transition:opacity .2s ease, background .2s ease, border-color .2s ease;
+}
+.reader-immersive-toggle[hidden] { display:none !important; }
+.reader-immersive-toggle:hover,
+.reader-immersive-toggle:focus-visible {
+  border-color:rgba(190,168,232,.62);
+  background:rgba(73,57,99,.96);
+}
+.reader-immersive-toggle:focus-visible {
+  outline:2px solid rgba(184,157,239,.82);
+  outline-offset:3px;
+}
+
+/* Keep the heading's action slot alive while the rest of the chrome collapses. */
+.reading-workspace.reader-immersive-mode {
+  gap:0 !important;
+  padding:0 !important;
+}
+.reading-workspace.reader-immersive-mode .book-heading {
+  display:block !important;
+  flex:0 0 0 !important;
+  width:0 !important;
+  height:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+  border:0 !important;
+}
+.reading-workspace.reader-immersive-mode .book-heading > div:first-child,
+.reading-workspace.reader-immersive-mode .book-progress > strong,
+.reading-workspace.reader-immersive-mode .book-progress > span {
+  display:none !important;
+}
+.reading-workspace.reader-immersive-mode .book-progress {
+  display:block !important;
+  position:static !important;
+  width:0 !important;
+  height:0 !important;
+  min-width:0 !important;
+  max-width:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+}
+.reading-workspace.reader-immersive-mode .reader-quick-actions {
+  display:block !important;
+  position:static !important;
+  width:0 !important;
+  height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+.reading-workspace.reader-immersive-mode .reader-quick-actions > button:not(#reader-immersive-toggle) {
+  display:none !important;
+}
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle {
+  display:grid !important;
+  position:fixed !important;
+  top:var(--reader-immersive-top,18px) !important;
+  right:calc(12px + env(safe-area-inset-right, 0px)) !important;
+  z-index:2147483002 !important;
+  width:27px;
+  height:29px;
+  margin:0;
+  border-color:rgba(216,199,243,.16);
+  border-radius:9px;
+  color:rgba(244,237,255,.82);
+  background:rgba(34,28,47,.2);
+  box-shadow:0 3px 16px rgba(0,0,0,.12);
+  opacity:.25;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  transition:opacity .24s ease, background .24s ease, border-color .24s ease;
+}
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle:hover,
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle:focus-visible,
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle:active {
+  border-color:rgba(216,199,243,.5);
+  background:rgba(54,43,75,.72);
+  opacity:.94;
+}
+.reading-workspace.reader-immersive-mode .reader-layout {
+  display:flex !important;
+  flex:1 1 auto !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  gap:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace.reader-immersive-mode .reader-sidebar,
+.reading-workspace.reader-immersive-mode .reader-sidebar-backdrop,
+.reading-workspace.reader-immersive-mode .reader-controls,
+.reading-workspace.reader-immersive-mode .reader-status,
+.reading-workspace.reader-immersive-mode .reading-session-indicator {
+  display:none !important;
+}
+.reading-workspace.reader-immersive-mode .reader-main-column {
+  display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace.reader-immersive-mode .reader-frame {
+  display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace.reader-immersive-mode .reader-viewport {
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  border:0 !important;
+  border-radius:0 !important;
+}
+.reading-workspace.reader-immersive-mode .reader-viewport foliate-view {
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+}
+.reading-workspace.reader-immersive-mode .reader-quick-actions,
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle {
+  pointer-events:auto !important;
+}
+
+@media(max-width:720px) {
+  .reading-workspace.reader-immersive-mode {
+    padding:0 !important;
+  }
+  .reading-workspace.reader-immersive-mode .reader-frame,
+  .reading-workspace.reader-immersive-mode .reader-viewport {
+    border-radius:0 !important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .reader-immersive-toggle,
+  .reading-workspace.reader-immersive-mode #reader-immersive-toggle {
+    transition:none !important;
+  }
+}
