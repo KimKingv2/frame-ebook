@@ -106,7 +106,7 @@
     if (progressSaveTimer) clearTimeout(progressSaveTimer);
     progressSaveTimer = setTimeout(function () {
       flushLibraryProgress();
-    }, 1200);
+    }, 5000);
   }
   function updateLocation(detail) {
     if (!detail || restoring) return;
@@ -488,6 +488,10 @@
   });
 
   loadAppearance({});
+  window.addEventListener('frame-reader-cloud-save-error', function (event) {
+    var message = event && event.detail && event.detail.message;
+    setText('reader-status', '雲端閱讀統計保存失敗：' + String(message || '請檢查網路連線。'));
+  });
   el('font-scale').addEventListener('change', function (event) { setAppearance('fontScale', event.target.value); });
   el('line-height').addEventListener('change', function (event) { setAppearance('lineHeight', event.target.value); });
   el('vertical-margin').addEventListener('change', function (event) { setAppearance('verticalMargin', event.target.value); });
