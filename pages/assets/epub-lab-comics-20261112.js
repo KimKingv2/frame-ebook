@@ -51,7 +51,8 @@
     violet: '#A78BFA',
     mint: '#65C9A5',
     rose: '#E88EAF',
-    sky: '#6FB9E8'
+    sky: '#6FB9E8',
+    underline: '#A78BFA'
   };
 
   function annotationColor(name) {
@@ -160,7 +161,7 @@
       var item = document.createElement('article');
       item.className = 'annotation-item';
       var marker = document.createElement('span');
-      marker.className = 'annotation-marker ' + (annotation.type === 'note' ? 'is-note' : 'is-highlight');
+      marker.className = 'annotation-marker ' + (annotation.type === 'note' ? 'is-note' : (annotation.type === 'highlight' && annotation.color === 'underline' ? 'is-underline' : 'is-highlight'));
       marker.style.setProperty('--annotation-color', annotationColor(annotation.color));
       marker.setAttribute('aria-hidden', 'true');
 
@@ -170,7 +171,7 @@
       content.title = '跳回這段文字';
       var kind = document.createElement('span');
       kind.className = 'annotation-kind';
-      kind.textContent = annotation.type === 'note' ? '筆記' : '高亮';
+      kind.textContent = annotation.type === 'note' ? '筆記' : (annotation.color === 'underline' ? '下劃線' : '高亮');
       var quote = document.createElement('span');
       quote.className = 'annotation-quote';
       quote.textContent = annotation.quote || '未附選取文字';
@@ -283,7 +284,7 @@
     }
   }
 
-  async function addHighlight(color) {
+  async function addHighlight(color, asUnderline) {
     if (annotationBusy || !selectedTextState || !currentBookId) return;
     annotationBusy = true;
     var toolbar = annotationToolbar();
@@ -297,14 +298,14 @@
         cfi: selectedTextState.cfi,
         quote: selectedTextState.quote,
         text: '',
-        color: color,
+        color: asUnderline ? 'underline' : color,
         createdAt: Date.now()
       });
       var navigation = view.resolveNavigation(saved.cfi);
       saved.sectionIndex = navigation && navigation.index;
       upsertAnnotation(saved);
       await drawAnnotation(saved);
-      setText('reader-status', '已新增高亮，並保存至雲端 D1。');
+      setText('reader-status', asUnderline ? '已新增下劃線，並保存至雲端 D1。' : '已新增高亮，並保存至雲端 D1。');
       hideSelectionToolbar(true);
     } catch (error) {
       setText('reader-status', '高亮保存失敗：' + (error.message || String(error)));
@@ -339,6 +340,7 @@
     toolbar.querySelectorAll('[data-highlight-color]').forEach(function (button) {
       button.addEventListener('click', function () { addHighlight(button.getAttribute('data-highlight-color')); });
     });
+    el('selection-add-underline').addEventListener('click', function () { addHighlight('underline', true); });
     el('selection-add-note').addEventListener('click', function () { openNoteComposer(null); });
     el('selection-dismiss').addEventListener('click', function () { hideSelectionToolbar(true); });
     el('annotation-note-cancel').addEventListener('click', closeNoteComposer);
@@ -724,7 +726,11 @@
     view.addEventListener('draw-annotation', function (event) {
       var detail = event.detail || {};
       var annotation = detail.annotation || {};
-      if (annotation.type === 'highlight') {
+      if (annotation.type === 'highlight' && annotation.color === 'underline') {
+        var writingMode = 'horizontal-tb';
+        try { writingMode = detail.doc.defaultView.getComputedStyle(detail.doc.documentElement).writingMode || writingMode; } catch (error) {}
+        detail.draw(Overlayer.underline, { color: annotationColor('underline'), width: 2.2, writingMode: writingMode });
+      } else if (annotation.type === 'highlight') {
         detail.draw(Overlayer.highlight, { color: annotationColor(annotation.color) });
       } else if (annotation.type === 'note') {
         var writingMode = 'horizontal-tb';
@@ -754,7 +760,7 @@
       var annotation = activeAnnotations.find(function (item) { return item.cfi === value; });
       if (!annotation) return;
       if (annotation.type === 'note') openNoteComposer(annotation);
-      else setText('reader-status', '高亮原文：' + (annotation.quote || '已定位到標記文字'));
+      else setText('reader-status', (annotation.color === 'underline' ? '下劃線原文：' : '高亮原文：') + (annotation.quote || '已定位到標記文字'));
     });
 
     var metadata = parsedBook.metadata || {};
