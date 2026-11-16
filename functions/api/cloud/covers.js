@@ -5,6 +5,7 @@ const LIBRARIES = new Set(["books", "comics"]);
 const HASH_RE = /^[a-f0-9]{64}$/i;
 const MIME_TYPES = new Set(["image/webp", "image/jpeg"]);
 const MAX_COVER_BYTES = 2 * 1024 * 1024;
+const CATALOG_PROVIDER = "vps";
 
 function validScope(provider, library, rootPath) {
   return PROVIDERS.has(provider) && LIBRARIES.has(library) && !!rootPath;
@@ -54,12 +55,12 @@ export async function onRequest({ request, env }) {
       const [count, rows] = await Promise.all([
         db.prepare(
           "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 AND cover_status='pending'"
-        ).bind(provider, library, rootPath).first(),
+        ).bind(CATALOG_PROVIDER, library, rootPath).first(),
         db.prepare(
           "SELECT path,name,format,size_bytes,modified_at FROM cloud_catalog " +
           "WHERE provider=? AND library=? AND root_path=? AND is_dir=0 AND cover_status='pending' " +
           "ORDER BY path LIMIT ?"
-        ).bind(provider, library, rootPath, limit).all()
+        ).bind(CATALOG_PROVIDER, library, rootPath, limit).all()
       ]);
       return json({
         ok: true,
@@ -96,7 +97,7 @@ export async function onRequest({ request, env }) {
       try {
         const row = await db.prepare(
           "SELECT 1 AS found FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
-        ).bind(provider, library, rootPath, path).first();
+        ).bind(CATALOG_PROVIDER, library, rootPath, path).first();
         if (!row) return json({ error: "找不到對應的雲端書籍索引項目。" }, 404);
         await bucket.put("covers/" + hash, data, {
           httpMetadata: { contentType, cacheControl: "private, max-age=86400" },
@@ -124,7 +125,7 @@ export async function onRequest({ request, env }) {
         const result = await db.prepare(
           "UPDATE cloud_catalog SET cover_status='pending',cover_error=NULL,cover_updated_at=NULL " +
           "WHERE provider=? AND library=? AND root_path=? AND is_dir=0 AND cover_status='error'"
-        ).bind(provider, library, rootPath).run();
+        ).bind(CATALOG_PROVIDER, library, rootPath).run();
         return json({ ok: true, retried: Number(result?.meta?.changes || 0) });
       }
 
