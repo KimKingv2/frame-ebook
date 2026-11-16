@@ -39,45 +39,64 @@ export async function onRequestGet({ request, env }) {
         ? rootsConfig[provider]
         : Object.values(rootsConfig).find(value => value && (value.books || value.comics)) || {});
     const envRoots = getOpenListRootPaths(env);
-    const roots = {
-      books: normalizePath(savedRoots.books || envRoots.books || DEFAULT_ROOTS.books),
-      comics: normalizePath(savedRoots.comics || envRoots.comics || DEFAULT_ROOTS.comics)
-    };
-    const rawRows = [];
-    for (const library of ["books", "comics"]) {
-      const rootPath = roots[library];
-      if (!rootPath) continue;
-      let rows;
-      try {
-        rows = await db.prepare(
-          "WITH ranked AS (" +
-          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
-          "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status,indexed_at," +
-          "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
-          "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
-          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
-          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
-          "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status " +
-          "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
-        ).bind(library, rootPath).all();
-      } catch (error) {
-        if (!String(error?.message || error).toLowerCase().includes("no such column: book_title")) throw error;
-        rows = await db.prepare(
-          "WITH ranked AS (" +
-          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at," +
-          "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
-          "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
-          "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
-          "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status " +
-          "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
-        ).bind(library, rootPath).all();
+    const rootCandidates = { books: [], comics: [] };
+    const roots = {};
+    for (const library of ["books","comics"]) {
+      const values = [
+        rootsConfig.shared?.[library],
+        rootsConfig[provider]?.[library],
+        ...Object.values(rootsConfig).map(value => value?.[library]),
+        envRoots[library],
+        DEFAULT_ROOTS[library]
+      ];
+      for (const value of values) {
+        const normalized = normalizePath(value || "");
+        if (normalized && !rootCandidates[library].includes(normalized)) rootCandidates[library].push(normalized);
       }
-      for (const row of rows.results || []) rawRows.push({
-        book_title:"",book_creator:"",book_language:"",book_description:"",
-        book_publisher:"",book_date:"",book_identifier:"",book_subjects_json:"[]",
-        book_metadata_status:"pending",...row,provider,library,rootPath
-      });
+      roots[library] = rootCandidates[library][0] || DEFAULT_ROOTS[library];
     }
+
+    const rawRows = [];
+    const rowMap = new Map();
+    for (const library of ["books","comics"]) {
+      for (const rootPath of rootCandidates[library]) {
+        let rows;
+        try {
+          rows = await db.prepare(
+            "WITH ranked AS (" +
+            "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
+            "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status,indexed_at," +
+            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+            "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
+            "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
+            "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
+            "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status,indexed_at " +
+            "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
+          ).bind(library,rootPath).all();
+        } catch (error) {
+          if (!String(error?.message || error).toLowerCase().includes("no such column: book_title")) throw error;
+          rows = await db.prepare(
+            "WITH ranked AS (" +
+            "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at," +
+            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+            "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND is_dir=0 " +
+            "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
+            "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at " +
+            "FROM ranked WHERE rn=1 ORDER BY path LIMIT 10000"
+          ).bind(library,rootPath).all();
+        }
+        for (const row of rows.results || []) {
+          const key = library + "\n" + String(row.path || "");
+          const normalizedRow = {
+            book_title:"",book_creator:"",book_language:"",book_description:"",
+            book_publisher:"",book_date:"",book_identifier:"",book_subjects_json:"[]",
+            book_metadata_status:"pending",...row,provider,library,rootPath
+          };
+          if (!rowMap.has(key)) rowMap.set(key,normalizedRow);
+        }
+      }
+    }
+    rawRows.push(...rowMap.values());
 
     const stateResult = await db.prepare(
       "SELECT book_id AS bookId,state_json AS stateJson FROM reader_book_state WHERE user_id=?"
