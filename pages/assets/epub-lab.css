@@ -2132,34 +2132,6 @@ body.reader-settings-open .reader-quick-actions {
 
 
 /* Immersive fullscreen toggle and edge-tap page navigation. */
-.reader-immersive-toggle {
-  display:inline-grid;
-  place-items:center;
-  width:25px;
-  height:28px;
-  margin:0 0 0 2px;
-  padding:0;
-  border:1px solid rgba(190,168,232,.3);
-  border-radius:7px;
-  color:#e7dcfa;
-  background:rgba(48,39,65,.88);
-  font-size:13px;
-  line-height:1;
-  cursor:pointer;
-  touch-action:manipulation;
-  transition:opacity .2s ease, background .2s ease, border-color .2s ease;
-}
-.reader-immersive-toggle[hidden] { display:none !important; }
-.reader-immersive-toggle:hover,
-.reader-immersive-toggle:focus-visible {
-  border-color:rgba(190,168,232,.62);
-  background:rgba(73,57,99,.96);
-}
-.reader-immersive-toggle:focus-visible {
-  outline:2px solid rgba(184,157,239,.82);
-  outline-offset:3px;
-}
-
 /* Keep the heading's action slot alive while the rest of the chrome collapses. */
 .reading-workspace.reader-immersive-mode {
   gap:0 !important;
@@ -2208,7 +2180,6 @@ body.reader-settings-open .reader-quick-actions {
 .reading-workspace.reader-immersive-mode .reader-quick-actions > button {
   display:none !important;
 }
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle { pointer-events:auto !important; }
 .reading-workspace.reader-immersive-mode .reader-layout {
   display:flex !important;
   flex:1 1 auto !important;
@@ -2267,10 +2238,7 @@ body.reader-settings-open .reader-quick-actions {
   height:100% !important;
   min-height:0 !important;
 }
-.reading-workspace.reader-immersive-mode .reader-quick-actions,
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle {
-  pointer-events:auto !important;
-}
+
 
 @media(max-width:720px) {
   .reading-workspace.reader-immersive-mode {
@@ -2281,12 +2249,7 @@ body.reader-settings-open .reader-quick-actions {
     border-radius:0 !important;
   }
 }
-@media(prefers-reduced-motion:reduce) {
-  .reader-immersive-toggle,
-  .reading-workspace.reader-immersive-mode #reader-immersive-toggle {
-    transition:none !important;
-  }
-}
+
 
 
 /* Unified dimensions for the three primary reader actions. */
