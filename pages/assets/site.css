@@ -277,6 +277,18 @@ a { color: inherit; }
 .dialog-link-candidate-copy strong { overflow-wrap:anywhere; color:#e4dced; font-size:9px; font-weight:550; }
 .dialog-link-candidate-copy small { overflow-wrap:anywhere; color:#877d94; font-size:8px; line-height:1.5; }
 .dialog-link-action { flex:0 0 auto; min-height:30px; padding:0 11px; font-size:8px; }
+.dialog-extra-metadata { white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 15px; padding:11px 13px; border:1px solid rgba(205,188,239,.1); border-radius:7px; color:#aaa0b7; background:rgba(12,10,18,.2); font-size:9px; line-height:1.8; }
+.dialog-bangumi-search { display:flex; align-items:center; gap:8px; margin-top:12px; }
+.dialog-bangumi-search input { flex:1; min-width:0; min-height:35px; padding:0 10px; border:1px solid rgba(205,188,239,.16); border-radius:6px; outline:none; color:#efe9f7; background:#252031; font:inherit; font-size:9px; }
+.dialog-bangumi-search input:focus { border-color:#9e83d5; box-shadow:0 0 0 2px rgba(155,124,216,.12); }
+.dialog-bangumi-search button { flex:0 0 auto; min-height:35px; padding:0 12px; font-size:9px; }
+.dialog-bangumi-current { white-space:pre-wrap; margin:10px 0 0; padding:10px; border:1px solid rgba(205,188,239,.1); border-radius:6px; color:#c6b8d8; background:rgba(12,10,18,.2); font-size:9px; line-height:1.7; }
+#detail-bangumi-results .dialog-link-candidate { align-items:flex-start; }
+@media (max-width:480px) {
+  .dialog-bangumi-search { align-items:stretch; flex-direction:column; }
+  .dialog-bangumi-search button { width:100%; }
+}
+
 .library-book-grid.is-list { display: flex; flex-direction: column; gap: 11px; }
 .library-book-grid.is-list .library-card { display: grid; grid-template-columns: 82px minmax(0,1fr) minmax(100px,160px) minmax(155px,190px); align-items: center; gap: 14px; padding: 10px; border: 1px solid rgba(205,188,239,.1); border-radius: 8px; background: rgba(30,26,40,.42); }
 .library-book-grid.is-list .library-card-open { grid-column: 1; grid-row: 1 / span 3; }
