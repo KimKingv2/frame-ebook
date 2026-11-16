@@ -487,3 +487,47 @@ button:disabled { opacity: .38; cursor: default; }
 @media(prefers-reduced-motion:reduce) {
   .annotation-note-dialog[open] { animation:none; }
 }
+
+
+.annotation-selection-toolbar .annotation-underline-action {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:29px;
+  padding:0 9px;
+  border-color:rgba(167,139,250,.46);
+  color:#e7dcfb;
+  background:rgba(102,77,151,.35);
+  font-size:9px;
+  white-space:nowrap;
+}
+.annotation-selection-toolbar .annotation-underline-action span {
+  color:#c7adff;
+  font-family:Georgia,serif;
+  font-size:15px;
+  font-weight:700;
+  text-decoration:underline;
+  text-decoration-thickness:2px;
+  text-underline-offset:2px;
+}
+.annotation-marker.is-underline {
+  width:6px;
+  min-height:34px;
+  background:transparent;
+  border-bottom:3px solid var(--annotation-color,#A78BFA);
+  box-shadow:none;
+}
+@media(max-width:720px) {
+  .annotation-selection-toolbar .annotation-underline-action {
+    min-height:27px;
+    padding:0 7px;
+    font-size:8px;
+  }
+}
+@media(max-width:380px) {
+  .annotation-selection-toolbar .annotation-underline-action {
+    padding:0 5px;
+    font-size:8px;
+  }
+}
