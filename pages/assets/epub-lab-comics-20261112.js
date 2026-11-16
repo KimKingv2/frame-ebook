@@ -45,6 +45,42 @@
   };
   var el = function (id) { return document.getElementById(id); };
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
+  var pageTapBoundDocuments = new WeakSet();
+
+  function turnReaderPage(direction) {
+    if (!view) return;
+    try {
+      var result = direction < 0 ? view.prev() : view.next();
+      if (result && typeof result.catch === 'function') {
+        result.catch(function (error) { console.error('FRAME Reader page tap failed:', error); });
+      }
+    } catch (error) {
+      console.error('FRAME Reader page tap failed:', error);
+    }
+  }
+
+  function bindPageTapNavigation(doc) {
+    if (!doc || !doc.addEventListener || pageTapBoundDocuments.has(doc)) return;
+    pageTapBoundDocuments.add(doc);
+    doc.addEventListener('click', function (event) {
+      if (!view || event.defaultPrevented || event.button !== 0 || event.detail === 0) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      var target = event.target;
+      if (target && typeof target.closest === 'function' &&
+          target.closest('a,area[href],button,input,select,textarea,video,audio,[contenteditable]:not([contenteditable="false"]),[role="button"],[data-no-page-turn]')) return;
+      try {
+        var selection = doc.getSelection && doc.getSelection();
+        if (selection && !selection.isCollapsed && String(selection).trim()) return;
+      } catch (error) {}
+      var width = doc.documentElement && doc.documentElement.clientWidth ||
+        (doc.defaultView && doc.defaultView.innerWidth) ||
+        (doc.body && doc.body.clientWidth) || 0;
+      if (!width || !Number.isFinite(event.clientX)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      turnReaderPage(event.clientX < width / 2 ? -1 : 1);
+    }, true);
+  }
 
   function bindReaderRoomControls() {
     var workspace = el('reading-workspace');
@@ -988,7 +1024,9 @@
     view.style.width = '100%';
     view.style.height = '100%';
     view.addEventListener('load', function (event) {
-      if (!view.isFixedLayout) applyDocumentAppearance(event.detail && event.detail.doc);
+      var detail = event.detail || {};
+      bindPageTapNavigation(detail.doc);
+      if (!view.isFixedLayout) applyDocumentAppearance(detail.doc);
     });
     view.addEventListener('relocate', function (event) {
       updateLocation(event.detail || {});
@@ -1186,18 +1224,62 @@
   el('next-page').addEventListener('click', function () {
     if (view) view.next().catch(function (error) { console.error(error); });
   });
+  var readerViewport = el('reader-viewport');
+  if (readerViewport) {
+    readerViewport.addEventListener('click', function (event) {
+      if (!view || event.defaultPrevented || event.detail === 0) return;
+      if (event.target !== readerViewport && event.target !== view) return;
+      var rect = readerViewport.getBoundingClientRect();
+      if (!rect.width) return;
+      turnReaderPage(event.clientX < rect.left + rect.width / 2 ? -1 : 1);
+    });
+  }
   el('toc-select').addEventListener('change', function (event) {
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
   function updateReaderFullscreenButton() {
     var workspace = el('reading-workspace');
     var button = el('reader-fullscreen');
+    var immersiveToggle = el('reader-immersive-toggle');
     if (!workspace || !button) return;
     var active = document.fullscreenElement === workspace ||
       document.webkitFullscreenElement === workspace;
+    if (!active) {
+      workspace.classList.remove('reader-immersive-mode');
+      if (immersiveToggle) immersiveToggle.style.removeProperty('--reader-immersive-top');
+    }
+    var immersive = active && workspace.classList.contains('reader-immersive-mode');
     button.textContent = active ? '↙ 退出全螢幕' : '⛶ 全螢幕';
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
     button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
+    if (immersiveToggle) {
+      immersiveToggle.hidden = !active;
+      immersiveToggle.textContent = immersive ? '▾' : '▸';
+      immersiveToggle.setAttribute('aria-pressed', immersive ? 'true' : 'false');
+      immersiveToggle.title = immersive ? '返回一般全螢幕' : '進入沉浸全螢幕';
+    }
+  }
+  function toggleImmersiveFullscreen() {
+    var workspace = el('reading-workspace');
+    var immersiveToggle = el('reader-immersive-toggle');
+    var fullscreenButton = el('reader-fullscreen');
+    if (!workspace || !immersiveToggle) return;
+    var active = document.fullscreenElement === workspace ||
+      document.webkitFullscreenElement === workspace;
+    if (!active) return;
+    if (workspace.classList.contains('reader-immersive-mode')) {
+      workspace.classList.remove('reader-immersive-mode');
+      immersiveToggle.style.removeProperty('--reader-immersive-top');
+    } else {
+      var rect = fullscreenButton && fullscreenButton.getBoundingClientRect();
+      var top = rect && Number.isFinite(rect.top) ? Math.max(6, Math.round(rect.top)) : 18;
+      immersiveToggle.style.setProperty('--reader-immersive-top', top + 'px');
+      workspace.classList.add('reader-immersive-mode');
+    }
+    updateReaderFullscreenButton();
+    if (view && view.renderer && typeof view.renderer.render === 'function') {
+      window.requestAnimationFrame(function () { view.renderer.render(); });
+    }
   }
   async function toggleReaderFullscreen() {
     var workspace = el('reading-workspace');
@@ -1223,6 +1305,8 @@
     updateReaderFullscreenButton();
   }
   el('reader-fullscreen').addEventListener('click', toggleReaderFullscreen);
+  var immersiveToggleButton = el('reader-immersive-toggle');
+  if (immersiveToggleButton) immersiveToggleButton.addEventListener('click', toggleImmersiveFullscreen);
   document.addEventListener('fullscreenchange', function () {
     updateReaderFullscreenButton();
     if (view && view.renderer && typeof view.renderer.render === 'function') {
