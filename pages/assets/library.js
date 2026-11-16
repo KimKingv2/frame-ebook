@@ -107,11 +107,12 @@ function makeCover(book, compact) {
     }
   }
 
-  const format = document.createElement("span");
-  format.className = "library-format-badge";
-  const volumeCount = isFolderCard ? Math.max(1, Number(book.volumeCount) || book._groupMembers.length) : 1;
-  format.textContent = isFolderCard && volumeCount > 1 ? volumeCount + " VOLUMES" : book.format;
-  frame.appendChild(format);
+  if (!isFolderCard) {
+    const format = document.createElement("span");
+    format.className = "library-format-badge";
+    format.textContent = book.format || "";
+    frame.appendChild(format);
+  }
   return frame;
 }
 function createCard(book, compact) {
