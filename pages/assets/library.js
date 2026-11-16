@@ -308,6 +308,7 @@ async function linkOldBookData(oldBookId, oldTitle, button) {
       "閱讀事件 " + (Number(moved.readingEvents) || 0) + " 筆",
       "標註 " + (Number(moved.annotations) || 0) + " 筆"
     ].join(" · ");
+    $("book-dialog").close();
     await refresh();
     await showBookDetails(book.id);
     const resultStatus = $("detail-link-status");
