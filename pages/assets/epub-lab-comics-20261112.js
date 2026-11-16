@@ -1338,7 +1338,7 @@
       immersiveExitTimer = window.setTimeout(function () {
         workspace.classList.remove('reader-immersive-exiting');
         immersiveExitTimer = 0;
-      }, 300);
+      }, 420);
     } else {
       workspace.classList.remove('reader-immersive-exiting');
       workspace.classList.add('reader-immersive-mode');
