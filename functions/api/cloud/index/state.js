@@ -2,16 +2,26 @@ import { json, requireAuth, getDatabase, isSameOrigin, normalizePath } from "../
 
 const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
+const CATALOG_PROVIDER = "vps";
 
 function validScope(provider, library, rootPath) {
   return PROVIDERS.has(provider) && LIBRARIES.has(library) && !!rootPath;
 }
 
-async function stateKey(provider, library, rootPath) {
-  const input = provider + "\n" + library + "\n" + rootPath;
+async function stateKey(library, rootPath) {
+  const input = CATALOG_PROVIDER + "\n" + library + "\n" + rootPath;
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return "reader_scan_" + hex;
+}
+
+async function writeSharedState(db, key, library, rootPath, state, now) {
+  const storedState = { ...state, provider: CATALOG_PROVIDER };
+  await db.prepare(
+    "INSERT INTO cloud_scan_state (scan_key,provider,library,root_path,state_json,updated_at) VALUES (?,?,?,?,?,?) " +
+    "ON CONFLICT(scan_key) DO UPDATE SET state_json=excluded.state_json,updated_at=excluded.updated_at"
+  ).bind(key, CATALOG_PROVIDER, library, rootPath, JSON.stringify(storedState), now).run();
+  return storedState;
 }
 
 export async function onRequest({ request, env }) {
@@ -27,15 +37,25 @@ export async function onRequest({ request, env }) {
     const rootPath = normalizePath(url.searchParams.get("root_path") || "");
     if (!validScope(provider, library, rootPath)) return json({ error: "索引來源、分類或根目錄無效。" }, 400);
     try {
-      const key = await stateKey(provider, library, rootPath);
-      const row = await db.prepare(
-        "SELECT state_json,updated_at FROM cloud_scan_state WHERE scan_key=?"
-      ).bind(key).first();
-      return json({
-        ok: true,
-        state: row ? JSON.parse(row.state_json) : null,
-        updatedAt: row?.updated_at || null
-      });
+      const key = await stateKey(library, rootPath);
+      const [sharedRow, latestRow] = await Promise.all([
+        db.prepare("SELECT state_json,updated_at FROM cloud_scan_state WHERE scan_key=?").bind(key).first(),
+        db.prepare(
+          "SELECT state_json,updated_at FROM cloud_scan_state WHERE library=? AND root_path=? " +
+          "ORDER BY updated_at DESC LIMIT 1"
+        ).bind(library, rootPath).first()
+      ]);
+      let row = sharedRow;
+      if (!row || (latestRow?.updated_at && String(latestRow.updated_at) > String(row.updated_at || ""))) {
+        row = latestRow;
+        if (row) {
+          const legacyState = JSON.parse(row.state_json);
+          await writeSharedState(db, key, library, rootPath, legacyState, row.updated_at || new Date().toISOString());
+        }
+      }
+      let state = row ? JSON.parse(row.state_json) : null;
+      if (state) state = { ...state, provider };
+      return json({ ok: true, state, updatedAt: row?.updated_at || null });
     } catch {
       return json({ error: "讀取 D1 掃描進度失敗。請確認已執行 migrations/0002_cloud_catalog.sql。" }, 503);
     }
@@ -54,15 +74,15 @@ export async function onRequest({ request, env }) {
         !Array.isArray(state.pendingFolders) || !Array.isArray(state.seenFolders)) {
       return json({ error: "索引進度內容無效。" }, 400);
     }
-    const value = JSON.stringify(state);
+    const value = JSON.stringify({ ...state, provider: CATALOG_PROVIDER });
     if (value.length > 800000) return json({ error: "索引進度超過 800 KB 上限。" }, 413);
     try {
-      const key = await stateKey(provider, library, rootPath);
+      const key = await stateKey(library, rootPath);
       const now = new Date().toISOString();
       await db.prepare(
         "INSERT INTO cloud_scan_state (scan_key,provider,library,root_path,state_json,updated_at) VALUES (?,?,?,?,?,?) " +
         "ON CONFLICT(scan_key) DO UPDATE SET state_json=excluded.state_json,updated_at=excluded.updated_at"
-      ).bind(key, provider, library, rootPath, value, now).run();
+      ).bind(key, CATALOG_PROVIDER, library, rootPath, value, now).run();
       return json({ ok: true, updatedAt: now });
     } catch {
       return json({ error: "保存 D1 掃描進度失敗。請保留目前畫面並重試。" }, 503);
