@@ -19,9 +19,10 @@ export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); } catch (_) { return json({ error: "EPUB metadata 格式無效。" }, 400); }
   const provider = String(body?.provider || "");
+  const library = String(body?.library || "books");
   const rootPath = normalizePath(body?.rootPath || "");
   const entries = body?.entries;
-  if (!PROVIDERS.has(provider) || !rootPath || !Array.isArray(entries) ||
+  if (!PROVIDERS.has(provider) || !["books", "comics"].includes(library) || !rootPath || !Array.isArray(entries) ||
       entries.length < 1 || entries.length > MAX_ITEMS) {
     return json({ error: "EPUB metadata 批次參數無效。" }, 400);
   }
@@ -35,8 +36,8 @@ export async function onRequestPost({ request, env }) {
       return json({ error: "EPUB metadata 項目包含無效路徑或資料。" }, 400);
     }
     const row = await db.prepare(
-      "SELECT name,format,is_dir FROM cloud_catalog WHERE provider=? AND library='books' AND root_path=? AND path=?"
-    ).bind(provider, rootPath, path).first();
+      "SELECT name,format,is_dir FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=?"
+    ).bind(provider, library, rootPath, path).first();
     if (!row || Number(row.is_dir) !== 0 || String(row.format || "").toUpperCase() !== "EPUB") {
       return json({ error: "EPUB metadata 目標不在目前電子書索引中：" + path.slice(-120) }, 404);
     }
@@ -58,10 +59,10 @@ export async function onRequestPost({ request, env }) {
       "UPDATE cloud_catalog SET book_title=?,book_creator=?,book_language=?,book_description=?," +
       "book_publisher=?,book_date=?,book_identifier=?,book_subjects_json=?," +
       "book_metadata_status='ready',book_metadata_updated_at=? " +
-      "WHERE provider=? AND library='books' AND root_path=? AND path=?"
+      "WHERE provider=? AND library=? AND root_path=? AND path=?"
     ).bind(
       title, creator, language, description, publisher, date, identifier,
-      JSON.stringify(subjects), Date.now(), provider, rootPath, path
+      JSON.stringify(subjects), Date.now(), provider, library, rootPath, path
     ));
   }
 
