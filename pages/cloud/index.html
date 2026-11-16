@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
-  <title>雲端書庫 · FRAME Reader</title>
+  <title>檔案瀏覽 · FRAME Reader</title>
   <link rel="stylesheet" href="/assets/site.css?v=20261116-cloud-manager-r1">
   <link rel="stylesheet" href="/assets/cloud-library.css?v=20261116-cloud-manager-r1">
 </head>
@@ -19,7 +19,7 @@
       <nav class="main-nav" aria-label="主要導覽">
         <a href="/">我的書架</a>
         <a href="/reading-stats/">閱讀時光</a>
-        <a class="active" href="/cloud/">雲端書庫</a>
+        <a class="active" href="/cloud/">檔案瀏覽</a>
       </nav>
       <span class="edition"><span class="edition-dot"></span> OPENLIST · PRIVATE</span>
     </header>
@@ -27,7 +27,7 @@
     <section class="cloud-hero">
       <p class="eyebrow"><span class="eyebrow-line"></span> YOUR BOOKS, WHERE YOU KEEP THEM</p>
       <h1>把私人書庫，<br><em>接回自己的閱讀室。</em></h1>
-      <p>以四路來源連接私人 OpenList：VPS Alist、OpenList Worker、Mobile Device Alist，或目前裝置直連區域網路 OpenList。伺服器端使用帳號密碼自動登入，短效 Token 不會交給瀏覽器。</p>
+      <p>只使用伺服器端的 Alist／OpenList 來源：VPS Alist、OpenList Worker 或 Mobile Device Alist。帳號密碼由 Pages Functions 保管並自動登入，短效 Token 不會交給瀏覽器。</p>
     </section>
 
     <section id="cloud-login-panel" class="cloud-auth-panel">
@@ -47,9 +47,9 @@
           <button id="cloud-settings-close" class="cloud-settings-close" type="button" aria-label="關閉設定與索引">×</button>
         </div>
         <div class="cloud-settings-dialog-body">
-      <section class="cloud-connection-panel" aria-label="四路 OpenList 連線設定">
+      <section class="cloud-connection-panel" aria-label="三路 OpenList 連線設定">
         <div class="cloud-connection-heading">
-          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>四個來源沿用相同目錄結構；電子書與漫畫分別設定根目錄，但各自保留獨立 D1 索引與掃描進度。登入後會自動載入上次使用來源的索引。</p></div>
+          <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>三個伺服器端來源沿用相同目錄結構；電子書與漫畫分別設定根目錄，但各自保留獨立 D1 索引與掃描進度。登入後會自動載入上次使用來源的索引。</p></div>
           <span id="cloud-connection-status" class="cloud-status-pill">尚未測試</span>
         </div>
         <div class="cloud-provider-select">
@@ -58,26 +58,20 @@
             <option value="vps">VPS Alist（伺服器端）</option>
             <option value="worker">OpenList Worker（伺服器端）</option>
             <option value="mobile">Mobile Device Alist（伺服器端）</option>
-            <option value="local">區域網路 OpenList（裝置直連）</option>
           </select>
         </div>
         <div class="cloud-provider-grid">
           <article class="cloud-provider-card"><div><strong>VPS Alist</strong><span>SERVER PROXY</span></div><p id="cloud-vps-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_VPS_API_BASE_URL</code><br>Pages Variable：<code>ALIST_VPS_USERNAME</code><br>Pages Secret：<code>ALIST_VPS_PASSWORD</code></small></article>
           <article class="cloud-provider-card"><div><strong>OpenList Worker</strong><span>SERVER PROXY</span></div><p id="cloud-worker-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_WORKER_API_BASE_URL</code><br>Pages Variable：<code>ALIST_WORKER_USERNAME</code><br>Pages Secret：<code>ALIST_WORKER_PASSWORD</code></small></article>
           <article class="cloud-provider-card"><div><strong>Mobile Device Alist</strong><span>SERVER PROXY</span></div><p id="cloud-mobile-status">讀取設定中…</p><small>Pages Variable：<code>ALIST_MOBILE_DEVICE_API_BASE_URL</code><br>Pages Variable：<code>ALIST_MOBILE_DEVICE_USERNAME</code><br>Pages Secret：<code>ALIST_MOBILE_DEVICE_PASSWORD</code></small></article>
-          <article class="cloud-provider-card cloud-provider-local"><div><strong>區域網路 OpenList</strong><span>DEVICE DIRECT</span></div>
-            <label for="cloud-local-url">本機 OpenList API 網址</label><input id="cloud-local-url" type="url" placeholder="http://192.168.31.185:5244" autocomplete="off" spellcheck="false">
-            <label for="cloud-local-username">本機 OpenList 帳號</label><input id="cloud-local-username" type="text" placeholder="OpenList 登入帳號" autocomplete="username" spellcheck="false">
-            <label for="cloud-local-password">本機 OpenList 密碼</label><input id="cloud-local-password" type="password" placeholder="目前分頁工作階段使用" autocomplete="current-password" spellcheck="false">
-            <small>網址與帳號保存在這台裝置；密碼只保存在目前分頁的工作階段，關閉分頁後需重新輸入。帳號密碼直接傳給指定的 LAN OpenList。HTTP 不加密，僅適合可信任的 LAN／已加密 VPN。</small>
-          </article>
+
         </div>
         <div class="cloud-root-settings">
           <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
-          <p>電子書與漫畫分別設定根目錄；VPS Alist、OpenList Worker、Mobile Device Alist 與區域網路 OpenList 都使用相同的資料夾路徑。設定保存在目前瀏覽器，重新進入、重新整理或切換來源後仍會記住。</p>
+          <p>電子書與漫畫分別設定根目錄；不同伺服器端來源可分別設定根目錄；設定保存在雲端 D1，登入後會在不同裝置自動還原。</p>
           <div class="cloud-roots-grid">
-            <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" value="/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">預設：/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔</small></div>
-            <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" value="/中國移動雲盤/Kim King/11 Comic" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">預設：/中國移動雲盤/Kim King/11 Comic</small></div>
+            <div class="cloud-root-field"><label for="cloud-books-root">電子書根目錄（EPUB）</label><input id="cloud-books-root" type="text" value="/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔" placeholder="/你的電子書資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button><small id="cloud-books-root-status">雲端 D1 保存</small></div>
+            <div class="cloud-root-field"><label for="cloud-comics-root">漫畫根目錄（EPUB／CBZ）</label><input id="cloud-comics-root" type="text" value="/中國移動雲盤/Kim King/11 Comic" placeholder="/你的漫畫資料夾" spellcheck="false" autocomplete="off"><button id="cloud-use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button><small id="cloud-comics-root-status">雲端 D1 保存</small></div>
           </div>
           <div class="cloud-root-save-row"><button id="cloud-save-roots" class="quiet-button" type="button">保存電子書／漫畫根目錄</button><span>兩條路徑分別保存；切換書庫類型時會自動切換對應路徑。</span></div>
         </div>
@@ -132,7 +126,7 @@
         </div>
       </dialog>
       <div class="cloud-browser-heading">
-        <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端書庫</h2></div>
+        <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端檔案</h2></div>
         <div class="cloud-browser-actions">
           <button id="cloud-settings-open" class="quiet-button" type="button">連接與索引設定</button>
           <button id="cloud-refresh" class="quiet-button" type="button">重新整理</button>
@@ -166,7 +160,7 @@
 
     <section class="cloud-security-note">
       <span>✦</span>
-      <div><strong>帳密留在各自的連線端，書籍仍在你的雲端。</strong><p>VPS Alist、OpenList Worker 與 Mobile Device 的帳號密碼只由 Pages Functions 讀取；每次 API 請求時自動登入取得短效 Token，Token 僅在伺服器本次請求中使用，不寫入 D1 或傳給瀏覽器。區域網路來源由目前裝置直接登入，帳號名稱保存在這台裝置，密碼只保存在目前分頁工作階段。加入本機書架時，書檔會讀入目前瀏覽器的 IndexedDB。</p></div>
+      <div><strong>帳密留在各自的連線端，書籍仍在你的雲端。</strong><p>VPS Alist、OpenList Worker 與 Mobile Device Alist 的帳號密碼只由 Pages Functions 讀取；每次 API 請求時自動登入取得短效 Token。書架索引、來源與目錄偏好均保存在 D1，封面保存在 R2，原始 EPUB／CBZ 留在 Alist／OpenList。閱讀時只透過伺服器端 Range 讀取，不會建立本機書庫。</p></div>
     </section>
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
