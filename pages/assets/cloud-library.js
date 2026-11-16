@@ -1053,10 +1053,17 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
           }
         }
         if(metadataItems.length) {
-          const metadataSaved=await saveEpubMetadata(scope,metadataItems);
-          batch.metadataProcessed+=metadataSaved;
-          scanState.metadataProcessedCount=Number(scanState.metadataProcessedCount||0)+metadataSaved;
-          appendIndexLog("EPUB metadata 已保存至 D1："+metadataSaved+" 本；解析失敗 "+batch.metadataFailed+" 本。","success");
+          try {
+            const metadataSaved=await saveEpubMetadata(scope,metadataItems);
+            batch.metadataProcessed+=metadataSaved;
+            scanState.metadataProcessedCount=Number(scanState.metadataProcessedCount||0)+metadataSaved;
+            appendIndexLog("EPUB metadata 已保存至 D1："+metadataSaved+" 本；解析失敗 "+batch.metadataFailed+" 本。","success");
+          } catch(error) {
+            const unavailable=metadataItems.length;
+            batch.metadataFailed+=unavailable;
+            scanState.metadataFailedCount=Number(scanState.metadataFailedCount||0)+unavailable;
+            appendIndexLog("EPUB metadata 已解析，但 D1 保存失敗："+(error.message||error)+"。請先執行 0007 migration；之後重新完整掃描即可補齊。","error");
+          }
         }
         await saveIndexScanState(scanState,scope);
       }
