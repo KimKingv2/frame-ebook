@@ -93,28 +93,17 @@
         if (toggle) toggle.setAttribute('aria-expanded', 'true');
       }
     }
-    function positionSettingsPanel() {
-      if (!appearancePanel || !appearancePanel.open || !appearanceToggle) return;
-      var anchor = appearanceToggle.closest('.reader-quick-actions') || appearanceToggle;
-      var rect = anchor.getBoundingClientRect();
-      if (!rect || !rect.width || !rect.height) return;
-      var gap = 8;
-      var top = Math.round(rect.bottom + gap);
-      var right = Math.max(8, Math.round(window.innerWidth - rect.right));
-      var available = Math.max(180, Math.floor(window.innerHeight - top - 12));
-      appearancePanel.style.position = 'fixed';
-      appearancePanel.style.top = top + 'px';
-      appearancePanel.style.right = right + 'px';
-      appearancePanel.style.bottom = 'auto';
-      appearancePanel.style.left = 'auto';
-      appearancePanel.style.maxHeight = available + 'px';
-    }
     function syncSettings() {
       var open = !!(appearancePanel && appearancePanel.open);
       if (settingsBackdrop) settingsBackdrop.hidden = !open;
       if (appearanceToggle) appearanceToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       document.body.classList.toggle('reader-settings-open', open);
-      if (open) positionSettingsPanel();
+      // The stylesheet owns drawer placement; clear legacy inline coordinates.
+      if (appearancePanel) {
+        ['position', 'top', 'right', 'bottom', 'left', 'max-height'].forEach(function (property) {
+          appearancePanel.style.removeProperty(property);
+        });
+      }
     }
     function toggleSidebar(event) {
       if (event) {
@@ -182,11 +171,7 @@
       if (appearancePanel) appearancePanel.open = false;
       syncSettings();
     });
-    window.addEventListener('scroll', function () {
-      if (appearancePanel && appearancePanel.open) positionSettingsPanel();
-    }, true);
     window.addEventListener('resize', function () {
-      if (appearancePanel && appearancePanel.open) positionSettingsPanel();
       if (!isMobile()) {
         if (sidebar) sidebar.classList.remove('is-open');
         if (sidebarBackdrop) sidebarBackdrop.hidden = true;
