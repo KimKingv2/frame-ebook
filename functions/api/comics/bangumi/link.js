@@ -1,4 +1,4 @@
-import { json, requireAuth, isSameOrigin, getDatabase } from "../../../_lib/common.js";
+import { json, requireAuth, isSameOrigin, getDatabase, getAccessIdentity } from "../../../_lib/common.js";
 import { resolveReaderBook, readerBookIdForFilename } from "../../../_lib/reader-data.js";
 
 const API = "https://api.bgm.tv/v0";
@@ -31,7 +31,6 @@ export async function onRequestPost({ request, env }) {
   }
   let identity;
   try {
-    const { getAccessIdentity } = await import("../../../_lib/common.js");
     identity = await getAccessIdentity(request, env);
   } catch (error) {
     return json({ error: error?.message || "Cloudflare Access 身分驗證失敗。" }, error?.status || 503);
@@ -56,6 +55,10 @@ export async function onRequestPost({ request, env }) {
     const subject = await response.json();
     if (Number(subject?.id) !== subjectId || Number(subject?.type) !== 1) {
       return json({ error: "選取的 Bangumi 條目不是有效的書籍類作品。" }, 400);
+    }
+    const bookCategory = Number(subject?.platform) || 0;
+    if (bookCategory && bookCategory !== 1001) {
+      return json({ error: "這個 Bangumi 條目屬於小說或其他書籍分類，不是漫畫。請選擇漫畫類條目。" }, 400);
     }
 
     const folderPath = target.path.slice(0, target.path.lastIndexOf("/")) || "/";
@@ -83,7 +86,7 @@ export async function onRequestPost({ request, env }) {
       nameCn: clean(subject.name_cn, 240),
       summary: clean(subject.summary, 8000),
       date: clean(subject.date, 80),
-      platform: clean(subject.platform, 120),
+      platform: bookCategory === 1001 ? "漫畫" : clean(subject.platform, 120),
       image: clean(subject.images?.large || subject.images?.common || subject.images?.medium, 1000),
       score: Number(subject.rating?.score) || 0,
       ratingCount: Number(subject.rating?.total) || 0,
