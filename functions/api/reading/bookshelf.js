@@ -62,7 +62,7 @@ export async function onRequestGet({ request, env }) {
     for (const row of rawRows) {
       const path = normalizePath(row.path);
       const rootPath = normalizePath(row.rootPath);
-      const identityText = [row.provider, row.library, stripSlash(rootPath), stripSlash(path)].join("\n");
+      const identityText = [row.provider, row.library, stripSlash(rootPath), stripSlash(path)].join("\\n");
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identityText));
       const id = "cloud:" + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
       const prefix = rootPath === "/" ? "/" : rootPath + "/";
@@ -98,7 +98,7 @@ export async function onRequestGet({ request, env }) {
       item._state = state;
       items.push(item);
       if (folderPath) {
-        const key = [row.provider,row.library,rootPath,folderPath].join("\n");
+        const key = [row.provider,row.library,rootPath,folderPath].join("\\n");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(item);
       }
