@@ -122,7 +122,8 @@ function groupedShelfBooks() {
     if (!group) {
       group = {
         ...book,
-        title: book.manualTitle ? book.title : (book.folderTitle || folderPath.split("/").pop() || book.title),
+        title: book.manualTitle ? book.title :
+          (book.comicMetadata?.nameCn || book.comicMetadata?.name || book.bookTitle || book.title || book.folderTitle || folderPath.split("/").pop()),
         folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
         cloudCoverHashes: [],
         cloudSource: { ...source, files: [] },
@@ -156,7 +157,9 @@ function filteredBooks() {
     if (!query) return true;
     const memberText = Array.isArray(book._groupMembers)
       ? book._groupMembers.map(item => [item.fileName,item.title,item.format].join(" ")).join(" ") : "";
-    return [book.title,book.author,book.fileName,book.format,memberText].join(" ").toLocaleLowerCase().includes(query);
+    const bangumiText = book.comicMetadata ? [book.comicMetadata.name,book.comicMetadata.nameCn,book.comicMetadata.author,
+      ...(book.comicMetadata.tags || []).map(tag => tag?.name || tag)].join(" ") : "";
+    return [book.title,book.author,book.fileName,book.format,memberText,bangumiText].join(" ").toLocaleLowerCase().includes(query);
   }).slice();
   if (state.sort === "title") books.sort((a,b) => (a.title || "").localeCompare(b.title || "", "zh-Hant"));
   else if (state.sort === "added") books.sort((a,b) => (b.addedAt || 0) - (a.addedAt || 0));
@@ -229,6 +232,39 @@ async function showBookDetails(id) {
   $("detail-added").textContent = formatDate(book.addedAt);
   $("detail-progress").textContent = book.progress?.percent > 0
     ? Math.round(book.progress.percent) + "% · " + (book.progress.label || "閱讀中") : "尚未開始";
+  const extraMetadata = [];
+  if (book.language) extraMetadata.push("語言：" + book.language);
+  if (book.publisher) extraMetadata.push("出版社：" + book.publisher);
+  if (book.publishedAt) extraMetadata.push("出版日期：" + book.publishedAt);
+  if (book.identifier) extraMetadata.push("識別碼：" + book.identifier);
+  if (Array.isArray(book.subjects) && book.subjects.length) extraMetadata.push("主題：" + book.subjects.join("、"));
+  if (book.description) extraMetadata.push("簡介：" + book.description);
+  $("detail-extra-metadata").textContent = extraMetadata.join("\n") || "尚未讀取到其他內部書籍資訊。";
+  $("detail-extra-metadata").hidden = getBookShelf(book) !== "books" || extraMetadata.length === 0;
+
+  const bangumiSection = $("detail-bangumi-section");
+  const bangumiStatus = $("detail-bangumi-status");
+  const bangumiCurrent = $("detail-bangumi-current");
+  const bangumiResults = $("detail-bangumi-results");
+  const isComic = getBookShelf(book) === "comics";
+  bangumiSection.hidden = !isComic;
+  bangumiResults.replaceChildren();
+  bangumiResults.hidden = true;
+  bangumiStatus.textContent = "";
+  $("detail-bangumi-query").value = book.comicMetadata?.nameCn || book.comicMetadata?.name ||
+    book.folderTitle || book.title || "";
+  if (book.comicMetadata) {
+    const meta = book.comicMetadata;
+    bangumiCurrent.hidden = false;
+    bangumiCurrent.textContent = "已關聯 Bangumi：" + (meta.nameCn || meta.name || ("條目 " + meta.subjectId)) +
+      (meta.author ? "\n作者：" + meta.author : "") +
+      (meta.date ? "\n日期：" + meta.date : "") +
+      (meta.score ? "\n評分：" + meta.score + (meta.ratingCount ? "（" + meta.ratingCount + " 人）" : "") : "") +
+      "\n已套用到同資料夾卷冊。";
+  } else {
+    bangumiCurrent.hidden = true;
+    bangumiCurrent.textContent = "";
+  }
   const volumeSection = $("detail-volumes-section"), volumeList = $("detail-volume-list");
   volumeList.replaceChildren();
   const source = book.cloudSource || {};
@@ -401,6 +437,88 @@ async function showLinkCandidates() {
   }
 }
 
+async function searchBangumi() {
+  const book = await getBook(state.dialogBookId);
+  if (!book) return;
+  const keyword = $("detail-bangumi-query").value.trim();
+  if (!keyword) { $("detail-bangumi-query").focus(); return; }
+  const button = $("detail-bangumi-search");
+  const status = $("detail-bangumi-status");
+  const list = $("detail-bangumi-results");
+  button.disabled = true;
+  status.textContent = "正在搜尋 Bangumi 漫畫資料……";
+  list.hidden = true;
+  list.replaceChildren();
+  try {
+    const response = await fetch("/api/comics/bangumi/search", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword })
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok || data.error) throw new Error(data.error || "Bangumi 搜尋失敗。");
+    const items = Array.isArray(data.items) ? data.items : [];
+    status.textContent = items.length
+      ? "找到 " + items.length + " 個候選條目。請核對名稱、日期與標籤，再套用正確作品。"
+      : "沒有找到候選作品。可以試試日文原名或其他常用名稱。";
+    for (const item of items) {
+      const card = document.createElement("article");
+      card.className = "dialog-link-candidate";
+      const copy = document.createElement("div");
+      copy.className = "dialog-link-candidate-copy";
+      const title = document.createElement("strong");
+      title.textContent = item.nameCn || item.name || ("Bangumi #" + item.id);
+      const details = document.createElement("small");
+      const facts = [];
+      if (item.name && item.nameCn && item.name !== item.nameCn) facts.push(item.name);
+      if (item.date) facts.push(item.date);
+      if (item.score) facts.push("評分 " + item.score + (item.ratingCount ? " · " + item.ratingCount + " 人" : ""));
+      if (item.tags?.length) facts.push(item.tags.join("、"));
+      if (item.summary) facts.push(item.summary);
+      details.textContent = facts.join(" · ");
+      copy.append(title, details);
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "dialog-secondary dialog-link-action";
+      action.textContent = "套用";
+      action.addEventListener("click", () => applyBangumiSubject(item, action)
+        .catch(error => { status.textContent = "套用失敗：" + (error.message || String(error)); action.disabled = false; }));
+      card.append(copy, action);
+      list.appendChild(card);
+    }
+    list.hidden = !items.length;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function applyBangumiSubject(item, button) {
+  const book = await getBook(state.dialogBookId);
+  if (!book) return;
+  button.disabled = true;
+  const status = $("detail-bangumi-status");
+  status.textContent = "正在取得 Bangumi 完整資料，並套用至同資料夾卷冊……";
+  try {
+    const response = await fetch("/api/comics/bangumi/link", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book: bookDescriptor(book), subjectId: Number(item.id) })
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok || data.error) throw new Error(data.error || "保存 Bangumi 資料失敗。");
+    const bookId = state.dialogBookId;
+    await refresh();
+    await showBookDetails(bookId);
+    $("detail-bangumi-status").textContent = "已關聯 " + (data.subject?.nameCn || data.subject?.name || "Bangumi 作品") +
+      "，共套用至 " + Number(data.linkedBooks || 0) + " 個卷冊。";
+  } catch (error) {
+    status.textContent = "套用失敗：" + (error.message || String(error));
+    button.disabled = false;
+  }
+}
+
 async function saveDetails(event) {
   event.preventDefault();
   if (!state.dialogBookId) return;
@@ -425,6 +543,12 @@ $("view-list").addEventListener("click", () => { state.view = "list"; render(); 
 $("detail-form").addEventListener("submit", event => { saveDetails(event).catch(error => { $("library-status").textContent = "雲端保存失敗：" + error.message; }); });
 $("detail-cancel").addEventListener("click", () => $("book-dialog").close());
 $("detail-link-open").addEventListener("click", () => { showLinkCandidates().catch(error => { $("detail-link-status").hidden = false; $("detail-link-status").textContent = error.message || String(error); }); });
+$("detail-bangumi-search").addEventListener("click", () => {
+  searchBangumi().catch(error => { $("detail-bangumi-status").textContent = "搜尋失敗：" + (error.message || String(error)); });
+});
+$("detail-bangumi-query").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); $("detail-bangumi-search").click(); }
+});
 $("detail-link-target").addEventListener("change", event => { state.linkTargetBookId = event.target.value || state.dialogBookId; $("detail-link-candidates").hidden = true; $("detail-link-status").hidden = true; });
 $("detail-open").addEventListener("click", () => {
   const book = state.books.find(item => item.id === state.dialogBookId);
