@@ -85,7 +85,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 
 ## 5. Verify the configuration
 
-1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. For a new database, apply migrations 0001 through 0006 in order. For an existing deployment that already has 0001 through 0005, apply only `migrations/0006_remove_legacy_reader_tables.sql` after confirming 0005 has already been applied.
+1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. For a new database, apply migrations 0001 through 0007 in order. For an existing database, apply whichever migrations are still missing, in numeric order. A Production database that already has migrations 0001 through 0006 only needs `migrations/0007_book_metadata_and_bangumi.sql` for this release. Apply it once to the Production D1 database `frame-reader-db`, not to Preview.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
@@ -112,3 +112,13 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 - Migration 0006 permanently drops the old unscoped `reading_events` table and the unused `auth_attempts` table. New statistics use the user-scoped `reader_reading_events` table.
 - On first visit after this release, `legacy-cleanup.js` automatically deletes the old `frame-reader-library` IndexedDB database and all `frame-reader-*` keys from localStorage/sessionStorage. If deletion is blocked by an older open tab, close old FRAME Reader tabs and revisit the site to retry. No browser-only book files or progress are migrated because they have been explicitly retired.
 - Reader uses only the three server-side provider IDs: `vps`, `worker` and `mobile`. The cloud file proxy fetches the original archive on demand; the book blob exists in memory only for the active reading session.
+
+## 8. EPUB metadata refresh and Bangumi comic metadata
+
+- During a complete Books or Comics rescan, the browser reads each EPUB's `META-INF/container.xml` and OPF metadata through HTTP Range requests. It reads the ZIP directory and OPF entry rather than downloading the entire EPUB. It stores title, creators, language, description, publisher, date, identifier and subjects in the matching `cloud_catalog` row.
+- Edit the EPUB's internal metadata in your desktop editor without changing the filename, then run a **complete rescan** of that library. The Book ID remains the SHA-256 identity derived from the normalized filename, so reading progress, annotations and reading events stay attached to the same identity. A normal bookshelf reload does not re-parse EPUB metadata. If the scan is already complete and has pending cover work, use the **完整重掃** action to force a new pass.
+- User-edited title/author overrides remain explicit overrides. Clear or change those overrides in the book details dialog if you want the EPUB's internal title/creator to show again.
+- Comic folder details include a Bangumi search panel. Search candidates are Bangumi book-type entries; the API's search filter does not expose a manga-only subcategory filter. Confirm the correct comic manually before applying it. The selected work's detail record is saved to the per-user `reader_comic_metadata` table and associated with each EPUB/CBZ file in that folder using each filename-derived Book ID. New volumes in the same indexed folder inherit the linked series metadata in the bookshelf grouping.
+- Bangumi metadata is separate from the local archive. Local CBZ cover extraction remains the primary cover source; the imported Bangumi image URL is stored only as source metadata and is not used to replace local covers.
+- The Bangumi v0 subject search endpoint is documented as experimental and may change. The application uses the public v0 endpoints and a descriptive User-Agent; it does not require a Bangumi account password or API token for this read-only workflow.
+
