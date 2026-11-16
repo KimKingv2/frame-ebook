@@ -1085,3 +1085,38 @@ button:disabled { opacity: .38; cursor: default; }
   .toc-tree-link,
   .toc-tree-label { min-height:31px; font-size:10px; }
 }
+
+
+/* Reading room header: keep engine status beside the room label. */
+.reader-top-actions .engine-status {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: min(34vw, 360px);
+  margin: 0;
+  color: #a79bb8;
+  font-size: 9px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    height: auto;
+    min-height: 60px;
+    padding: 10px 0;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .reader-top-actions {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .reader-top-actions .engine-status {
+    max-width: 42vw;
+    font-size: 8px;
+  }
+}
