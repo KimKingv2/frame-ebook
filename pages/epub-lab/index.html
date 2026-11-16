@@ -24,13 +24,10 @@
       <section class="intro">
         <p class="eyebrow">YOUR PRIVATE READING ROOM</p>
         <h1>把一本 EPUB，<em>真正打開。</em></h1>
-        <p>雲端書籍會在開啟時從 OpenList 讀取；雲端書籍的書籤、筆記與高亮保存在 D1，會隨登入帳號跨裝置使用。本機匯入書籍的標註則保存在這台設備，不會上傳。閱讀位置與外觀設定目前仍保存在本機。</p>
+        <p>閱讀室只接受已掃描索引的 Alist／OpenList 雲端書籍。原始書檔留在雲端，閱讀位置、外觀偏好、書籤、筆記與閱讀統計都保存在你的 Cloudflare D1 帳戶。</p>
       </section>
       <section class="toolbar" aria-label="書籍操作">
-        <button id="load-demo" type="button" class="primary-button">載入 EPUB 測試書</button>
-        <button id="load-comic-demo" type="button">載入漫畫示範</button>
-        <label class="file-button" for="epub-file">選擇 EPUB / CBZ</label>
-        <input id="epub-file" type="file" accept=".epub,.cbz,application/epub+zip,application/vnd.comicbook+zip">
+        <a class="primary-button" href="/">返回雲端書架</a>
         <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
       </section>
 
@@ -161,14 +158,14 @@
             </div>
           </div>
         </div>
-        <p id="appearance-status" class="appearance-status">外觀設定只保存在這台設備。</p>
+        <p id="appearance-status" class="appearance-status">外觀設定會保存至雲端 D1，其他裝置可自動還原。</p>
       </details>
 
       <section class="book-heading">
         <div>
           <p class="book-kicker">NOW READING</p>
           <h2 id="book-title">尚未載入書籍</h2>
-          <p id="book-author" class="book-author">載入內建測試書，或選擇本機 EPUB。</p>
+          <p id="book-author" class="book-author">從雲端書架開啟已掃描索引的書籍。</p>
         </div>
         <div class="book-progress">
           <strong id="progress-percent">0%</strong>
@@ -180,7 +177,7 @@
           <div id="reader-placeholder" class="reader-placeholder">
             <div class="placeholder-mark">F</div>
             <h3>準備好開始閱讀</h3>
-            <p>載入 EPUB 或 CBZ 後，內容會顯示在這裡。</p>
+            <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
           </div>
         </div>
       </section>
@@ -196,12 +193,12 @@
       <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       <section class="notice">
         <strong>閱讀資料保存</strong>
-        <p>開啟雲端作品時，原始 EPUB／CBZ 會載入目前瀏覽器記憶體供閱讀，不會保存成整本本機副本。雲端書籍的書籤、筆記與高亮保存在 D1，依 Cloudflare Access 登入身分隔離；本機匯入書籍的標註保存在 IndexedDB。閱讀位置與外觀偏好目前仍是本機資料。清除網站資料會移除本機匯入書籍的檔案與本機標註。</p>
+        <p>原始 EPUB／CBZ 留在 Alist／OpenList，閱讀時才透過伺服器端讀取。D1 保存每本書的 CFI／頁碼、閱讀外觀、自訂書名作者、書籤、筆記與高亮，以及閱讀統計；所有資料依 Cloudflare Access 登入身分隔離。瀏覽器只在當前閱讀工作階段使用記憶體，不建立本機書庫或持久化閱讀資料。</p>
       </section>
     </main>
     <footer class="footer">
       <a href="/">FRAME READER</a>
-      <span>CLOUD BOOK ANNOTATIONS · LOCAL IMPORT DATA</span>
+      <span>CLOUD BOOKS · D1 READING STATE</span>
     </footer>
   </div>
   <dialog id="cloud-manager-dialog" class="cloud-manager-dialog" aria-labelledby="cloud-manager-title">
