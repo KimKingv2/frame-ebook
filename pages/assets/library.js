@@ -472,6 +472,7 @@ async function searchBangumi() {
       const details = document.createElement("small");
       const facts = [];
       if (item.name && item.nameCn && item.name !== item.nameCn) facts.push(item.name);
+      if (item.categoryLabel) facts.push(item.categoryLabel);
       if (item.date) facts.push(item.date);
       if (item.score) facts.push("評分 " + item.score + (item.ratingCount ? " · " + item.ratingCount + " 人" : ""));
       if (item.tags?.length) facts.push(item.tags.join("、"));
