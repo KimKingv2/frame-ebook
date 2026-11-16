@@ -107,7 +107,7 @@ export async function onRequest({ request, env }) {
         await db.prepare(
           "UPDATE cloud_catalog SET cover_hash=?,cover_type=?,cover_status='ready',cover_error=NULL,cover_updated_at=? " +
           "WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
-        ).bind(hash, contentType, now, provider, library, rootPath, path).run();
+        ).bind(hash, contentType, now, CATALOG_PROVIDER, library, rootPath, path).run();
         return json({ ok: true, hash, contentType, sizeBytes: data.byteLength });
       } catch {
         return json({ error: "保存封面至 R2 或更新 D1 封面索引失敗。" }, 503);
@@ -139,7 +139,7 @@ export async function onRequest({ request, env }) {
       const result = await db.prepare(
         "UPDATE cloud_catalog SET cover_hash=NULL,cover_type=NULL,cover_status=?,cover_error=?,cover_updated_at=? " +
         "WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
-      ).bind(status, message, now, provider, library, rootPath, path).run();
+      ).bind(status, message, now, CATALOG_PROVIDER, library, rootPath, path).run();
       if (!Number(result?.meta?.changes || 0)) return json({ error: "找不到對應的雲端書籍索引項目。" }, 404);
       return json({ ok: true, path, status, updatedAt: now });
     } catch {
