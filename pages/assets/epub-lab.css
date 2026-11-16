@@ -2067,3 +2067,65 @@ body.reader-settings-open .reader-quick-actions {
     transition:none !important;
   }
 }
+
+
+/* Final stacking correction: settings are modal layers, never underneath
+   reader controls or the Foliate reading surface. */
+body.reader-settings-open .reader-quick-actions {
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+.reader-settings-backdrop:not([hidden]) {
+  z-index:2147483000 !important;
+}
+.appearance-panel[open] {
+  z-index:2147483001 !important;
+}
+.reading-workspace:fullscreen .reader-settings-backdrop:not([hidden]),
+.reading-workspace:-webkit-full-screen .reader-settings-backdrop:not([hidden]) {
+  position:absolute !important;
+  inset:0;
+  z-index:2147483000 !important;
+}
+.reading-workspace:fullscreen .appearance-panel,
+.reading-workspace:fullscreen .appearance-panel[open],
+.reading-workspace:-webkit-full-screen .appearance-panel,
+.reading-workspace:-webkit-full-screen .appearance-panel[open] {
+  position:absolute !important;
+  z-index:2147483001 !important;
+  isolation:isolate;
+}
+@media(max-width:820px) {
+  body.reader-settings-open .reader-quick-actions {
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+  }
+  .reader-settings-backdrop:not([hidden]) {
+    z-index:2147483000 !important;
+  }
+  .appearance-panel[open] {
+    z-index:2147483001 !important;
+  }
+  .reading-workspace:fullscreen .reader-settings-backdrop:not([hidden]),
+  .reading-workspace:-webkit-full-screen .reader-settings-backdrop:not([hidden]) {
+    position:absolute !important;
+    inset:0;
+    z-index:2147483000 !important;
+  }
+  .reading-workspace:fullscreen .appearance-panel,
+  .reading-workspace:fullscreen .appearance-panel[open],
+  .reading-workspace:-webkit-full-screen .appearance-panel,
+  .reading-workspace:-webkit-full-screen .appearance-panel[open] {
+    position:absolute !important;
+    top:calc(env(safe-area-inset-top, 0px) + 6px);
+    right:0;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
+    left:auto;
+    width:min(420px,91vw);
+    max-width:calc(100vw - 12px);
+    max-height:none;
+    z-index:2147483001 !important;
+  }
+}
