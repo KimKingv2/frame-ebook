@@ -39,7 +39,6 @@ const state = {
   scanPauseReason:"",
   scanState:null,
   scanLogEntries:[],
-  shelfSyncRunning:new Set()
 };
 
 function formatBytes(bytes) {
@@ -221,9 +220,6 @@ async function readJsonResponse(response, fallback) {
     throw new Error(data.error || fallback || ("HTTP " + response.status));
   }
   return data;
-}
-async function syncIndexedFilesToShelf() {
-  return true;
 }
 function indexScope(library=state.activeLibrary,provider=state.activeProvider) {
   return {
@@ -961,7 +957,6 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
       const writeStarted=performance.now();
       batch.currentWriteCount=entries.length;
       const saved=entries.length?await writeIndexEntries(scanState,entries):0;
-      await syncIndexedFilesToShelf(scope,entries);
       const writeElapsed=Math.round(performance.now()-writeStarted);
       batch.currentWriteCount=0;
       scanState.scannedCount=Number(scanState.scannedCount||0)+found.length;
