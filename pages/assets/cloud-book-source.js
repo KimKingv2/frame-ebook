@@ -33,13 +33,14 @@ export async function fetchCloudBookFile(record) {
     root_path: String(source.rootPath || ""),
     path: String(source.path || "")
   };
-  const isCbz = /\\.cbz$/i.test(String(source.path || record.fileName || ""));
+  const sourceLibrary = String(source.library || record.shelf || "books").toLowerCase();
+  const isComicLibrary = sourceLibrary === "comics";
   let directError = null;
 
-  // CBZ archives can be very large. First let the browser follow the Pages
+  // Comic archives can be very large. First let the browser follow the Pages
   // Function's 302 directly to OpenList's signed file URL, avoiding a second
   // full-file hop through Pages. The final host must allow CORS for fetch().
-  if (isCbz) {
+  if (isComicLibrary) {
     const redirectQuery = new URLSearchParams({ ...baseParams, delivery: "redirect" });
     try {
       const directResponse = await fetch("/api/cloud/file?" + redirectQuery.toString(), {
@@ -60,7 +61,7 @@ export async function fetchCloudBookFile(record) {
       // works without requiring provider-side CORS configuration.
       directError = error;
     }
-    console.info("[FRAME Reader] CBZ direct redirect unavailable; falling back to Pages stream.",
+    console.info("[FRAME Reader] Comic direct redirect unavailable; falling back to Pages stream.",
       String(directError && directError.message || directError || "unknown error").slice(0, 180));
   }
 
@@ -72,5 +73,5 @@ export async function fetchCloudBookFile(record) {
     cache: "no-store"
   });
   if (!response.ok) throw await responseError(response);
-  return makeFile(await response.blob(), record, isCbz ? "stream-fallback" : "stream");
+  return makeFile(await response.blob(), record, isComicLibrary ? "stream-fallback" : "stream");
 }
