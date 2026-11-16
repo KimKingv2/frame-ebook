@@ -442,7 +442,7 @@ a { color: inherit; }
   inset:0;
   isolation:isolate;
   overflow:hidden;
-  background:#51465f;
+  background:#c9c2d2;
 }
 .library-cover-stack::before {
   content:none;
@@ -453,7 +453,7 @@ a { color: inherit; }
   z-index:0;
   inset:8px;
   pointer-events:none;
-  border:1px solid rgba(229,218,244,.2);
+  border:1px solid rgba(66,53,83,.22);
   border-radius:4px;
 }
 
