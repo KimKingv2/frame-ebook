@@ -50,7 +50,7 @@ async function readAliases(db, userId) {
 
 async function getCurrentIds(db) {
   const result = await db.prepare(
-    "SELECT name FROM cloud_catalog WHERE is_dir=0 AND provider IN ('vps','worker','mobile') " +
+    "SELECT name FROM cloud_catalog WHERE is_dir=0 AND provider='vps' " +
     "AND format IN ('EPUB','CBZ') LIMIT 50000"
   ).all();
   const ids = new Set();
