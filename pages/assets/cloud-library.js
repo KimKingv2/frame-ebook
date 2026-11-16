@@ -1202,7 +1202,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
     } catch(_) {}
     try {
       state.currentPath=scope.rootPath;
-      if(isActiveSourceReady()) {
+      if(isActiveSourceReady() || state.activeProvider==="local") {
         await loadDirectory(scope.rootPath,1);
         if(outcome.ok&&outcome.completed)setSourceStatus(LIBRARY_LABELS[scope.library]+"索引已完成，已自動載入雲端書架："+scope.rootPath);
         else if(outcome.ok)setSourceStatus(LIBRARY_LABELS[scope.library]+"本批索引已保存；再次掃描可接續："+scope.rootPath);
@@ -1329,8 +1329,13 @@ async function checkSession() {
       state.activeProvider = selectedProvider;
       state.editProvider = selectedProvider;
       state.activeLibrary = selectedLibrary;
+      state.localConnectionReady = false;
       $("cloud-provider").value = selectedProvider;
       $("cloud-library-type").value = selectedLibrary;
+      const localModule = await import("/assets/local-openlist.js?v=20261116-local-r1");
+      $("cloud-local-base-url").value = localModule.getSavedLocalOpenListBaseUrl();
+      $("cloud-local-connection").hidden = selectedProvider !== "local";
+      $("cloud-local-status").textContent = selectedProvider === "local" ? "需在目前瀏覽器重新登入" : "選用後登入";
       readRootSelections(selectedProvider);
       clearListing();
       await renderAllScanSummaries();
@@ -1643,6 +1648,12 @@ $("cloud-provider").addEventListener("change", event => {
   const provider = event.target.value;
   if (!Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, provider)) return;
   state.editProvider = provider;
+  $("cloud-local-connection").hidden = provider !== "local";
+  if(provider==="local") {
+    void import("/assets/local-openlist.js?v=20261116-local-r1").then(local=>{
+      if(!$("cloud-local-base-url").value)$("cloud-local-base-url").value=local.getSavedLocalOpenListBaseUrl();
+    });
+  }
   readRootSelections(provider);
   void renderAllScanSummaries(provider, state.editRoots);
   setSourceStatus("目前活動來源仍是 " + PROVIDER_LABELS[state.activeProvider] + "；按「保存來源設定」後才會切換為 " + PROVIDER_LABELS[provider] + "。");
@@ -1684,9 +1695,9 @@ $("cloud-test-source").addEventListener("click", async () => {
     await saveSourceSettings();
     const root = getActiveRoot();
     if (!root) throw new Error("尚未設定目前" + LIBRARY_LABELS[state.activeLibrary] + "根目錄。");
-    setSourceStatus("正在測試 " + PROVIDER_LABELS[state.activeProvider] + " 伺服器端連線與目錄讀取……");
+    setSourceStatus("正在測試 " + PROVIDER_LABELS[state.activeProvider] + (state.activeProvider==="local"?" 瀏覽器直連":" 伺服器端") + "連線與目錄讀取……");
     await fetchScanDirectory(root, 1, 1);
-    setSourceStatus("Alist／OpenList 連線成功，目錄可讀取。正在載入目前書庫的 D1 索引……");
+    setSourceStatus(PROVIDER_LABELS[state.activeProvider] + " 連線成功，目錄可讀取。正在載入共用 D1 書架索引……");
     state.currentPath = root;
     await loadDirectory(root, 1);
   } catch (error) {
