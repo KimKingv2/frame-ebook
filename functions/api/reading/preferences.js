@@ -25,14 +25,17 @@ function validate(key, value) {
   if (key === "roots") {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("書庫根目錄設定無效。");
     const clean = {};
-    for (const provider of PROVIDERS) {
-      const pair = value[provider] && typeof value[provider] === "object" ? value[provider] : {};
+    for (const [provider, pairValue] of Object.entries(value)) {
+      if (!PROVIDERS.has(provider)) continue;
+      const pair = pairValue && typeof pairValue === "object" && !Array.isArray(pairValue) ? pairValue : {};
       clean[provider] = {};
       for (const library of LIBRARIES) {
-        const path = normalizePath(pair[library] || "/");
-        if (!path) throw new Error("書庫根目錄路徑無效。");
+        if (!Object.prototype.hasOwnProperty.call(pair, library)) continue;
+        const path = normalizePath(pair[library]);
+        if (!path || path.length > 2048) throw new Error("書庫根目錄路徑無效。");
         clean[provider][library] = path;
       }
+      if (!Object.keys(clean[provider]).length) delete clean[provider];
     }
     return clean;
   }
