@@ -20,7 +20,7 @@
   var annotationBusy = false;
   var libraryStorePromise = import('/assets/library-store.js?v=20261116-shared-local-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
-  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-cbz-browser-redirect-r2');
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-comic-epub-redirect-r3');
   var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
@@ -1509,11 +1509,11 @@
       if (typeof view.renderer.setFlow === 'function') view.renderer.setFlow(appearance.comicReadingMode);
     }
 
-    var locationMessage = isCbz
-      ? 'CBZ 漫畫已載入。閱讀位置會自動保存至雲端。' +
-        (source.frameDeliveryMode === 'redirect' ? ' 已使用瀏覽器 302 直連。' :
-          source.frameDeliveryMode === 'stream-fallback' ? ' 來源不支援瀏覽器跨來源讀取，已自動回退串流。' : '')
-      : 'EPUB 已載入。閱讀位置會自動保存至雲端。';
+    var locationMessage = (isCbz
+      ? 'CBZ 漫畫已載入。閱讀位置會自動保存至雲端。'
+      : 'EPUB 已載入。閱讀位置會自動保存至雲端。') +
+      (source.frameDeliveryMode === 'redirect' ? ' 已使用瀏覽器 302 直連。' :
+        source.frameDeliveryMode === 'stream-fallback' ? ' 漫畫來源不支援瀏覽器跨來源讀取，已自動回退串流。' : '');
     try {
       if (restoreCfi) {
         await view.init({ lastLocation: restoreCfi, showTextStart: true });
