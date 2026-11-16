@@ -436,7 +436,7 @@ a { color: inherit; }
 .library-origin-note { display: block; margin-top: 3px; color: #665f70; font-size: 7px; line-height: 1.2; letter-spacing: .15px; }
 
 
-/* Folder stacks use a full-frame three-cover fan composition. */
+/* Folder stacks: casually scattered full book covers, with no crop or edge clipping. */
 .library-cover-stack {
   position:absolute;
   inset:0;
@@ -448,57 +448,38 @@ a { color: inherit; }
 .library-cover-stack::after {
   content:none;
 }
-.library-cover-stack img {
+.library-cover-stack-book {
   position:absolute;
-  top:-2%;
-  width:78%;
-  height:104%;
-  object-fit:cover;
-  border:1px solid rgba(245,240,250,.5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:visible;
+  border:1px solid rgba(245,240,250,.58);
   border-radius:3px;
-  box-shadow:0 8px 18px rgba(0,0,0,.24);
-  background:#241d31;
-  transform-origin:50% 88%;
+  background:#f4f1f6;
+  box-shadow:0 8px 18px rgba(0,0,0,.28);
+  transform-origin:center center;
 }
-.library-cover-stack img:nth-child(1) {
-  left:-7%;
-  z-index:1;
-  transform:rotate(-8deg);
-}
-.library-cover-stack img:nth-child(2) {
-  left:21%;
-  top:8%;
-  width:58%;
-  height:84%;
-  z-index:3;
-  object-fit:contain;
-  transform:rotate(0);
-}
-.library-cover-stack img:nth-child(3) {
-  left:29%;
-  z-index:2;
-  transform:rotate(8deg);
-}
-/* Two-cover folders get a balanced open fan as well. */
-.library-cover-stack img:nth-child(1):nth-last-child(2) {
-  left:-3%;
-  width:78%;
-  transform:rotate(-7deg);
-}
-.library-cover-stack img:nth-child(2):last-child {
-  left:25%;
-  width:78%;
-  z-index:2;
-  transform:rotate(7deg);
-}
-.library-cover-stack img:only-child {
-  left:0;
-  top:0;
+.library-cover-stack-book > img {
+  display:block;
   width:100%;
   height:100%;
-  transform:none;
-  box-shadow:none;
+  object-fit:contain;
+  background:#f4f1f6;
 }
+.library-cover-stack-book.is-fallback {
+  background:transparent;
+}
+.library-cover-stack-book .library-cover-fallback {
+  width:100%;
+  height:100%;
+  padding:8px 7px;
+  border-radius:2px;
+}
+.library-cover-stack-book .library-cover-fallback strong {
+  font-size:clamp(8px,1.5vw,15px);
+}
+
 
 .dialog-volumes { margin:14px 0 4px; }
 .dialog-volumes h3 { margin:0 0 9px; color:#d8cde8; font-size:13px; font-weight:600; }
