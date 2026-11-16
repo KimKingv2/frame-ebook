@@ -1,6 +1,8 @@
 import { json, getDatabase, requireAuth, getAccessIdentity, getOpenListRootPaths, normalizePath } from "../../_lib/common.js";
 import { READER_PROVIDERS, readerBookIdForFilename, migrateLegacyReaderBookIds } from "../../_lib/reader-data.js";
 
+const CATALOG_PROVIDER = "vps";
+
 const DEFAULT_ROOTS = {
   books: "/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔",
   comics: "/中國移動雲盤/Kim King/11 Comic"
@@ -30,7 +32,7 @@ export async function onRequestGet({ request, env }) {
     await migrateLegacyReaderBookIds(db, identity.userId);
     const preferences = await loadPreferences(db, identity.userId);
     const provider = READER_PROVIDERS.has(preferences.activeProvider) ? preferences.activeProvider : "vps";
-    const savedRoots = preferences.roots?.[provider] || {};
+    const savedRoots = preferences.roots?.shared || preferences.roots?.[provider] || {};
     const envRoots = getOpenListRootPaths(env);
     const roots = {
       books: normalizePath(savedRoots.books || envRoots.books || DEFAULT_ROOTS.books),
@@ -47,14 +49,14 @@ export async function onRequestGet({ request, env }) {
           "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status " +
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 " +
           "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+") ORDER BY path LIMIT 10000"
-        ).bind(provider, library, rootPath).all();
+        ).bind(CATALOG_PROVIDER, library, rootPath).all();
       } catch (error) {
         if (!String(error?.message || error).toLowerCase().includes("no such column: book_title")) throw error;
         rows = await db.prepare(
           "SELECT path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status " +
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND is_dir=0 " +
           "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+") ORDER BY path LIMIT 10000"
-        ).bind(provider, library, rootPath).all();
+        ).bind(CATALOG_PROVIDER, library, rootPath).all();
       }
       for (const row of rows.results || []) rawRows.push({
         book_title:"",book_creator:"",book_language:"",book_description:"",
@@ -81,9 +83,9 @@ export async function onRequestGet({ request, env }) {
         try {
           const metadata = JSON.parse(row.metadataJson);
           comicMetadataMap.set(String(row.bookId), metadata);
-          if (metadata?.provider && metadata?.library && metadata?.rootPath && metadata?.folderPath &&
+          if (metadata?.library && metadata?.rootPath && metadata?.folderPath &&
               metadata.folderPath !== "/") {
-            const key = [metadata.provider,metadata.library,metadata.rootPath,metadata.folderPath].join("\\n");
+            const key = [metadata.library,metadata.rootPath,metadata.folderPath].join("\\n");
             if (!comicSeriesMetadataMap.has(key)) comicSeriesMetadataMap.set(key, metadata);
           }
         } catch (_) {}
@@ -105,7 +107,7 @@ export async function onRequestGet({ request, env }) {
       const folderTitle = folderPath ? folderPath.slice(prefix.length) : "";
       const state = stateMap.get(id) || {};
       const metadata = state.metadata || {};
-      const seriesKey = [row.provider,row.library,rootPath,folderPath].join("\\n");
+      const seriesKey = [row.library,rootPath,folderPath].join("\\n");
       const comicMetadata = comicMetadataMap.get(id) || comicSeriesMetadataMap.get(seriesKey) || null;
       const importedTitle = String(row.book_title || "");
       const fallbackTitle = folderTitle || String(row.name).replace(/\.(epub|cbz)$/i,"");
