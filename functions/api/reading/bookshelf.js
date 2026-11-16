@@ -1,5 +1,5 @@
 import { json, getDatabase, requireAuth, getAccessIdentity, getOpenListRootPaths, normalizePath } from "../../_lib/common.js";
-import { READER_PROVIDERS } from "../../_lib/reader-data.js";
+import { READER_PROVIDERS, readerBookIdForFilename, migrateLegacyReaderBookIds } from "../../_lib/reader-data.js";
 
 const DEFAULT_ROOTS = {
   books: "/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔",
@@ -17,8 +17,6 @@ async function loadPreferences(db, userId) {
   return output;
 }
 
-function stripSlash(value) { return String(value || "").replace(/^\/+/, ""); }
-
 export async function onRequestGet({ request, env }) {
   const denied = await requireAuth(request, env);
   if (denied) return denied;
@@ -29,6 +27,7 @@ export async function onRequestGet({ request, env }) {
   catch (error) { return json({ error: error?.message || "Cloudflare Access 身分驗證失敗。", }, error?.status || 503); }
 
   try {
+    await migrateLegacyReaderBookIds(db, identity.userId);
     const preferences = await loadPreferences(db, identity.userId);
     const provider = READER_PROVIDERS.has(preferences.activeProvider) ? preferences.activeProvider : "vps";
     const savedRoots = preferences.roots?.[provider] || {};
@@ -62,9 +61,7 @@ export async function onRequestGet({ request, env }) {
     for (const row of rawRows) {
       const path = normalizePath(row.path);
       const rootPath = normalizePath(row.rootPath);
-      const identityText = [row.provider, row.library, stripSlash(rootPath), stripSlash(path)].join("\\n");
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identityText));
-      const id = "cloud:" + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+      const id = await readerBookIdForFilename(row.name);
       const prefix = rootPath === "/" ? "/" : rootPath + "/";
       const relative = path.startsWith(prefix) ? path.slice(prefix.length) : "";
       const parts = relative.split("/").filter(Boolean);
