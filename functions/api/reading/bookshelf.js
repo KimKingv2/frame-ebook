@@ -76,8 +76,17 @@ export async function onRequestGet({ request, env }) {
       const comicRows = await db.prepare(
         "SELECT book_id AS bookId,metadata_json AS metadataJson FROM reader_comic_metadata WHERE user_id=?"
       ).bind(identity.userId).all();
+      var comicSeriesMetadataMap = new Map();
       for (const row of comicRows.results || []) {
-        try { comicMetadataMap.set(String(row.bookId), JSON.parse(row.metadataJson)); } catch (_) {}
+        try {
+          const metadata = JSON.parse(row.metadataJson);
+          comicMetadataMap.set(String(row.bookId), metadata);
+          if (metadata?.provider && metadata?.library && metadata?.rootPath && metadata?.folderPath &&
+              metadata.folderPath !== "/") {
+            const key = [metadata.provider,metadata.library,metadata.rootPath,metadata.folderPath].join("\\n");
+            if (!comicSeriesMetadataMap.has(key)) comicSeriesMetadataMap.set(key, metadata);
+          }
+        } catch (_) {}
       }
     } catch (error) {
       if (!String(error?.message || error).toLowerCase().includes("no such table: reader_comic_metadata")) throw error;
@@ -96,7 +105,8 @@ export async function onRequestGet({ request, env }) {
       const folderTitle = folderPath ? folderPath.slice(prefix.length) : "";
       const state = stateMap.get(id) || {};
       const metadata = state.metadata || {};
-      const comicMetadata = comicMetadataMap.get(id) || null;
+      const seriesKey = [row.provider,row.library,rootPath,folderPath].join("\\n");
+      const comicMetadata = comicMetadataMap.get(id) || comicSeriesMetadataMap.get(seriesKey) || null;
       const importedTitle = String(row.book_title || "");
       const fallbackTitle = folderTitle || String(row.name).replace(/\.(epub|cbz)$/i,"");
       const item = {
