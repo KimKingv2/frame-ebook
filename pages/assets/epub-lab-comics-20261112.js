@@ -765,11 +765,20 @@
     var libraryRecord = initialRecord || await libraryStore.getBook(currentBookId);
     if (!libraryRecord) throw new Error('無法讀取這本書的雲端索引與閱讀資料，請返回書架重新開啟。');
     loadAppearance(libraryRecord.appearance || {});
-    activeAnnotations = await libraryStore.listAnnotations(currentBookId);
-    activeAnnotations.forEach(function (annotation) {
-      var navigation = view.resolveNavigation(annotation.cfi);
-      annotation.sectionIndex = navigation && navigation.index;
-    });
+    var annotationLoadWarning = '';
+    try {
+      activeAnnotations = await libraryStore.listAnnotations(currentBookId);
+      activeAnnotations.forEach(function (annotation) {
+        var navigation = view.resolveNavigation(annotation.cfi);
+        annotation.sectionIndex = navigation && navigation.index;
+      });
+    } catch (annotationError) {
+      // A temporary annotation API/D1 issue must never prevent the book itself
+      // from opening. The user can retry from the annotations panel afterward.
+      activeAnnotations = [];
+      annotationLoadWarning = '（標註暫時無法讀取，可在「筆記與標註」中重新整理）';
+      console.warn('FRAME Reader could not restore annotations:', annotationError);
+    }
     renderAnnotationList();
     var savedProgress = libraryRecord.progress || {};
     restoreCfi = !view.isFixedLayout && savedProgress.cfi ? savedProgress.cfi : null;
@@ -827,7 +836,7 @@
     applyAppearance();
     el('prev-page').disabled = false;
     el('next-page').disabled = false;
-    setText('reader-status', locationMessage);
+    setText('reader-status', locationMessage + annotationLoadWarning);
     setText('engine-status', isCbz
       ? 'CBZ 漫畫閱讀引擎已就緒'
       : (view.isFixedLayout ? '固定版面 EPUB 已載入' : 'EPUB 閱讀引擎已就緒'));
