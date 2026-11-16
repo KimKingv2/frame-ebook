@@ -50,7 +50,8 @@ export async function onRequestGet({ request, env }) {
         DEFAULT_ROOTS[library]
       ];
       for (const value of values) {
-        const normalized = normalizePath(value || "");
+        if (value == null || String(value).trim() === "") continue;
+        const normalized = normalizePath(value);
         if (normalized && !rootCandidates[library].includes(normalized)) rootCandidates[library].push(normalized);
       }
       roots[library] = rootCandidates[library][0] || DEFAULT_ROOTS[library];
