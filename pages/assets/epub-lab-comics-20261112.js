@@ -488,8 +488,8 @@
     if (value && typeof value === 'object') {
       if (['0.9', '1', '1.1', '1.2', '1.3'].indexOf(String(value.fontScale)) !== -1) appearance.fontScale = String(value.fontScale);
       if (['1.45', '1.65', '1.85', '2'].indexOf(String(value.lineHeight)) !== -1) appearance.lineHeight = String(value.lineHeight);
-      if (['8', '16', '24'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
-      if (['4', '7', '10'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
+      if (['8', '16', '24', '32', '40', '48', '64'].indexOf(String(value.verticalMargin)) !== -1) appearance.verticalMargin = String(value.verticalMargin);
+      if (['4', '7', '10', '13', '16', '20'].indexOf(String(value.horizontalMargin)) !== -1) appearance.horizontalMargin = String(value.horizontalMargin);
       if (['original', 'serif', 'sans'].indexOf(String(value.fontFamily)) !== -1) appearance.fontFamily = String(value.fontFamily);
       if (['original', 'normal', 'medium'].indexOf(String(value.fontWeight)) !== -1) appearance.fontWeight = String(value.fontWeight);
       if (['original', 'compact', 'standard', 'loose'].indexOf(String(value.paragraphSpacing)) !== -1) appearance.paragraphSpacing = String(value.paragraphSpacing);
