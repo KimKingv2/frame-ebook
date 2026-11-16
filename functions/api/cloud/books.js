@@ -51,14 +51,14 @@ export async function onRequestGet({ request, env }) {
     const rowsStatement = recursiveShelf
       ? db.prepare(
           "WITH ranked AS (" +
-          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY indexed_at DESC,CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,provider DESC) AS rn " +
           "FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where +
           ") SELECT " + selectColumns + " FROM ranked WHERE rn=1 " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
         ).bind(library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
       : db.prepare(
           "WITH ranked AS (" +
-          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY indexed_at DESC,CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,provider DESC) AS rn " +
           "FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where +
           ") SELECT " + selectColumns + " FROM ranked WHERE rn=1 " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
