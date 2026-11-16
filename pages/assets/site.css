@@ -485,3 +485,128 @@ a { color: inherit; }
 @media(max-width:640px) {
   .dialog-volume-link { align-items:flex-start; flex-direction:column; gap:3px; }
 }
+
+
+/* FRAME Reader: compact folder-first home and per-folder volume detail */
+.library-category-grid {
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 19px 13px;
+}
+.recent-grid {
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 15px;
+}
+.library-folder-card .library-card-open { cursor: pointer; }
+.library-folder-card .library-cover { aspect-ratio: 2 / 3; }
+.library-folder-card .library-book-meta h3 { font-size: 11px; }
+.library-folder-card .library-book-meta p { font-size: 8px; }
+.folder-detail-section {
+  padding: 35px 0 68px;
+  border-top: 1px solid var(--line);
+  animation: rise-in .35s ease both;
+}
+.folder-detail-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 23px;
+}
+.folder-detail-back {
+  min-height: 35px;
+  padding: 0 12px;
+  border: 1px solid rgba(205,188,239,.16);
+  border-radius: 7px;
+  color: #d4c4eb;
+  background: rgba(34,29,45,.68);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.folder-detail-back:hover {
+  border-color: rgba(190,160,230,.4);
+  background: rgba(120,86,162,.16);
+}
+.folder-detail-count {
+  color: #a99abf;
+  font-size: 9px;
+}
+.folder-detail-heading { margin-bottom: 23px; }
+.folder-detail-heading h2 {
+  margin: 9px 0 5px;
+  color: #f0eaf7;
+  font-size: 27px;
+  font-weight: 560;
+  letter-spacing: -.5px;
+}
+.folder-detail-path {
+  margin: 0;
+  color: #82798d;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.folder-detail-status {
+  margin: 11px 0 0;
+  color: #9b91a8;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.folder-books-grid {
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  align-items: start;
+  gap: 21px 13px;
+}
+.folder-books-grid .library-cover { aspect-ratio: 2 / 3; }
+.folder-books-grid .library-book-meta {
+  min-height: 45px;
+  padding: 9px 1px 0;
+}
+.folder-books-grid .library-book-meta h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  line-height: 1.45;
+  font-size: 11px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.folder-books-grid .library-book-meta p {
+  margin-top: 4px;
+  font-size: 8px;
+}
+.folder-books-grid .library-progress {
+  gap: 5px;
+  margin: 8px 1px 0;
+}
+.folder-books-grid .library-progress small { font-size: 8px; }
+.folder-books-grid .library-card-actions { margin-top: 8px; }
+.folder-books-grid .library-open-link { font-size: 8px; }
+.folder-books-grid .library-details-button {
+  min-height: 27px;
+  padding: 0 7px;
+  font-size: 8px;
+}
+.folder-detail-empty {
+  padding: 40px 15px;
+  border: 1px dashed rgba(202,183,236,.17);
+  border-radius: 9px;
+  color: #92899f;
+  text-align: center;
+  font-size: 10px;
+}
+@media (max-width: 980px) {
+  .library-category-grid,
+  .folder-books-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+}
+@media (max-width: 760px) {
+  .library-category-grid,
+  .folder-books-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .recent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .library-category-grid,
+  .folder-books-grid,
+  .recent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 19px 11px; }
+  .folder-detail-section { padding-top: 25px; }
+  .folder-detail-heading h2 { font-size: 23px; }
+}
