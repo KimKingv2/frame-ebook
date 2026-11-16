@@ -295,7 +295,8 @@ function renderLibraryScanSummary(library,scanState,rootPath) {
     "已完成資料夾："+Number(scanState.visitedFolderCount||0)+" 個",
     "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
     "封面已保存："+Number(scanState.coverReadyCount||0)+" 本；無封面："+Number(scanState.coverMissingCount||0)+
-      " 本；失敗："+Number(scanState.coverFailedCount||0)+" 本"
+      " 本；失敗："+Number(scanState.coverFailedCount||0)+" 本",
+    "EPUB metadata 已更新："+Number(scanState.metadataProcessedCount||0)+" 本；解析失敗："+Number(scanState.metadataFailedCount||0)+" 本"
   ];
   if(scanState.currentFolder)lines.push("續作游標：第 "+Number(scanState.page||1)+" 頁");
   if(scanState.lastCompletedName)lines.push("最近完成："+String(scanState.lastCompletedName)+"｜"+String(scanState.lastCompletedPath||""));
@@ -368,6 +369,8 @@ function newIndexScanState(rootPath, provider, library) {
     coverReadyCount: 0,
     coverMissingCount: 0,
     coverFailedCount: 0,
+    metadataProcessedCount: 0,
+    metadataFailedCount: 0,
     pausedByUser: false,
     resumeOnNextOpen: false,
     errors: [],
@@ -390,7 +393,8 @@ function indexScanProgressText(scanState,batch,finished=false) {
     "待掃描資料夾："+(scanState.pendingFolders||[]).length+(scanState.currentFolder?"；目前："+scanState.currentFolder:""),
     "本批檢查："+Number(batch.entries||0)+" 個；寫入／更新："+Number(batch.indexed||0)+
       " 個；略過："+Number(batch.skipped||0)+" 個；失敗："+Number(batch.failed||0)+
-      " 個；完成資料夾："+Number(batch.folders||0)+" 個"
+      " 個；完成資料夾："+Number(batch.folders||0)+" 個",
+    "EPUB metadata：已保存 "+Number(scanState.metadataProcessedCount||0)+" 本；解析失敗 "+Number(scanState.metadataFailedCount||0)+" 本"
   ];
   if(batch.currentPath)lines.push("正在處理："+batch.currentPath);
   if(batch.lastCompleted)lines.push("最近完成："+batch.lastCompleted);
@@ -568,6 +572,64 @@ async function readRangeResponse(response,start,end,totalSize) {
   try { await response.body?.cancel(); } catch (_) {}
   if(!response.ok)throw new Error("讀取封面資料失敗：HTTP "+response.status);
   throw new Error("來源未支援 HTTP Range，為避免下載整本書，已停止封面擷取。");
+}
+async function extractEpubMetadata(item,onEvent=()=>{}) {
+  const rangeReader=await makeCoverRangeReader(item,onEvent);
+  const zip=new ZipReader(rangeReader,{useWebWorkers:false,useCompressionStream:true});
+  const entries=await zip.getEntries();
+  const byName=new Map(entries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
+  const container=byName.get("META-INF/container.xml");
+  if(!container)throw new Error("EPUB 缺少 META-INF/container.xml。");
+  const containerText=await container.getData(new TextWriter("utf-8"));
+  const containerXml=new DOMParser().parseFromString(String(containerText||""),"application/xml");
+  if(containerXml.getElementsByTagName("parsererror").length)throw new Error("EPUB container.xml 格式錯誤。");
+  const rootfile=containerXml.getElementsByTagName("rootfile")[0];
+  const opfPath=zipPath(rootfile?.getAttribute("full-path")||"");
+  if(!opfPath)throw new Error("EPUB 沒有有效的 OPF 路徑。");
+  const opfEntry=byName.get(opfPath);
+  if(!opfEntry)throw new Error("EPUB 找不到 OPF metadata。");
+  if(Number(opfEntry.uncompressedSize||0)>2*1024*1024)throw new Error("EPUB OPF metadata 超過 2 MiB。");
+  const opfText=await opfEntry.getData(new TextWriter("utf-8"));
+  const opfXml=new DOMParser().parseFromString(String(opfText||""),"application/xml");
+  if(opfXml.getElementsByTagName("parsererror").length)throw new Error("EPUB OPF XML 格式錯誤。");
+  const elements=localName=>Array.from(opfXml.getElementsByTagNameNS("*",localName));
+  const value=node=>String(node?.textContent||"").replace(/\s+/g," ").trim();
+  const creators=[...new Set(elements("creator").map(value).filter(Boolean))].slice(0,12);
+  const subjects=[...new Set(elements("subject").map(value).filter(Boolean))].slice(0,40);
+  const identifiers=elements("identifier");
+  const uniqueId=opfXml.documentElement?.getAttribute("unique-identifier")||"";
+  const identifier=identifiers.find(node=>node.getAttribute("id")===uniqueId)||identifiers[0];
+  const metadata={
+    title:value(elements("title")[0]).slice(0,240),
+    creators,
+    language:value(elements("language")[0]).slice(0,64),
+    description:value(elements("description")[0]).slice(0,8000),
+    publisher:value(elements("publisher")[0]).slice(0,240),
+    date:value(elements("date")[0]).slice(0,120),
+    identifier:value(identifier).slice(0,500),
+    subjects
+  };
+  onEvent("EPUB metadata 已解析："+(metadata.title||item.name)+"；作者 "+(creators.join("、")||"未提供")+"。","success");
+  return metadata;
+}
+async function saveEpubMetadata(scope,items) {
+  if(!items.length)return 0;
+  let saved=0;
+  for(let offset=0;offset<items.length;offset+=50) {
+    const response=await fetch("/api/cloud/index/metadata",{
+      method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        provider:scope.provider,
+        library:scope.library,
+        rootPath:scope.rootPath,
+        entries:items.slice(offset,offset+50)
+      })
+    });
+    const data=await readJsonResponse(response,"保存 EPUB metadata 至 D1 失敗。");
+    saved+=Number(data.updated||0);
+  }
+  return saved;
 }
 async function findEpubCover(zipEntries,onEvent=()=>{}) {
   const byName=new Map(zipEntries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
@@ -834,7 +896,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
   const pauseButton=$("cloud-scan-pause");
   let scanState=null;
   let outcome={ok:false};
-  const batch={entries:0,indexed:0,skipped:0,failed:0,folders:0,currentPath:"",coverProcessed:0,coverMissing:0,coverFailed:0};
+  const batch={entries:0,indexed:0,skipped:0,failed:0,folders:0,currentPath:"",coverProcessed:0,coverMissing:0,coverFailed:0,metadataProcessed:0,metadataFailed:0};
 
   state.scanRunning=true;
   scanButtons.forEach(id=>{const button=$(id);if(button)button.disabled=true;});
@@ -975,6 +1037,30 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
       }
       appendIndexLog("D1 索引寫入完成："+saved+" 筆；耗時 "+writeElapsed+" ms。","success");
       if(lastBook)appendIndexLog("最近完成："+lastBook.name+"｜"+lastBook.path+"｜已寫入／更新 D1；本頁 D1 "+writeElapsed+" ms。","success");
+
+      const epubFiles=entries.filter(item=>!item.isDir&&item.format==="EPUB");
+      if(epubFiles.length) {
+        appendIndexLog("EPUB metadata 解析開始："+epubFiles.length+" 本；僅透過 HTTP Range 讀取 ZIP 目錄與 OPF，不下載整本 EPUB。");
+        const metadataItems=[];
+        for(const item of epubFiles) {
+          if(state.scanPauseRequested)break;
+          try {
+            const metadata=await extractEpubMetadata(item,message=>appendIndexLog(item.name+"｜"+message));
+            metadataItems.push({path:item.path,metadata});
+          } catch(error) {
+            batch.metadataFailed++;
+            scanState.metadataFailedCount=Number(scanState.metadataFailedCount||0)+1;
+            appendIndexLog("EPUB metadata 解析失敗："+item.name+"｜"+(error.message||error),"warning");
+          }
+        }
+        if(metadataItems.length) {
+          const metadataSaved=await saveEpubMetadata(scope,metadataItems);
+          batch.metadataProcessed+=metadataSaved;
+          scanState.metadataProcessedCount=Number(scanState.metadataProcessedCount||0)+metadataSaved;
+          appendIndexLog("EPUB metadata 已保存至 D1："+metadataSaved+" 本；解析失敗 "+batch.metadataFailed+" 本。","success");
+        }
+        await saveIndexScanState(scanState,scope);
+      }
 
       const total=Math.max(0,Number(listing.total)||found.length);
       if(page*pageSize<total)scanState.page=page+1;
