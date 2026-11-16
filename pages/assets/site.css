@@ -263,6 +263,18 @@ a { color: inherit; }
 .dialog-actions .primary-link { border: 1px solid rgba(220,203,255,.28); font: inherit; font-size: 9px; cursor: pointer; }
 .dialog-danger { border-color: rgba(208,119,141,.2); color: #d49aa8; background: rgba(81,35,49,.22); }
 .dialog-secondary { border-color: rgba(205,188,239,.15); }
+.dialog-link-section { margin: 16px 0 2px; padding: 13px; border: 1px solid rgba(205,188,239,.12); border-radius: 8px; background: rgba(12,10,18,.22); }
+.dialog-link-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.dialog-link-heading h3 { margin:0; color:#ddd3ea; font-size:11px; font-weight:600; }
+.dialog-link-heading p { margin:5px 0 0; color:#857b91; font-size:8px; line-height:1.6; }
+.dialog-link-heading button { flex:0 0 auto; min-height:32px; padding:0 10px; font-size:8px; }
+.dialog-link-status { margin:10px 0 0; color:#bcaed0; font-size:9px; line-height:1.7; }
+.dialog-link-candidates { display:grid; gap:8px; margin-top:10px; max-height:250px; overflow:auto; }
+.dialog-link-candidate { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px; border:1px solid rgba(205,188,239,.1); border-radius:6px; background:rgba(39,33,51,.62); }
+.dialog-link-candidate-copy { display:flex; flex:1; flex-direction:column; gap:4px; min-width:0; }
+.dialog-link-candidate-copy strong { overflow-wrap:anywhere; color:#e4dced; font-size:9px; font-weight:550; }
+.dialog-link-candidate-copy small { overflow-wrap:anywhere; color:#877d94; font-size:8px; line-height:1.5; }
+.dialog-link-action { flex:0 0 auto; min-height:30px; padding:0 11px; font-size:8px; }
 .library-book-grid.is-list { display: flex; flex-direction: column; gap: 11px; }
 .library-book-grid.is-list .library-card { display: grid; grid-template-columns: 82px minmax(0,1fr) minmax(100px,160px) minmax(155px,190px); align-items: center; gap: 14px; padding: 10px; border: 1px solid rgba(205,188,239,.1); border-radius: 8px; background: rgba(30,26,40,.42); }
 .library-book-grid.is-list .library-card-open { grid-column: 1; grid-row: 1 / span 3; }
