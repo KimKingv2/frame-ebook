@@ -46,6 +46,138 @@
   var el = function (id) { return document.getElementById(id); };
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
 
+  function bindReaderRoomControls() {
+    var workspace = el('reading-workspace');
+    var sidebar = el('reader-sidebar');
+    var sidebarToggle = el('reader-sidebar-toggle');
+    var sidebarClose = el('reader-sidebar-close');
+    var sidebarBackdrop = el('reader-sidebar-backdrop');
+    var appearancePanel = el('reader-appearance-panel');
+    var appearanceToggle = el('reader-appearance-toggle');
+    var settingsBackdrop = el('reader-settings-backdrop');
+    var tocSelect = el('toc-select');
+    var paneButtons = Array.prototype.slice.call(document.querySelectorAll('[data-reader-pane]'));
+
+    function isMobile() {
+      return !!(window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
+    }
+    function setSidebar(open) {
+      if (!sidebar || !sidebarToggle || !workspace) return;
+      if (isMobile()) {
+        sidebar.classList.toggle('is-open', !!open);
+        if (sidebarBackdrop) sidebarBackdrop.hidden = !open;
+        sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('reader-drawer-open', !!open);
+      } else {
+        workspace.classList.toggle('reader-sidebar-collapsed', !open);
+        sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+    }
+    function closeSidebar() {
+      if (isMobile()) setSidebar(false);
+    }
+    function selectPane(name) {
+      if (!sidebar) return;
+      var notes = name === 'notes';
+      sidebar.classList.toggle('mobile-pane-notes', notes);
+      sidebar.classList.toggle('mobile-pane-toc', !notes);
+      paneButtons.forEach(function (button) {
+        var active = button.getAttribute('data-reader-pane') === (notes ? 'notes' : 'toc');
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      if (notes) {
+        var panel = el('annotation-panel');
+        var toggle = el('annotation-list-toggle');
+        if (panel) panel.hidden = false;
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+    }
+    function syncSettings() {
+      var open = !!(appearancePanel && appearancePanel.open);
+      if (settingsBackdrop) settingsBackdrop.hidden = !open;
+      if (appearanceToggle) appearanceToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      document.body.classList.toggle('reader-settings-open', open);
+    }
+    function toggleSidebar(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (!sidebar || !workspace) return;
+      if (isMobile()) {
+        var nextOpen = !sidebar.classList.contains('is-open');
+        setSidebar(nextOpen);
+        if (nextOpen) selectPane('toc');
+      } else {
+        setSidebar(workspace.classList.contains('reader-sidebar-collapsed'));
+      }
+    }
+    function toggleSettings(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (!appearancePanel) return;
+      if (isMobile()) closeSidebar();
+      appearancePanel.open = !appearancePanel.open;
+      syncSettings();
+    }
+
+    // Expose a single close path for TOC navigation and the drawer controls.
+    window.frameReaderCloseSidebar = closeSidebar;
+    selectPane('toc');
+    if (isMobile() && sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+
+    // Capture clicks at document level so another nested listener cannot swallow
+    // taps on these two primary controls.
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest('#reader-sidebar-toggle, #reader-appearance-toggle')
+        : null;
+      if (!target) return;
+      if (target.id === 'reader-sidebar-toggle') toggleSidebar(event);
+      else if (target.id === 'reader-appearance-toggle') toggleSettings(event);
+    }, true);
+
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+    paneButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        selectPane(button.getAttribute('data-reader-pane'));
+      });
+    });
+    if (appearancePanel) appearancePanel.addEventListener('toggle', syncSettings);
+    if (settingsBackdrop) {
+      settingsBackdrop.addEventListener('click', function () {
+        if (appearancePanel) appearancePanel.open = false;
+        syncSettings();
+      });
+    }
+    if (tocSelect) {
+      tocSelect.addEventListener('change', function () {
+        if (isMobile()) closeSidebar();
+      });
+    }
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      closeSidebar();
+      if (appearancePanel) appearancePanel.open = false;
+      syncSettings();
+    });
+    window.addEventListener('resize', function () {
+      if (!isMobile()) {
+        if (sidebar) sidebar.classList.remove('is-open');
+        if (sidebarBackdrop) sidebarBackdrop.hidden = true;
+        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+        if (workspace) workspace.classList.remove('reader-sidebar-collapsed');
+        document.body.classList.remove('reader-drawer-open');
+      }
+      syncSettings();
+    });
+    syncSettings();
+  }
+
   var ANNOTATION_COLORS = {
     yellow: '#F2C94C',
     violet: '#A78BFA',
@@ -1009,6 +1141,7 @@
     setText('reading-live-label', detail.stopped ? '本次閱讀已暫停' : '正在記錄本次閱讀');
   });
 
+  bindReaderRoomControls();
   loadAppearance({});
   bindAnnotationControls();
   window.addEventListener('frame-reader-cloud-save-error', function (event) {
