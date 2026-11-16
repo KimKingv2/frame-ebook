@@ -19,6 +19,7 @@ npx wrangler d1 execute frame-reader-db --remote --file=migrations/0002_cloud_ca
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_covers.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0004_cloud_annotations.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0006_remove_legacy_reader_tables.sql
 ```
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
@@ -51,7 +52,7 @@ FRAME Reader uses Cloudflare Zero Trust Access as its website sign-in layer. Acc
 
 This design relies on the Access edge policy. If the production hostname or any API route is left outside the Access application, the corresponding Reader content/API is not protected by an application-level JWT check. Confirm the hostname-wide Access application before deploying or changing its scope.
 
-D1 stores reading events/statistics, the metadata-only cloud catalog, resumable scan state and cover hashes/status. The private R2 bucket stores normalized cover thumbnails only; original EPUB / CBZ files remain in OpenList. Cover extraction uses bounded HTTP Range reads from ZIP archives and does not intentionally download the full book. The app converts extracted covers to small WebP (JPEG fallback) thumbnails and deduplicates them by SHA-256. It never stores OpenList credentials in D1 or R2. The old `auth_attempts` table may remain in D1 and is no longer used.
+D1 stores reading events/statistics, the metadata-only cloud catalog, resumable scan state and cover hashes/status. The private R2 bucket stores normalized cover thumbnails only; original EPUB / CBZ files remain in OpenList. Cover extraction uses bounded HTTP Range reads from ZIP archives and does not intentionally download the full book. The app converts extracted covers to small WebP (JPEG fallback) thumbnails and deduplicates them by SHA-256. It never stores OpenList credentials in D1 or R2. Migration `0006_remove_legacy_reader_tables.sql` drops the retired unscoped `reading_events` table and unused `auth_attempts` table. It preserves `cloud_catalog`, `cloud_scan_state`, cover metadata and `reader_annotations`.
 
 
 ## 3. Configure Cloudflare Access identity for cloud reading data
@@ -84,7 +85,7 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
 
 ## 5. Verify the configuration
 
-1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. Apply `migrations/0001_reading_events.sql`, `migrations/0002_cloud_catalog.sql`, `migrations/0003_cloud_covers.sql`, `migrations/0004_cloud_annotations.sql` and `migrations/0005_cloud_only_reader_data.sql` to the `frame-reader-db` database.
+1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. For a new database, apply migrations 0001 through 0006 in order. For an existing deployment that already has 0001 through 0005, apply only `migrations/0006_remove_legacy_reader_tables.sql` after confirming 0005 has already been applied.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
    - In Workers & Pages → `frame-ebook` → Settings → General, enable Access policy.
    - In Zero Trust → Access → Applications, open the application created for this Pages project and select Configure.
@@ -108,6 +109,6 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 - Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. Migration `0005_cloud_only_reader_data.sql` adds user-scoped preferences, book state and reading-event tables. The two Access identity Variables must be configured as described above.
 - There is no local-file import path or browser-to-LAN OpenList path. A book can enter the shelf only through a completed D1 scan of a configured server-side Alist／OpenList source.
 - `reader_preferences` and `reader_book_state` store per-user preferences and per-book progress/appearance/metadata in D1. `reader_reading_events` stores per-user reading history. The Reader frontend uses only in-memory objects for the active page; persistent user data is written to D1 and cover thumbnails to private R2.
-- The old unscoped `reading_events` table is left untouched by migration 0005. New statistics use the user-scoped `reader_reading_events` table. Old events cannot safely be assigned to an Access identity automatically, so they are not included in new statistics.
-- Legacy IndexedDB/localStorage data from older releases is not read by the cloud-only app and is not automatically deleted. This release does not transfer old browser-only progress or unscoped reading history into an Access identity. Leave those legacy records untouched until any needed information has been exported or deliberately discarded.
+- Migration 0006 permanently drops the old unscoped `reading_events` table and the unused `auth_attempts` table. New statistics use the user-scoped `reader_reading_events` table.
+- On first visit after this release, `legacy-cleanup.js` automatically deletes the old `frame-reader-library` IndexedDB database and all `frame-reader-*` keys from localStorage/sessionStorage. If deletion is blocked by an older open tab, close old FRAME Reader tabs and revisit the site to retry. No browser-only book files or progress are migrated because they have been explicitly retired.
 - Reader uses only the three server-side provider IDs: `vps`, `worker` and `mobile`. The cloud file proxy fetches the original archive on demand; the book blob exists in memory only for the active reading session.
