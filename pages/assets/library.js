@@ -1,7 +1,7 @@
 import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261116-filename-id-r1";
 
 const $ = id => document.getElementById(id);
-const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null };
+const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, linkTargetBookId: null };
 const readerUrl = book => {
   const source = book?.cloudSource || {};
   const query = new URLSearchParams({
@@ -214,6 +214,7 @@ async function showBookDetails(id) {
   const book = await getBook(id);
   if (!book) return;
   state.dialogBookId = id;
+  state.linkTargetBookId = id;
   $("detail-heading").textContent = getBookShelf(book) === "comics" ? "漫畫資訊" : "電子書資訊";
   $("detail-title").value = book.title || "";
   $("detail-shelf").value = getBookShelf(book);
@@ -249,6 +250,18 @@ async function showBookDetails(id) {
       link.append(name,meta); volumeList.appendChild(link);
     });
   }
+  const linkTargets = siblings.length > 1 ? siblings : [book];
+  const targetSelect = $("detail-link-target");
+  targetSelect.replaceChildren();
+  linkTargets.forEach(volume => {
+    const option = document.createElement("option");
+    option.value = volume.id;
+    option.textContent = volume.fileName || volume.title || "未命名檔案";
+    targetSelect.appendChild(option);
+  });
+  $("detail-link-target-wrap").hidden = linkTargets.length < 2;
+  targetSelect.value = book.id;
+  state.linkTargetBookId = book.id;
   $("detail-link-status").hidden = true;
   $("detail-link-status").textContent = "";
   $("detail-link-candidates").hidden = true;
@@ -278,7 +291,7 @@ function formatReadingTime(seconds) {
 }
 
 async function linkOldBookData(oldBookId, oldTitle, button) {
-  const book = await getBook(state.dialogBookId);
+  const book = await getBook(state.linkTargetBookId || state.dialogBookId);
   if (!book) return;
   const confirmed = window.confirm(
     "確定將「" + oldTitle + "」的舊閱讀資料關聯到「" + book.fileName + "」嗎？\\n\\n" +
@@ -308,9 +321,10 @@ async function linkOldBookData(oldBookId, oldTitle, button) {
       "閱讀事件 " + (Number(moved.readingEvents) || 0) + " 筆",
       "標註 " + (Number(moved.annotations) || 0) + " 筆"
     ].join(" · ");
+    const detailsBookId = state.dialogBookId;
     $("book-dialog").close();
     await refresh();
-    await showBookDetails(book.id);
+    await showBookDetails(detailsBookId);
     const resultStatus = $("detail-link-status");
     resultStatus.hidden = false;
     resultStatus.textContent = "關聯完成。" + summary + (data.note ? " " + data.note : "");
@@ -322,7 +336,8 @@ async function linkOldBookData(oldBookId, oldTitle, button) {
 }
 
 async function showLinkCandidates() {
-  const book = state.books.find(item => item.id === state.dialogBookId) || await getBook(state.dialogBookId);
+  const targetId = state.linkTargetBookId || state.dialogBookId;
+  const book = state.books.find(item => item.id === targetId) || await getBook(targetId);
   if (!book) return;
   const button = $("detail-link-open");
   const status = $("detail-link-status");
@@ -410,6 +425,7 @@ $("view-list").addEventListener("click", () => { state.view = "list"; render(); 
 $("detail-form").addEventListener("submit", event => { saveDetails(event).catch(error => { $("library-status").textContent = "雲端保存失敗：" + error.message; }); });
 $("detail-cancel").addEventListener("click", () => $("book-dialog").close());
 $("detail-link-open").addEventListener("click", () => { showLinkCandidates().catch(error => { $("detail-link-status").hidden = false; $("detail-link-status").textContent = error.message || String(error); }); });
+$("detail-link-target").addEventListener("change", event => { state.linkTargetBookId = event.target.value || state.dialogBookId; $("detail-link-candidates").hidden = true; $("detail-link-status").hidden = true; });
 $("detail-open").addEventListener("click", () => {
   const book = state.books.find(item => item.id === state.dialogBookId);
   if (book) location.href = readerUrl(book);
