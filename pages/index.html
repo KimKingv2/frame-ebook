@@ -167,6 +167,14 @@
         <h3 id="detail-volumes-heading">資料夾內冊數</h3>
         <div id="detail-volume-list" class="dialog-volume-list"></div>
       </section>
+      <section class="dialog-link-section">
+        <div class="dialog-link-heading">
+          <div><h3>書籍身份管理</h3><p>如果這本書曾經改名，可在這裡接回舊閱讀記憶。</p></div>
+          <button id="detail-link-open" type="button" class="dialog-secondary">關聯舊資料</button>
+        </div>
+        <p id="detail-link-status" class="dialog-link-status" role="status" hidden></p>
+        <div id="detail-link-candidates" class="dialog-link-candidates" hidden></div>
+      </section>
       <div class="dialog-actions">
         
         <span></span>
@@ -179,6 +187,6 @@
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/library.js?v=20261116-filename-id-r1"></script>
+  <script type="module" src="/assets/library.js?v=20261116-book-link-r1"></script>
 </body>
 </html>
