@@ -400,7 +400,7 @@ function indexScanProgressText(scanState,batch,finished=false) {
   if(batch.stopReason)lines.push("本批停止原因："+batch.stopReason);
   if(scanState.currentFolder)lines.push("續作游標：第 "+Number(scanState.page||1)+" 頁；每頁完成後保存至 D1。");
   if(scanState.completed)lines.push("目錄索引已完成。重新進入時會直接讀取 D1 書架；封面佇列完成後不會重複遍歷目錄。");
-  else if(finished&&state.scanPauseRequested)lines.push("已要求暫停，進度已保存；可在下次進入時續掃。");
+  else if(finished&&state.scanPauseRequested)lines.push("已要求暫停，進度已保存；下次開啟後按「掃描／續掃」即可手動繼續。");
   else if(finished)lines.push("本批結束，進度已保存到 D1；可關閉頁面，之後再續掃。");
   else lines.push("掃描進行中；目錄索引與續作游標會持續保存至 D1。");
   const lastError=scanState.errors?.[scanState.errors.length-1];
@@ -1012,8 +1012,8 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
         batch.entries>=maxEntriesPerBatch?"達到每批 500 個目錄項目上限":
         batch.folders>=maxFoldersPerBatch?"達到每批 500 個資料夾上限":"達到單批 4 分鐘安全時限";
       batch.stopReason=reason;
-      scanState.pausedByUser=!!state.scanPauseRequested&&state.scanPauseReason==="manual";
-      scanState.resumeOnNextOpen=!!state.scanPauseRequested&&state.scanPauseReason!=="manual";
+      scanState.pausedByUser=!!state.scanPauseRequested;
+      scanState.resumeOnNextOpen=false;
       await saveIndexScanState(scanState,scope);
       setIndexProgress(indexScanProgressText(scanState,batch,true),false);
       appendIndexLog("本批結束："+reason+"；進度已保存，可再次點擊續掃。","warning");
@@ -1075,29 +1075,31 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
     }
   }
 }
-async function runLibraryScanContinuous(library,options={}) {
+async function runLibraryScan(library,options={}) {
   if(state.scanAllRunning||state.scanRunning)return;
+  const continueFullRescan=options.forceRescan===true;
   state.scanAllRunning=true;
   state.scanPauseRequested=false;
   state.scanPauseReason="";
   ["cloud-scan-books","cloud-scan-comics","cloud-scan-all","cloud-retry-covers","cloud-scan-books-full","cloud-scan-comics-full"].forEach(id=>{const button=$(id);if(button)button.disabled=true;});
-  appendIndexLog("========== 開始連續掃描："+LIBRARY_LABELS[library]+" ==========");
+  appendIndexLog("========== 開始"+(continueFullRescan?"完整重掃":"掃描／續掃")+"："+LIBRARY_LABELS[library]+" ==========");
   let result={ok:false};
   let firstPass=true;
   try {
     do {
-      result=await runIndexScan(library,true,{forceRescan:firstPass&&options.forceRescan===true});
+      result=await runIndexScan(library,true,{forceRescan:firstPass&&continueFullRescan});
       firstPass=false;
-      if(!result?.ok||result.paused||result.cancelled)break;
-      if(!result.completed)appendIndexLog("本批已保存；自動從 D1 游標繼續下一批。","warning");
+      if(!result?.ok||result.paused||result.cancelled||!continueFullRescan)break;
+      if(!result.completed)appendIndexLog("完整重掃本批已保存；自動從 D1 游標接續下一批。","warning");
     } while(!result.completed);
+    if(result?.ok&&!result.completed&&!result.paused&&!result.cancelled&&!continueFullRescan) {
+      appendIndexLog("本批已結束，D1 游標已保存。再次按「掃描／續掃」即可繼續；開啟網站或管理視窗時不會自動索引。","info");
+    }
     return result;
   } finally {
-    const resumeAfterClose=result?.paused&&state.scanPauseReason==="close"&&$("cloud-settings-dialog")?.open;
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all","cloud-retry-covers","cloud-scan-books-full","cloud-scan-comics-full"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
     ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
-    if(resumeAfterClose)void resumeSavedScanOnOpen();
   }
 }
 async function runAllIndexScans() {
@@ -1126,11 +1128,9 @@ async function runAllIndexScans() {
     if(!stopped)appendIndexLog("========== 電子書與漫畫兩個書庫均已完成 ==========","success");
     else appendIndexLog("連續掃描已停止；已完成項目及 D1 進度保留，可稍後續作。","warning");
   } finally {
-    const resumeAfterClose=stopped&&state.scanPauseReason==="close"&&$("cloud-settings-dialog")?.open;
     state.scanAllRunning=false;
     ["cloud-scan-books","cloud-scan-comics","cloud-scan-all","cloud-retry-covers"].forEach(id=>{const button=$(id);if(button)button.disabled=false;});
     ["cloud-provider","cloud-library-type","cloud-books-root","cloud-comics-root","cloud-save-roots","cloud-save-source","cloud-test-source"].forEach(id=>{const control=$(id);if(control)control.disabled=false;});
-    if(resumeAfterClose)void resumeSavedScanOnOpen();
   }
 }
 async function retryCurrentLibraryCovers() {
@@ -1153,7 +1153,7 @@ async function retryCurrentLibraryCovers() {
       setIndexProgress("目前 "+LIBRARY_LABELS[scope.library]+"沒有可重試的失敗封面。");
       return;
     }
-    await runLibraryScanContinuous(scope.library);
+    await runLibraryScan(scope.library);
   } catch(error) {
     appendIndexLog("重試失敗封面時發生錯誤："+(error.message||error),"error");
     setIndexProgress("重試失敗封面失敗："+(error.message||error),true);
@@ -1169,39 +1169,9 @@ function pauseIndexScan(reason="manual") {
   if(button)button.disabled=true;
   setIndexProgress(reason==="manual"
     ?"已要求手動暫停；目前目錄頁或封面工作完成並保存 D1 游標後就會停止。"
-    :"已關閉掃描視窗；目前工作完成後會保存 D1 游標，下次開啟可自動續掃。");
+    :"已關閉掃描視窗；目前工作完成後會保存 D1 游標。下次開啟後，按「掃描／續掃」手動繼續。");
 }
 
-async function findResumableScanScope() {
-  if(!state.authenticated||!isActiveSourceReady())return null;
-  for(const library of ["books","comics"]) {
-    const scope=indexScope(library);
-    try {
-      const saved=await loadIndexScanState(scope);
-      if(!saved||saved.pausedByUser)continue;
-      let coverPending=false;
-      if(saved.completed) {
-        const pending=await fetchPendingCovers(scope,1);
-        coverPending=Number(pending.total||0)>0;
-      }
-      if(!saved.completed||coverPending)return {scope,saved};
-    } catch(error) {
-      appendIndexLog("檢查"+LIBRARY_LABELS[library]+"自動續掃狀態失敗："+String(error?.message||error),"error");
-    }
-  }
-  return null;
-}
-async function resumeSavedScanOnOpen() {
-  if(state.scanRunning||state.scanAllRunning)return;
-  try {
-    const resumable=await findResumableScanScope();
-    if(!resumable)return;
-    appendIndexLog("重新開啟索引管理："+LIBRARY_LABELS[resumable.scope.library]+" 已找到保存的 D1 游標／封面佇列，開始自動續作。","warning");
-    void runLibraryScanContinuous(resumable.scope.library);
-  } catch(error) {
-    appendIndexLog("檢查自動續掃狀態失敗："+String(error?.message||error),"error");
-  }
-}
 async function checkSession() {
   try {
     const response=await fetch("/api/auth/session",{credentials:"same-origin"});
@@ -1232,8 +1202,6 @@ async function checkSession() {
         state.currentPath=getActiveRoot();
         setSourceStatus("私人書庫已登入，正在讀取 "+PROVIDER_LABELS[state.activeProvider]+" · "+LIBRARY_LABELS[state.activeLibrary]+" 的 D1 索引……");
         await loadDirectory(state.currentPath,1);
-        const resumable=await findResumableScanScope();
-        if(resumable)openCloudSettings(resumable.scope.library);
       } else {
         setSourceStatus("私人書庫已登入。請先完成 "+PROVIDER_LABELS[state.activeProvider]+" 的帳號密碼設定，再按「讀取書架」。",true);
       }
@@ -1463,7 +1431,6 @@ function openCloudSettings(targetLibrary=state.activeLibrary) {
   readRootSelections(state.activeProvider);
   $("cloud-provider").value=state.activeProvider;
   void renderAllScanSummaries(state.activeProvider,state.selectedRoots);
-  void resumeSavedScanOnOpen();
 }
 if(isManagerEmbed) {
   window.addEventListener("message",event=>{
@@ -1493,15 +1460,15 @@ settingsDialog?.addEventListener("close",()=>{
 window.addEventListener("pagehide",()=>{
   if(state.scanRunning||state.scanAllRunning)pauseIndexScan("close");
 });
-$("cloud-scan-books").addEventListener("click",()=>runLibraryScanContinuous("books"));
-$("cloud-scan-comics").addEventListener("click",()=>runLibraryScanContinuous("comics"));
+$("cloud-scan-books").addEventListener("click",()=>runLibraryScan("books"));
+$("cloud-scan-comics").addEventListener("click",()=>runLibraryScan("comics"));
 $("cloud-scan-books-full").addEventListener("click",()=>{
   if(window.confirm("將完整重掃電子書根目錄：重新遍歷所有資料夾與 EPUB，更新 D1 書目及封面，完成後清理已不存在的索引。原始檔案與閱讀標註不會被修改。確定開始？"))
-    void runLibraryScanContinuous("books",{forceRescan:true});
+    void runLibraryScan("books",{forceRescan:true});
 });
 $("cloud-scan-comics-full").addEventListener("click",()=>{
   if(window.confirm("將完整重掃漫畫根目錄：重新遍歷所有資料夾與 EPUB／CBZ，更新 D1 書目及封面，完成後清理已不存在的索引。原始檔案與閱讀標註不會被修改。確定開始？"))
-    void runLibraryScanContinuous("comics",{forceRescan:true});
+    void runLibraryScan("comics",{forceRescan:true});
 });
 $("cloud-scan-all").addEventListener("click",runAllIndexScans);
 $("cloud-scan-pause").addEventListener("click",()=>pauseIndexScan("manual"));
