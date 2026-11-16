@@ -30,6 +30,18 @@
         <a class="primary-button" href="/">返回雲端書架</a>
         <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
       </section>
+      <section id="local-reader-login" class="local-reader-login" hidden>
+        <div><p class="eyebrow">LOCAL OPENLIST LOGIN</p><h2>閱讀室需要重新登入本地端口</h2>
+          <p>本地端口的登入 Token 不會跨頁保存。請在此輸入本地 OpenList 帳號密碼，登入後直接讀取原始書檔。</p>
+        </div>
+        <div class="local-reader-login-fields">
+          <label for="reader-local-base-url">OpenList 網址<input id="reader-local-base-url" type="url" placeholder="http://192.168.31.185:5244" autocomplete="url"></label>
+          <label for="reader-local-username">帳號<input id="reader-local-username" type="text" autocomplete="username"></label>
+          <label for="reader-local-password">密碼<input id="reader-local-password" type="password" autocomplete="current-password"></label>
+          <button id="reader-local-login" type="button">登入並繼續閱讀</button>
+          <p id="reader-local-login-status" role="status">密碼只用於本次登入，不會保存。</p>
+        </div>
+      </section>
 
       <details class="appearance-panel">
         <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
