@@ -57,41 +57,21 @@ export async function onRequestGet({ request, env }) {
       target = new URL(target.pathname + target.search, config.base);
     }
 
-    const headers = new Headers();
-    const range = request.headers.get("Range");
-    if (range && /^bytes=\d*-\d*(,\d*-\d*)*$/.test(range)) headers.set("Range", range);
-    const upstream = await fetch(target.toString(), {
-      method: "GET",
-      headers,
-      redirect: "follow"
-    });
-
-    if (![200, 206, 416].includes(upstream.status)) {
-      return json({ error: "OpenList 檔案來源回應 HTTP " + upstream.status + "。" }, 502);
+    // Return the signed/raw download URL to the browser instead of proxying
+    // the entire archive through the Pages Function. fetch() in the reader
+    // follows this 302 automatically and downloads directly from OpenList.
+    if (target.username || target.password) {
+      return json({ error: "OpenList 回傳的檔案位址不可包含 URL 帳密。" }, 502);
     }
 
-    const responseHeaders = new Headers({
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Disposition": "inline; filename*=UTF-8''" + encodeURIComponent(String(metadata.name || path.split("/").pop()))
-    });
-    [
-      "Content-Type",
-      "Content-Length",
-      "Content-Range",
-      "Accept-Ranges",
-      "ETag",
-      "Last-Modified"
-    ].forEach(name => {
-      const value = upstream.headers.get(name);
-      if (value) responseHeaders.set(name, value);
-    });
-    if (!responseHeaders.has("Content-Type")) {
-      responseHeaders.set("Content-Type", /\.cbz$/i.test(path) ? "application/vnd.comicbook+zip" : "application/epub+zip");
-    }
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Location": target.toString(),
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff"
+      }
     });
   } catch (error) {
     return json({ error: error && error.message ? error.message : "OpenList 檔案讀取失敗。" }, 502);
