@@ -5,6 +5,17 @@ function isLocalHost(hostname) {
   return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
 }
 
+const FILE_LINK_RETRY_DELAYS_MS = [700, 1500];
+const TRANSIENT_FILE_LINK_ERROR = /(?:i\\/o timeout|client\\.timeout exceeded|context deadline exceeded|dial tcp[^\\n]*timeout|tls handshake timeout|connection timed out|operation timed out|temporary failure in name resolution|server misbehaving|no such host|network is unreachable|connection reset by peer|unexpected eof)/i;
+
+function isTransientFileLinkError(error) {
+  return TRANSIENT_FILE_LINK_ERROR.test(String(error && error.message || error || ""));
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function onRequestGet({ request, env }) {
   const denied = await requireAuth(request, env);
   if (denied) return denied;
@@ -37,13 +48,47 @@ export async function onRequestGet({ request, env }) {
   }
 
   try {
-    const metadata = await openListPost(env, "/api/fs/get", {
-      path,
-      password: "",
-      page: 1,
-      per_page: 0,
-      refresh: false
-    }, provider, library);
+    // Keep the request identical to FRAME Audio: /api/fs/get only needs
+    // the absolute path and optional password. Retry brief upstream network
+    // failures without changing the 302 direct-download architecture.
+    let metadata = null;
+    let lastLinkError = null;
+    let retryCount = 0;
+
+    for (let attempt = 1; attempt <= FILE_LINK_RETRY_DELAYS_MS.length + 1; attempt += 1) {
+      try {
+        metadata = await openListPost(env, "/api/fs/get", {
+          path,
+          password: ""
+        }, provider, library);
+        lastLinkError = null;
+        break;
+      } catch (error) {
+        lastLinkError = error;
+        if (!isTransientFileLinkError(error) || attempt > FILE_LINK_RETRY_DELAYS_MS.length) break;
+
+        const delayMs = FILE_LINK_RETRY_DELAYS_MS[attempt - 1];
+        retryCount += 1;
+        console.warn("[FRAME Ebook] retrying transient OpenList file-link failure", {
+          provider,
+          attempt,
+          nextAttempt: attempt + 1,
+          delayMs,
+          reason: "temporary provider network failure"
+        });
+        await sleep(delayMs);
+      }
+    }
+
+    if (lastLinkError) {
+      const message = String(lastLinkError.message || "OpenList 檔案讀取失敗。");
+      throw new Error(
+        retryCount > 0 && isTransientFileLinkError(lastLinkError)
+          ? message + "（已自動重試 " + retryCount + " 次，仍未成功）"
+          : message
+      );
+    }
+
     if (!metadata || metadata.is_dir || !metadata.raw_url) return json({ error: "OpenList 沒有提供這個檔案的下載位址。" }, 502);
 
     let target;
