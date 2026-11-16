@@ -19,7 +19,7 @@ The only route for adding a book is a recursive scan of a configured server-side
 
 The Reader frontend does not persist personal or library data in IndexedDB, localStorage or sessionStorage. JavaScript objects and the current book archive exist in browser memory only for the active page/session. They disappear when the page closes or reloads; the authoritative state remains in D1/R2 and the original archive remains in Alist／OpenList.
 
-Older releases used IndexedDB and localStorage. Migration 0005 does not delete or silently import those legacy browser records. The cloud-only version no longer reads them. Any legacy local-only books must be moved into an Alist／OpenList source and scanned before they are available here. Legacy reading events in the old unscoped `reading_events` table are not merged into user-specific statistics because they cannot safely be assigned to a Cloudflare Access identity.
+Older releases used IndexedDB and localStorage. On first visit after the cloud-only release, `legacy-cleanup.js` deletes the `frame-reader-library` IndexedDB database and all `frame-reader-*` localStorage/sessionStorage keys. If an older open tab blocks database deletion, close that tab and revisit the site. Migration 0006 drops the retired unscoped `reading_events` table and unused `auth_attempts` table. The D1 cloud catalog, resumable scan state, cover metadata and cloud annotations are preserved.
 
 ## 2. Stable cloud book identity
 
@@ -106,5 +106,6 @@ Schema migrations:
 3. `0003_cloud_covers.sql` — cover metadata.
 4. `0004_cloud_annotations.sql` — user-scoped cloud annotations.
 5. `0005_cloud_only_reader_data.sql` — user-scoped preferences, book state and reading events.
+6. `0006_remove_legacy_reader_tables.sql` — removes retired unscoped reading events and the unused legacy auth-attempt table.
 
 For an existing deployment that already applied migrations 0001–0004, apply only migration 0005. Do not recreate or reset the database. See `docs/CLOUDFLARE-SETUP.md` for environment configuration and deployment steps.
