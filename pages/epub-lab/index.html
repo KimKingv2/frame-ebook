@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-local-reader-r1">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-annotations-r1">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -209,13 +209,46 @@
             <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
           </div>
           <button id="next-page" type="button" disabled>下一頁 →</button>
+          <button id="annotation-list-toggle" class="annotation-list-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">筆記與標註 <span id="annotation-count">0</span></button>
         </section>
+        <section id="annotation-panel" class="annotation-panel" hidden aria-label="本書筆記與標註">
+          <div class="annotation-panel-heading">
+            <div><p class="eyebrow">YOUR ANNOTATIONS</p><h3>筆記與標註</h3></div>
+            <button id="annotation-refresh" type="button" class="annotation-refresh">重新整理</button>
+          </div>
+          <div id="annotation-list" class="annotation-list">
+            <p class="annotation-empty">載入書籍後顯示本書的筆記與高亮。</p>
+          </div>
+        </section>
+        <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
+          <span class="annotation-toolbar-label">標記</span>
+          <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
+          <button type="button" class="annotation-color-button is-violet" data-highlight-color="violet" title="紫色高亮" aria-label="紫色高亮"></button>
+          <button type="button" class="annotation-color-button is-mint" data-highlight-color="mint" title="綠色高亮" aria-label="綠色高亮"></button>
+          <button type="button" class="annotation-color-button is-rose" data-highlight-color="rose" title="粉色高亮" aria-label="粉色高亮"></button>
+          <button type="button" id="selection-add-note" class="annotation-note-action">寫筆記</button>
+          <button type="button" id="selection-dismiss" class="annotation-dismiss" aria-label="關閉選取工具列">×</button>
+        </div>
+        <dialog id="annotation-note-dialog" class="annotation-note-dialog" aria-labelledby="annotation-note-title">
+          <div class="annotation-note-dialog-head">
+            <div><p class="eyebrow">PRIVATE READING NOTE</p><h3 id="annotation-note-title">為這段文字寫筆記</h3></div>
+            <button type="button" id="annotation-note-delete" class="annotation-note-delete" hidden>刪除筆記</button>
+          </div>
+          <blockquote id="annotation-note-quote" class="annotation-note-quote"></blockquote>
+          <label class="annotation-note-label" for="annotation-note-text">我的筆記</label>
+          <textarea id="annotation-note-text" rows="5" maxlength="20000" placeholder="記下你的想法、解讀或補充資料……"></textarea>
+          <p id="annotation-note-status" class="annotation-note-status" role="status"></p>
+          <div class="annotation-note-actions">
+            <button type="button" id="annotation-note-cancel">取消</button>
+            <button type="button" id="annotation-note-save" class="annotation-note-save">保存筆記</button>
+          </div>
+        </dialog>
         <p id="reader-status" class="reader-status" role="status">尚未載入 EPUB。</p>
         <p class="reading-session-indicator"><span class="record-dot"></span><span id="reading-live-label">閱讀時間計時待命</span><strong id="reading-live-duration">00:00</strong><small>前景閱讀 · 閒置 5 分鐘暫停</small></p>
       </section>
       <section class="notice">
         <strong>閱讀資料保存</strong>
-        <p>原始 EPUB／CBZ 留在 Alist／OpenList，閱讀時才透過伺服器端讀取。D1 保存每本書的 CFI／頁碼、閱讀外觀、自訂書名作者與閱讀統計；書籤、筆記與高亮的資料接口已預留，閱讀器介面尚未啟用。所有資料依 Cloudflare Access 登入身分隔離。瀏覽器只在當前閱讀工作階段使用記憶體，不建立本機書庫或持久化閱讀資料。</p>
+        <p>原始 EPUB／CBZ 留在 Alist／OpenList。選取 EPUB 正文即可新增彩色高亮或筆記；所有標註以 CFI 定位並保存至 Cloudflare D1，重新開啟書籍後會自動恢復。標註僅屬於目前 Cloudflare Access 帳戶，不會修改雲端原始書檔。</p>
       </section>
     </main>
     <footer class="footer">
@@ -234,6 +267,6 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-stream-reader-r2"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-annotations-r1"></script>
 </body>
 </html>
