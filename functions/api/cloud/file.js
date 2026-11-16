@@ -10,6 +10,7 @@ export async function onRequestGet({ request, env }) {
   if (denied) return denied;
   const requestUrl = new URL(request.url);
   const provider = requestUrl.searchParams.get("provider") || "vps";
+  const catalogProvider = "vps";
   const library = requestUrl.searchParams.get("library") === "comics" ? "comics" : "books";
   if (!["vps", "worker", "mobile"].includes(provider)) return json({ error: "不支援的雲端來源。請選擇已設定的伺服器端 Alist／OpenList 來源。" }, 400);
   const config = getOpenListConfig(env, provider, library);
@@ -26,7 +27,7 @@ export async function onRequestGet({ request, env }) {
   try {
     const indexed = await db.prepare(
       "SELECT is_dir,format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=?"
-    ).bind(provider, library, rootPath, path).first();
+    ).bind(catalogProvider, library, rootPath, path.first();
     const expectedFormat = path.toLowerCase().endsWith(".cbz") ? "CBZ" : "EPUB";
     if (!indexed || Number(indexed.is_dir) !== 0 || indexed.format !== expectedFormat) {
       return json({ error: "這個檔案不在目前來源的書庫索引中。請先完成或更新索引，再重新載入書架。" }, 404);
