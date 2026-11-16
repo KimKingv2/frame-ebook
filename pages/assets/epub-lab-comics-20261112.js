@@ -403,8 +403,10 @@
     restorePageIndex = view.isFixedLayout && Number.isInteger(savedProgress.index) && savedProgress.index >= 0
       ? savedProgress.index : null;
     restoring = !!restoreCfi || restorePageIndex !== null;
-    setText('book-title', libraryRecord.title || titleText(metadata.title) || name);
-    setText('book-author', libraryRecord.author || titleText(metadata.author) || (isCbz ? '漫畫圖像檔' : name));
+    setText('book-title', libraryRecord.manualTitle && libraryRecord.title
+      ? libraryRecord.title : (titleText(metadata.title) || libraryRecord.title || name));
+    setText('book-author', libraryRecord.manualAuthor && libraryRecord.author
+      ? libraryRecord.author : (titleText(metadata.author) || libraryRecord.author || (isCbz ? '漫畫圖像檔' : name)));
     populateTOC(parsedBook.toc || []);
     var metadataPatch = { lastOpenedAt: Date.now() };
     if (!libraryRecord.manualTitle && titleText(metadata.title)) metadataPatch.title = titleText(metadata.title);
