@@ -21,7 +21,6 @@
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-stream-reader-r1');
   var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
-  var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
     sepia: { background: '#f1e7d5', foreground: '#40362b', colorScheme: 'light' },
@@ -86,7 +85,7 @@
       hideSelectionToolbar(false);
       return;
     }
-    var quote = String(selection.toString() || '').replace(/\\s+/g, ' ').trim();
+    var quote = String(selection.toString() || '').replace(/\s+/g, ' ').trim();
     if (!quote || quote.length > 12000) {
       hideSelectionToolbar(false);
       return;
