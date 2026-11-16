@@ -8,7 +8,7 @@
   <meta name="description" content="FRAME Reader，透過 Alist／OpenList 掃描索引的雲端電子書與漫畫書架。">
   <title>FRAME Reader · My Library</title>
   <link rel="preload" as="image" href="/assets/covers/frame-sample.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/site.css?v=20261116-metadata-bangumi-r3">
+  <link rel="stylesheet" href="/assets/site.css?v=20261116-folder-navigation-r1">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -29,7 +29,7 @@
       <span class="edition"><span class="edition-dot"></span> PRIVATE LIBRARY · 0.7</span>
     </header>
 
-    <section class="hero library-hero">
+    <section id="library-hero" class="hero library-hero">
       <div class="hero-copy">
         <p class="eyebrow"><span class="eyebrow-line"></span> YOUR PRIVATE READING ROOM</p>
         <h1>把喜歡的書，<br><em>安放在自己的書架。</em></h1>
@@ -53,7 +53,7 @@
       </div>
     </section>
 
-    <section class="library-stats" aria-label="書庫統計">
+    <section id="library-stats" class="library-stats" aria-label="書庫統計">
       <article><span>BOOKS IN LIBRARY</span><strong id="book-count">00</strong><small>已收藏書籍</small></article>
       <article><span>IN PROGRESS</span><strong id="started-count">00</strong><small>正在閱讀</small></article>
       <article><span>EPUB</span><strong id="epub-count">00</strong><small>文字與固定版面</small></article>
@@ -66,6 +66,21 @@
         <span class="section-subtitle">從上次停下的地方接著讀</span>
       </div>
       <div id="recent-grid" class="book-grid recent-grid"></div>
+    </section>
+
+    <section id="folder-detail" class="folder-detail-section" hidden aria-labelledby="folder-detail-title">
+      <div class="folder-detail-topline">
+        <button id="folder-detail-back" class="folder-detail-back" type="button">← 返回我的書架</button>
+        <span id="folder-detail-count" class="folder-detail-count"></span>
+      </div>
+      <div class="folder-detail-heading">
+        <p class="section-kicker">YOUR FOLDER · BOOK COLLECTION</p>
+        <h2 id="folder-detail-title">資料夾</h2>
+        <p id="folder-detail-path" class="folder-detail-path"></p>
+        <p id="folder-detail-status" class="folder-detail-status"></p>
+      </div>
+      <div id="folder-books-grid" class="book-grid folder-books-grid"></div>
+      <div id="folder-detail-empty" class="folder-detail-empty" hidden>這個資料夾目前沒有可閱讀的書籍。</div>
     </section>
 
     <section class="shelf-section library-shelf" id="library">
@@ -128,13 +143,13 @@
       <p id="library-status" class="library-status" role="status" aria-live="polite">正在開啟我的書架……</p>
     </section>
 
-    <section class="library-privacy">
+    <section id="library-privacy" class="library-privacy">
       <span class="privacy-mark">⌂</span>
       <div><strong>雲端保存書檔，Cloudflare 保存你的閱讀資料。</strong><p>原始 EPUB／CBZ 留在 Alist／OpenList；D1 保存索引、閱讀位置、閱讀統計、分類與外觀偏好，R2 保存索引封面。書籤、螢光標記與筆記也保存在 D1，依 Cloudflare Access 使用者身分隔離。瀏覽器只在閱讀時暫時載入書檔，不會建立本機書庫或持久化副本。</p></div>
       <span class="privacy-tag">PRIVATE BY DESIGN</span>
     </section>
 
-    <section class="bottom-banner library-bottom-banner">
+    <section id="library-bottom-banner" class="bottom-banner library-bottom-banner">
       <div><p class="section-kicker">ONE BOOK · YOUR OWN RHYTHM</p><h2>翻到下一頁，繼續自己的故事。</h2></div>
       <a href="/epub-lab/">進入閱讀空間 <span aria-hidden="true">↗</span></a>
     </section>
@@ -205,6 +220,6 @@
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/library.js?v=20261116-metadata-bangumi-r4"></script>
+  <script type="module" src="/assets/library.js?v=20261116-folder-navigation-r1"></script>
 </body>
 </html>
