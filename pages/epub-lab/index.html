@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r1">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r2">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -209,8 +209,12 @@
             <section class="reader-sidebar-section" aria-label="章節目錄">
               <div class="reader-sidebar-section-title"><span>章節目錄</span><small>CONTENTS</small></div>
           <div class="toc-wrap">
-              <label for="toc-select">章節目錄</label>
-              <select id="toc-select" disabled><option value="">載入書籍後顯示目錄</option></select>
+              <div id="toc-tree" class="toc-tree" aria-label="EPUB 階層目錄">
+                <p class="toc-tree-empty">載入書籍後顯示目錄</p>
+              </div>
+              <select id="toc-select" class="toc-select-compat" aria-hidden="true" tabindex="-1" disabled>
+                <option value="">載入書籍後顯示目錄</option>
+              </select>
             </div>
             </section>
             <section class="reader-sidebar-section reader-sidebar-annotations" aria-label="個人筆記與標註">
@@ -346,6 +350,6 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-annotations-r2"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-toc-annotations-r1"></script>
 </body>
 </html>
