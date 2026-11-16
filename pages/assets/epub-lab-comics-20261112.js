@@ -635,7 +635,7 @@
     });
     button.disabled = !cfi || !currentBookId;
     button.setAttribute('aria-pressed', bookmarked ? 'true' : 'false');
-    button.textContent = bookmarked ? '★ 已加入書籤' : '☆ 加入書籤';
+    button.textContent = bookmarked ? '★ 書籤' : '☆ 書籤';
     button.title = bookmarked ? '移除此頁書籤' : '將目前閱讀位置加入書籤';
   }
 
