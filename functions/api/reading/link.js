@@ -13,7 +13,7 @@ function fileNameFromPath(path) {
 }
 
 function titleFromFileName(name) {
-  return String(name || "").replace(/\\.(epub|cbz)$/i, "") || "未命名書籍";
+  return String(name || "").replace(/\.(epub|cbz)$/i, "") || "未命名書籍";
 }
 
 function parseJson(value, fallback = {}) {
