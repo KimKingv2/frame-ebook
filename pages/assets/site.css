@@ -268,6 +268,8 @@ a { color: inherit; }
 .dialog-link-heading h3 { margin:0; color:#ddd3ea; font-size:11px; font-weight:600; }
 .dialog-link-heading p { margin:5px 0 0; color:#857b91; font-size:8px; line-height:1.6; }
 .dialog-link-heading button { flex:0 0 auto; min-height:32px; padding:0 10px; font-size:8px; }
+.dialog-link-target-wrap { display:flex; flex-direction:column; gap:6px; margin-top:11px; color:#988da4; font-size:8px; }
+.dialog-link-target-wrap select { width:100%; min-height:34px; padding:0 9px; border:1px solid rgba(205,188,239,.16); border-radius:6px; color:#e4dced; background:#252031; font:inherit; font-size:9px; }
 .dialog-link-status { margin:10px 0 0; color:#bcaed0; font-size:9px; line-height:1.7; }
 .dialog-link-candidates { display:grid; gap:8px; margin-top:10px; max-height:250px; overflow:auto; }
 .dialog-link-candidate { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px; border:1px solid rgba(205,188,239,.1); border-radius:6px; background:rgba(39,33,51,.62); }
