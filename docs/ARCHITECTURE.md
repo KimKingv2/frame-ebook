@@ -108,4 +108,4 @@ Schema migrations:
 5. `0005_cloud_only_reader_data.sql` — user-scoped preferences, book state and reading events.
 6. `0006_remove_legacy_reader_tables.sql` — removes retired unscoped reading events and the unused legacy auth-attempt table.
 
-For an existing deployment that already applied migrations 0001–0004, apply only migration 0005. Do not recreate or reset the database. See `docs/CLOUDFLARE-SETUP.md` for environment configuration and deployment steps.
+For an existing deployment that already applied migrations 0001–0004, apply migrations 0005 and 0006 in order. If migration 0005 has already been applied, apply only migration 0006. Do not recreate or reset the database. See `docs/CLOUDFLARE-SETUP.md` for environment configuration and deployment steps.
