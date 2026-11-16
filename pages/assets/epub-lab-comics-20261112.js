@@ -107,15 +107,17 @@
     if (!rect) return;
     var frame = win.frameElement;
     var frameRect = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
-    var left = frameRect.left + rect.left + Math.max(0, rect.width / 2);
-    var top = frameRect.top + rect.top - 48;
+    var readerFrame = el('reader-frame');
+    var hostRect = readerFrame ? readerFrame.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    var left = frameRect.left + rect.left + Math.max(0, rect.width / 2) - hostRect.left;
+    var top = frameRect.top + rect.top - hostRect.top - 48;
     var toolbar = annotationToolbar();
     if (!toolbar) return;
     toolbar.hidden = false;
     var toolbarWidth = toolbar.offsetWidth || 270;
     var toolbarHeight = toolbar.offsetHeight || 46;
-    left = Math.max(12 + toolbarWidth / 2, Math.min(window.innerWidth - 12 - toolbarWidth / 2, left));
-    top = Math.max(10, Math.min(window.innerHeight - toolbarHeight - 10, top));
+    left = Math.max(12 + toolbarWidth / 2, Math.min(hostRect.width - 12 - toolbarWidth / 2, left));
+    top = Math.max(8, Math.min(hostRect.height - toolbarHeight - 8, top));
     toolbar.style.left = left + 'px';
     toolbar.style.top = top + 'px';
     selectedTextState = {
