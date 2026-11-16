@@ -58,6 +58,13 @@
     var tocSelect = el('toc-select');
     var paneButtons = Array.prototype.slice.call(document.querySelectorAll('[data-reader-pane]'));
 
+    // Move both layers to the end of the workspace so they paint above the
+    // reading surface in native fullscreen as well as in the regular page.
+    if (workspace) {
+      if (settingsBackdrop) workspace.appendChild(settingsBackdrop);
+      if (appearancePanel) workspace.appendChild(appearancePanel);
+    }
+
     function isMobile() {
       return !!(window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
     }
