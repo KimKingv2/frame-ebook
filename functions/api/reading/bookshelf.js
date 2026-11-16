@@ -32,7 +32,8 @@ export async function onRequestGet({ request, env }) {
     await migrateLegacyReaderBookIds(db, identity.userId);
     const preferences = await loadPreferences(db, identity.userId);
     const provider = READER_PROVIDERS.has(preferences.activeProvider) ? preferences.activeProvider : "vps";
-    const savedRoots = preferences.roots?.shared || preferences.roots?.[provider] || {};
+    const savedRoots = preferences.roots?.shared || preferences.roots?.[provider] ||
+      Object.values(preferences.roots || {}).find(value => value && (value.books || value.comics)) || {};
     const envRoots = getOpenListRootPaths(env);
     const roots = {
       books: normalizePath(savedRoots.books || envRoots.books || DEFAULT_ROOTS.books),
