@@ -66,3 +66,8 @@ On first visit, the app automatically deletes the old `frame-reader-library` Ind
 The Reading Room uses the pinned Foliate.js reader and JSZip for EPUB / CBZ parsing. EPUB CFI and fixed-layout comic page index are saved to D1. Appearance options are validated against an allow-list before being written to D1. Reading duration is sent directly to the per-user D1 event table with idempotent event IDs.
 
 See [Architecture](docs/ARCHITECTURE.md), [Cloudflare setup](docs/CLOUDFLARE-SETUP.md) and [third-party notices](docs/THIRD-PARTY.md).
+
+
+## 共用書庫
+
+VPS Alist、OpenList Worker 與 Mobile Device Alist 僅作為檔案連線來源。D1 書目索引、掃描進度、封面與 EPUB metadata 由所有來源共用，目錄根路徑亦使用全域共用設定。首次升級時執行 `migrations/0008_shared_provider_catalog.sql`，將先前各來源的目錄索引合併至共用命名空間；原來源資料列不刪除。
