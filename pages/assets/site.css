@@ -443,9 +443,8 @@ a { color: inherit; }
   isolation:isolate;
   overflow:hidden;
   background:
-    radial-gradient(ellipse at 48% 38%,rgba(226,190,255,.42),transparent 48%),
-    radial-gradient(ellipse at 12% 92%,rgba(171,117,232,.48),transparent 55%),
-    linear-gradient(145deg,#8159b4 0%,#62418f 48%,#9a70b8 100%);
+    radial-gradient(ellipse at 50% 8%,rgba(190,205,229,.28),transparent 54%),
+    linear-gradient(155deg,#62738d 0%,#46566f 48%,#34445d 100%);
 }
 .library-cover-stack::before {
   content:"";
@@ -454,9 +453,8 @@ a { color: inherit; }
   inset:0;
   pointer-events:none;
   background:
-    radial-gradient(circle,rgba(250,235,255,.34) 1px,transparent 1.6px) 0 0 / 13px 13px,
-    repeating-linear-gradient(135deg,rgba(248,226,255,.09) 0 1px,transparent 1px 9px);
-  opacity:.42;
+    linear-gradient(118deg,rgba(255,255,255,.11),transparent 36%,rgba(12,20,34,.12) 100%),
+    repeating-linear-gradient(135deg,rgba(231,239,250,.035) 0 1px,transparent 1px 12px);
 }
 .library-cover-stack::after {
   content:"";
@@ -464,10 +462,12 @@ a { color: inherit; }
   z-index:0;
   inset:8px;
   pointer-events:none;
-  border:1px solid rgba(250,232,255,.28);
+  border:1px solid rgba(230,237,249,.2);
   border-radius:4px;
-  box-shadow:inset 0 0 26px rgba(29,13,48,.22);
+  box-shadow:inset 0 0 22px rgba(13,22,37,.16);
 }
+
+
 .library-cover-stack img {
   position:absolute;
   width:70%;
