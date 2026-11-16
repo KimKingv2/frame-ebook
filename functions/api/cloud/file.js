@@ -6,7 +6,7 @@ function isLocalHost(hostname) {
 }
 
 const FILE_LINK_RETRY_DELAYS_MS = [700, 1500];
-const TRANSIENT_FILE_LINK_ERROR = /(?:i\\/o timeout|client\\.timeout exceeded|context deadline exceeded|dial tcp[^\\n]*timeout|tls handshake timeout|connection timed out|operation timed out|temporary failure in name resolution|server misbehaving|no such host|network is unreachable|connection reset by peer|unexpected eof)/i;
+const TRANSIENT_FILE_LINK_ERROR = /(?:i\/o timeout|client\.timeout exceeded|context deadline exceeded|dial tcp[^\n]*timeout|tls handshake timeout|connection timed out|operation timed out|temporary failure in name resolution|server misbehaving|no such host|network is unreachable|connection reset by peer|unexpected eof)/i;
 
 function isTransientFileLinkError(error) {
   return TRANSIENT_FILE_LINK_ERROR.test(String(error && error.message || error || ""));
