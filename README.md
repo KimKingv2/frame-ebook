@@ -46,18 +46,17 @@ Each source uses its own Cloudflare Pages Variables／Secrets for the API base U
 - Cloudflare Access must protect the complete hostname and all Pages Functions routes.
 - User-scoped reading data requires `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`.
 
-Apply migrations in order for a new database. For an existing installation that already has migrations 0001 through 0004, apply migrations 0005 and 0006 in order:
+Apply migrations in order for a new database. For an existing installation, apply any missing migrations in numeric order. If the Reading Room reports `no such table: reader_annotations`, apply the idempotent repair migration below. It creates the annotation table and indexes only when missing and does not delete existing annotation data.
 
 ```sh
-npx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
-npx wrangler d1 execute frame-reader-db --remote --file=migrations/0006_remove_legacy_reader_tables.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0009_ensure_reader_annotations.sql
 ```
 
 See [Cloudflare setup](docs/CLOUDFLARE-SETUP.md) for the full binding, Access and provider configuration.
 
 ## Migration notes
 
-The cloud catalog and cloud annotations from earlier releases remain in D1. Migration 0005 adds user-scoped preferences, per-book state and reading events. Migration 0006 removes the old unscoped `reading_events` and unused `auth_attempts` tables.
+The cloud catalog and cloud annotations from earlier releases remain in D1. Migration 0005 adds user-scoped preferences, per-book state and reading events. Migration 0006 removes the old unscoped `reading_events` and unused `auth_attempts` tables. Migration 0009 is an idempotent repair for installations where `reader_annotations` is missing.
 
 On first visit, the app automatically deletes the old `frame-reader-library` IndexedDB database and all `frame-reader-*` localStorage/sessionStorage keys. Legacy local-only books and progress are intentionally discarded. Books that exist only as local imports must first be placed in an Alist／OpenList source and scanned before they can appear in this cloud-only Reader.
 
