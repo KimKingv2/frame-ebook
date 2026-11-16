@@ -20,7 +20,7 @@
       <nav class="main-nav" aria-label="主要導覽">
         <a href="/">我的書架</a>
         <a class="active" href="/reading-stats/">閱讀時光</a>
-        <a href="/cloud/">雲端書庫</a>
+        <a href="/cloud/">檔案瀏覽</a>
       </nav>
       <button id="open-cloud-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-manager-dialog">連接與掃描</button>
       <span class="edition"><span class="edition-dot"></span> PRIVATE READING DATA</span>
@@ -44,8 +44,8 @@
       </div>
       <div class="period-meta">
         <span id="period-label">本月閱讀紀錄</span>
-        <button type="button" id="export-json" class="quiet-button">本機 JSON</button>
-        <button type="button" id="export-csv" class="quiet-button">本機 CSV</button>
+        <button type="button" id="export-json" class="quiet-button">雲端 JSON</button>
+        <button type="button" id="export-csv" class="quiet-button">雲端 CSV</button>
       </div>
     </section>
 
@@ -156,7 +156,7 @@
     <section class="cloud-sync-panel">
       <div class="cloud-sync-copy">
         <span class="cloud-sync-icon">☁</span>
-        <div><strong>跨裝置統計同步</strong><p id="cloud-sync-status">目前先記錄在這台設備。完成 Cloudflare D1 設定後，才會開放雲端登入與跨裝置同步。</p></div>
+        <div><strong>雲端閱讀資料</strong><p id="cloud-sync-status">正在從 Cloudflare D1 載入這個 Access 帳戶的閱讀紀錄……</p></div>
       </div>
       <form id="cloud-login-form" class="cloud-login-form">
         <label for="cloud-password">私人閱讀密碼</label>
@@ -170,7 +170,7 @@
       </div>
     </section>
 
-    <p class="stats-privacy-note">閱讀時間只在閱讀室位於前景且視窗有焦點時累積；連續 5 分鐘沒有操作會暫停計時。每日閱讀日以累積滿 1 分鐘計算。未登入雲端時，資料只保存在這個瀏覽器。</p>
+    <p class="stats-privacy-note">閱讀時間只在閱讀室位於前景且視窗有焦點時累積；連續 5 分鐘沒有操作會暫停計時。每日閱讀日以累積滿 1 分鐘計算。所有閱讀時間都直接寫入 Cloudflare D1，依 Cloudflare Access 身分隔離並跨裝置同步；瀏覽器不保存閱讀紀錄副本。</p>
 
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>PRIVATE READING INSIGHTS</span><span>YOUR DATA · YOUR DEVICE</span></footer>
   </main>
