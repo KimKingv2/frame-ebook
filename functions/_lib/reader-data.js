@@ -68,7 +68,7 @@ export async function migrateLegacyReaderBookIds(db, userId) {
   ).bind(userId, IDENTITY_MIGRATION_KEY).first();
   if (marker && marker.valueJson === '"done"') return false;
 
-  const [catalogResult, stateResult, annotationResult] = await Promise.all([
+  const [catalogResult, stateResult] = await Promise.all([
     db.prepare(
       "SELECT provider,library,root_path AS rootPath,path,name FROM cloud_catalog " +
       "WHERE is_dir=0 AND provider IN ('vps','worker','mobile') " +
@@ -78,17 +78,27 @@ export async function migrateLegacyReaderBookIds(db, userId) {
       "SELECT book_id AS bookId,provider,library,root_path AS rootPath,book_path AS path," +
       "state_json AS stateJson,created_at AS createdAt,updated_at AS updatedAt " +
       "FROM reader_book_state WHERE user_id=?"
-    ).bind(userId).all(),
-    db.prepare(
-      "SELECT DISTINCT book_id AS bookId,provider,library,root_path AS rootPath,book_path AS path " +
-      "FROM reader_annotations WHERE user_id=?"
     ).bind(userId).all()
   ]);
+
+  // Annotation support is optional in some older Production D1 databases.
+  // A missing table must not prevent the cloud bookshelf from loading.
+  let annotationRows = [];
+  try {
+    const annotationResult = await db.prepare(
+      "SELECT DISTINCT book_id AS bookId,provider,library,root_path AS rootPath,book_path AS path " +
+      "FROM reader_annotations WHERE user_id=?"
+    ).bind(userId).all();
+    annotationRows = annotationResult.results || [];
+  } catch (error) {
+    const message = String(error?.message || error);
+    if (!/no such table:\\s*reader_annotations/i.test(message)) throw error;
+  }
 
   const mapping = new Map();
   for (const row of catalogResult.results || []) await addLegacyIdentity(mapping, row);
   for (const row of stateResult.results || []) await addLegacyIdentity(mapping, row);
-  for (const row of annotationResult.results || []) await addLegacyIdentity(mapping, row);
+  for (const row of annotationRows) await addLegacyIdentity(mapping, row);
 
   const statements = [];
   const legacyStates = (stateResult.results || [])
@@ -118,7 +128,7 @@ export async function migrateLegacyReaderBookIds(db, userId) {
     ).bind(userId, row.bookId));
   }
 
-  const legacyAnnotationIds = [...new Set((annotationResult.results || [])
+  const legacyAnnotationIds = [...new Set(annotationRows
     .map(row => String(row.bookId))
     .filter(bookId => mapping.has(bookId)))];
   for (const oldId of legacyAnnotationIds) {
