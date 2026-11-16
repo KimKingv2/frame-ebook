@@ -447,6 +447,11 @@ function indexScanProgressText(scanState,batch,finished=false) {
 
 async function fetchScanDirectory(path, page, perPage) {
   const scope = indexScope();
+  if(scope.provider==="local") {
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const result = await local.listLocalOpenListDirectory(path,page,perPage);
+    return {ok:true,...result};
+  }
   const query = new URLSearchParams({
     provider: scope.provider,
     library: scope.library,
@@ -575,6 +580,13 @@ async function makeCoverRangeReader(item,onEvent=()=>{}) {
     root_path:getActiveRoot(),
     path:item.path
   });
+  if(state.activeProvider==="local") {
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    return new HttpRangeReader(size,async(start,end)=>{
+      const response=await local.fetchLocalFileRange(item.path,start,end);
+      return readRangeResponse(response,start,end,size);
+    },onEvent);
+  }
   const url="/api/cloud/file?"+query.toString();
   return new HttpRangeReader(size,async(start,end)=>{
     const response=await fetch(url,{
