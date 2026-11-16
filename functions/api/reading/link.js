@@ -300,7 +300,7 @@ export async function onRequestPost({ request, env }) {
         "state_json=excluded.state_json,created_at=MIN(reader_book_state.created_at,excluded.created_at)," +
         "updated_at=MAX(reader_book_state.updated_at,excluded.updated_at)"
       ).bind(
-        context.userId, newBookId, target.provider, target.library, target.rootPath, target.path,
+        context.userId, newBookId, target.provider === "local" ? "vps" : target.provider, target.library, target.rootPath, target.path,
         JSON.stringify(merged), Math.min(Number(oldState.createdAt) || Date.now(), Number(newState?.createdAt) || Date.now()),
         Math.max(oldUpdated, currentUpdated, Date.now())
       ));
