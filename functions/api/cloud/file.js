@@ -26,8 +26,8 @@ export async function onRequestGet({ request, env }) {
   if (!db || typeof db.prepare !== "function") return json({ error: "FRAME_READER_DB 尚未綁定。" }, 503);
   try {
     const indexed = await db.prepare(
-      "SELECT is_dir,format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=?"
-    ).bind(catalogProvider, library, rootPath, path).first();
+      "SELECT is_dir,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND path=? ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC LIMIT 1"
+    ).bind(library, rootPath, path).first();
     const expectedFormat = path.toLowerCase().endsWith(".cbz") ? "CBZ" : "EPUB";
     if (!indexed || Number(indexed.is_dir) !== 0 || indexed.format !== expectedFormat) {
       return json({ error: "這個檔案不在目前來源的書庫索引中。請先完成或更新索引，再重新載入書架。" }, 404);
