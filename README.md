@@ -70,3 +70,9 @@ See [Architecture](docs/ARCHITECTURE.md), [Cloudflare setup](docs/CLOUDFLARE-SET
 ## 共用書庫
 
 VPS Alist、OpenList Worker 與 Mobile Device Alist 僅作為檔案連線來源。D1 書目索引、掃描進度、封面與 EPUB metadata 由所有來源共用，目錄根路徑亦使用全域共用設定。首次升級時執行 `migrations/0008_shared_provider_catalog.sql`，將先前各來源的目錄索引合併至共用命名空間；原來源資料列不刪除。
+
+## Android app
+
+The Android app prototype is in `android/`. It reuses the production FRAME Ebook site in an embedded WebView and intercepts only comic-library `delivery=redirect` file requests. Android follows the authenticated Pages 302 to the signed storage URL and streams the upstream response back to the same-origin reader request. The native transport forwards byte-range headers when present.
+
+The first milestone still uses the website's current full-archive EPUB loading path. It avoids relaying comic bytes through Cloudflare Pages, but lazy ZIP range loading is a separate follow-up.
