@@ -41,7 +41,11 @@ function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
   frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
-  const hashes = [...new Set((book.cloudCoverHashes || (book.cloudCoverHash ? [book.cloudCoverHash] : []))
+  const isFolderCard = Array.isArray(book._groupMembers) && book._groupMembers.length > 0;
+  const sourceHashes = isFolderCard
+    ? (book.cloudCoverHashes || [])
+    : (book.cloudCoverHash ? [book.cloudCoverHash] : (book.cloudCoverHashes || []).slice(0, 1));
+  const hashes = [...new Set(sourceHashes
     .filter(hash => /^[a-f0-9]{64}$/i.test(String(hash))))].slice(0, 3);
   if (hashes.length > 1) {
     const stack = document.createElement("div");
@@ -68,8 +72,8 @@ function makeCover(book, compact) {
   }
   const format = document.createElement("span");
   format.className = "library-format-badge";
-  const volumeCount = Math.max(1, Number(book.volumeCount) || book.cloudSource?.files?.length || 1);
-  format.textContent = volumeCount > 1 ? volumeCount + " VOLUMES" : book.format;
+  const volumeCount = isFolderCard ? Math.max(1, Number(book.volumeCount) || book._groupMembers.length) : 1;
+  format.textContent = isFolderCard && volumeCount > 1 ? volumeCount + " VOLUMES" : book.format;
   frame.appendChild(format);
   return frame;
 }
@@ -89,6 +93,12 @@ function createCard(book, compact) {
   const title = document.createElement("h3"); title.textContent = book.title || book.fileName;
   const author = document.createElement("p"); author.textContent = book.author || (getBookShelf(book) === "comics" ? "漫畫／圖像書" : "作者未提供");
   copy.append(title, author);
+  if (book._isFolderVolume) {
+    const fileName = document.createElement("small");
+    fileName.className = "library-volume-filename";
+    fileName.textContent = book.fileName || "";
+    copy.appendChild(fileName);
+  }
   const kind = document.createElement("span"); kind.className = "book-kind";
   kind.textContent = folderGroup ? (Number(book.volumeCount) || book._groupMembers.length) + " 冊" : book.format;
   meta.append(copy, kind);
@@ -180,6 +190,17 @@ function filteredBooks() {
   else books.sort((a,b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0));
   return books;
 }
+function folderVolumeTitle(volume) {
+  if (volume.manualTitle && volume.title) return volume.title;
+  const fileName = String(volume.fileName || volume.title || "未命名檔案");
+  const fileStem = fileName.replace(/\.(epub|cbz)$/i, "");
+  if (getBookShelf(volume) === "comics") return fileStem;
+  return volume.bookTitle || fileStem;
+}
+function folderVolumeAuthor(volume) {
+  if (volume.manualAuthor) return volume.author || "";
+  return volume.bookCreator || volume.author || "";
+}
 function openFolderDetails(book) {
   const key = book?._folderKey || folderGroupKey(book);
   if (!key || !Array.isArray(book?._groupMembers)) return;
@@ -203,7 +224,8 @@ function renderFolderDetail() {
 
   const source = folder.cloudSource || {};
   const volumes = [...folder._groupMembers].sort((a, b) =>
-    String(a.fileName || a.title || "").localeCompare(String(b.fileName || b.title || ""), "zh-Hant", { numeric: true, sensitivity: "base" }));
+    String(a.fileName || "").localeCompare(String(b.fileName || ""), "zh-Hant", { numeric: true, sensitivity: "base" }) ||
+    String(a.cloudSource?.path || "").localeCompare(String(b.cloudSource?.path || ""), "zh-Hant", { numeric: true, sensitivity: "base" }));
   const totalSize = volumes.reduce((sum, volume) => sum + Math.max(0, Number(volume.size) || 0), 0);
   $("folder-detail-title").textContent = folder.title || folder.folderTitle || "未命名資料夾";
   $("folder-detail-path").textContent = source.folderPath || "雲端資料夾";
@@ -211,7 +233,12 @@ function renderFolderDetail() {
   $("folder-detail-status").textContent = "這個資料夾共有 " + volumes.length + " 個可閱讀檔案。選擇下方任一本作品即可進入閱讀室。";
   const grid = $("folder-books-grid");
   grid.replaceChildren();
-  volumes.forEach(volume => grid.appendChild(createCard(volume, false)));
+  volumes.forEach(volume => grid.appendChild(createCard({
+    ...volume,
+    title: folderVolumeTitle(volume),
+    author: folderVolumeAuthor(volume),
+    _isFolderVolume: true
+  }, false)));
   $("folder-detail-empty").hidden = volumes.length > 0;
 }
 function renderCategoryShelf(allItems, visibleItems, gridId, emptyId, searchEmptyId, countId) {
