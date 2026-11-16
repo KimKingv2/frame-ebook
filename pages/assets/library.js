@@ -249,9 +249,142 @@ async function showBookDetails(id) {
       link.append(name,meta); volumeList.appendChild(link);
     });
   }
+  $("detail-link-status").hidden = true;
+  $("detail-link-status").textContent = "";
+  $("detail-link-candidates").hidden = true;
+  $("detail-link-candidates").replaceChildren();
+  $("detail-link-open").disabled = false;
   const dialog = $("book-dialog");
   if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
 }
+function bookDescriptor(book) {
+  const source = book?.cloudSource || {};
+  return {
+    id: String(book?.id || ""),
+    provider: String(source.provider || ""),
+    library: String(source.library || ""),
+    rootPath: String(source.rootPath || ""),
+    path: String(source.path || "")
+  };
+}
+
+function formatReadingTime(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours) return hours + " 小時 " + minutes + " 分鐘";
+  if (minutes) return minutes + " 分鐘";
+  return total ? total + " 秒" : "沒有閱讀紀錄";
+}
+
+async function linkOldBookData(oldBookId, oldTitle, button) {
+  const book = await getBook(state.dialogBookId);
+  if (!book) return;
+  const confirmed = window.confirm(
+    "確定將「" + oldTitle + "」的舊閱讀資料關聯到「" + book.fileName + "」嗎？\\n\\n" +
+    "閱讀進度、自訂資訊、閱讀統計，以及資料庫中已有的標註都會合併。這項操作完成後不提供自動還原。"
+  );
+  if (!confirmed) return;
+
+  button.disabled = true;
+  const status = $("detail-link-status");
+  status.hidden = false;
+  status.textContent = "正在合併舊書籍資料……";
+  try {
+    const response = await fetch("/api/reading/link", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book: bookDescriptor(book), oldBookId })
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok || data.error) throw new Error(data.error || "關聯失敗，請稍後重試。");
+
+    const moved = data.moved || {};
+    const summary = [
+      "閱讀狀態 " + (moved.readingState ? "已合併" : "無"),
+      "閱讀事件 " + (Number(moved.readingEvents) || 0) + " 筆",
+      "標註 " + (Number(moved.annotations) || 0) + " 筆"
+    ].join(" · ");
+    await refresh();
+    await showBookDetails(book.id);
+    const resultStatus = $("detail-link-status");
+    resultStatus.hidden = false;
+    resultStatus.textContent = "關聯完成。" + summary + (data.note ? " " + data.note : "");
+  } catch (error) {
+    status.hidden = false;
+    status.textContent = "關聯失敗：" + (error.message || String(error));
+    button.disabled = false;
+  }
+}
+
+async function showLinkCandidates() {
+  const book = state.books.find(item => item.id === state.dialogBookId) || await getBook(state.dialogBookId);
+  if (!book) return;
+  const button = $("detail-link-open");
+  const status = $("detail-link-status");
+  const list = $("detail-link-candidates");
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = "正在搜尋可關聯的舊書籍資料……";
+  list.hidden = true;
+  list.replaceChildren();
+  try {
+    const query = new URLSearchParams({
+      book_id: book.id,
+      provider: book.cloudSource?.provider || "",
+      library: book.cloudSource?.library || "",
+      root_path: book.cloudSource?.rootPath || "",
+      path: book.cloudSource?.path || ""
+    });
+    const response = await fetch("/api/reading/link?" + query.toString(), {
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok || data.error) throw new Error(data.error || "無法搜尋舊書籍資料。");
+
+    status.textContent = data.candidates?.length
+      ? "找到 " + data.candidates.length + " 筆尚未關聯的舊書籍資料。請核對檔名和閱讀記錄後再選擇。"
+      : "目前沒有可關聯的舊書籍資料。";
+    if (!data.candidates?.length) return;
+    for (const candidate of data.candidates) {
+      const card = document.createElement("article");
+      card.className = "dialog-link-candidate";
+      const copy = document.createElement("div");
+      copy.className = "dialog-link-candidate-copy";
+      const title = document.createElement("strong");
+      title.textContent = candidate.title || candidate.fileName || "未命名舊書籍";
+      const details = document.createElement("small");
+      const facts = [];
+      if (candidate.fileName) facts.push(candidate.fileName);
+      if (candidate.progress > 0) facts.push("進度 " + Math.round(candidate.progress) + "%");
+      if (candidate.readingSeconds > 0) facts.push("累計 " + formatReadingTime(candidate.readingSeconds));
+      if (candidate.annotationCount > 0) facts.push("標註 " + candidate.annotationCount + " 筆");
+      details.textContent = facts.join(" · ") || "保留有閱讀歷史";
+      copy.append(title, details);
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "dialog-secondary dialog-link-action";
+      action.textContent = "關聯";
+      action.addEventListener("click", () => {
+        linkOldBookData(candidate.bookId, candidate.title || candidate.fileName || "舊書籍", action)
+          .catch(error => { status.hidden = false; status.textContent = error.message || String(error); });
+      });
+      card.append(copy, action);
+      list.appendChild(card);
+    }
+    list.hidden = false;
+  } catch (error) {
+    status.textContent = "搜尋失敗：" + (error.message || String(error));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function saveDetails(event) {
   event.preventDefault();
   if (!state.dialogBookId) return;
@@ -275,6 +408,7 @@ $("view-grid").addEventListener("click", () => { state.view = "grid"; render(); 
 $("view-list").addEventListener("click", () => { state.view = "list"; render(); });
 $("detail-form").addEventListener("submit", event => { saveDetails(event).catch(error => { $("library-status").textContent = "雲端保存失敗：" + error.message; }); });
 $("detail-cancel").addEventListener("click", () => $("book-dialog").close());
+$("detail-link-open").addEventListener("click", () => { showLinkCandidates().catch(error => { $("detail-link-status").hidden = false; $("detail-link-status").textContent = error.message || String(error); }); });
 $("detail-open").addEventListener("click", () => {
   const book = state.books.find(item => item.id === state.dialogBookId);
   if (book) location.href = readerUrl(book);
