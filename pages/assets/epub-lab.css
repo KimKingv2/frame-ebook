@@ -2297,3 +2297,304 @@ body.reader-settings-open .reader-quick-actions {
     font-size:8px !important;
   }
 }
+
+
+/* Fullscreen navigation and immersive-mode transitions.
+   Keep panels in the render tree so close/open states can animate instead of popping. */
+@media(min-width:821px) {
+  .reading-workspace:fullscreen .reader-layout {
+    display:grid !important;
+    grid-template-columns:220px minmax(0,1fr) !important;
+    gap:12px;
+    transition:
+      grid-template-columns .48s cubic-bezier(.22,1,.36,1),
+      gap .48s cubic-bezier(.22,1,.36,1);
+  }
+  .reading-workspace:fullscreen.reader-sidebar-collapsed .reader-layout {
+    grid-template-columns:0px minmax(0,1fr) !important;
+    gap:0;
+  }
+  .reading-workspace:fullscreen .reader-sidebar {
+    display:flex !important;
+    min-width:0;
+    width:100%;
+    max-width:220px;
+    opacity:1;
+    transform:translateX(0);
+    visibility:visible;
+    overflow:hidden;
+    transition:
+      opacity .32s ease,
+      transform .46s cubic-bezier(.22,1,.36,1),
+      max-width .48s cubic-bezier(.22,1,.36,1),
+      padding .48s cubic-bezier(.22,1,.36,1),
+      border-width .48s ease,
+      visibility 0s;
+  }
+  .reading-workspace:fullscreen.reader-sidebar-collapsed .reader-sidebar,
+  .reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar {
+    display:flex !important;
+    max-width:0;
+    padding-left:0;
+    padding-right:0;
+    border-left-width:0;
+    border-right-width:0;
+    opacity:0;
+    transform:translateX(-16px);
+    visibility:hidden;
+    pointer-events:none;
+    transition:
+      opacity .25s ease,
+      transform .42s cubic-bezier(.22,1,.36,1),
+      max-width .48s cubic-bezier(.22,1,.36,1),
+      padding .48s cubic-bezier(.22,1,.36,1),
+      border-width .48s ease,
+      visibility 0s linear .48s;
+  }
+}
+
+/* The workspace chrome folds away while the reading surface grows into place. */
+.reading-workspace:fullscreen .book-heading {
+  display:block !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:104px;
+  margin:0 !important;
+  padding:0 3px 10px !important;
+  overflow:hidden !important;
+  opacity:1;
+  transform:translateY(0);
+  transition:
+    max-height .5s cubic-bezier(.22,1,.36,1),
+    padding .5s cubic-bezier(.22,1,.36,1),
+    opacity .34s ease,
+    transform .5s cubic-bezier(.22,1,.36,1);
+}
+.reading-workspace:fullscreen .book-heading > div:first-child,
+.reading-workspace:fullscreen .book-progress > strong,
+.reading-workspace:fullscreen .book-progress > span {
+  display:initial !important;
+  opacity:1;
+  transition:opacity .28s ease;
+}
+.reading-workspace:fullscreen .book-progress {
+  display:flex !important;
+  position:relative !important;
+  width:auto !important;
+  height:auto !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+}
+.reading-workspace:fullscreen .reader-quick-actions {
+  display:flex !important;
+  position:relative !important;
+  width:auto !important;
+  height:auto !important;
+  margin:5px 0 0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+}
+.reading-workspace:fullscreen .reader-quick-actions > button {
+  display:inline-flex !important;
+}
+.reading-workspace:fullscreen .reader-layout {
+  transition:
+    grid-template-columns .5s cubic-bezier(.22,1,.36,1),
+    gap .5s cubic-bezier(.22,1,.36,1),
+    flex .5s cubic-bezier(.22,1,.36,1);
+}
+.reading-workspace:fullscreen .reader-frame {
+  transition:
+    padding .5s cubic-bezier(.22,1,.36,1),
+    border-radius .5s cubic-bezier(.22,1,.36,1),
+    border-color .42s ease,
+    box-shadow .42s ease;
+}
+.reading-workspace:fullscreen .reader-viewport {
+  transition:border-radius .5s cubic-bezier(.22,1,.36,1);
+}
+
+/* Immersive mode no longer removes the header/sidebar with display:none.
+   Their dimensions and opacity animate, while the Foliate viewport expands. */
+.reading-workspace:fullscreen.reader-immersive-mode {
+  padding:0 !important;
+  transition:padding .5s cubic-bezier(.22,1,.36,1);
+}
+.reading-workspace:fullscreen.reader-immersive-mode .book-heading {
+  max-height:0 !important;
+  padding-top:0 !important;
+  padding-bottom:0 !important;
+  opacity:0;
+  transform:translateY(-14px);
+  pointer-events:none;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .book-heading > div:first-child,
+.reading-workspace:fullscreen.reader-immersive-mode .book-progress > strong,
+.reading-workspace:fullscreen.reader-immersive-mode .book-progress > span {
+  opacity:0;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-quick-actions > button {
+  opacity:0;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-layout {
+  display:grid !important;
+  grid-template-columns:0px minmax(0,1fr) !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  gap:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar {
+  display:flex !important;
+  max-width:0 !important;
+  min-width:0 !important;
+  padding-left:0 !important;
+  padding-right:0 !important;
+  border-left-width:0 !important;
+  border-right-width:0 !important;
+  opacity:0 !important;
+  transform:translateX(-16px) !important;
+  visibility:hidden;
+  pointer-events:none;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar-backdrop {
+  display:none !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-controls {
+  display:flex !important;
+  flex:0 0 auto !important;
+  max-height:42px;
+  margin:0 !important;
+  padding:7px 0 0 !important;
+  overflow:hidden !important;
+  opacity:1;
+  transform:translateY(0);
+  transition:
+    max-height .42s cubic-bezier(.22,1,.36,1),
+    padding .42s cubic-bezier(.22,1,.36,1),
+    opacity .28s ease,
+    transform .42s cubic-bezier(.22,1,.36,1);
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-controls button,
+.reading-workspace:fullscreen.reader-immersive-mode .reader-controls-hint {
+  transition:opacity .22s ease, transform .36s ease;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-controls {
+  max-height:0;
+  padding-top:0 !important;
+  opacity:0;
+  transform:translateY(9px);
+  pointer-events:none;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-main-column {
+  display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-frame {
+  display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  border-width:0 !important;
+  border-radius:0 !important;
+  overflow:hidden !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-viewport {
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  border:0 !important;
+  border-radius:0 !important;
+}
+
+/* Mobile fullscreen navigation remains a left-side drawer, but now has a
+   slower glide and also animates out/in when immersion is toggled. */
+@media(max-width:820px) {
+  .reading-workspace:fullscreen .reader-layout {
+    display:block !important;
+    position:relative;
+    transition:none;
+  }
+  .reading-workspace:fullscreen .reader-sidebar,
+  .reading-workspace:fullscreen .reader-sidebar.is-open {
+    display:flex !important;
+    position:fixed !important;
+    top:calc(env(safe-area-inset-top, 0px) + 6px) !important;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+    left:0 !important;
+    width:min(320px,85vw);
+    max-width:calc(100vw - 20px);
+    max-height:none !important;
+    min-width:0;
+    transform:translateX(-105%);
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transition:
+      transform .48s cubic-bezier(.22,1,.36,1),
+      opacity .36s ease,
+      visibility 0s linear .48s;
+  }
+  .reading-workspace:fullscreen .reader-sidebar.is-open {
+    transform:translateX(0);
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transition:
+      transform .48s cubic-bezier(.22,1,.36,1),
+      opacity .36s ease,
+      visibility 0s;
+  }
+  .reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar,
+  .reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar.is-open {
+    transform:translateX(-105%) !important;
+    opacity:0 !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+    transition:
+      transform .48s cubic-bezier(.22,1,.36,1),
+      opacity .34s ease,
+      visibility 0s linear .48s !important;
+  }
+  .reading-workspace:fullscreen.reader-immersive-mode .reader-layout {
+    display:block !important;
+  }
+  .reading-workspace:fullscreen.reader-immersive-mode .reader-frame {
+    padding:0 !important;
+  }
+}
+
+/* Let all major surfaces return smoothly from immersion to normal fullscreen. */
+@media(prefers-reduced-motion:reduce) {
+  .reading-workspace:fullscreen .reader-layout,
+  .reading-workspace:fullscreen .reader-sidebar,
+  .reading-workspace:fullscreen .book-heading,
+  .reading-workspace:fullscreen .reader-frame,
+  .reading-workspace:fullscreen .reader-viewport,
+  .reading-workspace:fullscreen .reader-controls,
+  .reading-workspace:fullscreen.reader-immersive-mode {
+    transition:none !important;
+  }
+}
