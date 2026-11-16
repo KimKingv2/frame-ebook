@@ -190,7 +190,7 @@
             <span id="progress-detail">等待閱讀</span>
             <div class="reader-quick-actions">
               <button id="reader-sidebar-toggle" type="button" aria-expanded="true" aria-controls="reader-sidebar" title="顯示或隱藏目錄與筆記">☷ 導覽</button>
-              <button id="reader-appearance-toggle" type="button" aria-haspopup="true" aria-controls="reader-appearance-panel">Aa 閱讀設定</button>
+              <button id="reader-appearance-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="reader-appearance-panel">Aa 閱讀設定</button>
               <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
             </div>
           </div>
@@ -406,7 +406,10 @@
     });
     window.addEventListener('resize', function () {
       if (!isMobileReader()) {
-        closeSidebar();
+        if (sidebar) sidebar.classList.remove('is-open');
+        if (sidebarBackdrop) sidebarBackdrop.hidden = true;
+        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+        if (workspace) workspace.classList.remove('reader-sidebar-collapsed');
         document.body.classList.remove('reader-drawer-open');
       }
     });
@@ -416,6 +419,6 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-toc-annotations-r1"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-mobile-ui-r1"></script>
 </body>
 </html>
