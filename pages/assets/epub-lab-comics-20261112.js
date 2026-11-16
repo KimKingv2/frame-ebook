@@ -76,9 +76,19 @@
         (doc.defaultView && doc.defaultView.innerWidth) ||
         (doc.body && doc.body.clientWidth) || 0;
       if (!width || !Number.isFinite(event.clientX)) return;
+      var viewport = el('reader-viewport');
+      var viewportRect = viewport && viewport.getBoundingClientRect();
+      var frame = doc.defaultView && doc.defaultView.frameElement;
+      var frameRect = frame && frame.getBoundingClientRect();
+      var screenX = event.clientX;
+      var splitX = width / 2;
+      if (frameRect && viewportRect && viewportRect.width && frameRect.width) {
+        screenX = frameRect.left + (event.clientX / width) * frameRect.width;
+        splitX = viewportRect.left + viewportRect.width / 2;
+      }
       event.preventDefault();
       event.stopPropagation();
-      turnReaderPage(event.clientX < width / 2 ? -1 : 1);
+      turnReaderPage(screenX < splitX ? -1 : 1);
     }, true);
   }
 
