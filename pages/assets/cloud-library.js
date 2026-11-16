@@ -1040,10 +1040,9 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
 
       const epubFiles=entries.filter(item=>!item.isDir&&item.format==="EPUB");
       if(epubFiles.length) {
-        appendIndexLog("EPUB metadata 解析開始："+epubFiles.length+" 本；僅透過 HTTP Range 讀取 ZIP 目錄與 OPF，不下載整本 EPUB。");
+        appendIndexLog("EPUB metadata 重新解析開始："+epubFiles.length+" 本；僅透過 HTTP Range 讀取 ZIP 目錄與 OPF，不下載整本 EPUB。");
         const metadataItems=[];
         for(const item of epubFiles) {
-          if(state.scanPauseRequested)break;
           try {
             const metadata=await extractEpubMetadata(item,message=>appendIndexLog(item.name+"｜"+message));
             metadataItems.push({path:item.path,metadata});
