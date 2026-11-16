@@ -21,4 +21,4 @@ Opening a book requests its original archive through the protected Pages Functio
 
 ## Legacy browser data
 
-Previous FRAME Reader versions used IndexedDB and localStorage. The cloud-only release no longer reads or updates those legacy records and does not delete them automatically. Users should review or export any legacy local-only books or reading history before manually clearing the site's old browser data.
+Previous FRAME Reader versions used IndexedDB and localStorage. On the first visit after this release, the app automatically deletes the old `frame-reader-library` IndexedDB database and all `frame-reader-*` keys from localStorage/sessionStorage. If an older open tab blocks IndexedDB deletion, close old FRAME Reader tabs and revisit the site. Legacy local-only books and reading history are intentionally discarded.
