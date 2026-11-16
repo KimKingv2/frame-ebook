@@ -466,11 +466,12 @@ a { color: inherit; }
   transform:rotate(-8deg);
 }
 .library-cover-stack img:nth-child(2) {
-  left:15%;
-  top:3%;
-  width:70%;
-  height:94%;
+  left:21%;
+  top:8%;
+  width:58%;
+  height:84%;
   z-index:3;
+  object-fit:contain;
   transform:rotate(0);
 }
 .library-cover-stack img:nth-child(3) {
