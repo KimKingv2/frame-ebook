@@ -59,12 +59,12 @@ function remember(book) {
 async function cloudBookId(scope, path) {
   const provider = String(scope?.provider || "");
   const library = String(scope?.library || "");
-  const rootPath = String(scope?.rootPath || "").replace(/\\/g, "/").replace(/^\\/+|\\/+$/g, "");
+  const rootPath = String(scope?.rootPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   const filePath = String(path || "").replace(/\\/g, "/").replace(/^\\/+|\\/+$/g, "");
   if (!["vps", "worker", "mobile"].includes(provider) || !["books", "comics"].includes(library) || !rootPath || !filePath) {
     throw new Error("雲端書籍識別資訊無效。");
   }
-  const identity = [provider, library, rootPath, filePath].join("\\n");
+  const identity = [provider, library, rootPath, filePath].join("\n");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   return "cloud:" + hash;
@@ -90,7 +90,7 @@ async function getBook(bookOrId) {
       rootPath: descriptor.rootPath,
       path: descriptor.path,
       fileName: descriptor.path.split("/").pop(),
-      title: descriptor.path.split("/").pop()?.replace(/\\.(epub|cbz)$/i, "") || "未命名書籍",
+      title: descriptor.path.split("/").pop()?.replace(/\.(epub|cbz)$/i, "") || "未命名書籍",
       author: "",
       format: descriptor.path.toLowerCase().endsWith(".cbz") ? "CBZ" : "EPUB",
       shelf: descriptor.library,
