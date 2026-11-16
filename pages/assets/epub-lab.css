@@ -2598,3 +2598,146 @@ body.reader-settings-open .reader-quick-actions {
     transition:none !important;
   }
 }
+
+
+/* Fullscreen action dock and low-reflow immersion transitions. */
+.reading-workspace:fullscreen {
+  position:relative;
+  isolation:isolate;
+}
+.reading-workspace:fullscreen .book-heading {
+  position:relative;
+  z-index:20;
+  isolation:isolate;
+  transition:opacity .2s ease, transform .24s cubic-bezier(.22,1,.36,1) !important;
+}
+.reading-workspace:fullscreen .reader-layout {
+  position:relative;
+  z-index:1;
+}
+.reading-workspace:fullscreen > #reader-quick-actions {
+  position:absolute !important;
+  top:10px !important;
+  right:14px !important;
+  bottom:auto !important;
+  left:auto !important;
+  z-index:2147482002 !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:nowrap !important;
+  gap:6px;
+  width:max-content !important;
+  max-width:calc(100% - 16px);
+  margin:0 !important;
+  padding:5px !important;
+  border:1px solid rgba(193,170,238,.28);
+  border-radius:12px;
+  background:rgba(19,16,28,.94);
+  box-shadow:0 10px 30px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.05);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  transform:none;
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transition:
+    opacity .16s ease,
+    transform .22s cubic-bezier(.22,1,.36,1),
+    visibility 0s;
+}
+.reading-workspace:fullscreen > #reader-quick-actions > button {
+  position:relative;
+  z-index:1;
+  pointer-events:auto;
+}
+.reading-workspace:fullscreen .book-progress {
+  position:absolute !important;
+  top:2px !important;
+  right:350px !important;
+  width:auto !important;
+  max-width:calc(100% - 370px) !important;
+  margin:0 !important;
+  padding:0 !important;
+  align-items:flex-end;
+}
+.reading-workspace:fullscreen .reader-main-column {
+  transform:scale(.997);
+  transform-origin:center center;
+  opacity:.985;
+  transition:
+    transform .24s cubic-bezier(.22,1,.36,1),
+    opacity .18s ease;
+  will-change:transform,opacity;
+}
+
+/* Geometry changes happen once. Only compositor-friendly properties animate,
+   preventing the EPUB renderer from repaginating on every animation frame. */
+.reading-workspace:fullscreen .book-heading {
+  transition:opacity .2s ease, transform .24s cubic-bezier(.22,1,.36,1) !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode,
+.reading-workspace:fullscreen.reader-immersive-exiting {
+  transition:none !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .book-heading,
+.reading-workspace:fullscreen.reader-immersive-exiting .book-heading {
+  transition:opacity .2s ease, transform .24s cubic-bezier(.22,1,.36,1) !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-layout,
+.reading-workspace:fullscreen.reader-immersive-exiting .reader-layout,
+.reading-workspace:fullscreen.reader-immersive-mode .reader-frame,
+.reading-workspace:fullscreen.reader-immersive-exiting .reader-frame,
+.reading-workspace:fullscreen.reader-immersive-mode .reader-viewport,
+.reading-workspace:fullscreen.reader-immersive-exiting .reader-viewport {
+  transition:none !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-sidebar,
+.reading-workspace:fullscreen.reader-immersive-exiting .reader-sidebar {
+  transition:opacity .16s ease, transform .22s cubic-bezier(.22,1,.36,1) !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-controls {
+  transition:opacity .14s ease, transform .2s cubic-bezier(.22,1,.36,1) !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-main-column {
+  transform:scale(1);
+  opacity:1;
+}
+.reading-workspace:fullscreen.reader-immersive-mode > #reader-quick-actions {
+  opacity:0 !important;
+  visibility:hidden !important;
+  transform:translateY(-8px) !important;
+  pointer-events:none !important;
+  transition:
+    opacity .14s ease,
+    transform .2s cubic-bezier(.22,1,.36,1),
+    visibility 0s linear .2s !important;
+}
+
+@media(max-width:820px) {
+  .reading-workspace:fullscreen .book-progress {
+    top:1px !important;
+    right:4px !important;
+    max-width:72px !important;
+  }
+  .reading-workspace:fullscreen > #reader-quick-actions {
+    top:auto !important;
+    right:auto !important;
+    bottom:calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    left:50% !important;
+    max-width:calc(100vw - 12px);
+    gap:5px;
+    transform:translateX(-50%);
+  }
+  .reading-workspace:fullscreen.reader-immersive-mode > #reader-quick-actions {
+    transform:translate(-50%,-8px) !important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .reading-workspace:fullscreen .book-heading,
+  .reading-workspace:fullscreen .reader-main-column,
+  .reading-workspace:fullscreen > #reader-quick-actions {
+    transition:none !important;
+    animation:none !important;
+  }
+}
