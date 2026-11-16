@@ -1,6 +1,6 @@
 import { recordReadingEvent, localDayKey } from "/assets/library-store.js";
 
-const HEARTBEAT_MS = 15000;
+const HEARTBEAT_MS = 30000;
 const IDLE_LIMIT_MS = 5 * 60 * 1000;
 let activeBook = null;
 let timer = null;
