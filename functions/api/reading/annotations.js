@@ -1,49 +1,10 @@
-import {
-  json, getDatabase, requireAuth, isSameOrigin, normalizePath, isWithinRoot,
-  sha256Hex, getAccessIdentity
-} from "../../_lib/common.js";
+import { json, getDatabase, requireAuth, isSameOrigin, getAccessIdentity } from "../../_lib/common.js";
+import { resolveReaderBook, migrateLegacyReaderBookIds } from "../../_lib/reader-data.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile"]);
-const LIBRARIES = new Set(["books", "comics"]);
 const ANNOTATION_TYPES = new Set(["highlight", "note", "bookmark"]);
 
 function cleanText(value, maxLength) {
   return String(value == null ? "" : value).slice(0, maxLength);
-}
-
-async function resolveBook(db, raw) {
-  const provider = String(raw && raw.provider || "");
-  const library = String(raw && raw.library || "");
-  const rootPath = normalizePath(raw && raw.rootPath);
-  const path = normalizePath(raw && raw.path);
-  const bookId = String(raw && raw.id || "");
-
-  if (!PROVIDERS.has(provider) || !LIBRARIES.has(library) || !rootPath || !path ||
-      path === "/" || !isWithinRoot(path, rootPath) ||
-      !/^cloud:[a-f0-9]{64}$/.test(bookId)) {
-    return { error: json({ error: "雲端書籍識別資訊無效。" }, 400) };
-  }
-
-  // Keep this identity recipe exactly aligned with cloudBookId() in the browser.
-  const stripLeadingSlash = value => value.replace(/^\/+/, "");
-  const identity = [
-    provider, library, stripLeadingSlash(rootPath), stripLeadingSlash(path)
-  ].join("\\n");
-  const expectedId = "cloud:" + await sha256Hex(identity);
-  if (expectedId !== bookId) return { error: json({ error: "雲端書籍識別碼不相符。" }, 400) };
-
-  const indexed = await db.prepare(
-    "SELECT format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
-  ).bind(provider, library, rootPath, path).first();
-  if (!indexed) return { error: json({ error: "這本書不在目前的 OpenList 書庫索引中。請先重新掃描書庫。" }, 404) };
-
-  const format = String(indexed.format || "").toUpperCase();
-  const validFormat = library === "books"
-    ? format === "EPUB"
-    : format === "EPUB" || format === "CBZ";
-  if (!validFormat) return { error: json({ error: "這個檔案格式不屬於目前的書庫。" }, 415) };
-
-  return { provider, library, rootPath, path, bookId };
 }
 
 async function resolveContext(request, env, rawBook) {
@@ -62,11 +23,12 @@ async function resolveContext(request, env, rawBook) {
   }
 
   try {
-    const book = await resolveBook(db, rawBook);
+    const book = await resolveReaderBook(db, rawBook);
     if (book.error) return book;
+    await migrateLegacyReaderBookIds(db, identity.userId);
     return { db, userId: identity.userId, book };
   } catch (error) {
-    return { error: json({ error: "驗證雲端書籍失敗：" + cleanText(error && error.message, 180) }, 503) };
+    return { error: json({ error: "驗證或遷移雲端標註資料失敗：" + cleanText(error && error.message, 180) }, 503) };
   }
 }
 
