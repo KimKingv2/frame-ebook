@@ -117,6 +117,11 @@ final class FrameEbookDirectTransport {
                 continue;
             }
 
+            if (status >= 300 && status < 400) {
+                connection.disconnect();
+                throw new IOException("網盤回傳未處理的 HTTP 跳轉狀態：" + status);
+            }
+
             InputStream body;
             try {
                 body = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
