@@ -941,3 +941,147 @@ button:disabled { opacity: .38; cursor: default; }
 @media(prefers-reduced-motion:reduce) {
   .appearance-panel[open] { animation:none; }
 }
+
+
+/* Nested EPUB table of contents. */
+.reader-sidebar .toc-wrap {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:6px;
+  width:100%;
+  min-width:0;
+}
+.toc-select-compat {
+  position:absolute !important;
+  width:1px !important;
+  height:1px !important;
+  margin:-1px !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  clip:rect(0,0,0,0) !important;
+  white-space:nowrap !important;
+  border:0 !important;
+}
+.toc-tree {
+  min-width:0;
+  max-height:min(48vh,520px);
+  overflow:auto;
+  scrollbar-width:thin;
+  scrollbar-color:#514365 transparent;
+}
+.toc-tree-list,
+.toc-tree-children {
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.toc-tree-item { min-width:0; }
+.toc-tree-row {
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr);
+  align-items:center;
+  gap:2px;
+  min-width:0;
+  min-height:30px;
+}
+.toc-tree-disclosure,
+.toc-tree-disclosure-spacer {
+  display:grid;
+  place-items:center;
+  width:22px;
+  min-width:22px;
+  height:26px;
+  min-height:26px;
+  padding:0;
+  border:0;
+  border-radius:5px;
+  color:#a99abf;
+  background:transparent;
+  font-size:15px;
+  line-height:1;
+}
+.toc-tree-disclosure:hover:not(:disabled) {
+  transform:none;
+  border:0;
+  color:#eee5ff;
+  background:rgba(167,139,250,.12);
+}
+.toc-tree-link,
+.toc-tree-label {
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:29px;
+  padding:6px 8px;
+  overflow:hidden;
+  border:1px solid transparent;
+  border-radius:6px;
+  color:#bcb2ca;
+  background:transparent;
+  font:inherit;
+  font-size:9px;
+  line-height:1.5;
+  text-align:left;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.toc-tree-link:hover:not(:disabled) {
+  transform:none;
+  border-color:rgba(174,145,226,.14);
+  color:#f3edff;
+  background:rgba(167,139,250,.09);
+}
+.toc-tree-link.is-current {
+  border-color:rgba(167,139,250,.24);
+  color:#f3edff;
+  background:linear-gradient(100deg,rgba(128,97,208,.28),rgba(88,66,132,.12));
+  box-shadow:inset 2px 0 0 #a78bfa;
+}
+.toc-tree-link[aria-current="location"] { color:#f6f0ff; }
+.toc-tree-label {
+  display:flex;
+  align-items:center;
+  color:#d8cdea;
+  font-weight:560;
+  cursor:default;
+}
+.toc-tree-children {
+  margin:2px 0 4px 10px;
+  padding:2px 0 2px 10px;
+  border-left:1px solid rgba(174,145,226,.15);
+}
+.toc-tree-empty {
+  margin:0;
+  padding:12px 8px;
+  color:#8c8299;
+  font-size:9px;
+  line-height:1.7;
+  text-align:center;
+}
+.reader-sidebar .toc-tree { max-height:min(48vh,520px); }
+.reader-sidebar .toc-tree-link { font-size:9px; }
+.reader-sidebar .toc-tree-item[data-depth="0"] > .toc-tree-row .toc-tree-link,
+.reader-sidebar .toc-tree-item[data-depth="0"] > .toc-tree-row .toc-tree-label {
+  color:#e1d7ef;
+}
+
+/* The selection toolbar must accept real pointer and click events. */
+.annotation-selection-toolbar {
+  pointer-events:auto;
+  touch-action:manipulation;
+}
+.annotation-selection-toolbar button {
+  pointer-events:auto;
+  touch-action:manipulation;
+}
+@media(max-width:820px) {
+  .reader-sidebar .toc-tree { max-height:min(43vh,420px); }
+}
+@media(max-width:560px) {
+  .reader-sidebar .toc-tree { max-height:38vh; }
+  .toc-tree-row { grid-template-columns:21px minmax(0,1fr); }
+  .toc-tree-disclosure,
+  .toc-tree-disclosure-spacer { width:21px; min-width:21px; }
+  .toc-tree-link,
+  .toc-tree-label { min-height:31px; font-size:10px; }
+}
