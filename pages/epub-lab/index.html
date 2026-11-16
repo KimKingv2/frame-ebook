@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-mobile-ui-r1">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-mobile-ui-r2">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -299,127 +299,11 @@
     </div>
     <iframe id="cloud-manager-frame" title="OpenList 連接與掃描管理" data-src="/cloud/?manager=1" loading="lazy"></iframe>
   </dialog>
-  <script>
-  (function () {
-    var workspace = document.getElementById('reading-workspace');
-    var sidebar = document.getElementById('reader-sidebar');
-    var sidebarToggle = document.getElementById('reader-sidebar-toggle');
-    var sidebarClose = document.getElementById('reader-sidebar-close');
-    var sidebarBackdrop = document.getElementById('reader-sidebar-backdrop');
-    var appearance = document.getElementById('reader-appearance-panel');
-    var appearanceToggle = document.getElementById('reader-appearance-toggle');
-    var settingsBackdrop = document.getElementById('reader-settings-backdrop');
-    var toc = document.getElementById('toc-select');
-    var paneButtons = Array.prototype.slice.call(document.querySelectorAll('[data-reader-pane]'));
 
-    function isMobileReader() {
-      return window.matchMedia('(max-width: 820px)').matches;
-    }
-    function setSidebarOpen(open) {
-      if (!sidebar || !sidebarToggle) return;
-      if (!isMobileReader()) {
-        workspace.classList.toggle('reader-sidebar-collapsed', !open);
-        sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        return;
-      }
-      sidebar.classList.toggle('is-open', !!open);
-      if (sidebarBackdrop) sidebarBackdrop.hidden = !open;
-      sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      document.body.classList.toggle('reader-drawer-open', !!open);
-    }
-    function closeSidebar() {
-      if (isMobileReader()) setSidebarOpen(false);
-    }
-    function setMobilePane(name) {
-      if (!sidebar) return;
-      var notes = name === 'notes';
-      sidebar.classList.toggle('mobile-pane-notes', notes);
-      sidebar.classList.toggle('mobile-pane-toc', !notes);
-      paneButtons.forEach(function (button) {
-        var active = button.getAttribute('data-reader-pane') === (notes ? 'notes' : 'toc');
-        button.classList.toggle('is-active', active);
-        button.setAttribute('aria-pressed', active ? 'true' : 'false');
-      });
-      if (notes) {
-        var panel = document.getElementById('annotation-panel');
-        var toggle = document.getElementById('annotation-list-toggle');
-        if (panel) panel.hidden = false;
-        if (toggle) toggle.setAttribute('aria-expanded', 'true');
-      }
-    }
-
-    window.frameReaderCloseSidebar = closeSidebar;
-    setMobilePane('toc');
-    if (isMobileReader() && sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
-
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', function (event) {
-        event.preventDefault();
-        if (isMobileReader()) {
-          setSidebarOpen(!sidebar.classList.contains('is-open'));
-          if (sidebar.classList.contains('is-open')) setMobilePane('toc');
-        } else {
-          setSidebarOpen(workspace.classList.contains('reader-sidebar-collapsed'));
-        }
-      });
-    }
-    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
-    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
-
-    paneButtons.forEach(function (button) {
-      button.addEventListener('click', function () {
-        setMobilePane(button.getAttribute('data-reader-pane'));
-      });
-    });
-
-    function syncAppearanceOverlay() {
-      var open = !!(appearance && appearance.open);
-      if (settingsBackdrop) settingsBackdrop.hidden = !open;
-      if (appearanceToggle) appearanceToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      document.body.classList.toggle('reader-settings-open', open);
-    }
-    if (appearance && appearanceToggle) {
-      appearanceToggle.addEventListener('click', function (event) {
-        event.preventDefault();
-        if (isMobileReader()) closeSidebar();
-        appearance.open = !appearance.open;
-        syncAppearanceOverlay();
-      });
-      appearance.addEventListener('toggle', syncAppearanceOverlay);
-    }
-    if (settingsBackdrop) {
-      settingsBackdrop.addEventListener('click', function () {
-        if (appearance) appearance.open = false;
-        syncAppearanceOverlay();
-      });
-    }
-    if (toc) {
-      toc.addEventListener('change', function () {
-        if (isMobileReader()) closeSidebar();
-      });
-    }
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        closeSidebar();
-        if (appearance) appearance.open = false;
-        syncAppearanceOverlay();
-      }
-    });
-    window.addEventListener('resize', function () {
-      if (!isMobileReader()) {
-        if (sidebar) sidebar.classList.remove('is-open');
-        if (sidebarBackdrop) sidebarBackdrop.hidden = true;
-        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
-        if (workspace) workspace.classList.remove('reader-sidebar-collapsed');
-        document.body.classList.remove('reader-drawer-open');
-      }
-    });
-  }());
-  </script>
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-mobile-ui-r1"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-mobile-ui-r2"></script>
 </body>
 </html>
