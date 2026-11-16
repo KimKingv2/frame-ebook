@@ -610,3 +610,16 @@ a { color: inherit; }
   .folder-detail-section { padding-top: 25px; }
   .folder-detail-heading h2 { font-size: 23px; }
 }
+
+
+/* Folder detail: show each file's independent name and metadata. */
+.library-volume-filename {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #746b80;
+  font-size: 7px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
