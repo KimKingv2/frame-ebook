@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-reader-fullscreen-motion-r9">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-footnote-popover-bookmarks-r10">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -212,8 +212,9 @@
               <button id="reader-sidebar-close" class="reader-sidebar-close" type="button" aria-label="關閉閱讀導覽">×</button>
             </div>
             <nav class="reader-sidebar-mobile-tabs" aria-label="閱讀導覽分類">
-              <button type="button" class="is-active" data-reader-pane="toc" aria-pressed="true">章節目錄</button>
-              <button type="button" data-reader-pane="notes" aria-pressed="false">筆記與標註</button>
+              <button type="button" class="is-active" data-reader-pane="toc" aria-pressed="true">目錄</button>
+              <button type="button" data-reader-pane="notes" aria-pressed="false">筆記</button>
+              <button type="button" data-reader-pane="bookmarks" aria-pressed="false">書籤 <span id="bookmark-tab-count">0</span></button>
             </nav>
             <section id="reader-toc-section" class="reader-sidebar-section" aria-label="章節目錄">
               <div class="reader-sidebar-section-title"><span>章節目錄</span><small>CONTENTS</small></div>
@@ -240,7 +241,13 @@
           </section>
 
             </section>
-            <p class="reader-sidebar-footnote">閱讀位置與標註會同步保存至雲端</p>
+            <section id="reader-bookmarks-section" class="reader-sidebar-section reader-sidebar-bookmarks" aria-label="書籤">
+              <div class="reader-sidebar-section-title"><span>我的書籤</span><small>BOOKMARKS</small></div>
+              <div id="bookmark-list" class="annotation-list bookmark-list">
+                <p class="annotation-empty">載入書籍後顯示書籤。</p>
+              </div>
+            </section>
+            <p class="reader-sidebar-footnote">閱讀位置、筆記與書籤都會同步保存至雲端</p>
           </aside>
           <div class="reader-main-column">
             <section id="reader-frame" class="reader-frame">
@@ -251,6 +258,14 @@
                   <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
                 </div>
               </div>
+            <button id="reader-bookmark-toggle" class="reader-bookmark-toggle" type="button" data-no-page-turn disabled aria-pressed="false">☆ 加入書籤</button>
+            <div id="reader-footnote-popover" class="reader-footnote-popover" hidden role="dialog" aria-label="註釋內容">
+              <div class="reader-footnote-popover-head">
+                <span>註釋</span>
+                <button id="reader-footnote-close" type="button" aria-label="關閉註釋">×</button>
+              </div>
+              <div id="reader-footnote-content" class="reader-footnote-content"></div>
+            </div>
             <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
               <span class="annotation-toolbar-label">標記</span>
               <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
@@ -309,6 +324,6 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-reader-fullscreen-motion-r9"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261116-footnote-popover-bookmarks-r10"></script>
 </body>
 </html>
