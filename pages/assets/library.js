@@ -42,90 +42,73 @@ function compareFolderFiles(a, b) {
   const nameB = String(b?.fileName || b?.name || "");
   return nameA.localeCompare(nameB, "zh-Hant", { numeric: true, sensitivity: "base" });
 }
-function folderStackPlacements(book, count) {
-  const key = String(book._folderKey || book.folderTitle || book.title || "");
-  let seed = 2166136261;
-  for (let index = 0; index < key.length; index += 1) {
-    seed ^= key.charCodeAt(index);
-    seed = Math.imul(seed, 16777619);
-  }
-  const layouts = {
-    2: [
-      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }],
-      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }],
-      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }]
-    ],
-    3: [
-      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -10 }],
-      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }, { x: 36, y: 45.5, rotation: 10 }],
-      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 10 }]
-    ],
-    4: [
-      [{ x: 36, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -10 }, { x: 36, y: 54.5, rotation: 10 }],
-      [{ x: 64, y: 45.5, rotation: 12 }, { x: 36, y: 54.5, rotation: -12 }, { x: 36, y: 45.5, rotation: 10 }, { x: 64, y: 54.5, rotation: -10 }],
-      [{ x: 36, y: 54.5, rotation: 12 }, { x: 64, y: 45.5, rotation: -12 }, { x: 64, y: 54.5, rotation: 10 }, { x: 36, y: 45.5, rotation: -10 }]
-    ]
-  };
-  const choices = layouts[Math.min(4, Math.max(2, count))] || layouts[4];
-  return choices[(seed >>> 0) % choices.length];
-}
 function makeCover(book, compact) {
   const frame = document.createElement("div");
   frame.className = "cover-frame library-cover" + (compact ? " library-cover-compact" : "");
-  frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
   const isFolderCard = Array.isArray(book._groupMembers) && book._groupMembers.length > 0;
   if (isFolderCard) {
-    const members = book._groupMembers.slice().sort(compareFolderFiles).slice(0, 4);
-    if (members.length > 1) {
-      const stack = document.createElement("div");
-      stack.className = "library-cover-stack";
-      stack.setAttribute("aria-label", "依檔名排序的前 " + members.length + " 本書，隨意堆疊展示");
-      const placements = folderStackPlacements(book, members.length);
-      members.forEach((member, index) => {
-        const sheet = document.createElement("div");
-        sheet.className = "library-cover-stack-book";
-        const point = placements[index] || placements[placements.length - 1];
-        sheet.style.left = (point.x - 27.5) + "%";
-        sheet.style.top = (point.y - 39.5) + "%";
-        sheet.style.width = "55%";
-        sheet.style.height = "79%";
-        sheet.style.transform = "rotate(" + point.rotation + "deg)";
-        sheet.style.zIndex = String(members.length - index + 1);
-        const hash = member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
-          ? member.cloudCoverHash : "";
-        if (hash) {
-          const image = document.createElement("img");
-          image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
-          image.alt = member.fileName || member.title || "書籍封面";
-          image.loading = "lazy"; image.decoding = "async";
-          image.addEventListener("error", () => {
-            sheet.replaceChildren(makeFallback(member));
-            sheet.classList.add("is-fallback");
-          }, { once: true });
-          sheet.appendChild(image);
-        } else {
-          sheet.classList.add("is-fallback");
-          sheet.appendChild(makeFallback(member));
-        }
-        stack.appendChild(sheet);
-      });
-      frame.appendChild(stack);
+    frame.classList.add("library-folder-cover");
+    frame.setAttribute("aria-label", (book.folderTitle || book.title || "資料夾") + " 封面");
+    const members = book._groupMembers.slice().sort(compareFolderFiles);
+    const first = members[0] || book;
+    const face = document.createElement("div");
+    face.className = "library-folder-cover-face";
+
+    const spine = document.createElement("span");
+    spine.className = "library-folder-cover-spine";
+    spine.setAttribute("aria-hidden", "true");
+
+    const header = document.createElement("div");
+    header.className = "library-folder-cover-header";
+    const brand = document.createElement("span");
+    brand.className = "library-folder-cover-brand";
+    brand.textContent = "FRAME READER";
+    const edition = document.createElement("span");
+    edition.className = "library-folder-cover-edition";
+    edition.textContent = "PRIVATE ARCHIVE";
+    header.append(brand, edition);
+
+    const title = document.createElement("div");
+    title.className = "library-folder-cover-title";
+    title.textContent = book.folderTitle || book.title || "未命名收藏";
+
+    const rule = document.createElement("span");
+    rule.className = "library-folder-cover-rule";
+
+    const feature = document.createElement("div");
+    feature.className = "library-folder-cover-feature";
+    const hash = first.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(first.cloudCoverHash || ""))
+      ? first.cloudCoverHash : "";
+    if (hash) {
+      const image = document.createElement("img");
+      image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+      image.alt = first.fileName || first.title || "第一本書籍封面";
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.addEventListener("error", () => {
+        feature.replaceChildren(makeFallback(first));
+        feature.classList.add("is-fallback");
+      }, { once: true });
+      feature.appendChild(image);
     } else {
-      const member = members[0];
-      const hash = member?.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
-        ? member.cloudCoverHash : "";
-      if (hash) {
-        const image = document.createElement("img");
-        image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
-        image.alt = member.fileName || member.title || "書籍封面";
-        image.loading = "lazy"; image.decoding = "async";
-        image.addEventListener("error", () => { image.remove(); frame.appendChild(makeFallback(member)); }, { once: true });
-        frame.appendChild(image);
-      } else {
-        frame.appendChild(makeFallback(member || book));
-      }
+      feature.classList.add("is-fallback");
+      feature.appendChild(makeFallback(first));
     }
+
+    const footer = document.createElement("div");
+    footer.className = "library-folder-cover-footer";
+    const firstName = document.createElement("span");
+    firstName.className = "library-folder-cover-first";
+    firstName.textContent = first.fileName || first.title || "COLLECTION";
+    const count = document.createElement("span");
+    count.className = "library-folder-cover-count";
+    count.textContent = String(members.length).padStart(2, "0") + " VOLUMES";
+    footer.append(firstName, count);
+
+    face.append(spine, header, title, rule, feature, footer);
+    frame.appendChild(face);
   } else {
+    frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
     const hash = book.cloudCoverHash && book.cloudCoverStatus === "ready"
       ? book.cloudCoverHash
       : (book.cloudCoverHashes || []).find(value => /^[a-f0-9]{64}$/i.test(String(value))) || "";
@@ -133,13 +116,18 @@ function makeCover(book, compact) {
       const image = document.createElement("img");
       image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
       image.alt = (book.title || "作品") + " 封面";
-      image.loading = "lazy"; image.decoding = "async";
-      image.addEventListener("error", () => { image.remove(); frame.appendChild(makeFallback(book)); }, { once: true });
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.addEventListener("error", () => {
+        image.remove();
+        frame.appendChild(makeFallback(book));
+      }, { once: true });
       frame.appendChild(image);
     } else {
       frame.appendChild(makeFallback(book));
     }
   }
+
   const format = document.createElement("span");
   format.className = "library-format-badge";
   const volumeCount = isFolderCard ? Math.max(1, Number(book.volumeCount) || book._groupMembers.length) : 1;
