@@ -54,9 +54,12 @@ function makeCover(book, compact) {
     if (members.length > 1) {
       const stack = document.createElement("div");
       stack.className = "library-cover-stack";
-      stack.setAttribute("aria-label", "依檔案名稱排序的前三本書籍封面堆疊");
+      stack.setAttribute("aria-label", "中央為檔名排序第一本書的封面，左右展示後續冊次");
+      const visualMembers = members.length === 3
+        ? [members[1], members[0], members[2]]
+        : [members[1], members[0]];
 
-      members.forEach((member, index) => {
+      visualMembers.forEach((member, index) => {
         const sheet = document.createElement("div");
         sheet.className = "library-cover-stack-book";
         const hash = member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
@@ -64,7 +67,7 @@ function makeCover(book, compact) {
         if (hash) {
           const image = document.createElement("img");
           image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
-          image.alt = member.fileName || member.title || ("第 " + (index + 1) + " 本書籍封面");
+          image.alt = member.fileName || member.title || "書籍封面";
           image.loading = "lazy";
           image.decoding = "async";
           image.addEventListener("error", () => {
