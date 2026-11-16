@@ -135,8 +135,8 @@ function groupedShelfBooks() {
       group = {
         ...book,
         _folderKey: key,
-        title: book.manualTitle ? book.title :
-          (book.comicMetadata?.nameCn || book.comicMetadata?.name || book.bookTitle || book.title || book.folderTitle || folderPath.split("/").pop()),
+        title: book.comicMetadata?.nameCn || book.comicMetadata?.name ||
+          book.folderTitle || folderPath.split("/").pop() || book.title || book.bookTitle,
         folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
         cloudCoverHashes: [],
         cloudSource: { ...source, files: [] },
