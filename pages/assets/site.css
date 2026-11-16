@@ -436,14 +436,15 @@ a { color: inherit; }
 .library-origin-note { display: block; margin-top: 3px; color: #665f70; font-size: 7px; line-height: 1.2; letter-spacing: .15px; }
 
 
-/* Text-free luxury folder cover: warm mineral paper, deep jade geometry and a framed lead cover. */
+/* Flat folder cover: solid colour planes, no typography, gloss, bevels or shadows. */
 .library-folder-cover {
   position:relative;
   overflow:hidden;
-  border:1px solid rgba(167,145,108,.48);
-  border-radius:5px;
-  background:#e9e3d7;
-  box-shadow:0 13px 30px rgba(0,0,0,.24);
+  border:0;
+  border-radius:4px;
+  background:#e8e3d8;
+  box-shadow:none;
+  transition:transform .25s ease;
 }
 .library-folder-cover::after { content:none; }
 .library-folder-cover .library-format-badge { display:none; }
@@ -451,60 +452,36 @@ a { color: inherit; }
   position:absolute;
   inset:0;
   overflow:hidden;
-  background:#e9e3d7;
+  background:#e8e3d8;
 }
 .library-folder-cover-face::before {
   position:absolute;
-  top:-19%;
-  right:-31%;
-  width:105%;
-  aspect-ratio:1;
-  border-radius:50%;
-  background:#30443d;
+  top:0;
+  right:0;
+  width:100%;
+  height:100%;
+  background:#355047;
+  clip-path:polygon(58% 0,100% 0,100% 61%);
   content:"";
 }
 .library-folder-cover-face::after {
   position:absolute;
-  bottom:-56%;
-  left:-44%;
-  width:112%;
-  aspect-ratio:1;
-  border:1px solid rgba(158,126,82,.55);
-  border-radius:50%;
-  box-shadow:
-    0 0 0 10px rgba(158,126,82,.07),
-    0 0 0 11px rgba(158,126,82,.24),
-    0 0 0 22px rgba(158,126,82,.045),
-    0 0 0 23px rgba(158,126,82,.16);
-  content:"";
-}
-.library-folder-cover-spine {
-  position:absolute;
-  z-index:4;
-  top:0;
   bottom:0;
   left:0;
-  width:8px;
-  border-right:1px solid rgba(185,151,103,.8);
-  background:#263a34;
+  width:100%;
+  height:100%;
+  background:#c58c70;
+  clip-path:polygon(0 74%,0 100%,34% 100%);
+  content:"";
 }
+.library-folder-cover-spine,
 .library-folder-cover-ornament {
-  position:absolute;
-  z-index:2;
-  top:9%;
-  right:12%;
-  width:15%;
-  aspect-ratio:1;
-  border:1px solid rgba(211,187,143,.68);
-  border-radius:50%;
-  box-shadow:
-    0 0 0 5px rgba(211,187,143,.08),
-    0 0 0 6px rgba(211,187,143,.25);
+  display:none;
 }
 .library-folder-cover-feature {
   position:absolute;
-  z-index:3;
-  inset:9% 12% 9% 12%;
+  z-index:2;
+  inset:8% 12%;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -513,42 +490,35 @@ a { color: inherit; }
 }
 .library-folder-cover-feature > img {
   display:block;
-  max-width:82%;
+  max-width:78%;
   max-height:100%;
   width:auto;
   height:auto;
   object-fit:contain;
-  padding:5px;
-  border:1px solid rgba(167,145,108,.48);
-  border-radius:2px;
-  background:#f5f1e8;
-  box-shadow:0 12px 24px rgba(24,35,30,.25);
+  border:0;
+  border-radius:0;
+  padding:0;
+  background:transparent;
+  box-shadow:none;
 }
 .library-folder-cover-feature.has-no-cover::before {
-  width:56%;
-  height:75%;
-  border:1px solid rgba(167,145,108,.65);
-  border-radius:3px;
-  background:#f5f1e8;
-  box-shadow:0 12px 24px rgba(24,35,30,.2);
+  width:48%;
+  height:68%;
+  background:#355047;
+  clip-path:polygon(50% 0,100% 26%,82% 100%,18% 100%,0 26%);
   content:"";
 }
 .library-folder-cover-feature.has-no-cover::after {
   position:absolute;
-  width:24%;
-  aspect-ratio:1;
-  border:1px solid rgba(48,68,61,.5);
-  border-radius:50%;
-  box-shadow:
-    0 0 0 8px rgba(48,68,61,.05),
-    0 0 0 9px rgba(48,68,61,.22),
-    0 0 0 20px rgba(48,68,61,.04),
-    0 0 0 21px rgba(48,68,61,.16);
+  width:20%;
+  height:20%;
+  background:#c58c70;
+  clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
   content:"";
 }
-@media(max-width:640px) {
-  .library-folder-cover-feature > img { max-width:84%; padding:4px; }
-  .library-folder-cover-ornament { top:10%; right:10%; }
+.library-folder-card:hover .library-folder-cover {
+  transform:translateY(-3px);
+  box-shadow:none;
 }
 
 .dialog-volumes { margin:14px 0 4px; }
