@@ -193,7 +193,7 @@
             <button id="reader-fullscreen" class="reader-fullscreen-button" type="button" aria-pressed="false" title="進入全螢幕閱讀">⛶ 全螢幕</button>
           </div>
         </section>
-        <section class="reader-frame">
+        <section id="reader-frame" class="reader-frame">
           <div id="reader-viewport" class="reader-viewport">
             <div id="reader-placeholder" class="reader-placeholder">
               <div class="placeholder-mark">F</div>
@@ -201,6 +201,15 @@
               <p>返回雲端書架並開啟一本已索引的 EPUB 或 CBZ。</p>
             </div>
           </div>
+        <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
+          <span class="annotation-toolbar-label">標記</span>
+          <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
+          <button type="button" class="annotation-color-button is-violet" data-highlight-color="violet" title="紫色高亮" aria-label="紫色高亮"></button>
+          <button type="button" class="annotation-color-button is-mint" data-highlight-color="mint" title="綠色高亮" aria-label="綠色高亮"></button>
+          <button type="button" class="annotation-color-button is-rose" data-highlight-color="rose" title="粉色高亮" aria-label="粉色高亮"></button>
+          <button type="button" id="selection-add-note" class="annotation-note-action">寫筆記</button>
+          <button type="button" id="selection-dismiss" class="annotation-dismiss" aria-label="關閉選取工具列">×</button>
+        </div>
         </section>
         <section class="reader-controls">
           <button id="prev-page" type="button" disabled>← 上一頁</button>
@@ -220,15 +229,6 @@
             <p class="annotation-empty">載入書籍後顯示本書的筆記與高亮。</p>
           </div>
         </section>
-        <div id="annotation-selection-toolbar" class="annotation-selection-toolbar" hidden role="toolbar" aria-label="選取文字操作">
-          <span class="annotation-toolbar-label">標記</span>
-          <button type="button" class="annotation-color-button is-yellow" data-highlight-color="yellow" title="黃色高亮" aria-label="黃色高亮"></button>
-          <button type="button" class="annotation-color-button is-violet" data-highlight-color="violet" title="紫色高亮" aria-label="紫色高亮"></button>
-          <button type="button" class="annotation-color-button is-mint" data-highlight-color="mint" title="綠色高亮" aria-label="綠色高亮"></button>
-          <button type="button" class="annotation-color-button is-rose" data-highlight-color="rose" title="粉色高亮" aria-label="粉色高亮"></button>
-          <button type="button" id="selection-add-note" class="annotation-note-action">寫筆記</button>
-          <button type="button" id="selection-dismiss" class="annotation-dismiss" aria-label="關閉選取工具列">×</button>
-        </div>
         <dialog id="annotation-note-dialog" class="annotation-note-dialog" aria-labelledby="annotation-note-title">
           <div class="annotation-note-dialog-head">
             <div><p class="eyebrow">PRIVATE READING NOTE</p><h3 id="annotation-note-title">為這段文字寫筆記</h3></div>
