@@ -86,6 +86,10 @@ export async function onRequestPost({ request, env }) {
       .filter(tag => tag.name);
     const metadata = {
       source: "Bangumi",
+      provider: target.provider,
+      library: target.library,
+      rootPath: target.rootPath,
+      folderPath,
       subjectId,
       name: clean(subject.name, 240),
       nameCn: clean(subject.name_cn, 240),
