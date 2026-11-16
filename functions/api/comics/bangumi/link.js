@@ -74,7 +74,7 @@ export async function onRequestPost({ request, env }) {
       const result = await db.prepare(
         "SELECT name FROM cloud_catalog WHERE provider=? AND library='comics' AND root_path=? " +
         "AND parent_path=? AND is_dir=0 AND format IN ('CBZ','EPUB') ORDER BY path LIMIT 500"
-      ).bind(target.provider, target.rootPath, folderPath).all();
+      ).bind("vps", target.rootPath, folderPath).all();
       rows = result.results || [];
       if (!rows.some(row => row.name === target.fileName)) rows.push({ name: target.fileName });
     }
