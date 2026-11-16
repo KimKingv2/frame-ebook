@@ -3109,3 +3109,105 @@ body.reader-settings-open .reader-quick-actions {
     white-space:nowrap !important;
   }
 }
+
+/* Mobile reader actions belong to the reading header, not the screen bottom. */
+@media (max-width:820px) {
+  #reading-workspace:not(:fullscreen) .book-heading {
+    padding-bottom:12px !important;
+  }
+  #reading-workspace:not(:fullscreen) .book-progress {
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) !important;
+    align-items:center !important;
+    justify-content:stretch !important;
+    gap:5px 8px !important;
+    width:100% !important;
+  }
+  #reading-workspace:not(:fullscreen) .reader-quick-actions {
+    position:relative !important;
+    top:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    left:auto !important;
+    grid-column:1 / -1 !important;
+    display:flex !important;
+    flex-direction:row !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:4px !important;
+    width:100% !important;
+    max-width:none !important;
+    margin:3px 0 0 !important;
+    padding:4px !important;
+    border:1px solid rgba(193,170,238,.24) !important;
+    border-radius:11px !important;
+    background:rgba(25,21,35,.94) !important;
+    box-shadow:0 5px 18px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.045) !important;
+    transform:none !important;
+  }
+  #reading-workspace:not(:fullscreen) .reader-quick-actions > button {
+    position:relative !important;
+    flex:1 1 0 !important;
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:34px !important;
+    min-height:34px !important;
+    margin:0 !important;
+    padding:0 2px !important;
+    border-radius:7px !important;
+    font-size:clamp(7px,2.5vw,9px) !important;
+    white-space:nowrap !important;
+  }
+
+  /* In native fullscreen the dock is a real flex row directly under the title. */
+  .reading-workspace:fullscreen > .book-heading {
+    order:0 !important;
+  }
+  .reading-workspace:fullscreen > #reader-quick-actions {
+    position:relative !important;
+    top:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    left:auto !important;
+    order:1 !important;
+    align-self:center !important;
+    flex:0 0 auto !important;
+    display:flex !important;
+    flex-direction:row !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:4px !important;
+    width:calc(100vw - 20px) !important;
+    max-width:360px !important;
+    margin:0 auto 8px !important;
+    padding:4px !important;
+    transform:none !important;
+  }
+  .reading-workspace:fullscreen > #reader-quick-actions > button {
+    position:relative !important;
+    flex:1 1 0 !important;
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:34px !important;
+    min-height:34px !important;
+    margin:0 !important;
+    padding:0 2px !important;
+    font-size:clamp(7px,2.5vw,9px) !important;
+    white-space:nowrap !important;
+  }
+  .reading-workspace:fullscreen > .reader-layout {
+    order:2 !important;
+    flex:1 1 0 !important;
+    min-height:0 !important;
+  }
+  .reading-workspace:fullscreen.reader-immersive-mode > #reader-quick-actions {
+    transform:translateY(-12px) !important;
+  }
+  .reading-workspace:fullscreen.reader-immersive-exiting > #reader-quick-actions {
+    transform:translateY(0) !important;
+  }
+}
