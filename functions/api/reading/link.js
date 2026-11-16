@@ -247,13 +247,22 @@ export async function onRequestPost({ request, env }) {
       const oldUpdated = Number(oldState.updatedAt) || 0;
       const currentUpdated = Number(newState?.updatedAt) || 0;
       const newerProgress = oldUpdated > currentUpdated ? previous.progress : current.progress;
+      const oldMetadata = previous.metadata || {};
+      const currentMetadata = current.metadata || {};
+      const mergedMetadata = { ...oldMetadata, ...currentMetadata };
+      for (const key of ["title", "author"]) {
+        const manualKey = key === "title" ? "manualTitle" : "manualAuthor";
+        if (!currentMetadata[manualKey] && oldMetadata[manualKey] && oldMetadata[key]) {
+          mergedMetadata[key] = oldMetadata[key];
+          mergedMetadata[manualKey] = true;
+        }
+      }
       const merged = {
         ...previous,
         ...current,
         ...(previous.appearance || current.appearance
           ? { appearance: { ...(previous.appearance || {}), ...(current.appearance || {}) } } : {}),
-        ...(previous.metadata || current.metadata
-          ? { metadata: { ...(previous.metadata || {}), ...(current.metadata || {}) } } : {}),
+        ...(previous.metadata || current.metadata ? { metadata: mergedMetadata } : {}),
         ...(newerProgress ? { progress: newerProgress } : {}),
         lastOpenedAt: Math.max(Number(previous.lastOpenedAt) || 0, Number(current.lastOpenedAt) || 0)
       };
