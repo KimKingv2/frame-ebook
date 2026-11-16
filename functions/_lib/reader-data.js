@@ -120,7 +120,7 @@ export async function migrateLegacyReaderBookIds(db, userId) {
       "created_at=MIN(reader_book_state.created_at,excluded.created_at)," +
       "updated_at=MAX(reader_book_state.updated_at,excluded.updated_at)"
     ).bind(
-      userId, nextId, row.provider, row.library, row.rootPath, row.path,
+      userId, nextId, row.provider === "local" ? "vps" : row.provider, row.library, row.rootPath, row.path,
       row.stateJson || "{}", Number(row.createdAt) || Date.now(), Number(row.updatedAt) || 0
     ));
     statements.push(db.prepare(
