@@ -17,7 +17,8 @@ Apply the schema from the repository root if it has not already been applied:
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0001_reading_events.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0002_cloud_catalog.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0003_cloud_covers.sql
-npx wrangler d1 execute frame-reader-db --remote --file=migrations/0004_cloud_annotations.sql\nnpx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0004_cloud_annotations.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0005_cloud_only_reader_data.sql
 ```
 
 In Workers & Pages → `frame-ebook` → Settings → Bindings, add a D1 database binding named `FRAME_READER_DB` and select `frame-reader-db`. Also create a private R2 bucket named `frame-reader-covers`, then add an R2 bucket binding named `FRAME_READER_COVERS` pointing to it. Do not enable public access for this bucket. Save and redeploy so both bindings are available to Pages Functions. Do not recreate or reset an existing database.
@@ -46,7 +47,7 @@ The three server-side profiles are independent. Configure only the sources you i
 
 Pages Functions read each source's API URL, username and password from Cloudflare. They call `getProviderToken()` before `/api/fs/list` and `/api/fs/get`: a valid short-lived JWT is reused from the shared `MEDIA_AUTH_TOKEN_CACHE` KV namespace, and a new `POST /api/auth/login` is made only on a cache miss or refresh. The record uses the common prefix `media-platform:provider-auth:v1`, expiry-aware TTL and the same SHA-256 key derivation as FRAME Audio. Provider identities and `Client-Id` values are exactly `vps`, `worker` and `mobile-device` (`media-platform-server-{provider}`), so matching provider URL and username allow Audio and Reader to reuse the same cached JWT. When an upstream API rejects a cached token with HTTP/API code 401, Reader invalidates it, logs in again and retries once. A per-isolate memory cache and single-flight login guard reduce repeated KV reads and concurrent logins. If KV is unavailable or not bound, Reader remains functional using isolate-memory caching, but cold starts may log in again. JWTs are never sent to the browser or stored in D1/R2; account passwords remain in Pages Secrets.
 
-FRAME Reader uses Cloudflare Zero Trust Access as its **only** website authentication layer. Cloudflare Access must authenticate requests at the edge before they reach Pages, and its application must protect the complete hostname, including static pages and every `/api/*` route. Pages Functions intentionally do not independently inspect or verify `Cf-Access-Jwt-Assertion`; there is no second Reader password, custom session cookie, Team Domain Variable or AUD Variable. Do not add `FRAME_READER_ACCESS_TEAM_DOMAIN` or `FRAME_READER_ACCESS_AUD`.
+FRAME Reader uses Cloudflare Zero Trust Access as its website sign-in layer. Access must protect the complete hostname, including static pages and every `/api/*` route. In addition, user-owned reading data is partitioned by the verified Access identity. Configure the team-domain and application-AUD variables in Section 3. There is no second Reader password or custom session cookie.
 
 This design relies on the Access edge policy. If the production hostname or any API route is left outside the Access application, the corresponding Reader content/API is not protected by an application-level JWT check. Confirm the hostname-wide Access application before deploying or changing its scope.
 
@@ -76,20 +77,20 @@ Use a separate read-only account. Plain HTTP does not encrypt the username/passw
 
 Legacy local Token settings are not reused. On first open after this update, the old saved local Token is discarded; enter the LAN account and password once and save the source again.
 
-## 5. Set the two library paths like FRAME Audio
+## 4. Set the two library paths
 
 The cloud page has two independent path fields:
 
 - **Books root:** EPUB electronic books.
 - **Comics root:** EPUB and CBZ comics.
 
-You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. The two HTML input `value` attributes are the defaults. Changes in the page apply only to the current page session; refreshing restores the HTML defaults. The current values are reused when switching between VPS Alist, OpenList Worker, Mobile Device Alist and LAN-direct OpenList.
+You can type an absolute path directly, or browse folders and use the current folder as the Books or Comics root. The two HTML input `value` attributes are the defaults. Each server-side provider has independent Books and Comics roots. Saved paths are stored in the current Access user's D1 preferences and are restored after refresh or on another device.
 
-All sources should expose the same absolute folder layout so the two HTML input paths work after switching sources. The default paths are the `value` attributes of `cloud-books-root` and `cloud-comics-root` in `pages/cloud/index.html`. Changes made in the browser apply only to the current page session; refreshing restores the HTML defaults. The previous `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` variables are not used for path defaults or access control. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
+The first-use default paths are seeded from `pages/cloud/index.html`. Once saved, the active provider, Books/Comics selection and each provider's root paths are stored in D1 under the Access user identity. The actual permission boundary is the Alist account: restrict each account to the intended read-only directories.
 
 After Cloudflare Access authentication succeeds, the cloud page automatically reads the D1 index for the previously selected source, library and HTML-default root path. The first use of each source/library/root combination requires **手動掃描／續掃**. The recursive scan stores its folder queue and page cursor in D1 after each directory page, so a paused or interrupted scan can resume later. Once complete, normal page loads and folder navigation query D1 only; they do not list directories from OpenList. Run another manual scan after adding, removing or reorganizing cloud files. The next completed scan removes stale catalog entries only after the whole root has been traversed successfully. Each VPS, Worker and Mobile Device source, and each Books/Comics root, has an independent catalog and scan state.
 
-## 6. Verify the configuration
+## 5. Verify the configuration
 
 1. Confirm the D1 binding `FRAME_READER_DB` and private R2 binding `FRAME_READER_COVERS` exist. Apply `migrations/0001_reading_events.sql`, `migrations/0002_cloud_catalog.sql`, `migrations/0003_cloud_covers.sql`, `migrations/0004_cloud_annotations.sql` and `migrations/0005_cloud_only_reader_data.sql` to the `frame-reader-db` database.
 2. Protect the complete production hostname `frame-ebook.pages.dev` with Cloudflare Access. Important: for Pages, the initial `Enable access policy` toggle protects Preview deployments only, not the root `*.pages.dev` production hostname. To protect Production as well:
@@ -99,22 +100,22 @@ After Cloudflare Access authentication succeeds, the cloud page automatically re
    - Confirm the Access application/policy covers the entire hostname and therefore `/`, `/cloud/*`, `/reading-stats/*`, and `/api/*`. Do not add path exclusions for the API routes.
    - Return to the Pages project settings and enable the Preview access policy again if you also want Preview deployments protected. Preview uses a separate hostname/policy and must not be confused with Production.
    - If a custom domain is used, create a separate Access application for that hostname and protect the complete hostname too.
-   **Security boundary:** Cloudflare Access must protect the complete hostname. The cloud-annotation endpoint additionally verifies the Access JWT signature, issuer, expiry and application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. The other existing APIs continue to rely on the Access edge. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
+   **Security boundary:** Cloudflare Access must protect the complete hostname. All user-owned reading-data endpoints verify the Access JWT signature, issuer, expiry and application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. Cloud catalog scan/file endpoints rely on Access at the edge. If Access does not protect the full hostname, the API routes can be reached without Reader-level authentication.
 3. Open the protected FRAME Reader site. Cloudflare Access should handle authentication before the page loads; there is no separate Reader password in Access mode.
-4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; Only server-side Alist／OpenList sources are supported; choose VPS Alist, OpenList Worker or Mobile Device Alist.
+4. The previously selected source and its D1 catalog load automatically. If no source has been selected yet, choose one and save it; Only server-side Alist／OpenList sources are supported: VPS Alist, OpenList Worker or Mobile Device Alist.
 5. Set the Books and Comics root paths. For each source and each library, click **手動掃描／續掃** once and allow the recursive scan to finish. If interrupted, click it again to resume from the saved D1 cursor.
 6. After the first completed scan, folder navigation reads D1. Re-run the scan when you want to synchronize new, modified or deleted OpenList files.
-7. Open any cloud book from the main bookshelf. Its original EPUB / CBZ is fetched from OpenList for the active reading session and is not persisted as a second cloud-file copy in IndexedDB. The cloud original is never changed or deleted.
+7. Open any scanned cloud book from the main bookshelf. Its original EPUB / CBZ is fetched from Alist／OpenList for the active reading session and remains in memory only. The cloud original is never changed or deleted.
 
-## 8. Shared provider Token cache (2026-11-14)
+## 6. Shared provider Token cache (2026-11-14)
 
 The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now use the same short-lived JWT cache contract as FRAME Audio. Bind the existing shared KV namespace as `MEDIA_AUTH_TOKEN_CACHE` in this Pages environment before relying on cross-project reuse. Use `frame-series-auth-cache-production` for Production and the separate `media-platform-auth-cache` namespace for Preview. Never share a KV namespace across Preview and Production. After changing the binding, trigger a new deployment so the Pages Functions receive it. Without the binding, Reader falls back to isolate memory and may authenticate again after a cold start.
 
 ## 7. Existing data and current behavior
 
-- Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. It is additive and does not alter existing reading events, local books, reading progress or appearance settings. The two Access verification Variables must be configured as described above.
-- There is no local import path or LAN-direct OpenList path. A book can enter the shelf only through a completed D1 scan of a configured server-side Alist／OpenList source.
-- `reader_preferences` and `reader_book_state` store per-user preferences and per-book progress/appearance/metadata in D1. `reader_reading_events` stores per-user reading history. The browser uses an in-memory cache only; it does not write these records to IndexedDB or localStorage.
-- The old unscoped `reading_events` table is left untouched by migration 0005. New statistics use the user-scoped `reader_reading_events` table. Old events cannot safely be assigned to an Access identity automatically.
-- Existing IndexedDB/localStorage records from older releases are not automatically deleted or migrated by this code change. They are no longer read or updated; clear them only after deciding whether any old local-only books or progress need to be retained.
+- Cloud catalog indexing requires `migrations/0002_cloud_catalog.sql`. Migration `0005_cloud_only_reader_data.sql` adds user-scoped preferences, book state and reading-event tables. The two Access identity Variables must be configured as described above.
+- There is no local-file import path or browser-to-LAN OpenList path. A book can enter the shelf only through a completed D1 scan of a configured server-side Alist／OpenList source.
+- `reader_preferences` and `reader_book_state` store per-user preferences and per-book progress/appearance/metadata in D1. `reader_reading_events` stores per-user reading history. The Reader frontend uses only in-memory objects for the active page; persistent user data is written to D1 and cover thumbnails to private R2.
+- The old unscoped `reading_events` table is left untouched by migration 0005. New statistics use the user-scoped `reader_reading_events` table. Old events cannot safely be assigned to an Access identity automatically, so they are not included in new statistics.
+- Legacy IndexedDB/localStorage data from older releases is not read by the cloud-only app and is not automatically deleted. This release does not transfer old browser-only progress or unscoped reading history into an Access identity. Leave those legacy records untouched until any needed information has been exported or deliberately discarded.
 - Reader uses only the three server-side provider IDs: `vps`, `worker` and `mobile`. The cloud file proxy fetches the original archive on demand; the book blob exists in memory only for the active reading session.
