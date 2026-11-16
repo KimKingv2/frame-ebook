@@ -492,10 +492,16 @@
               });
             }
             if (window.matchMedia('(max-width: 820px)').matches) {
-              var sidebar = el('reader-sidebar');
-              var toggle = el('reader-sidebar-toggle');
-              if (sidebar) sidebar.classList.remove('is-open');
-              if (toggle) toggle.setAttribute('aria-expanded', 'false');
+              if (typeof window.frameReaderCloseSidebar === 'function') {
+                window.frameReaderCloseSidebar();
+              } else {
+                var sidebar = el('reader-sidebar');
+                var toggle = el('reader-sidebar-toggle');
+                var backdrop = el('reader-sidebar-backdrop');
+                if (sidebar) sidebar.classList.remove('is-open');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                if (backdrop) backdrop.hidden = true;
+              }
             }
           });
         } else {
