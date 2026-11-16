@@ -283,7 +283,7 @@ export async function getAccessIdentity(request, env) {
   const rawDomain = String(env.FRAME_READER_ACCESS_TEAM_DOMAIN || "").trim().replace(/\/+$/, "");
   const audience = String(env.FRAME_READER_ACCESS_AUD || "").trim();
   if (!rawDomain || !audience) {
-    const error = new Error("雲端標註尚未設定 Access 身分驗證。請新增 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。");
+    const error = new Error("雲端個人閱讀資料尚未設定 Access 身分驗證。請新增 FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD。");
     error.status = 503;
     throw error;
   }

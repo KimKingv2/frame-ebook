@@ -1,10 +1,7 @@
-import {
-  getReadingEvents, getReadingSetting, setReadingSetting, getPendingReadingEvents,
-  markReadingEventsSynced, listBooks
-} from "/assets/library-store.js";
+import { getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261116-cloud-only-r1";
 
 const $ = id => document.getElementById(id);
-const state = { period:"month", calendarDate:new Date(), goalMinutes:30, localEvents:[], activeEvents:[], remote:false, authenticated:false, databaseConfigured:false, remoteStats:null };
+const state = { period:"month", calendarDate:new Date(), goalMinutes:30, authenticated:false, databaseConfigured:false };
 const DAY_MS = 86400000;
 
 function dateKey(date) {
@@ -56,7 +53,7 @@ function localSummary(events) {
     daySeconds[event.dayKey]=(daySeconds[event.dayKey]||0)+seconds;
     bookSeconds[event.bookId]=(bookSeconds[event.bookId]||0)+seconds;
     bookTitles[event.bookId]=event.bookTitle||"未命名書籍";
-    const hour=new Date(Number(event.startedAt)||Date.now()).getHours();
+    const hour=Number.isInteger(Number(event.localHour))?Number(event.localHour):new Date(Number(event.startedAt)||Date.now()).getHours();
     const band=hour>=6&&hour<11?0:hour>=11&&hour<17?1:hour>=17&&hour<23?2:3;
     timeBands[band]+=seconds;
     rawSessions.push(event);
@@ -254,120 +251,130 @@ function renderSummary(summary,range,allData) {
   const mini=$("overview-bars");mini.replaceChildren();
   bars.slice(-14).forEach(item=>{const bar=document.createElement("i");bar.style.height=Math.max(3,item.seconds/Math.max(1,...bars.map(x=>x.seconds))*28)+"px";mini.appendChild(bar);});
 }
-async function fetchLocalData() {
-  const end=dateKey(new Date());
-  const events=await getReadingEvents("2000-01-01",end);
-  return localSummary(events);
+async function fetchCloudStats(range, includeEvents = false) {
+  const query = new URLSearchParams({ from: range.from, to: range.to });
+  if (includeEvents) query.set("include_events", "1");
+  const response = await fetch("/api/reading/stats?" + query.toString(), {
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok || data.error) {
+    throw new Error(data.error || "雲端閱讀統計暫時無法讀取。");
+  }
+  return data;
 }
-async function fetchCloudStats(range) {
-  const url="/api/reading/stats?from="+encodeURIComponent(range.from)+"&to="+encodeURIComponent(range.to);
-  const response=await fetch(url,{credentials:"same-origin"});
-  if(!response.ok)throw new Error("雲端統計暫時無法讀取。");
-  return response.json();
+function dayMap(rows) {
+  const result = {};
+  (rows || []).forEach(row => { result[row.dayKey] = Number(row.seconds) || 0; });
+  return result;
+}
+function makeRemoteSummary(data) {
+  return {
+    totalSeconds: Number(data.totalSeconds) || 0,
+    booksOpened: Number(data.booksOpened) || 0,
+    daySeconds: dayMap(data.days),
+    topBooks: (data.topBooks || []).map(book => ({
+      bookId: book.bookId, title: book.title || "未命名書籍", seconds: Number(book.seconds) || 0
+    })),
+    timeBands: Array.isArray(data.timeBands) ? data.timeBands.map(Number) : [0,0,0,0],
+    sessions: mergeSessions(data.recentEvents || []),
+    events: []
+  };
+}
+async function checkSession() {
+  try {
+    const response = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) throw new Error("無法確認 Cloudflare Access 登入狀態。");
+    const data = await response.json();
+    state.authenticated = !!data.authenticated;
+    state.databaseConfigured = !!data.databaseConfigured && !!data.cloudReaderDataConfigured;
+    $("cloud-account-label").textContent = !state.authenticated
+      ? "尚未通過 Cloudflare Access 驗證"
+      : !state.databaseConfigured
+        ? "D1 或 Access 身分設定尚未完成"
+        : "Cloudflare Access 已驗證 · 閱讀資料保存至 D1";
+    $("cloud-sync-status").textContent = !state.authenticated
+      ? "尚未取得 Access 身分，無法讀取雲端統計。"
+      : !state.databaseConfigured
+        ? "請確認 FRAME_READER_DB、FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD 已設定。"
+        : "已連線至雲端資料庫。所有統計依登入身分保存，跨裝置同步。";
+  } catch (error) {
+    state.authenticated = false;
+    $("cloud-account-label").textContent = "登入狀態讀取失敗";
+    $("cloud-sync-status").textContent = error.message || String(error);
+  }
+}
+async function refreshCalendar() {
+  const first = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth(), 1);
+  const last = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() + 1, 0);
+  const range = { from: dateKey(first), to: dateKey(last) };
+  const data = await fetchCloudStats(range);
+  renderCalendar({ daySeconds: dayMap(data.days) });
 }
 async function refresh() {
   try {
-    state.goalMinutes=Number(await getReadingSetting("goalMinutes",30))||30;
-    const allData=await fetchLocalData();
-    const range=periodRange(state.period);
-    let summary=selectedData(allData,range);
-    let allDataForRender=allData;
-    if(state.authenticated){
-      try{
-        const remote=await fetchCloudStats(range);
-        state.remoteStats=remote;
-        const remoteDays={};
-        (remote.days||[]).forEach(day=>remoteDays[day.dayKey]=Number(day.seconds)||0);
-        const remoteAllDays={};
-        (remote.allDays||[]).forEach(day=>remoteAllDays[day.dayKey]=Number(day.seconds)||0);
-        const remoteSessions=(remote.topBooks||[]).map(book=>({bookId:book.bookId,bookTitle:book.title,seconds:book.seconds,dayKey:range.to,startedAt:Date.now(),format:""}));
-        const remoteSummary=localSummary(remoteSessions);
-        summary={totalSeconds:Number(remote.totalSeconds)||0,booksOpened:Number(remote.booksOpened)||0,daySeconds:remoteDays,topBooks:(remote.topBooks||[]).map(book=>({bookId:book.bookId,title:book.title,seconds:book.seconds})),timeBands:remote.timeBands||[0,0,0,0],sessions:mergeSessions(remote.recentEvents||[])};
-        state.remote=true;
-        allDataForRender={daySeconds:Object.keys(remoteAllDays).length?remoteAllDays:allData.daySeconds};
-      }catch(_){state.remote=false;summary=selectedData(allData,range);}
-    } else state.remote=false;
-    const rangeLabel=state.period==="week"?"本週":state.period==="month"?"本月":state.period==="year"?"今年":"累計";
-    $("period-label").textContent=state.period==="all"?(rangeLabel+" · "+(state.remote?"雲端合併":"本機紀錄")):(rangeLabel+" · "+range.from+" 至 "+range.to+(state.remote?" · 雲端合併":" · 本機紀錄"));
-    renderSummary(summary,range,allDataForRender);
-    $("cloud-sync-status").textContent=state.authenticated
-      ? (state.remote?"雲端閱讀統計已同步，包含這個帳戶的其他裝置紀錄。":"已登入，雲端統計暫不可用，先顯示本機資料。")
-      : (state.databaseConfigured?"目前在這台設備記錄。完成登入後，可以把閱讀紀錄同步到 D1。":"目前只使用本機統計。Cloudflare D1 尚未綁定，雲端登入與跨裝置同步尚未啟用。");
-  }catch(error){
-    $("cloud-sync-status").textContent="讀取統計失敗："+(error.message||String(error));
+    if (!state.authenticated) await checkSession();
+    if (!state.authenticated) throw new Error("尚未通過 Cloudflare Access 驗證，無法讀取雲端閱讀統計。");
+    state.goalMinutes = Number(await getReadingSetting("goalMinutes", 30)) || 30;
+    const range = periodRange(state.period);
+    const data = await fetchCloudStats(range);
+    const summary = makeRemoteSummary(data);
+    const allDataForRender = { daySeconds: dayMap(data.allDays) };
+    const rangeLabel = state.period === "week" ? "本週" : state.period === "month" ? "本月" :
+      state.period === "year" ? "今年" : "累計";
+    $("period-label").textContent = rangeLabel + " · " + range.from + " 至 " + range.to + " · 雲端 D1";
+    renderSummary(summary, range, allDataForRender);
+    $("cloud-sync-status").textContent = "雲端閱讀統計已載入，包含這個 Access 帳戶在所有裝置上的閱讀紀錄。";
+  } catch (error) {
+    $("cloud-sync-status").textContent = "雲端統計讀取失敗：" + (error.message || String(error));
   }
 }
-async function checkSession() {
-  try{
-    const response=await fetch("/api/auth/session",{credentials:"same-origin"});
-    if(!response.ok)return;
-    const data=await response.json();
-    state.authenticated=!!data.authenticated;
-    state.databaseConfigured=!!data.databaseConfigured;
-    $("cloud-login-form").hidden=state.authenticated||!state.databaseConfigured;
-    $("cloud-account-actions").hidden=!state.authenticated;
-    if(state.authenticated){
-      $("cloud-account-label").textContent=data.openListConfigured?"雲端閱讀統計已連線":"統計已登入，OpenList 尚未設定";
-      const tracker=await import("/assets/reading-tracker.js");
-      await tracker.syncPending(true);
-    }
-  }catch(_){}
-}
-async function login(event) {
-  event.preventDefault();
-  const password=$("cloud-password").value;
-  if(!password)return;
-  const button=$("cloud-login-form").querySelector("button");
-  button.disabled=true;
-  try{
-    const response=await fetch("/api/auth/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});
-    const data=await response.json();
-    if(!response.ok)throw new Error(data.error||"登入失敗。");
-    state.authenticated=true;
-    $("cloud-password").value="";
-    $("cloud-login-form").hidden=true;
-    $("cloud-account-actions").hidden=false;
-    $("cloud-account-label").textContent=data.openListConfigured?"雲端統計已連線":"統計已登入，OpenList 尚未設定";
-    const tracker=await import("/assets/reading-tracker.js");
-    await tracker.syncPending(true);
-    await refresh();
-  }catch(error){$("cloud-sync-status").textContent=error.message||String(error);}
-  finally{button.disabled=false;}
-}
-async function logout() {
-  try{await fetch("/api/auth/logout",{method:"POST",credentials:"same-origin"});}catch(_){}
-  state.authenticated=false;$("cloud-login-form").hidden=false;$("cloud-account-actions").hidden=true;
-  await refresh();
-}
-function download(filename,type,content) {
-  const blob=new Blob([content],{type});
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement("a");link.href=url;link.download=filename;link.click();
-  URL.revokeObjectURL(url);
+function download(filename, type, content) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a"); link.href = url; link.download = filename; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function exportData(kind) {
-  const range=periodRange(state.period);
-  const events=await getReadingEvents(range.from,range.to);
-  const summary=localSummary(events);
-  if(kind==="json"){
-    download("frame-reader-reading-"+state.period+".json","application/json;charset=utf-8",JSON.stringify({period:state.period,from:range.from,to:range.to,summary,events},null,2));
-  }else{
-    const rows=[["日期","書名","格式","閱讀秒數","開始時間","結束時間"]];
-    events.forEach(event=>rows.push([event.dayKey,event.bookTitle,event.format,event.seconds,new Date(event.startedAt).toISOString(),new Date(event.endedAt).toISOString()]));
-    const csv=rows.map(row=>row.map(value=>'"'+String(value??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
-    download("frame-reader-reading-"+state.period+".csv","text/csv;charset=utf-8","\uFEFF"+csv);
+  const range = periodRange(state.period);
+  const data = await fetchCloudStats(range, true);
+  const events = Array.isArray(data.events) ? data.events : [];
+  if (kind === "json") {
+    download("frame-reader-reading-" + state.period + ".json", "application/json;charset=utf-8",
+      JSON.stringify({ period: state.period, from: range.from, to: range.to, summary: makeRemoteSummary(data), events }, null, 2));
+  } else {
+    const rows = [["日期","書名","格式","閱讀秒數","開始時間","結束時間"]];
+    events.forEach(event => rows.push([
+      event.dayKey, event.bookTitle, event.format, event.seconds,
+      new Date(event.startedAt).toISOString(), new Date(event.endedAt).toISOString()
+    ]));
+    const csv = rows.map(row => row.map(value => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\r\n");
+    download("frame-reader-reading-" + state.period + ".csv", "text/csv;charset=utf-8", "\uFEFF" + csv);
   }
 }
-document.querySelectorAll("[data-period]").forEach(button=>button.addEventListener("click",()=>{state.period=button.dataset.period;document.querySelectorAll("[data-period]").forEach(item=>item.setAttribute("aria-pressed",item===button?"true":"false"));refresh();}));
-$("goal-select").addEventListener("change",async event=>{state.goalMinutes=Number(event.target.value)||30;await setReadingSetting("goalMinutes",state.goalMinutes);refresh();});
-$("calendar-prev").addEventListener("click",()=>{state.calendarDate=new Date(state.calendarDate.getFullYear(),state.calendarDate.getMonth()-1,1);fetchLocalData().then(renderCalendar);});
-$("calendar-next").addEventListener("click",()=>{state.calendarDate=new Date(state.calendarDate.getFullYear(),state.calendarDate.getMonth()+1,1);fetchLocalData().then(renderCalendar);});
-$("cloud-login-form").addEventListener("submit",login);
-$("cloud-sync-now").addEventListener("click",async()=>{const tracker=await import("/assets/reading-tracker.js");await tracker.syncPending(true);await refresh();});
-$("cloud-logout").addEventListener("click",logout);
-$("export-json").addEventListener("click",()=>exportData("json"));
-$("export-csv").addEventListener("click",()=>exportData("csv"));
-await checkSession();
-await refresh();
-window.addEventListener("focus",refresh);
-window.addEventListener("frame-reader-reading-time",refresh);
+document.querySelectorAll("[data-period]").forEach(button => button.addEventListener("click", () => {
+  state.period = button.dataset.period;
+  document.querySelectorAll("[data-period]").forEach(item => item.setAttribute("aria-pressed", item === button ? "true" : "false"));
+  void refresh();
+}));
+$("goal-select").addEventListener("change", async event => {
+  state.goalMinutes = Number(event.target.value) || 30;
+  try { await setReadingSetting("goalMinutes", state.goalMinutes); await refresh(); }
+  catch (error) { $("cloud-sync-status").textContent = "雲端目標保存失敗：" + (error.message || String(error)); }
+});
+$("calendar-prev").addEventListener("click", () => {
+  state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() - 1, 1);
+  refreshCalendar().catch(error => { $("cloud-sync-status").textContent = error.message || String(error); });
+});
+$("calendar-next").addEventListener("click", () => {
+  state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() + 1, 1);
+  refreshCalendar().catch(error => { $("cloud-sync-status").textContent = error.message || String(error); });
+});
+$("cloud-refresh").addEventListener("click", refresh);
+$("export-json").addEventListener("click", () => exportData("json").catch(error => { $("cloud-sync-status").textContent = error.message || String(error); }));
+$("export-csv").addEventListener("click", () => exportData("csv").catch(error => { $("cloud-sync-status").textContent = error.message || String(error); }));
+void checkSession().then(refresh);
+window.addEventListener("focus", refresh);
+window.addEventListener("frame-reader-reading-time", refresh);

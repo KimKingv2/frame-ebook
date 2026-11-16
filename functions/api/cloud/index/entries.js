@@ -1,6 +1,6 @@
 import { json, requireAuth, getDatabase, isSameOrigin, normalizePath, isWithinRoot } from "../../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const INSERT_SQL = [
   "INSERT INTO cloud_catalog",

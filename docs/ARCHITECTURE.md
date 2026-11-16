@@ -1,198 +1,111 @@
-# Architecture Notes
+# FRAME Reader architecture
 
-## Product shape
+**Current model: cloud-only bookshelf and cloud-only personal reading data.**
 
-FRAME Reader is one responsive library with three presentation profiles:
+The only route for adding a book is a recursive scan of a configured server-side Alist／OpenList source. The browser cannot import local EPUB／CBZ files and cannot connect directly to a LAN OpenList instance.
 
-1. Desktop: full library management, reading controls, search and annotations.
-2. Tablet: touch-first reading, portrait/landscape layouts and optional two-page spreads.
-3. Mobile: compact typography, one-hand controls and single-column reading.
+## 1. Data ownership
 
-All three profiles use the same book identity and reading-state model. Layout and pagination can adapt to the viewport without splitting the library into separate products.
-
-Kindle is outside the online reader's support scope. Any future Kindle use should remain a separate offline-reading workflow; no Kindle-browser compatibility layer is planned.
-
-## Visual system and bookshelf
-
-The visual direction is an editorial reading room: deep ink backgrounds, muted violet light, warm paper surfaces and restrained motion. The homepage cover cards are SVG design previews, not records from the private library.
-
-When OpenList is connected, each book record should expose a stable identifier, title, author, format, file path, and optional cover source. Resolve the display cover in this order:
-
-1. Embedded EPUB cover image when available.
-2. A sibling `cover.jpg` (or another explicitly supported image format) in the book folder.
-3. A generated fallback cover using available title/author metadata.
-
-Cover previews in the public repository must remain original artwork. Never copy private book covers or metadata exports into this repository.
-
-Animation should remain decorative and lightweight: short entrance transitions, subtle cover movement and hover feedback. Honor `prefers-reduced-motion`, and avoid making navigation depend on animation.
-
-## Format strategy
-
-| Format | Candidate | Notes |
+| Data | Authoritative location | Notes |
 |---|---|---|
-| EPUB | Foliate.js parser/renderer | Reflowable and fixed-layout books; CFI progress. |
-| MOBI | Foliate.js | Legacy Mobipocket parsing; add after EPUB validation. |
-| AZW3 / KF8 | Foliate.js | KF8 parsing; complex books may be expensive to decode. |
-| PDF | PDF.js | Mature rendering core; optimize page loading for mobile. |
-| Manga | Fixed-layout EPUB / CBZ | Test reading direction, spreads, images and pagination separately. |
+| Original EPUB／CBZ archives | Alist／OpenList | Read-only from FRAME Reader; never copied into D1 or R2 |
+| Directory and file catalog | D1 `cloud_catalog` | Provider, library, root, path, format, size, modified time and cover state |
+| Recursive scan progress | D1 `cloud_scan_state` | Per provider/library/root checkpoint, queue and cursor |
+| Extracted cover thumbnails | Private R2 `FRAME_READER_COVERS` | Normalized WebP/JPEG objects; hashes/status in D1 |
+| Source, root path and reading-goal preferences | D1 `reader_preferences` | Partitioned by verified Access user |
+| Book metadata, EPUB CFI, comic page index and appearance | D1 `reader_book_state` | Per Access user and stable cloud book ID |
+| Bookmarks, highlights and notes | D1 `reader_annotations` | Per Access user, book and annotation |
+| Reading-time events and statistics | D1 `reader_reading_events` | Per Access user; idempotent event IDs |
 
-Foliate.js supports EPUB, MOBI, KF8/AZW3 and CBZ. Its API is not stable, so the current source is pinned to an exact commit. See `docs/THIRD-PARTY.md`.
+The Reader frontend does not persist personal or library data in IndexedDB, localStorage or sessionStorage. JavaScript objects and the current book archive exist in browser memory only for the active page/session. They disappear when the page closes or reloads; the authoritative state remains in D1/R2 and the original archive remains in Alist／OpenList.
 
-## EPUB Lab (V0.3)
+Older releases used IndexedDB and localStorage. On first visit after the cloud-only release, `legacy-cleanup.js` deletes the `frame-reader-library` IndexedDB database and all `frame-reader-*` localStorage/sessionStorage keys. If an older open tab blocks database deletion, close that tab and revisit the site. Migration 0006 drops the retired unscoped `reading_events` table and unused `auth_attempts` table. The D1 cloud catalog, resumable scan state, cover metadata and cloud annotations are preserved.
 
-The Reading Room prototype is at `/epub-lab/`.
+## 2. Stable cloud book identity
 
-- Foliate.js source snapshot: `78914aef4466eb960965702401634c2cb348e9b1` (MIT).
-- JSZip 3.10.2 loads the small test archive for this compatibility experiment.
-- The adapter supplies Foliate's EPUB loader interface (`loadText`, `loadBlob`, `getSize`).
-- The view saves the current EPUB CFI to localStorage and restores it when the same book is reopened. After `view.open(book)`, the adapter must call `view.init({ showTextStart: true })` or initialize with a saved CFI; opening alone does not navigate to the first visible section.
-- A tiny original two-chapter Traditional Chinese EPUB is included for repeatable tests.
+A cloud book ID is:
 
-### Reading appearance
+```text
+cloud:SHA256(provider + "\n" + library + "\n" + stripLeadingSlash(rootPath) + "\n" + stripLeadingSlash(path))
+```
 
-For reflowable EPUB chapters, the adapter injects a small per-document style sheet when Foliate emits a chapter load event. User settings include:
+The same identity recipe is used in the browser client and Pages Functions. User-state APIs additionally verify that the descriptor matches a non-directory item in `cloud_catalog`. A file that is not indexed cannot be opened or receive a user-state record. The ID changes if the provider, library, configured root or file path changes.
 
-- Font scale: 90–130%.
-- Line spacing: 1.45–2.0.
-- Typography controls: original / serif / sans family; original / 400 / 500 body weight; original / compact / standard / loose paragraph spacing; original / left / justified alignment.
-- Independent paginator margins: top/bottom margin is 8, 16 or 24 CSS pixels (16 px by default); left/right page gap is 4%, 7% or 10% (7% by default). The adapter must pass a unit-bearing CSS length such as `16px` to Foliate's `margin` attribute and a percentage such as `7%` to `gap`. These settings must remain independent.
-- Reading flow: the reflowable paginator uses its native `flow="scrolled"` attribute for continuous scroll; removing the attribute restores paginated mode.
-- Page columns: `max-column-count` controls one or two columns. The pinned Foliate paginator's container query reduces the spread to one column in portrait orientation, even when two columns are preferred.
-- Fixed-layout EPUBs use Foliate's separate fixed-layout renderer and retain the book's native spread and progression direction; flow and column controls are disabled for them.
-- Paper white, warm sepia and night themes.
+## 3. Bookshelf and scanner
 
-Settings are validated against a fixed allow-list and stored locally under `frame-reader-appearance-v1`. Fixed-layout EPUBs keep their authored layout rather than having text styling forced on them.
+- `GET /api/reading/bookshelf` reads the active provider and per-provider root preferences for the current Access user, queries D1 catalog rows, and joins that user's `reader_book_state`.
+- Folder-level grouping combines sibling EPUB/CBZ files into one visual work card, but each archive keeps its own stable ID and reading position.
+- The scanner recursively calls the server-side Alist/OpenList API through Pages Functions. Every page writes metadata and scan cursor state to D1. A paused or interrupted scan can resume from its stored checkpoint.
+- A completed scan reconciles stale catalog rows only after the entire root was traversed successfully.
+- Scanning extracts covers using bounded HTTP Range reads and stores normalized thumbnails in private R2. It does not upload original book archives.
 
-This is a prototype appearance layer. EPUB authors may use deeply nested styles or fixed pixel sizes that need more testing. A future settings layer should prefer stable engine APIs where available.
+## 4. Reading Room
 
-### Device test order
+The Reading Room accepts a descriptor from a D1-backed bookshelf or the file browser. It first calls `GET /api/reading/state`, which confirms Cloudflare Access identity, stable book ID and D1 catalog membership. It then obtains the original file through `GET /api/cloud/file` using the server-side Alist/OpenList provider credentials.
 
-1. Mac Chrome and Safari: load the bundled demo, change each appearance setting, turn pages, jump chapters, reload and confirm location and appearance restore.
-2. Android Chrome and iOS/iPadOS Safari: verify EPUB loading, appearance controls, portrait/landscape layout and local file selection.
-3. A larger, image-heavy EPUB: measure load time and memory behavior on desktop, tablet and phone.
-4. Only after the browser reader is stable, implement OpenList metadata lookup and Range-backed reading.
+The archive is passed to Foliate.js/JSZip in memory for the active reading session. No local file picker, demo-import flow, IndexedDB Blob or localStorage fallback is present.
 
-The current browser prototype is only a compatibility baseline. Test the actual parser, paginator and local-file flow on each target browser; feature detection alone is not sufficient.
+For EPUB, the current CFI, progress percentage and section label are written to `reader_book_state`. For fixed-layout CBZ, the current image/page index and progress are written to the same record. Per-book appearance settings are validated against an allow-list and saved there too. Updates are debounced to reduce D1 write volume and use same-origin requests with `keepalive` for final page-exit writes.
 
-## Local library store (V0.5)
+## 5. Annotations and reading statistics
 
-The homepage at \`/\` is the primary bookshelf and is backed by \`pages/assets/library-store.js\`, a same-origin IndexedDB store named \`frame-reader-library\`. D1 remains the authoritative cloud catalog; completed cloud records are mirrored locally as metadata-only bookshelf entries.
+- `GET/POST/DELETE /api/reading/annotations` stores bookmarks, highlights and notes in `reader_annotations`.
+- `POST /api/reading/events` validates and writes short foreground-reading intervals to `reader_reading_events`. Events must refer to a cloud book ID and have a unique event ID.
+- `GET /api/reading/stats` aggregates daily totals, all-time streak data, books opened, top books, time bands and recent sessions for the current user.
+- Daily goal preference is stored in `reader_preferences`.
+- JSON/CSV export reads from the same user-scoped D1 table; there is no local event queue or local-only statistics fallback.
 
-Each local book record uses a browser-generated stable \`id\` and stores:
+## 6. Per-user isolation and Access boundary
 
-- The original EPUB / CBZ \`Blob\` (or structured-cloned \`File\`).
-- Original filename, byte size, last-modified timestamp and format.
-- Display title, author, language, optional EPUB identifier and item/page count.
-- Optional extracted cover image \`Blob\`.
-- Added / updated / last-opened timestamps.
-- Progress object: percentage, human-readable section/page label, EPUB CFI when available, and fixed-layout image index.
-- Reserved manual title / author flags so user corrections are not overwritten by future metadata refreshes.
+Cloudflare Access is the website sign-in boundary and must cover the entire hostname, every static page and every `/api/*` endpoint.
 
-Import is local-only. The browser parses the archive to obtain its metadata and cover, then writes the original archive and extracted cover into IndexedDB. No API request uploads book content. If the browser storage quota is exceeded, the user receives an explicit error and the import is not presented as successful.
+For user-owned reading data, Pages Functions also verify the `Cf-Access-Jwt-Assertion` signature against the configured Access team signing keys, and validate issuer, expiry and application AUD using:
 
-EPUB metadata is read from the OPF package metadata and manifest. The current implementation extracts the declared cover image (with format-specific fallbacks), title, creator, language, identifier and spine count. CBZ indexing enumerates supported image entries, sorts naturally, counts pages and selects a cover/front image candidate or the first image.
+- `FRAME_READER_ACCESS_TEAM_DOMAIN`
+- `FRAME_READER_ACCESS_AUD`
 
-The Reading Room opens a shelf book by ID using \`/epub-lab/?book=<id>\`. A local import is read from its Blob in IndexedDB; a cloud record resolves its saved OpenList source and fetches the original only when opened, without persisting a second copy in IndexedDB. The same stable book ID scopes CFI / image-index progress and the per-book appearance key (\`frame-reader-appearance-v1:<id>\`). The active book ID remains in the address bar so browser reload can reopen it.
+A SHA-256-derived owner ID is stored in D1. Raw email addresses and Access JWTs are not persisted. Each user-scoped query includes this owner ID. The cloud catalog itself is a shared read-only index of the server-side source contents; per-user progress, appearance, annotations, preferences and events are isolated.
 
-The bookshelf supports title / author / filename search, recent / added / title / progress sorting, cover grid / list layout, recently opened books, metadata editing and local removal. Removing a book deletes only the browser's stored copy; it does not touch the original file on disk.
+## 7. OpenList provider trust boundary
 
-### Local storage boundaries
+Only three server-side provider IDs are accepted:
 
-- IndexedDB is scoped to this browser origin and profile. Another browser, device, private window or cleared site data does not share the library.
-- Browser quota is implementation- and device-dependent. Large archives can fail to import; do not assume unlimited local capacity.
-- The EPUB metadata adapter currently uses JSZip, which may require extra memory while inspecting large EPUB archives.
-- CBZ shelf indexing reads the archive directory and a cover image; the reader's existing image loading remains lazy.
-- No OpenList API key, user credential or private book metadata is embedded in frontend source.
-- The D1 OpenList cloud catalog and resumable scan state are the source of cloud book metadata. A completed scan synchronizes metadata-only records into the main bookshelf automatically. Original cloud book files remain in OpenList and are fetched only when opened. Migration `0004_cloud_annotations.sql` stores cloud-origin annotations with a composite owner/book/annotation key.
+- `vps`: VPS Alist
+- `worker`: OpenList Worker
+- `mobile`: Mobile Device Alist
 
-## Sync data model (future)
+Provider API base URLs and read-only credentials are configured in Cloudflare Pages Variables/Secrets. Frontend JavaScript receives only provider labels and configured-status flags. Pages Functions obtain short-lived JWTs through Alist `/api/auth/login` and cache them in the shared `MEDIA_AUTH_TOKEN_CACHE` KV namespace plus isolate memory. The cache contract is shared with FRAME Audio. Passwords, JWTs and upstream raw download URLs are not returned to the browser.
 
-A reading-state record should be keyed by stable book_id and include:
+The file endpoint resolves the upstream download URL server-side and proxies the response, including valid Range requests. Original book archives remain in Alist/OpenList.
 
-- user_id
-- book_id
-- format
-- locator (EPUB CFI / PDF page / image index)
-- progress (0..1)
-- updated_at
-- device_id
+## 8. Pages Functions routes
 
-Use server timestamps and conflict resolution based on the latest valid update. Page numbers are not portable between reflowable layouts with different fonts or screen sizes. For EPUB, a CFI-like location is preferable to a page number.
+- `GET /api/auth/session` — reports Access-edge and service readiness.
+- `GET /api/reading/bookshelf` — per-user D1 bookshelf.
+- `GET/POST /api/reading/preferences` — per-user source, root and goal preferences.
+- `GET/POST /api/reading/state` — per-user per-book reading state.
+- `GET/POST/DELETE /api/reading/annotations` — per-user annotations.
+- `POST /api/reading/events` — per-user reading-time events.
+- `GET /api/reading/stats` — per-user statistics.
+- `GET /api/cloud/scan-list`, `POST /api/cloud/index/entries`, index state/completion endpoints — scan and D1 catalog management.
+- `GET /api/cloud/file` — authenticated server-side original-file proxy.
+- `GET /api/cloud/covers` — private R2 thumbnail retrieval.
 
-## Authentication boundary
+Cloudflare Pages serves static content from `pages/`; the Pages Functions source directory is the repository-root `functions/` folder.
 
-Never expose a long-lived OpenList administrator token in browser JavaScript. A future Worker should authenticate the reader and issue narrowly scoped, short-lived access to one file or range request. Validate the sign-in flow on desktop, tablet and mobile before enabling private-library access.
+## 9. Cloudflare bindings and migrations
 
+- D1 `frame-reader-db`, binding `FRAME_READER_DB`.
+- Private R2 `frame-reader-covers`, binding `FRAME_READER_COVERS`.
+- Shared KV `MEDIA_AUTH_TOKEN_CACHE`: Production uses `frame-series-auth-cache-production`; Preview uses its separate Preview namespace.
 
-### Cloud-first bookshelf and local personal data
+Schema migrations:
 
-The main bookshelf combines two record types in the same local IndexedDB store:
+1. `0001_reading_events.sql` — legacy unscoped reading-event table.
+2. `0002_cloud_catalog.sql` — cloud catalog and resumable scan state.
+3. `0003_cloud_covers.sql` — cover metadata.
+4. `0004_cloud_annotations.sql` — user-scoped cloud annotations.
+5. `0005_cloud_only_reader_data.sql` — user-scoped preferences, book state and reading events.
+6. `0006_remove_legacy_reader_tables.sql` — removes retired unscoped reading events and the unused legacy auth-attempt table.
 
-- **Cloud catalog records:** stable IDs derived from provider, library, root path and OpenList file path; title/file name, format, size, modified time, source coordinates, cover hash and local reading progress. Their `blob` field stays null. Scanning or syncing metadata never downloads the original EPUB / CBZ.
-- **Local imports:** user-selected files retain their original Blob in IndexedDB and are marked subtly as `本機` in the bookshelf.
-
-When a cloud book is opened, the Reading Room resolves the saved source. VPS, Worker and Mobile Device files are fetched through the protected Pages Function proxy; LAN-direct files are fetched from the device's configured OpenList after a fresh account/password login. The downloaded File is passed to Foliate in memory and is not written back as a cloud-book Blob in IndexedDB.
-
-Per-book reading position, page index and appearance settings remain local to the browser profile. IndexedDB version 3 keeps an `annotations` object store for highlights, notes and bookmarks belonging to locally imported books. For cloud-origin books, the same `saveAnnotation`, `listAnnotations` and `deleteAnnotation` APIs route to `/api/reading/annotations`; D1 is authoritative and the records are partitioned by the verified Cloudflare Access subject plus stable cloud book ID. Cloud annotations are not duplicated in IndexedDB. The current Reading Room still does not expose the complete highlight/note editing UI; this change establishes the correct persistence boundary for that UI. Clearing this site's browser data removes local book files and local-import annotations, but does not erase cloud annotations.
-
-### Fixed-layout and comic reading
-
-The Reading Room supports CBZ alongside fixed-layout EPUB. CBZ parsing uses the pinned Foliate.js makeBook() entry point, the comic archive adapter and Zip.js. The archive directory is read first; page image blobs are resolved lazily as the reader approaches them.
-
-The fixed-layout renderer has two distinct presentation paths:
-- Paginated mode uses the native spread map. Single-page preference disables spreads; double-page preference pairs pages and lets portrait screens fall back to one page. Image scaling can fit the full page or the available width.
-- Continuous mode builds a vertical page strip and uses an IntersectionObserver to load nearby pages. The current page index is reported back to the shared progress model. On resize, loaded pages are re-scaled to the new reading width.
-
-The UI does not provide a right-to-left override. It leaves the source book's original progression metadata intact. Comic background surfaces (wood desk, linen and slate) are rendered with CSS gradients and texture layers, so no remote images or third-party background assets are required. The background remains outside the page content; it must not tint or reduce contrast in the actual comic artwork.
-
-The four-page demo is generated in the browser from original SVG panels and packed into a CBZ Blob. When the user chooses the demo, it is imported into the local IndexedDB bookshelf like any other book. No sample comic archive is committed to the public repository.
-
-
-## V0.6 — Reading Insights and Cloud Library
-
-### Foreground reading timer
-
-The Reading Room starts the timer only after the Foliate view is initialized. The timer uses a 15-second heartbeat and records short event rows in the IndexedDB reading_events store. An event includes a stable event ID, local day key, local hour, book ID/title/format, seconds, and start/end timestamps.
-
-Activity from pointer, key, wheel, touch and reader scrolling refreshes a five-minute idle deadline. The timer also requires the document to be visible and the browser window to have focus. Hidden tabs and blurred windows pause the clock. Each segment is split at local midnight so daily totals do not spill into the wrong day.
-
-Adjacent heartbeat rows for the same book and local day are merged into a reading session for the recent-session UI. The underlying short rows stay separate for idempotent upload and reliable daily aggregation.
-
-Reading-day counting uses a threshold of at least 60 seconds per local day, matching the public WeChat Reading data definition. Daily goal preference (default 30 minutes) remains local to each browser for now.
-
-### Reading insights data
-
-The /reading-stats/ route summarizes the local IndexedDB event store and offers weekly, monthly, yearly and all-time ranges. It renders total duration, natural-day average, reading days, books opened, a current/best streak, the daily goal ring, calendar heatmap, reading trend, top books, time-of-day distribution and recent reading sessions. Local JSON / CSV exports contain local browser event details.
-
-When signed in, the page attempts to read the same aggregates from D1. The server returns daily totals, all-time daily totals for streaks, a distinct book count, top books, local-hour bands and recent events. The D1 data takes precedence for the selected period; unsynced / offline events remain in IndexedDB until upload succeeds.
-
-### D1 event sync
-
-The reading tracker batches up to 100 pending local events to POST /api/reading/events. Each D1 row uses event_id as the primary key and INSERT OR IGNORE so retrying a batch cannot double-count an event. The endpoint checks the signed session and same-origin POST, validates a small maximum duration per event, and stores no book file content.
-
-The /api/reading/stats endpoint is read-only and returns aggregate statistics for the requested day range. The database migration is migrations/0001_reading_events.sql. Cloudflare Access protects both endpoints at the edge; Pages Functions do not duplicate Access JWT verification.
-
-### Pages Functions and OpenList trust boundary
-
-Cloudflare Pages serves static content from pages/, but the Pages Functions source directory is at the repository root as /functions/. The file-based routes are:
-
-- POST /api/auth/login, GET /api/auth/session, POST /api/auth/logout.
-- GET /api/cloud/books?library=books|comics&path=... for a directory listing scoped to the separate EPUB or CBZ root.
-- GET /api/cloud/file?library=books|comics&path=... for a protected file download constrained to the matching root and extension.
-- POST /api/reading/events and GET /api/reading/stats.
-- GET /api/reading/annotations, POST /api/reading/annotations and DELETE /api/reading/annotations for cloud-book bookmarks, highlights and notes. Each request validates the exact cloud book descriptor against `cloud_catalog` and the stable cloud book ID.
-
-Cloudflare Zero Trust Access is the website sign-in and first authorization boundary. Its application must protect the complete Reader hostname, including every static page and `/api/*` route. Cloudflare Access rejects unauthenticated requests before they reach Pages Functions. The cloud-annotation endpoint additionally validates the `Cf-Access-Jwt-Assertion` signature against the configured team JWKS and checks issuer, expiry and the exact application AUD using `FRAME_READER_ACCESS_TEAM_DOMAIN` and `FRAME_READER_ACCESS_AUD`. It derives a non-reversible owner key from the verified subject; neither raw email nor JWT is stored in D1. Other existing Pages Functions continue to rely on the Access edge as documented.
-
-Most existing Pages Functions rely on the Access edge instead of independently verifying `Cf-Access-Jwt-Assertion`; the cloud-annotation endpoint is the deliberate exception because it needs a verified user identity for D1 partitioning. All routes still require the Access application to cover the whole hostname without path exclusions. If any production hostname or API route is outside the Access application, it is not protected by an additional in-code authentication layer.
-
-OpenList configuration is read only from the Pages Function environment. VPS Alist, OpenList Worker and Mobile Device Alist use dedicated base URL Variables and username/password Secrets. Pages Functions obtain short-lived JWTs through `/api/auth/login` and cache them in the shared `MEDIA_AUTH_TOKEN_CACHE` KV binding plus isolate memory. The shared cache contract uses the `media-platform:provider-auth:v1` prefix, SHA-256 provider/base-URL/username keys, expiry-aware TTL, and `Client-Id: media-platform-server-{provider}`. The canonical provider IDs are `vps`, `worker` and `mobile-device`, allowing FRAME Reader and FRAME Audio to reuse a JWT when their provider URL and username match. A rejected JWT is invalidated and refreshed once. Passwords and JWTs are never returned to frontend code or stored in D1/R2. `OPENLIST_BOOKS_ROOT_PATH` and `OPENLIST_COMICS_ROOT_PATH` define independent maximum directories for EPUB and CBZ access. All requested paths are normalized and constrained to the matching root; the browser may save a narrower preferred sub-root per device.
-
-The OpenList directory endpoint uses /api/fs/list. The file endpoint first calls /api/fs/get server-side to resolve raw_url, then streams the upstream body through the Pages Function and forwards valid Range requests and relevant response headers. Neither raw_url nor the OpenList token is exposed in the browser response.
-
-The cloud shelf currently downloads a selected file through this protected proxy into IndexedDB before opening it. The proxy supports Range, but the Foliate loader is not yet adapted to consume remote HTTP ranges directly. Large EPUBs therefore still incur full-download memory / storage cost in the browser.
-
-### Required deployment configuration
-
-Before private cloud features work, bind D1 as FRAME_READER_DB, bind the shared token-cache KV as MEDIA_AUTH_TOKEN_CACHE, apply the required migrations, configure the server-side OpenList Variables/Secrets, and protect the complete hostname with Cloudflare Access as described in docs/CLOUDFLARE-SETUP.md. Until then, /api/auth/session correctly reports that the database and OpenList are not configured. Local reading history remains available without those bindings.
-
+For an existing deployment that already applied migrations 0001–0004, apply migrations 0005 and 0006 in order. If migration 0005 has already been applied, apply only migration 0006. Do not recreate or reset the database. See `docs/CLOUDFLARE-SETUP.md` for environment configuration and deployment steps.

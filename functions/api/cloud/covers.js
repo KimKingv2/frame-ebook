@@ -1,6 +1,6 @@
 import { json, requireAuth, getDatabase, isSameOrigin, normalizePath, isWithinRoot } from "../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const HASH_RE = /^[a-f0-9]{64}$/i;
 const MIME_TYPES = new Set(["image/webp", "image/jpeg"]);
@@ -34,7 +34,7 @@ export async function onRequest({ request, env }) {
         if (!object) return json({ error: "R2 中找不到封面檔案。" }, 404);
         const headers = new Headers();
         object.writeHttpMetadata(headers);
-        headers.set("Cache-Control", "private, max-age=86400");
+        headers.set("Cache-Control", "private, no-store");
         headers.set("X-Content-Type-Options", "nosniff");
         headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
         headers.set("Content-Disposition", "inline");

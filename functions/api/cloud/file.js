@@ -11,7 +11,7 @@ export async function onRequestGet({ request, env }) {
   const requestUrl = new URL(request.url);
   const provider = requestUrl.searchParams.get("provider") || "vps";
   const library = requestUrl.searchParams.get("library") === "comics" ? "comics" : "books";
-  if (!["vps", "worker", "mobile"].includes(provider)) return json({ error: "不支援的雲端來源。區域網路來源必須由目前裝置直接連線。" }, 400);
+  if (!["vps", "worker", "mobile"].includes(provider)) return json({ error: "不支援的雲端來源。請選擇已設定的伺服器端 Alist／OpenList 來源。" }, 400);
   const config = getOpenListConfig(env, provider, library);
   if (!config) return json({ error: "選取的來源尚未設定。請確認 Pages API Base URL、帳號 Variable 與密碼 Secret。" }, 503);
 

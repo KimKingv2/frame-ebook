@@ -3,7 +3,7 @@ import {
   sha256Hex, getAccessIdentity
 } from "../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const ANNOTATION_TYPES = new Set(["highlight", "note", "bookmark"]);
 

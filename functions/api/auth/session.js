@@ -6,6 +6,7 @@ import { json, getOpenListProfiles, getOpenListRootPaths, getDatabase } from "..
 export async function onRequestGet({ env }) {
   const profiles = getOpenListProfiles(env);
   const anyServerProfileConfigured = Object.values(profiles).some(profile => profile.configured);
+  const accessIdentityConfigured = !!(env.FRAME_READER_ACCESS_TEAM_DOMAIN && env.FRAME_READER_ACCESS_AUD);
   return json({
     authenticated: true,
     accessEnabled: true,
@@ -14,6 +15,7 @@ export async function onRequestGet({ env }) {
     openListProfiles: profiles,
     rootPaths: getOpenListRootPaths(env),
     databaseConfigured: !!(env.FRAME_READER_DB || env.DB),
-    cloudAnnotationsConfigured: !!(env.FRAME_READER_ACCESS_TEAM_DOMAIN && env.FRAME_READER_ACCESS_AUD)
+    cloudReaderDataConfigured: accessIdentityConfigured,
+    cloudAnnotationsConfigured: accessIdentityConfigured
   });
 }
