@@ -1,3 +1,5 @@
+> **歷史測試紀錄**：本文件包含 FRAME Reader 早期本機原型的測試紀錄，當中的 IndexedDB、localStorage、檔案匯入和本機閱讀流程已於 cloud-only 架構中停用。目前資料設計請以 `docs/ARCHITECTURE.md` 和 `docs/CLOUDFLARE-SETUP.md` 為準。
+
 # EPUB Compatibility Test Log
 
 ## 2026-11-09 — Mac browser
