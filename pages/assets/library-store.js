@@ -64,7 +64,7 @@ async function cloudBookId(scope, path) {
   if (!["vps", "worker", "mobile"].includes(provider) || !["books", "comics"].includes(library) || !rootPath || !filePath) {
     throw new Error("雲端書籍識別資訊無效。");
   }
-  const identity = [provider, library, rootPath, filePath].join("\n");
+  const identity = [provider, library, rootPath, filePath].join("\\n");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   return "cloud:" + hash;
