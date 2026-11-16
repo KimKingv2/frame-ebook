@@ -65,14 +65,14 @@ export async function onRequestGet({ request, env }) {
         ).bind(library, rootPath, path);
 
     stage = "count_and_rows";
-    const [count, rows, scanKey] = await Promise.all([
-      countStatement.first(), rowsStatement.all(), scanStateKey(library, rootPath)
+    const [count, rows] = await Promise.all([
+      countStatement.first(), rowsStatement.all()
     ]);
 
     stage = "read_scan_state";
     const stateRow = await db.prepare(
-      "SELECT state_json,updated_at FROM cloud_scan_state WHERE scan_key=?"
-    ).bind(scanKey).first();
+      "SELECT state_json,updated_at FROM cloud_scan_state WHERE library=? AND root_path=? ORDER BY updated_at DESC LIMIT 1"
+    ).bind(library, rootPath).first();
 
     stage = "parse_scan_state";
     const scanState = stateRow ? { ...JSON.parse(stateRow.state_json), provider } : null;
