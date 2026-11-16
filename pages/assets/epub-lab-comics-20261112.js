@@ -228,10 +228,16 @@
       await view.goTo(resolvedHref);
       return;
     }
+    var targetText = String(targetNode.textContent || '').trim();
+    var targetTag = String(targetNode.localName || targetNode.tagName || '').toLowerCase();
+    var parentText = String(targetNode.parentElement && targetNode.parentElement.textContent || '').trim();
+    if ((!targetText || ((targetTag === 'a' || targetTag === 'span' || targetTag === 'sup') &&
+        parentText.length > targetText.length + 8)) && targetNode.parentElement) {
+      targetNode = targetNode.parentElement;
+    }
     if (!targetNode.textContent || !targetNode.textContent.trim()) {
       var nextNote = targetNode.nextElementSibling;
       if (nextNote && nextNote.textContent && nextNote.textContent.trim()) targetNode = nextNote;
-      else if (targetNode.parentElement && targetNode.parentElement.textContent.trim()) targetNode = targetNode.parentElement;
     }
     var content = cloneFootnoteContent(targetNode);
     if (!content.textContent || !content.textContent.trim()) {
@@ -1369,6 +1375,12 @@
   async function openEpub(source, name, bookId, initialRecord) {
     await flushLibraryProgress();
     await readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
+    currentLocation = null;
+    activeAnnotations = [];
+    closeFootnotePopover();
+    renderAnnotationList();
+    renderBookmarkList();
+    syncBookmarkButton();
     if (!window.JSZip) throw new Error('JSZip 尚未載入，請重新整理頁面。');
     setText('reader-status', '正在讀取書籍封裝與目錄……');
     setText('engine-status', '正在解析書籍');
