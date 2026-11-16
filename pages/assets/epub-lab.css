@@ -341,7 +341,7 @@ button:disabled { opacity: .38; cursor: default; }
   background:var(--annotation-color,#F2C94C);
   box-shadow:0 0 10px color-mix(in srgb,var(--annotation-color,#F2C94C) 24%,transparent);
 }
-.annotation-marker.is-note { width:3px; margin-left:2px; background:transparent; border-left:2px wavy var(--annotation-color,#A78BFA); }
+.annotation-marker.is-note { width:3px; margin-left:2px; background:transparent; border-left:2px dashed var(--annotation-color,#A78BFA); }
 .annotation-item-content {
   display:grid;
   justify-items:start;
