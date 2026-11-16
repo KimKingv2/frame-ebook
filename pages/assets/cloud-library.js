@@ -214,7 +214,7 @@ async function saveSourceSettings() {
   const provider = state.editProvider || $("cloud-provider").value;
   if (!Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, provider)) throw new Error("請選擇有效的 Alist／OpenList 來源。");
   if(provider==="local") {
-    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r2");
     const baseUrl = String($("cloud-local-base-url").value || "").trim();
     const username = String($("cloud-local-username").value || "").trim();
     const password = String($("cloud-local-password").value || "");
@@ -448,7 +448,7 @@ function indexScanProgressText(scanState,batch,finished=false) {
 async function fetchScanDirectory(path, page, perPage) {
   const scope = indexScope();
   if(scope.provider==="local") {
-    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r2");
     const result = await local.listLocalOpenListDirectory(path,page,perPage);
     return {ok:true,...result};
   }
@@ -581,7 +581,7 @@ async function makeCoverRangeReader(item,onEvent=()=>{}) {
     path:item.path
   });
   if(state.activeProvider==="local") {
-    const local = await import("/assets/local-openlist.js?v=20261116-local-r1");
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r2");
     return new HttpRangeReader(size,async(start,end)=>{
       const response=await local.fetchLocalFileRange(item.path,start,end);
       return readRangeResponse(response,start,end,size);
@@ -1332,7 +1332,7 @@ async function checkSession() {
       state.localConnectionReady = false;
       $("cloud-provider").value = selectedProvider;
       $("cloud-library-type").value = selectedLibrary;
-      const localModule = await import("/assets/local-openlist.js?v=20261116-local-r1");
+      const localModule = await import("/assets/local-openlist.js?v=20261116-local-r2");
       $("cloud-local-base-url").value = localModule.getSavedLocalOpenListBaseUrl();
       $("cloud-local-connection").hidden = selectedProvider !== "local";
       $("cloud-local-status").textContent = selectedProvider === "local" ? "需在目前瀏覽器重新登入" : "選用後登入";
@@ -1650,7 +1650,7 @@ $("cloud-provider").addEventListener("change", event => {
   state.editProvider = provider;
   $("cloud-local-connection").hidden = provider !== "local";
   if(provider==="local") {
-    void import("/assets/local-openlist.js?v=20261116-local-r1").then(local=>{
+    void import("/assets/local-openlist.js?v=20261116-local-r2").then(local=>{
       if(!$("cloud-local-base-url").value)$("cloud-local-base-url").value=local.getSavedLocalOpenListBaseUrl();
     });
   }
