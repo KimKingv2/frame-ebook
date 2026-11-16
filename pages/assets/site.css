@@ -480,12 +480,18 @@ a { color: inherit; }
   width:58%;
   height:84%;
   z-index:3;
-  border-color:rgba(245,240,250,.22);
-  background:#211b2e;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
   transform:rotate(0);
 }
 .library-cover-stack-book:nth-child(2) > img {
   object-fit:contain;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
 }
 .library-cover-stack-book:nth-child(3) {
   left:29%;
@@ -504,8 +510,10 @@ a { color: inherit; }
   width:58%;
   height:84%;
   z-index:3;
-  border-color:rgba(245,240,250,.22);
-  background:#211b2e;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
   transform:rotate(0);
 }
 .library-cover-stack-book:nth-child(2):last-child > img {
