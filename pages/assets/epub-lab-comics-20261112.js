@@ -13,6 +13,7 @@
   var pendingProgress = null;
   var pendingProgressBookId = null;
   var activeAnnotations = [];
+  var currentLocation = null;
   var selectedTextState = null;
   var editingAnnotation = null;
   var Overlayer = null;
@@ -125,10 +126,138 @@
     }
   }
 
-  function bindPageTapNavigation(doc) {
+  function epubTypeTokens(node) {
+    if (!node || !node.getAttribute) return [];
+    var value = '';
+    try { value = node.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || ''; } catch (error) {}
+    value = value || node.getAttribute('epub:type') || '';
+    return String(value).toLowerCase().split(/\s+/).filter(Boolean);
+  }
+
+  function isFootnoteReference(anchor) {
+    if (!anchor || !anchor.getAttribute) return false;
+    var tokens = epubTypeTokens(anchor);
+    var role = String(anchor.getAttribute('role') || '').toLowerCase();
+    var rel = String(anchor.getAttribute('rel') || '').toLowerCase();
+    var classes = String(anchor.className && anchor.className.baseVal !== undefined
+      ? anchor.className.baseVal : anchor.className || '').toLowerCase();
+    if (tokens.some(function (token) { return token === 'noteref' || token === 'footnote-ref' || token === 'endnote-ref'; })) return true;
+    if (role.indexOf('doc-noteref') >= 0 || rel.indexOf('footnote') >= 0 || rel.indexOf('endnote') >= 0) return true;
+    if (/noteref|footnote[-_ ]?ref|endnote[-_ ]?ref/.test(classes)) return true;
+    return !!(anchor.closest && anchor.closest('sup') && String(anchor.getAttribute('href') || '').indexOf('#') >= 0);
+  }
+
+  function cloneFootnoteContent(source) {
+    function clone(node) {
+      if (!node) return null;
+      if (node.nodeType === 3) return document.createTextNode(node.nodeValue || '');
+      if (node.nodeType !== 1) return null;
+      var types = epubTypeTokens(node);
+      var role = String(node.getAttribute('role') || '').toLowerCase();
+      var rel = String(node.getAttribute('rel') || '').toLowerCase();
+      if (types.indexOf('backlink') >= 0 || role.indexOf('doc-backlink') >= 0 || rel.indexOf('back') >= 0) return null;
+      var tag = String(node.localName || node.tagName || 'span').toLowerCase();
+      var allowed = ['p','div','span','em','strong','b','i','u','sup','sub','br','ul','ol','li','blockquote','code'];
+      var output = document.createElement(allowed.indexOf(tag) >= 0 ? tag : 'span');
+      Array.prototype.forEach.call(node.childNodes || [], function (child) {
+        var copied = clone(child);
+        if (copied) output.appendChild(copied);
+      });
+      return output;
+    }
+    var wrapper = document.createElement('div');
+    if (source && source.nodeType === 1) {
+      Array.prototype.forEach.call(source.childNodes || [], function (child) {
+        var copied = clone(child);
+        if (copied) wrapper.appendChild(copied);
+      });
+    }
+    return wrapper;
+  }
+
+  function closeFootnotePopover() {
+    var popover = el('reader-footnote-popover');
+    if (popover) popover.hidden = true;
+  }
+
+  async function showFootnotePopover(anchor, sourceDoc, sourceIndex, href) {
+    if (!view || !view.book || !view.book.sections) return;
+    var sourceSection = view.book.sections[sourceIndex];
+    var resolvedHref = sourceSection && sourceSection.resolveHref
+      ? sourceSection.resolveHref(href) : href;
+    var resolved = view.resolveNavigation(resolvedHref);
+    if (!resolved || !Number.isInteger(Number(resolved.index))) {
+      await view.goTo(resolvedHref);
+      return;
+    }
+    var targetSection = view.book.sections[Number(resolved.index)];
+    if (!targetSection || typeof targetSection.createDocument !== 'function') {
+      await view.goTo(resolvedHref);
+      return;
+    }
+    var targetDoc = await targetSection.createDocument();
+    var targetNode = resolved.anchor ? resolved.anchor(targetDoc) : null;
+    if (targetNode && targetNode.startContainer) {
+      targetNode = targetNode.startContainer.nodeType === 1
+        ? targetNode.startContainer : targetNode.startContainer.parentElement;
+    }
+    if (!targetNode || targetNode.nodeType !== 1) {
+      await view.goTo(resolvedHref);
+      return;
+    }
+    var content = cloneFootnoteContent(targetNode);
+    if (!content.textContent || !content.textContent.trim()) {
+      await view.goTo(resolvedHref);
+      return;
+    }
+    var popover = el('reader-footnote-popover');
+    var body = el('reader-footnote-content');
+    var host = el('reader-frame');
+    if (!popover || !body || !host) return;
+    body.textContent = '';
+    body.appendChild(content);
+    popover.hidden = false;
+
+    var anchorRect = anchor.getBoundingClientRect();
+    var frameElement = sourceDoc && sourceDoc.defaultView && sourceDoc.defaultView.frameElement;
+    var frameRect = frameElement ? frameElement.getBoundingClientRect() : { left:0, top:0 };
+    var hostRect = host.getBoundingClientRect();
+    var anchorX = frameRect.left + anchorRect.left + anchorRect.width / 2 - hostRect.left;
+    var anchorY = frameRect.top + anchorRect.top - hostRect.top;
+    var popoverWidth = Math.min(480, Math.max(240, hostRect.width - 28));
+    var left = Math.max(popoverWidth / 2 + 12, Math.min(hostRect.width - popoverWidth / 2 - 12, anchorX));
+    popover.style.left = left + 'px';
+    popover.style.top = '12px';
+    var popoverHeight = popover.offsetHeight || 180;
+    var top = anchorY + 18;
+    if (top + popoverHeight > hostRect.height - 12) top = anchorY - popoverHeight - 12;
+    top = Math.max(10, Math.min(hostRect.height - popoverHeight - 10, top));
+    popover.style.top = top + 'px';
+  }
+
+  function handleFootnoteReference(event, sourceDoc, sourceIndex) {
+    if (!event || event.defaultPrevented || !event.target || !event.target.closest) return false;
+    var anchor = event.target.closest('a[href]');
+    if (!anchor || !isFootnoteReference(anchor)) return false;
+    var href = String(anchor.getAttribute('href') || '').trim();
+    if (!href || /^(https?:|mailto:|tel:|javascript:)/i.test(href)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    closeFootnotePopover();
+    showFootnotePopover(anchor, sourceDoc, sourceIndex, href).catch(function (error) {
+      console.warn('FRAME Reader could not display footnote:', error);
+      if (view) view.goTo(href).catch(function () {});
+    });
+    return true;
+  }
+
+  function bindPageTapNavigation(doc, index) {
     if (!doc || !doc.addEventListener || pageTapBoundDocuments.has(doc)) return;
     pageTapBoundDocuments.add(doc);
     doc.addEventListener('click', function (event) {
+      if (handleFootnoteReference(event, doc, index)) return;
+      closeFootnotePopover();
       handleReaderWindowTap(event, doc);
     }, true);
   }
@@ -191,15 +320,16 @@
     }
     function selectPane(name) {
       if (!sidebar) return;
-      var notes = name === 'notes';
-      sidebar.classList.toggle('mobile-pane-notes', notes);
-      sidebar.classList.toggle('mobile-pane-toc', !notes);
+      var pane = name === 'notes' ? 'notes' : (name === 'bookmarks' ? 'bookmarks' : 'toc');
+      sidebar.classList.toggle('mobile-pane-notes', pane === 'notes');
+      sidebar.classList.toggle('mobile-pane-toc', pane === 'toc');
+      sidebar.classList.toggle('mobile-pane-bookmarks', pane === 'bookmarks');
       paneButtons.forEach(function (button) {
-        var active = button.getAttribute('data-reader-pane') === (notes ? 'notes' : 'toc');
+        var active = button.getAttribute('data-reader-pane') === pane;
         button.classList.toggle('is-active', active);
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
-      if (notes) {
+      if (pane === 'notes') {
         var panel = el('annotation-panel');
         var toggle = el('annotation-list-toggle');
         if (panel) panel.hidden = false;
@@ -397,16 +527,17 @@
     var list = el('annotation-list');
     var count = el('annotation-count');
     if (!list || !count) return;
-    count.textContent = String(activeAnnotations.length);
+    var annotations = activeAnnotations.filter(function (item) { return item.type !== 'bookmark'; });
+    count.textContent = String(annotations.length);
     list.textContent = '';
-    if (!activeAnnotations.length) {
+    if (!annotations.length) {
       var empty = document.createElement('p');
       empty.className = 'annotation-empty';
       empty.textContent = '這本書還沒有筆記或高亮。選取正文中的文字即可新增。';
       list.appendChild(empty);
       return;
     }
-    activeAnnotations.slice().sort(function (a, b) {
+    annotations.slice().sort(function (a, b) {
       return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
     }).forEach(function (annotation) {
       var item = document.createElement('article');
@@ -454,11 +585,125 @@
     });
   }
 
+  function bookmarkTarget(bookmark) {
+    var fixed = String(bookmark && bookmark.cfi || '').match(/^frame-fixed:(\d+)$/);
+    return fixed ? Number(fixed[1]) : String(bookmark && bookmark.cfi || '');
+  }
+
+  function syncBookmarkButton() {
+    var button = el('reader-bookmark-toggle');
+    if (!button) return;
+    var cfi = currentLocation && currentLocation.cfi;
+    var bookmarked = !!cfi && activeAnnotations.some(function (item) {
+      return item.type === 'bookmark' && item.cfi === cfi;
+    });
+    button.disabled = !cfi || !currentBookId;
+    button.setAttribute('aria-pressed', bookmarked ? 'true' : 'false');
+    button.textContent = bookmarked ? '★ 已加入書籤' : '☆ 加入書籤';
+    button.title = bookmarked ? '移除此頁書籤' : '將目前閱讀位置加入書籤';
+  }
+
+  function renderBookmarkList() {
+    var list = el('bookmark-list');
+    var count = el('bookmark-count');
+    if (!list || !count) return;
+    var bookmarks = activeAnnotations.filter(function (item) { return item.type === 'bookmark'; });
+    count.textContent = String(bookmarks.length);
+    list.textContent = '';
+    if (!bookmarks.length) {
+      var empty = document.createElement('p');
+      empty.className = 'annotation-empty';
+      empty.textContent = '尚無書籤。閱讀到想記住的位置時，點擊書頁右上角的書籤按鈕。';
+      list.appendChild(empty);
+      syncBookmarkButton();
+      return;
+    }
+    bookmarks.slice().sort(function (a, b) {
+      return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
+    }).forEach(function (bookmark) {
+      var item = document.createElement('article');
+      item.className = 'annotation-item bookmark-item';
+      var marker = document.createElement('span');
+      marker.className = 'bookmark-marker';
+      marker.textContent = '★';
+      marker.setAttribute('aria-hidden', 'true');
+      var content = document.createElement('button');
+      content.type = 'button';
+      content.className = 'annotation-item-content';
+      content.title = '跳回這個書籤';
+      var kind = document.createElement('span');
+      kind.className = 'annotation-kind';
+      kind.textContent = '書籤';
+      var quote = document.createElement('span');
+      quote.className = 'annotation-quote';
+      quote.textContent = bookmark.quote || '已保存的閱讀位置';
+      content.append(kind, quote);
+      content.addEventListener('click', async function () {
+        if (!view) return;
+        try {
+          await view.goTo(bookmarkTarget(bookmark));
+          closeFootnotePopover();
+          if (window.matchMedia('(max-width: 820px)').matches && typeof window.frameReaderCloseSidebar === 'function') {
+            window.frameReaderCloseSidebar();
+          }
+        } catch (error) {
+          setText('reader-status', '無法開啟這個書籤：' + (error.message || String(error)));
+        }
+      });
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'annotation-delete';
+      remove.textContent = '刪除';
+      remove.setAttribute('aria-label', '刪除這個書籤');
+      remove.addEventListener('click', function () { deleteAnnotationRecord(bookmark); });
+      item.append(marker, content, remove);
+      list.appendChild(item);
+    });
+    syncBookmarkButton();
+  }
+
+  async function toggleCurrentBookmark() {
+    if (annotationBusy || !currentBookId || !currentLocation || !currentLocation.cfi) return;
+    var existing = activeAnnotations.find(function (item) {
+      return item.type === 'bookmark' && item.cfi === currentLocation.cfi;
+    });
+    if (existing) {
+      await deleteAnnotationRecord(existing);
+      return;
+    }
+    annotationBusy = true;
+    var button = el('reader-bookmark-toggle');
+    if (button) button.disabled = true;
+    try {
+      var store = await libraryStorePromise;
+      var saved = await store.saveAnnotation({
+        id: makeAnnotationId(),
+        bookId: currentBookId,
+        type: 'bookmark',
+        cfi: currentLocation.cfi,
+        quote: currentLocation.label || (currentLocation.percent + '% 閱讀位置'),
+        text: '',
+        color: 'violet',
+        createdAt: Date.now()
+      });
+      saved.sectionIndex = currentLocation.index;
+      activeAnnotations.push(saved);
+      renderBookmarkList();
+      setText('reader-status', '書籤已保存至雲端 D1。');
+    } catch (error) {
+      setText('reader-status', '書籤保存失敗：' + (error.message || String(error)));
+    } finally {
+      annotationBusy = false;
+      syncBookmarkButton();
+    }
+  }
+
   function upsertAnnotation(annotation) {
     var index = activeAnnotations.findIndex(function (item) { return item.id === annotation.id; });
     if (index >= 0) activeAnnotations[index] = annotation;
     else activeAnnotations.push(annotation);
     renderAnnotationList();
+    renderBookmarkList();
   }
 
   function drawAnnotation(annotation) {
@@ -582,15 +827,17 @@
 
   async function deleteAnnotationRecord(annotation) {
     if (!annotation || annotationBusy || !currentBookId) return;
-    if (!window.confirm('確定刪除這筆標註嗎？')) return;
+    if (!window.confirm(annotation.type === 'bookmark' ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？')) return;
     annotationBusy = true;
     try {
       var store = await libraryStorePromise;
       await store.deleteAnnotation(annotation.id, currentBookId);
       activeAnnotations = activeAnnotations.filter(function (item) { return item.id !== annotation.id; });
-      if (view) await view.deleteAnnotation({ value: annotation.cfi });
+      if (view && annotation.type !== 'bookmark') await view.deleteAnnotation({ value: annotation.cfi });
       renderAnnotationList();
-      setText('reader-status', '標註已從雲端 D1 刪除。');
+      renderBookmarkList();
+      syncBookmarkButton();
+      setText('reader-status', annotation.type === 'bookmark' ? '書籤已從雲端 D1 刪除。' : '標註已從雲端 D1 刪除。');
     } catch (error) {
       setText('reader-status', '刪除標註失敗：' + (error.message || String(error)));
     } finally {
@@ -601,6 +848,10 @@
   function bindAnnotationControls() {
     var toolbar = annotationToolbar();
     if (!toolbar) return;
+    var bookmarkButton = el('reader-bookmark-toggle');
+    var footnoteClose = el('reader-footnote-close');
+    if (bookmarkButton) bookmarkButton.addEventListener('click', toggleCurrentBookmark);
+    if (footnoteClose) footnoteClose.addEventListener('click', closeFootnotePopover);
     // Do not cancel pointerdown here: cancelling it suppresses compatibility
     // mouse events and can prevent the buttons' click handlers from firing.
     // Selection CFI/quote are already captured before the toolbar is shown.
@@ -629,11 +880,17 @@
         var store = await libraryStorePromise;
         activeAnnotations = await store.listAnnotations(currentBookId);
         activeAnnotations.forEach(function (annotation) {
-          var nav = view && view.resolveNavigation(annotation.cfi);
-          annotation.sectionIndex = nav && nav.index;
+          if (annotation.type === 'bookmark' && /^frame-fixed:\d+$/.test(annotation.cfi)) {
+            annotation.sectionIndex = Number(annotation.cfi.split(':')[1]);
+          } else {
+            var nav = view && view.resolveNavigation(annotation.cfi);
+            annotation.sectionIndex = nav && nav.index;
+          }
         });
         renderAnnotationList();
-        setText('reader-status', '已重新整理本書標註。');
+        renderBookmarkList();
+        syncBookmarkButton();
+        setText('reader-status', '已重新整理本書標註與書籤。');
       } catch (error) {
         setText('reader-status', '讀取標註失敗：' + (error.message || String(error)));
       }
@@ -841,6 +1098,15 @@
       setText('reader-status', '閱讀位置正在保存至雲端 D1……');
     }
     if (typeof detail.index === 'number') progressPatch.index = detail.index;
+    currentLocation = {
+      cfi: detail.cfi || (view && view.isFixedLayout && Number.isInteger(detail.index)
+        ? 'frame-fixed:' + detail.index : ''),
+      index: Number.isInteger(detail.index) ? detail.index : null,
+      percent: typeof detail.fraction === 'number' ? Math.round(detail.fraction * 100) : 0,
+      label: (progressPatch.label || '閱讀位置') + (typeof detail.fraction === 'number'
+        ? ' · ' + Math.round(detail.fraction * 100) + '%' : '')
+    };
+    syncBookmarkButton();
     if (Object.keys(progressPatch).length) queueLibraryProgress(progressPatch);
   }
   function makeLoader(zip) {
@@ -1095,7 +1361,7 @@
     view.style.height = '100%';
     view.addEventListener('load', function (event) {
       var detail = event.detail || {};
-      bindPageTapNavigation(detail.doc);
+      bindPageTapNavigation(detail.doc, detail.index);
       if (!view.isFixedLayout) applyDocumentAppearance(detail.doc);
     });
     view.addEventListener('relocate', function (event) {
@@ -1160,8 +1426,12 @@
     try {
       activeAnnotations = await libraryStore.listAnnotations(currentBookId);
       activeAnnotations.forEach(function (annotation) {
-        var navigation = view.resolveNavigation(annotation.cfi);
-        annotation.sectionIndex = navigation && navigation.index;
+        if (annotation.type === 'bookmark' && /^frame-fixed:\d+$/.test(annotation.cfi)) {
+          annotation.sectionIndex = Number(annotation.cfi.split(':')[1]);
+        } else {
+          var navigation = view.resolveNavigation(annotation.cfi);
+          annotation.sectionIndex = navigation && navigation.index;
+        }
       });
     } catch (annotationError) {
       // A temporary annotation API/D1 issue must never prevent the book itself
@@ -1171,6 +1441,7 @@
       console.warn('FRAME Reader could not restore annotations:', annotationError);
     }
     renderAnnotationList();
+    renderBookmarkList();
     var savedProgress = libraryRecord.progress || {};
     restoreCfi = !view.isFixedLayout && savedProgress.cfi ? savedProgress.cfi : null;
     restorePageIndex = view.isFixedLayout && Number.isInteger(savedProgress.index) && savedProgress.index >= 0
@@ -1225,6 +1496,7 @@
     restorePageIndex = null;
     updateLayoutControlState();
     applyAppearance();
+    syncBookmarkButton();
     el('prev-page').disabled = false;
     el('next-page').disabled = false;
     setText('reader-status', locationMessage + annotationLoadWarning);
