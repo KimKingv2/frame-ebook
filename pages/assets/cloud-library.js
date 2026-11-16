@@ -1515,7 +1515,7 @@ async function openCloudBook(item) {
   renderItems();
   $("cloud-browser-status").textContent = "正在確認雲端索引並準備閱讀室……";
   try {
-    const store = await import("/assets/library-store.js?v=20261116-metadata-r2");
+    const store = await import("/assets/library-store.js?v=20261116-shared-local-r1");
     const id = await store.cloudBookId(scope, item.path);
     const query = new URLSearchParams({
       book: id,
