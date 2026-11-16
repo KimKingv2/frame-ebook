@@ -143,7 +143,7 @@ function renderRootStatus() {
   for(const library of ["books","comics"]) {
     const id=library==="books"?"cloud-books-root-status":"cloud-comics-root-status";
     const selected=state.editRoots[library]||"/";
-    $(id).textContent="目前編輯來源已保存於這台裝置："+selected;
+    $(id).textContent="目前已保存至雲端 D1："+selected;
   }
 }
 function setSourceStatus(message,isError=false) {
@@ -223,9 +223,6 @@ async function readJsonResponse(response, fallback) {
   return data;
 }
 async function syncIndexedFilesToShelf() {
-  return true;
-}
-async function syncCloudShelfToThisDevice() {
   return true;
 }
 function indexScope(library=state.activeLibrary,provider=state.activeProvider) {
@@ -820,6 +817,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
   if(!["books","comics"].includes(targetLibrary))return {ok:false,reason:"invalid_library"};
   state.activeLibrary=targetLibrary;
   $("cloud-library-type").value=targetLibrary;
+  await saveRemotePreference("activeLibrary", targetLibrary);
   state.currentPath=getActiveRoot(targetLibrary);
   if(!state.authenticated) {
     setIndexProgress("尚未通過 Cloudflare Access，無法開始索引。",true);
