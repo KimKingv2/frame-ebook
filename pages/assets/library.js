@@ -510,6 +510,7 @@ async function applyBangumiSubject(item, button) {
     try { data = await response.json(); } catch (_) {}
     if (!response.ok || data.error) throw new Error(data.error || "保存 Bangumi 資料失敗。");
     const bookId = state.dialogBookId;
+    $("book-dialog").close();
     await refresh();
     await showBookDetails(bookId);
     $("detail-bangumi-status").textContent = "已關聯 " + (data.subject?.nameCn || data.subject?.name || "Bangumi 作品") +
