@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r2">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r3">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -14,6 +14,7 @@
     <header class="topbar">
       <a class="brand" href="/">FRAME <b>READER</b></a>
       <div class="reader-top-actions">
+        <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
         <span class="lab-tag">READING ROOM · 0.6</span>
         <button id="open-cloud-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-manager-dialog">連接與掃描</button>
         <a class="back-shelf-link" href="/reading-stats/">閱讀時光</a>
@@ -25,10 +26,6 @@
         <p class="eyebrow">YOUR PRIVATE READING ROOM</p>
         <h1>把一本 EPUB，<em>真正打開。</em></h1>
         <p>閱讀室只接受已掃描索引的 Alist／OpenList 雲端書籍。原始書檔留在雲端，閱讀位置、外觀偏好、書籤、筆記與閱讀統計都保存在你的 Cloudflare D1 帳戶。</p>
-      </section>
-      <section class="toolbar" aria-label="書籍操作">
-        <a class="primary-button" href="/">返回雲端書架</a>
-        <span id="engine-status" class="engine-status">正在初始化閱讀引擎……</span>
       </section>
       <section id="local-reader-login" class="local-reader-login" hidden>
         <div><p class="eyebrow">LOCAL OPENLIST LOGIN</p><h2>閱讀室需要重新登入本地端口</h2>
