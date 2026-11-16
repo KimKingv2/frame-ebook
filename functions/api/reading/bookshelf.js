@@ -113,8 +113,7 @@ export async function onRequestGet({ request, env }) {
         id, sourceType: "cloud",
         provider: row.provider, library: row.library, rootPath, path,
         fileName: row.name,
-        title: metadata.manualTitle && metadata.title ? metadata.title :
-          (comicMetadata?.nameCn || comicMetadata?.name || importedTitle || fallbackTitle),
+        title: metadata.manualTitle && metadata.title ? metadata.title : (importedTitle || fallbackTitle),
         author: metadata.manualAuthor ? String(metadata.author || "") :
           String(comicMetadata?.author || row.book_creator || ""),
         bookTitle: importedTitle,
@@ -158,9 +157,8 @@ export async function onRequestGet({ request, env }) {
       if (sharedComicMetadata) {
         for (const item of group) {
           if (!item.comicMetadata) item.comicMetadata = sharedComicMetadata;
-          if (item.library === "comics" && !item.manualTitle) {
-            item.title = sharedComicMetadata.nameCn || sharedComicMetadata.name || item.title;
-            if (!item.author) item.author = sharedComicMetadata.author || "";
+          if (item.library === "comics" && !item.manualAuthor && !item.author) {
+            item.author = sharedComicMetadata.author || "";
           }
         }
       }
@@ -168,10 +166,8 @@ export async function onRequestGet({ request, env }) {
         path: item.path, name: item.fileName, format: item.format, size: item.size,
         modified: item.modifiedAt, coverHash: item.cloudCoverHash, coverStatus: item.cloudCoverStatus
       })).sort((a,b) => a.path.localeCompare(b.path,"zh-Hant",{numeric:true,sensitivity:"base"}));
-      const hashes = [...new Set(files.filter(file => file.coverHash && file.coverStatus === "ready").map(file => file.coverHash))].slice(0,8);
       for (const item of group) {
         item.cloudSource.files = files;
-        item.cloudCoverHashes = hashes;
         item.volumeCount = files.length;
       }
     }
