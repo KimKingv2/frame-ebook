@@ -19,7 +19,7 @@ export async function resolveReaderBook(db, raw) {
   }
 
   const stripLeadingSlash = value => value.replace(/^\/+/, "");
-  const identity = [provider, library, stripLeadingSlash(rootPath), stripLeadingSlash(path)].join("\n");
+  const identity = [provider, library, stripLeadingSlash(rootPath), stripLeadingSlash(path)].join("\\n");
   const expectedId = "cloud:" + await sha256Hex(identity);
   if (expectedId !== bookId) return { error: json({ error: "雲端書籍識別碼不相符。" }, 400) };
 
