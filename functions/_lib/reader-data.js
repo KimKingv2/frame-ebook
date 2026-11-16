@@ -175,8 +175,8 @@ export async function resolveReaderBook(db, raw) {
   }
 
   const indexed = await db.prepare(
-    "SELECT name,format FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND path=? AND is_dir=0"
-  ).bind(provider, library, rootPath, path).first();
+    "SELECT name,format FROM cloud_catalog WHERE provider='vps' AND library=? AND root_path=? AND path=? AND is_dir=0"
+  ).bind(library, rootPath, path).first();
   if (!indexed) return { error: json({ error: "這本書不在目前的 Alist／OpenList 書庫索引中。請先掃描書庫。" }, 404) };
 
   const format = String(indexed.format || "").toUpperCase();
