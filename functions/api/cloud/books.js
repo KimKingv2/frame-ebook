@@ -2,7 +2,7 @@ import { json, requireAuth, getDatabase, normalizePath, isWithinRoot } from "../
 
 const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const LIBRARIES = new Set(["books", "comics"]);
-const CATALOG_PROVIDERS_SQL = "'vps','worker','mobile'";
+const CATALOG_PROVIDERS_SQL = "'vps','worker','mobile','local'";
 
 async function scanStateKey(library, rootPath) {
   const input = "vps\n" + library + "\n" + rootPath;
