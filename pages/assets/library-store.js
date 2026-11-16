@@ -60,7 +60,7 @@ async function cloudBookId(scope, path) {
   const provider = String(scope?.provider || "");
   const library = String(scope?.library || "");
   const rootPath = String(scope?.rootPath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  const filePath = String(path || "").replace(/\\/g, "/").replace(/^\\/+|\\/+$/g, "");
+  const filePath = String(path || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   if (!["vps", "worker", "mobile"].includes(provider) || !["books", "comics"].includes(library) || !rootPath || !filePath) {
     throw new Error("雲端書籍識別資訊無效。");
   }
