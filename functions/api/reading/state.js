@@ -97,7 +97,7 @@ export async function onRequestPost({ request, env }) {
       "provider=excluded.provider,library=excluded.library,root_path=excluded.root_path,book_path=excluded.book_path," +
       "state_json=excluded.state_json,updated_at=excluded.updated_at"
     ).bind(
-      context.userId, context.book.bookId, context.book.provider, context.book.library,
+      context.userId, context.book.bookId, context.book.provider === "local" ? "vps" : context.book.provider, context.book.library,
       context.book.rootPath, context.book.path, stateJson, now, now
     ).run();
     return json({ ok: true, bookId: context.book.bookId, state: next, updatedAt: now });
