@@ -241,6 +241,27 @@ export async function onRequestPost({ request, env }) {
     }
 
     const statements = [];
+    let oldComicMetadata = null;
+    try {
+      oldComicMetadata = await context.db.prepare(
+        "SELECT subject_id AS subjectId,metadata_json AS metadataJson,source_url AS sourceUrl,fetched_at AS fetchedAt " +
+        "FROM reader_comic_metadata WHERE user_id=? AND book_id=?"
+      ).bind(context.userId, oldBookId).first();
+    } catch (error) {
+      if (!String(error?.message || error).toLowerCase().includes("no such table: reader_comic_metadata")) throw error;
+    }
+    if (oldComicMetadata) {
+      statements.push(context.db.prepare(
+        "INSERT OR IGNORE INTO reader_comic_metadata " +
+        "(user_id,book_id,subject_id,metadata_json,source_url,fetched_at,updated_at) VALUES (?,?,?,?,?,?,?)"
+      ).bind(
+        context.userId,newBookId,oldComicMetadata.subjectId,oldComicMetadata.metadataJson,
+        oldComicMetadata.sourceUrl,Number(oldComicMetadata.fetchedAt)||Date.now(),Date.now()
+      ));
+      statements.push(context.db.prepare(
+        "DELETE FROM reader_comic_metadata WHERE user_id=? AND book_id=?"
+      ).bind(context.userId,oldBookId));
+    }
     if (oldState) {
       const previous = parseJson(oldState.stateJson, {});
       const current = parseJson(newState?.stateJson, {});
@@ -318,7 +339,8 @@ export async function onRequestPost({ request, env }) {
       moved: {
         readingState: oldState ? 1 : 0,
         annotations: annotationTableAvailable ? annotationCount : 0,
-        readingEvents: eventCount
+        readingEvents: eventCount,
+        comicMetadata: oldComicMetadata ? 1 : 0
       },
       note: annotationTableAvailable ? "" : "目前 D1 尚未建立標註資料表，因此只合併了可用的閱讀資料。"
     });
