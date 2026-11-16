@@ -31,8 +31,9 @@ async function persistInterval(startAt, endAt) {
     while (cursor < endAt) {
       const date = new Date(cursor);
       const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
-      const segmentEnd = Math.min(endAt, midnight);
-      const seconds = Math.floor((segmentEnd - cursor) / 1000);
+      const dayEnd = Math.min(endAt, midnight);
+      const eventEnd = Math.min(dayEnd, cursor + 30000);
+      const seconds = Math.floor((eventEnd - cursor) / 1000);
       if (seconds > 0) {
         const event = {
           id: makeId(),
@@ -41,13 +42,13 @@ async function persistInterval(startAt, endAt) {
           bookTitle: activeBook.title,
           format: activeBook.format,
           localHour: new Date(cursor).getHours(),
-          seconds: Math.min(30, seconds),
+          seconds,
           startedAt: cursor,
-          endedAt: Math.min(segmentEnd, cursor + 30000)
+          endedAt: eventEnd
         };
         await recordReadingEvent(event);
       }
-      cursor = segmentEnd;
+      cursor = eventEnd;
     }
   } catch (error) {
     console.warn("FRAME Reader could not save cloud reading history:", error);
