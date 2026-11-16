@@ -2,7 +2,7 @@ import {
   json, requireAuth, isSameOrigin, getDatabase, normalizePath, isWithinRoot
 } from "../../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const MAX_ITEMS = 50;
 const CATALOG_PROVIDER = "vps";
 
