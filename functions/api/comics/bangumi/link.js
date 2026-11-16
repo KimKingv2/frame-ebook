@@ -100,7 +100,7 @@ export async function onRequestPost({ request, env }) {
       score: Number(subject.rating?.score) || 0,
       ratingCount: Number(subject.rating?.total) || 0,
       rank: Number(subject.rank) || 0,
-      author: infoboxText(infobox, ["作者", "原作", "漫畫", "作畫", "author"]),
+      author: infoboxText(infobox, ["作者", "原作", "漫畫", "漫画", "作畫", "作画", "マンガ", "author"]),
       tags,
       infobox,
       url: "https://bgm.tv/subject/" + subjectId,
