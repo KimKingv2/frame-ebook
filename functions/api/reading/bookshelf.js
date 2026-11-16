@@ -66,7 +66,7 @@ export async function onRequestGet({ request, env }) {
             "WITH ranked AS (" +
             "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
             "book_title,book_creator,book_language,book_description,book_publisher,book_date,book_identifier,book_subjects_json,book_metadata_status,indexed_at," +
-            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY indexed_at DESC,CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,provider DESC) AS rn " +
             "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND is_dir=0 " +
             "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
             "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status," +
@@ -78,7 +78,7 @@ export async function onRequestGet({ request, env }) {
           rows = await db.prepare(
             "WITH ranked AS (" +
             "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at," +
-            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+            "ROW_NUMBER() OVER (PARTITION BY path ORDER BY indexed_at DESC,CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,provider DESC) AS rn " +
             "FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND is_dir=0 " +
             "AND format IN ("+(library === "books" ? "'EPUB'" : "'EPUB','CBZ'")+")) " +
             "SELECT provider,path,parent_path,name,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,indexed_at " +
