@@ -144,7 +144,26 @@
     if (tokens.some(function (token) { return token === 'noteref' || token === 'footnote-ref' || token === 'endnote-ref'; })) return true;
     if (role.indexOf('doc-noteref') >= 0 || rel.indexOf('footnote') >= 0 || rel.indexOf('endnote') >= 0) return true;
     if (/noteref|footnote[-_ ]?ref|endnote[-_ ]?ref/.test(classes)) return true;
-    return !!(anchor.closest && anchor.closest('sup') && String(anchor.getAttribute('href') || '').indexOf('#') >= 0);
+    return !!(anchor.closest && (anchor.closest('sup') || anchor.querySelector('sup')) &&
+      String(anchor.getAttribute('href') || '').indexOf('#') >= 0);
+  }
+
+  function isFootnoteTarget(node) {
+    if (!node || node.nodeType !== 1) return false;
+    var candidates = [node, node.parentElement];
+    for (var i = 0; i < candidates.length; i++) {
+      var item = candidates[i];
+      if (!item || !item.getAttribute) continue;
+      var types = epubTypeTokens(item);
+      var role = String(item.getAttribute('role') || '').toLowerCase();
+      var classes = String(item.className && item.className.baseVal !== undefined
+        ? item.className.baseVal : item.className || '').toLowerCase();
+      var id = String(item.id || item.getAttribute('name') || '').toLowerCase();
+      if (types.some(function (token) { return token === 'footnote' || token === 'endnote' || token === 'rearnote'; })) return true;
+      if (/doc-(footnote|endnote)/.test(role) || /footnote|endnote/.test(classes) ||
+          /^(?:_?ftn|_?fn|footnote|endnote)[-_]?\\w*/.test(id)) return true;
+    }
+    return false;
   }
 
   function cloneFootnoteContent(source) {
@@ -180,7 +199,7 @@
     if (popover) popover.hidden = true;
   }
 
-  async function showFootnotePopover(anchor, sourceDoc, sourceIndex, href) {
+  async function showFootnotePopover(anchor, sourceDoc, sourceIndex, href, explicitReference) {
     if (!view || !view.book || !view.book.sections) return;
     var sourceSection = view.book.sections[sourceIndex];
     var resolvedHref = sourceSection && sourceSection.resolveHref
@@ -204,6 +223,15 @@
     if (!targetNode || targetNode.nodeType !== 1) {
       await view.goTo(resolvedHref);
       return;
+    }
+    if (!explicitReference && !isFootnoteTarget(targetNode)) {
+      await view.goTo(resolvedHref);
+      return;
+    }
+    if (!targetNode.textContent || !targetNode.textContent.trim()) {
+      var nextNote = targetNode.nextElementSibling;
+      if (nextNote && nextNote.textContent && nextNote.textContent.trim()) targetNode = nextNote;
+      else if (targetNode.parentElement && targetNode.parentElement.textContent.trim()) targetNode = targetNode.parentElement;
     }
     var content = cloneFootnoteContent(targetNode);
     if (!content.textContent || !content.textContent.trim()) {
@@ -238,14 +266,16 @@
   function handleFootnoteReference(event, sourceDoc, sourceIndex) {
     if (!event || event.defaultPrevented || !event.target || !event.target.closest) return false;
     var anchor = event.target.closest('a[href]');
-    if (!anchor || !isFootnoteReference(anchor)) return false;
+    if (!anchor) return false;
     var href = String(anchor.getAttribute('href') || '').trim();
-    if (!href || /^(https?:|mailto:|tel:|javascript:)/i.test(href)) return false;
+    var explicitReference = isFootnoteReference(anchor);
+    if (!href || (!explicitReference && href.indexOf('#') < 0) ||
+        /^(https?:|mailto:|tel:|javascript:)/i.test(href)) return false;
     event.preventDefault();
     event.stopPropagation();
     if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     closeFootnotePopover();
-    showFootnotePopover(anchor, sourceDoc, sourceIndex, href).catch(function (error) {
+    showFootnotePopover(anchor, sourceDoc, sourceIndex, href, explicitReference).catch(function (error) {
       console.warn('FRAME Reader could not display footnote:', error);
       if (view) view.goTo(href).catch(function () {});
     });
