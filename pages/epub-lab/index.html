@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-readingroom-r3">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261116-mobile-ui-r1">
   <link rel="stylesheet" href="/assets/cloud-manager-overlay.css?v=20261116-manager-type-r2">
 </head>
 <body>
@@ -40,6 +40,7 @@
         </div>
       </section>
 
+      <button id="reader-settings-backdrop" class="reader-modal-backdrop reader-settings-backdrop" type="button" aria-label="關閉閱讀設定" hidden></button>
       <details class="appearance-panel" id="reader-appearance-panel">
         <summary><span>閱讀外觀</span><span class="appearance-summary-note">PERSONALIZE YOUR PAGE</span></summary>
         <div class="appearance-controls">
@@ -194,6 +195,7 @@
             </div>
           </div>
         </section>
+        <button id="reader-sidebar-backdrop" class="reader-modal-backdrop reader-sidebar-backdrop" type="button" aria-label="關閉目錄與筆記" hidden></button>
         <div class="reader-layout" id="reader-layout">
           <aside class="reader-sidebar" id="reader-sidebar" aria-label="閱讀導覽">
             <div class="reader-sidebar-head">
@@ -202,8 +204,13 @@
                 <h3>閱讀導覽</h3>
               </div>
               <span class="reader-sidebar-mark">F</span>
+              <button id="reader-sidebar-close" class="reader-sidebar-close" type="button" aria-label="關閉閱讀導覽">×</button>
             </div>
-            <section class="reader-sidebar-section" aria-label="章節目錄">
+            <nav class="reader-sidebar-mobile-tabs" aria-label="閱讀導覽分類">
+              <button type="button" class="is-active" data-reader-pane="toc" aria-pressed="true">章節目錄</button>
+              <button type="button" data-reader-pane="notes" aria-pressed="false">筆記與標註</button>
+            </nav>
+            <section id="reader-toc-section" class="reader-sidebar-section" aria-label="章節目錄">
               <div class="reader-sidebar-section-title"><span>章節目錄</span><small>CONTENTS</small></div>
           <div class="toc-wrap">
               <div id="toc-tree" class="toc-tree" aria-label="EPUB 階層目錄">
@@ -214,7 +221,7 @@
               </select>
             </div>
             </section>
-            <section class="reader-sidebar-section reader-sidebar-annotations" aria-label="個人筆記與標註">
+            <section id="reader-notes-section" class="reader-sidebar-section reader-sidebar-annotations" aria-label="個人筆記與標註">
               <div class="reader-sidebar-section-title"><span>個人筆記</span><small>MY NOTES</small></div>
               <button id="annotation-list-toggle" class="annotation-list-toggle" type="button" aria-expanded="false" aria-controls="annotation-panel">筆記與標註 <span id="annotation-count">0</span></button>
           <section id="annotation-panel" class="annotation-panel" hidden aria-label="本書筆記與標註">
@@ -297,50 +304,112 @@
     var workspace = document.getElementById('reading-workspace');
     var sidebar = document.getElementById('reader-sidebar');
     var sidebarToggle = document.getElementById('reader-sidebar-toggle');
+    var sidebarClose = document.getElementById('reader-sidebar-close');
+    var sidebarBackdrop = document.getElementById('reader-sidebar-backdrop');
     var appearance = document.getElementById('reader-appearance-panel');
     var appearanceToggle = document.getElementById('reader-appearance-toggle');
+    var settingsBackdrop = document.getElementById('reader-settings-backdrop');
     var toc = document.getElementById('toc-select');
-    if (sidebar && sidebarToggle && workspace) {
-      sidebarToggle.addEventListener('click', function () {
-        if (window.matchMedia('(max-width: 820px)').matches) {
-          sidebar.classList.toggle('is-open');
-          sidebarToggle.setAttribute('aria-expanded', sidebar.classList.contains('is-open') ? 'true' : 'false');
+    var paneButtons = Array.prototype.slice.call(document.querySelectorAll('[data-reader-pane]'));
+
+    function isMobileReader() {
+      return window.matchMedia('(max-width: 820px)').matches;
+    }
+    function setSidebarOpen(open) {
+      if (!sidebar || !sidebarToggle) return;
+      if (!isMobileReader()) {
+        workspace.classList.toggle('reader-sidebar-collapsed', !open);
+        sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        return;
+      }
+      sidebar.classList.toggle('is-open', !!open);
+      if (sidebarBackdrop) sidebarBackdrop.hidden = !open;
+      sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      document.body.classList.toggle('reader-drawer-open', !!open);
+    }
+    function closeSidebar() {
+      setSidebarOpen(false);
+    }
+    function setMobilePane(name) {
+      if (!sidebar) return;
+      var notes = name === 'notes';
+      sidebar.classList.toggle('mobile-pane-notes', notes);
+      sidebar.classList.toggle('mobile-pane-toc', !notes);
+      paneButtons.forEach(function (button) {
+        var active = button.getAttribute('data-reader-pane') === (notes ? 'notes' : 'toc');
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      if (notes) {
+        var panel = document.getElementById('annotation-panel');
+        var toggle = document.getElementById('annotation-list-toggle');
+        if (panel) panel.hidden = false;
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+    }
+
+    window.frameReaderCloseSidebar = closeSidebar;
+    setMobilePane('toc');
+
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        if (isMobileReader()) {
+          setSidebarOpen(!sidebar.classList.contains('is-open'));
+          if (sidebar.classList.contains('is-open')) setMobilePane('toc');
         } else {
-          workspace.classList.toggle('reader-sidebar-collapsed');
-          sidebarToggle.setAttribute('aria-expanded', workspace.classList.contains('reader-sidebar-collapsed') ? 'false' : 'true');
+          setSidebarOpen(workspace.classList.contains('reader-sidebar-collapsed'));
         }
       });
-      sidebar.addEventListener('click', function (event) {
-        if (event.target === sidebar && window.matchMedia('(max-width: 820px)').matches) {
-          sidebar.classList.remove('is-open');
-          sidebarToggle.setAttribute('aria-expanded', 'false');
-        }
+    }
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+
+    paneButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        setMobilePane(button.getAttribute('data-reader-pane'));
       });
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && sidebar.classList.contains('is-open')) {
-          sidebar.classList.remove('is-open');
-          sidebarToggle.setAttribute('aria-expanded', 'false');
-        }
-      });
+    });
+
+    function syncAppearanceOverlay() {
+      var open = !!(appearance && appearance.open);
+      if (settingsBackdrop) settingsBackdrop.hidden = !open;
+      if (appearanceToggle) appearanceToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      document.body.classList.toggle('reader-settings-open', open);
     }
     if (appearance && appearanceToggle) {
-      appearanceToggle.addEventListener('click', function () {
-        appearance.open = true;
-        var summary = appearance.querySelector('summary');
-        if (summary) summary.focus({ preventScroll: true });
+      appearanceToggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        if (isMobileReader()) closeSidebar();
+        appearance.open = !appearance.open;
+        syncAppearanceOverlay();
       });
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && appearance.open) appearance.open = false;
+      appearance.addEventListener('toggle', syncAppearanceOverlay);
+    }
+    if (settingsBackdrop) {
+      settingsBackdrop.addEventListener('click', function () {
+        if (appearance) appearance.open = false;
+        syncAppearanceOverlay();
       });
     }
-    if (toc && sidebar && sidebarToggle) {
+    if (toc) {
       toc.addEventListener('change', function () {
-        if (window.matchMedia('(max-width: 820px)').matches) {
-          sidebar.classList.remove('is-open');
-          sidebarToggle.setAttribute('aria-expanded', 'false');
-        }
+        if (isMobileReader()) closeSidebar();
       });
     }
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeSidebar();
+        if (appearance) appearance.open = false;
+        syncAppearanceOverlay();
+      }
+    });
+    window.addEventListener('resize', function () {
+      if (!isMobileReader()) {
+        closeSidebar();
+        document.body.classList.remove('reader-drawer-open');
+      }
+    });
   }());
   </script>
   <script src="/vendor/jszip/jszip.min.js"></script>
