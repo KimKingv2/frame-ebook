@@ -2208,32 +2208,7 @@ body.reader-settings-open .reader-quick-actions {
 .reading-workspace.reader-immersive-mode .reader-quick-actions > button:not(#reader-immersive-toggle) {
   display:none !important;
 }
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle {
-  display:grid !important;
-  position:fixed !important;
-  top:var(--reader-immersive-top,18px) !important;
-  right:calc(12px + env(safe-area-inset-right, 0px)) !important;
-  z-index:2147483002 !important;
-  width:27px;
-  height:29px;
-  margin:0;
-  border-color:rgba(216,199,243,.16);
-  border-radius:9px;
-  color:rgba(244,237,255,.82);
-  background:rgba(34,28,47,.2);
-  box-shadow:0 3px 16px rgba(0,0,0,.12);
-  opacity:.25;
-  backdrop-filter:blur(7px);
-  -webkit-backdrop-filter:blur(7px);
-  transition:opacity .24s ease, background .24s ease, border-color .24s ease;
-}
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle:hover,
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle:focus-visible,
-.reading-workspace.reader-immersive-mode #reader-immersive-toggle:active {
-  border-color:rgba(216,199,243,.5);
-  background:rgba(54,43,75,.72);
-  opacity:.94;
-}
+.reading-workspace.reader-immersive-mode #reader-immersive-toggle { pointer-events:auto !important; }
 .reading-workspace.reader-immersive-mode .reader-layout {
   display:flex !important;
   flex:1 1 auto !important;
@@ -2311,4 +2286,102 @@ body.reader-settings-open .reader-quick-actions {
   .reading-workspace.reader-immersive-mode #reader-immersive-toggle {
     transition:none !important;
   }
+}
+
+
+/* Unified dimensions for the three primary reader actions. */
+#reading-workspace .reader-quick-actions > #reader-sidebar-toggle,
+#reading-workspace .reader-quick-actions > #reader-appearance-toggle,
+#reading-workspace .reader-quick-actions > #reader-fullscreen {
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  box-sizing:border-box !important;
+  width:104px !important;
+  min-width:104px !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 8px !important;
+  border-radius:8px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+  font-weight:500;
+  white-space:nowrap !important;
+  vertical-align:middle;
+}
+
+/* The floating triangle is hidden by default. A click/tap in the 20%-height
+   horizontal hotspot reveals or hides it; the arrow itself toggles immersion. */
+#reading-workspace #reader-immersive-toggle {
+  display:none !important;
+  position:fixed !important;
+  top:var(--reader-immersive-top,18px) !important;
+  right:calc(12px + env(safe-area-inset-right, 0px)) !important;
+  z-index:2147483002 !important;
+  width:27px;
+  height:29px;
+  margin:0;
+  padding:0;
+  border:1px solid rgba(216,199,243,.16);
+  border-radius:9px;
+  color:rgba(244,237,255,.82);
+  background:rgba(34,28,47,.2);
+  box-shadow:0 3px 16px rgba(0,0,0,.12);
+  font-size:13px;
+  line-height:1;
+  opacity:.25;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  cursor:pointer;
+  pointer-events:none;
+  touch-action:manipulation;
+  transition:opacity .24s ease,background .24s ease,border-color .24s ease;
+}
+#reading-workspace.reader-immersive-control-visible #reader-immersive-toggle,
+#reading-workspace:fullscreen.reader-immersive-control-visible #reader-immersive-toggle,
+#reading-workspace:-webkit-full-screen.reader-immersive-control-visible #reader-immersive-toggle {
+  display:grid !important;
+  pointer-events:auto !important;
+}
+#reading-workspace #reader-immersive-toggle:hover,
+#reading-workspace #reader-immersive-toggle:focus-visible,
+#reading-workspace #reader-immersive-toggle:active {
+  border-color:rgba(216,199,243,.5);
+  background:rgba(54,43,75,.72);
+  opacity:.94;
+}
+#reading-workspace #reader-immersive-toggle:focus-visible {
+  outline:2px solid rgba(184,157,239,.82);
+  outline-offset:3px;
+}
+#reading-workspace.reader-immersive-mode .reader-quick-actions > button:not(#reader-immersive-toggle) {
+  display:none !important;
+}
+
+/* Compact the same controls slightly on narrow screens without changing their height. */
+@media(max-width:820px) {
+  #reading-workspace .reader-quick-actions > #reader-sidebar-toggle,
+  #reading-workspace .reader-quick-actions > #reader-appearance-toggle,
+  #reading-workspace .reader-quick-actions > #reader-fullscreen {
+    width:92px !important;
+    min-width:92px !important;
+    height:33px !important;
+    min-height:33px !important;
+    padding:0 5px !important;
+    font-size:9px !important;
+  }
+}
+@media(max-width:380px) {
+  #reading-workspace .reader-quick-actions > #reader-sidebar-toggle,
+  #reading-workspace .reader-quick-actions > #reader-appearance-toggle,
+  #reading-workspace .reader-quick-actions > #reader-fullscreen {
+    width:86px !important;
+    min-width:86px !important;
+    padding:0 3px !important;
+    font-size:8px !important;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  #reading-workspace #reader-immersive-toggle { transition:none !important; }
 }
