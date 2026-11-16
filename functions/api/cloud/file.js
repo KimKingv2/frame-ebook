@@ -26,7 +26,7 @@ export async function onRequestGet({ request, env }) {
   if (!db || typeof db.prepare !== "function") return json({ error: "FRAME_READER_DB 尚未綁定。" }, 503);
   try {
     const indexed = await db.prepare(
-      "SELECT is_dir,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile') AND library=? AND root_path=? AND path=? ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC LIMIT 1"
+      "SELECT is_dir,format FROM cloud_catalog WHERE provider IN ('vps','worker','mobile','local') AND library=? AND root_path=? AND path=? ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC LIMIT 1"
     ).bind(library, rootPath, path).first();
     const expectedFormat = path.toLowerCase().endsWith(".cbz") ? "CBZ" : "EPUB";
     if (!indexed || Number(indexed.is_dir) !== 0 || indexed.format !== expectedFormat) {
