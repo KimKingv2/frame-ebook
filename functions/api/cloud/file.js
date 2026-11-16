@@ -6,7 +6,7 @@ function isLocalHost(hostname) {
 }
 
 const FILE_LINK_RETRY_DELAYS_MS = [700, 1500];
-const TRANSIENT_FILE_LINK_ERROR = /(?:i\\/o timeout|client\\.timeout exceeded|context deadline exceeded|dial tcp[^\\n]*(?:timeout|network is unreachable)|tls handshake timeout|connection timed out|operation timed out|temporary failure in name resolution|server misbehaving|no such host|network is unreachable|connection reset by peer|unexpected eof)/i;
+const TRANSIENT_FILE_LINK_ERROR = /(?:i\/o timeout|client\.timeout exceeded|context deadline exceeded|dial tcp[^\n]*(?:timeout|network is unreachable)|tls handshake timeout|connection timed out|operation timed out|temporary failure in name resolution|server misbehaving|no such host|network is unreachable|connection reset by peer|unexpected eof)/i;
 
 function isTransientFileLinkError(error) {
   const message = String(error && error.message || error || "");
@@ -22,7 +22,7 @@ function sleep(ms) {
 
 function getRangeHeader(request) {
   const range = request.headers.get("Range");
-  return range && /^bytes=\\d*-\\d*(?:,\\d*-\\d*)*$/.test(range) ? range : "";
+  return range && /^bytes=\d*-\d*(?:,\d*-\d*)*$/.test(range) ? range : "";
 }
 
 function buildDownloadHeaders(upstream, path, metadata, isComics) {
@@ -43,7 +43,7 @@ function buildDownloadHeaders(upstream, path, metadata, isComics) {
     if (value) headers.set(name, value);
   });
   if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", isComics && /\\.cbz$/i.test(path)
+    headers.set("Content-Type", isComics && /\.cbz$/i.test(path)
       ? "application/vnd.comicbook+zip"
       : "application/epub+zip");
   }
@@ -69,7 +69,7 @@ export async function onRequestGet({ request, env }) {
   const path = normalizePath(requestUrl.searchParams.get("path") || "");
   const rootPath = normalizePath(requestUrl.searchParams.get("root_path") || "");
   if (!path || path === "/" || !rootPath) return json({ error: "檔案路徑或書庫根目錄無效。" }, 400);
-  const allowedExtension = library === "comics" ? /\\.(epub|cbz)$/i : /\\.epub$/i;
+  const allowedExtension = library === "comics" ? /\.(epub|cbz)$/i : /\.epub$/i;
   if (!allowedExtension.test(path)) {
     return json({ error: library === "comics" ? "漫畫來源只允許 EPUB 或 CBZ 檔案。" : "電子書來源只允許 EPUB 檔案。" }, 415);
   }
