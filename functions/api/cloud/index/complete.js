@@ -2,6 +2,7 @@ import { json, requireAuth, getDatabase, isSameOrigin, normalizePath } from "../
 
 const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
+const CATALOG_PROVIDER = "vps";
 
 export async function onRequestPost({ request, env }) {
   if (!isSameOrigin(request)) return json({ error: "不允許跨來源完成索引。" }, 403);
@@ -24,7 +25,7 @@ export async function onRequestPost({ request, env }) {
   try {
     const result = await db.prepare(
       "DELETE FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND scan_id<>?"
-    ).bind(provider, library, rootPath, scanId).run();
+    ).bind(CATALOG_PROVIDER, library, rootPath, scanId).run();
     return json({
       ok: true,
       removed: Number(result?.meta?.changes || 0),
