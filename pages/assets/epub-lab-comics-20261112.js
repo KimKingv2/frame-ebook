@@ -47,6 +47,83 @@
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
   var pageTapBoundDocuments = new WeakSet();
 
+  function isReaderFullscreen() {
+    var workspace = el('reading-workspace');
+    return !!workspace && (
+      document.fullscreenElement === workspace ||
+      document.webkitFullscreenElement === workspace
+    );
+  }
+
+  function setImmersiveControlTop() {
+    var workspace = el('reading-workspace');
+    var button = el('reader-fullscreen');
+    if (!workspace || !button) return;
+    var rect = button.getBoundingClientRect();
+    if (rect && Number.isFinite(rect.top) && rect.height) {
+      workspace.style.setProperty('--reader-immersive-top', Math.max(6, Math.round(rect.top)) + 'px');
+    }
+  }
+
+  function updateImmersiveControlVisibility() {
+    var workspace = el('reading-workspace');
+    var button = el('reader-immersive-toggle');
+    if (!workspace || !button) return;
+    var visible = isReaderFullscreen() &&
+      workspace.classList.contains('reader-immersive-control-visible');
+    button.hidden = !visible;
+    if (visible) {
+      button.textContent = workspace.classList.contains('reader-immersive-mode') ? '▾' : '▸';
+      button.title = workspace.classList.contains('reader-immersive-mode')
+        ? '返回一般全螢幕' : '進入沉浸全螢幕';
+    }
+  }
+
+  function isControlOrLinkTarget(target) {
+    return !!(target && typeof target.closest === 'function' &&
+      target.closest('button,a,area[href],input,select,textarea,video,audio,[contenteditable]:not([contenteditable="false"]),[role="button"],[data-no-page-turn]'));
+  }
+
+  function toggleImmersiveControlHotspot(event, sourceDoc) {
+    var workspace = el('reading-workspace');
+    if (!workspace || !isReaderFullscreen() || !event ||
+        event.defaultPrevented || event.button !== 0 || event.detail === 0 ||
+        event.metaKey || event.ctrlKey || event.altKey || event.shiftKey ||
+        isControlOrLinkTarget(event.target)) return false;
+
+    try {
+      var selection = sourceDoc && sourceDoc.getSelection
+        ? sourceDoc.getSelection()
+        : (document.getSelection ? document.getSelection() : null);
+      if (selection && !selection.isCollapsed && String(selection).trim()) return false;
+    } catch (error) {}
+
+    var workspaceRect = workspace.getBoundingClientRect();
+    if (!workspaceRect.height) return false;
+    var screenY = event.clientY;
+    if (sourceDoc && sourceDoc.defaultView && sourceDoc.defaultView.frameElement) {
+      var frameRect = sourceDoc.defaultView.frameElement.getBoundingClientRect();
+      var sourceHeight = sourceDoc.documentElement && sourceDoc.documentElement.clientHeight ||
+        sourceDoc.defaultView.innerHeight || 0;
+      if (sourceHeight && frameRect.height) {
+        screenY = frameRect.top + (event.clientY / sourceHeight) * frameRect.height;
+      }
+    }
+    var hotspotY = workspaceRect.top + workspaceRect.height * 0.2;
+    var tolerance = Math.max(22, Math.min(38, workspaceRect.height * 0.025));
+    if (!Number.isFinite(screenY) || Math.abs(screenY - hotspotY) > tolerance) return false;
+
+    if (!workspace.classList.contains('reader-immersive-control-visible')) {
+      setImmersiveControlTop();
+    }
+    workspace.classList.toggle('reader-immersive-control-visible');
+    updateImmersiveControlVisibility();
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    return true;
+  }
+
   function turnReaderPage(direction) {
     if (!view) return;
     try {
@@ -66,8 +143,8 @@
       if (!view || event.defaultPrevented || event.button !== 0 || event.detail === 0) return;
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       var target = event.target;
-      if (target && typeof target.closest === 'function' &&
-          target.closest('a,area[href],button,input,select,textarea,video,audio,[contenteditable]:not([contenteditable="false"]),[role="button"],[data-no-page-turn]')) return;
+      if (isControlOrLinkTarget(target)) return;
+      if (toggleImmersiveControlHotspot(event, doc)) return;
       try {
         var selection = doc.getSelection && doc.getSelection();
         if (selection && !selection.isCollapsed && String(selection).trim()) return;
@@ -1247,6 +1324,13 @@
   el('toc-select').addEventListener('change', function (event) {
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
+  var readerWorkspace = el('reading-workspace');
+  if (readerWorkspace) {
+    readerWorkspace.addEventListener('click', function (event) {
+      toggleImmersiveControlHotspot(event, null);
+    }, true);
+  }
+
   function updateReaderFullscreenButton() {
     var workspace = el('reading-workspace');
     var button = el('reader-fullscreen');
@@ -1255,19 +1339,21 @@
     var active = document.fullscreenElement === workspace ||
       document.webkitFullscreenElement === workspace;
     if (!active) {
-      workspace.classList.remove('reader-immersive-mode');
-      if (immersiveToggle) immersiveToggle.style.removeProperty('--reader-immersive-top');
+      workspace.classList.remove('reader-immersive-mode', 'reader-immersive-control-visible');
+      workspace.style.removeProperty('--reader-immersive-top');
+    } else if (!workspace.style.getPropertyValue('--reader-immersive-top')) {
+      setImmersiveControlTop();
     }
     var immersive = active && workspace.classList.contains('reader-immersive-mode');
     button.textContent = active ? '↙ 退出全螢幕' : '⛶ 全螢幕';
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
     button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
     if (immersiveToggle) {
-      immersiveToggle.hidden = !active;
       immersiveToggle.textContent = immersive ? '▾' : '▸';
       immersiveToggle.setAttribute('aria-pressed', immersive ? 'true' : 'false');
       immersiveToggle.title = immersive ? '返回一般全螢幕' : '進入沉浸全螢幕';
     }
+    updateImmersiveControlVisibility();
   }
   function toggleImmersiveFullscreen() {
     var workspace = el('reading-workspace');
@@ -1279,11 +1365,8 @@
     if (!active) return;
     if (workspace.classList.contains('reader-immersive-mode')) {
       workspace.classList.remove('reader-immersive-mode');
-      immersiveToggle.style.removeProperty('--reader-immersive-top');
     } else {
-      var rect = fullscreenButton && fullscreenButton.getBoundingClientRect();
-      var top = rect && Number.isFinite(rect.top) ? Math.max(6, Math.round(rect.top)) : 18;
-      immersiveToggle.style.setProperty('--reader-immersive-top', top + 'px');
+      setImmersiveControlTop();
       workspace.classList.add('reader-immersive-mode');
     }
     updateReaderFullscreenButton();
