@@ -522,6 +522,50 @@
   el('toc-select').addEventListener('change', function (event) {
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
+  function updateReaderFullscreenButton() {
+    var workspace = el('reading-workspace');
+    var button = el('reader-fullscreen');
+    if (!workspace || !button) return;
+    var active = document.fullscreenElement === workspace ||
+      document.webkitFullscreenElement === workspace;
+    button.textContent = active ? '↙ 退出全螢幕' : '⛶ 全螢幕';
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
+  }
+  async function toggleReaderFullscreen() {
+    var workspace = el('reading-workspace');
+    if (!workspace) return;
+    var active = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (active) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        var request = workspace.requestFullscreen || workspace.webkitRequestFullscreen;
+        if (!request) {
+          setText('reader-status', '目前瀏覽器不支援頁面全螢幕，請使用瀏覽器的全螢幕功能。');
+          return;
+        }
+        var result = request.call(workspace);
+        if (result && typeof result.then === 'function') await result;
+      }
+    } catch (error) {
+      setText('reader-status', '無法切換全螢幕：' + (error && error.message ? error.message : String(error)));
+      console.warn('FRAME Reader fullscreen request failed:', error);
+    }
+    updateReaderFullscreenButton();
+  }
+  el('reader-fullscreen').addEventListener('click', toggleReaderFullscreen);
+  document.addEventListener('fullscreenchange', function () {
+    updateReaderFullscreenButton();
+    if (view && view.renderer && typeof view.renderer.render === 'function') {
+      window.requestAnimationFrame(function () { view.renderer.render(); });
+    }
+  });
+  document.addEventListener('webkitfullscreenchange', updateReaderFullscreenButton);
+  updateReaderFullscreenButton();
+
+
   window.addEventListener('pagehide', function () {
     flushLibraryProgress();
     readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
