@@ -1,11 +1,11 @@
 import { json, requireAuth, getDatabase, normalizePath, isWithinRoot } from "../../_lib/common.js";
 
-const PROVIDERS = new Set(["vps", "worker", "mobile"]);
+const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const LIBRARIES = new Set(["books", "comics"]);
-const CATALOG_PROVIDER = "vps";
+const CATALOG_PROVIDERS_SQL = "'vps','worker','mobile'";
 
-async function scanStateKey(provider, library, rootPath) {
-  const input = CATALOG_PROVIDER + "\n" + library + "\n" + rootPath;
+async function scanStateKey(library, rootPath) {
+  const input = "vps\n" + library + "\n" + rootPath;
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return "reader_scan_" + hex;
@@ -16,12 +16,9 @@ export async function onRequestGet({ request, env }) {
   try {
     const denied = await requireAuth(request, env);
     if (denied) return denied;
-
     stage = "resolve_database";
     const db = getDatabase(env);
-    if (!db || typeof db.prepare !== "function") {
-      return json({ error: "FRAME_READER_DB 尚未綁定。請先設定 D1 binding。" }, 503);
-    }
+    if (!db || typeof db.prepare !== "function") return json({ error: "FRAME_READER_DB 尚未綁定。請先設定 D1 binding。" }, 503);
 
     stage = "parse_request";
     const url = new URL(request.url);
@@ -37,36 +34,39 @@ export async function onRequestGet({ request, env }) {
     const page = Math.max(1, Math.min(100000, Number(url.searchParams.get("page")) || 1));
     const perPage = Math.max(1, Math.min(100, Number(url.searchParams.get("per_page")) || 80));
     const offset = (page - 1) * perPage;
-
-    stage = "prepare_queries";
     const recursiveShelf = url.searchParams.get("recursive") === "1" && path === rootPath;
     const prefix = rootPath === "/" ? "/" : rootPath + "/";
+    const where = recursiveShelf
+      ? "library=? AND root_path=? AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?))"
+      : "library=? AND root_path=? AND parent_path=?";
+
+    stage = "prepare_queries";
     const countStatement = recursiveShelf
-      ? db.prepare(
-          "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
-          "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?))"
-        ).bind(CATALOG_PROVIDER, library, rootPath, rootPath, prefix.length, prefix)
-      : db.prepare(
-          "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=?"
-        ).bind(CATALOG_PROVIDER, library, rootPath, path);
+      ? db.prepare("SELECT COUNT(DISTINCT path) AS count FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where)
+          .bind(library, rootPath, rootPath, prefix.length, prefix)
+      : db.prepare("SELECT COUNT(DISTINCT path) AS count FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where)
+          .bind(library, rootPath, path);
+
+    const selectColumns = "path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error,indexed_at";
     const rowsStatement = recursiveShelf
       ? db.prepare(
-          "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
-          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
-          "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?)) " +
+          "WITH ranked AS (" +
+          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where +
+          ") SELECT " + selectColumns + " FROM ranked WHERE rn=1 " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
-        ).bind(CATALOG_PROVIDER, library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
+        ).bind(library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
       : db.prepare(
-          "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
-          "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
+          "WITH ranked AS (" +
+          "SELECT " + selectColumns + ",ROW_NUMBER() OVER (PARTITION BY path ORDER BY CASE WHEN provider='vps' THEN 1 ELSE 0 END DESC,indexed_at DESC,provider DESC) AS rn " +
+          "FROM cloud_catalog WHERE provider IN (" + CATALOG_PROVIDERS_SQL + ") AND " + where +
+          ") SELECT " + selectColumns + " FROM ranked WHERE rn=1 " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
-        ).bind(CATALOG_PROVIDER, library, rootPath, path, perPage, offset);
+        ).bind(library, rootPath, path);
 
     stage = "count_and_rows";
     const [count, rows, scanKey] = await Promise.all([
-      countStatement.first(),
-      rowsStatement.all(),
-      scanStateKey(provider, library, rootPath)
+      countStatement.first(), rowsStatement.all(), scanStateKey(library, rootPath)
     ]);
 
     stage = "read_scan_state";
@@ -107,22 +107,11 @@ export async function onRequestGet({ request, env }) {
         coverFailedCount: Number(scanState.coverFailedCount || 0),
         updatedAt: stateRow.updated_at || scanState.updatedAt || null
       } : null,
-      path,
-      rootPath,
-      provider,
-      library,
-      page,
-      perPage,
-      total,
-      items
+      path,rootPath,provider,library,page,perPage,total,items
     });
   } catch (error) {
-    // Expose only a short stage/error description to the authenticated caller;
-    // never include SQL bindings, JWTs, cookies, or book contents.
     const name = typeof error?.name === "string" ? error.name.slice(0, 40) : "Error";
     const detail = String(error?.message || name).replace(/[\r\n\t]+/g, " ").slice(0, 180);
-    return json({
-      error: "D1 書庫索引 API 發生例外（" + stage + " / " + name + "）：" + detail
-    }, 503);
+    return json({ error: "D1 書庫索引 API 發生例外（" + stage + " / " + name + "）：" + detail }, 503);
   }
 }
