@@ -2,9 +2,10 @@ import { json, requireAuth, getDatabase, normalizePath, isWithinRoot } from "../
 
 const PROVIDERS = new Set(["vps", "worker", "mobile"]);
 const LIBRARIES = new Set(["books", "comics"]);
+const CATALOG_PROVIDER = "vps";
 
 async function scanStateKey(provider, library, rootPath) {
-  const input = provider + "\n" + library + "\n" + rootPath;
+  const input = CATALOG_PROVIDER + "\n" + library + "\n" + rootPath;
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
   return "reader_scan_" + hex;
@@ -44,22 +45,22 @@ export async function onRequestGet({ request, env }) {
       ? db.prepare(
           "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
           "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?))"
-        ).bind(provider, library, rootPath, rootPath, prefix.length, prefix)
+        ).bind(CATALOG_PROVIDER, library, rootPath, rootPath, prefix.length, prefix)
       : db.prepare(
           "SELECT COUNT(*) AS count FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=?"
-        ).bind(provider, library, rootPath, path);
+        ).bind(CATALOG_PROVIDER, library, rootPath, path);
     const rowsStatement = recursiveShelf
       ? db.prepare(
           "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? " +
           "AND ((is_dir=1 AND parent_path=?) OR (is_dir=0 AND substr(path,1,?)=?)) " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
-        ).bind(provider, library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
+        ).bind(CATALOG_PROVIDER, library, rootPath, rootPath, prefix.length, prefix, perPage, offset)
       : db.prepare(
           "SELECT path,parent_path,name,is_dir,format,size_bytes,modified_at,cover_hash,cover_type,cover_status,cover_error " +
           "FROM cloud_catalog WHERE provider=? AND library=? AND root_path=? AND parent_path=? " +
           "ORDER BY is_dir DESC,name COLLATE NOCASE,path LIMIT ? OFFSET ?"
-        ).bind(provider, library, rootPath, path, perPage, offset);
+        ).bind(CATALOG_PROVIDER, library, rootPath, path, perPage, offset);
 
     stage = "count_and_rows";
     const [count, rows, scanKey] = await Promise.all([
@@ -74,7 +75,7 @@ export async function onRequestGet({ request, env }) {
     ).bind(scanKey).first();
 
     stage = "parse_scan_state";
-    const scanState = stateRow ? JSON.parse(stateRow.state_json) : null;
+    const scanState = stateRow ? { ...JSON.parse(stateRow.state_json), provider } : null;
     const total = Number(count?.count || 0);
     const items = (rows?.results || []).map(row => ({
       name: row.name,
