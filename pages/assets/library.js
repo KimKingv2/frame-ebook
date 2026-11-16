@@ -50,42 +50,53 @@ function makeCover(book, compact) {
   if (isFolderCard) {
     frame.classList.add("library-folder-cover");
     frame.setAttribute("aria-label", (book.folderTitle || book.title || "資料夾") + " 封面");
-    const members = book._groupMembers.slice().sort(compareFolderFiles);
-    const first = members[0] || book;
+    const members = book._groupMembers.slice().sort(compareFolderFiles).slice(0, 3);
+    if (members.length > 1) {
+      const stack = document.createElement("div");
+      stack.className = "library-cover-stack";
+      stack.setAttribute("aria-label", "依檔案名稱排序的前三本書籍封面堆疊");
 
-    const face = document.createElement("div");
-    face.className = "library-folder-cover-face";
-
-    const spine = document.createElement("span");
-    spine.className = "library-folder-cover-spine";
-    spine.setAttribute("aria-hidden", "true");
-
-    const ornament = document.createElement("span");
-    ornament.className = "library-folder-cover-ornament";
-    ornament.setAttribute("aria-hidden", "true");
-
-    const feature = document.createElement("div");
-    feature.className = "library-folder-cover-feature";
-    const hash = first.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(first.cloudCoverHash || ""))
-      ? first.cloudCoverHash : "";
-
-    if (hash) {
-      const image = document.createElement("img");
-      image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
-      image.alt = first.fileName || first.title || "第一本書籍封面";
-      image.loading = "lazy";
-      image.decoding = "async";
-      image.addEventListener("error", () => {
-        feature.replaceChildren();
-        feature.classList.add("has-no-cover");
-      }, { once: true });
-      feature.appendChild(image);
+      members.forEach((member, index) => {
+        const sheet = document.createElement("div");
+        sheet.className = "library-cover-stack-book";
+        const hash = member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
+          ? member.cloudCoverHash : "";
+        if (hash) {
+          const image = document.createElement("img");
+          image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+          image.alt = member.fileName || member.title || ("第 " + (index + 1) + " 本書籍封面");
+          image.loading = "lazy";
+          image.decoding = "async";
+          image.addEventListener("error", () => {
+            sheet.classList.add("is-fallback");
+            sheet.replaceChildren();
+          }, { once: true });
+          sheet.appendChild(image);
+        } else {
+          sheet.classList.add("is-fallback");
+        }
+        stack.appendChild(sheet);
+      });
+      frame.appendChild(stack);
     } else {
-      feature.classList.add("has-no-cover");
+      const member = members[0] || book;
+      const hash = member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || ""))
+        ? member.cloudCoverHash : "";
+      if (hash) {
+        const image = document.createElement("img");
+        image.src = "/api/cloud/covers?hash=" + encodeURIComponent(hash);
+        image.alt = member.fileName || member.title || "書籍封面";
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.addEventListener("error", () => {
+          image.remove();
+          frame.classList.add("library-folder-cover-empty");
+        }, { once: true });
+        frame.appendChild(image);
+      } else {
+        frame.classList.add("library-folder-cover-empty");
+      }
     }
-
-    face.append(spine, ornament, feature);
-    frame.appendChild(face);
   } else {
     frame.setAttribute("aria-label", (book.title || "作品") + " 封面");
     const hash = book.cloudCoverHash && book.cloudCoverStatus === "ready"
@@ -105,9 +116,7 @@ function makeCover(book, compact) {
     } else {
       frame.appendChild(makeFallback(book));
     }
-  }
 
-  if (!isFolderCard) {
     const format = document.createElement("span");
     format.className = "library-format-badge";
     format.textContent = book.format || "";
