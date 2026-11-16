@@ -37,11 +37,11 @@ export async function onRequestPost({ request }) {
       type: Number(item.type) || 0,
       name: text(item.name, 240),
       nameCn: text(item.name_cn, 240),
-      summary: text(item.summary, 500),
+      summary: text(item.short_summary || item.summary, 500),
       date: text(item.date, 40),
       categoryLabel: "Bangumi 書籍候選",
       image: text(item.images?.medium || item.images?.common || item.images?.small, 1000),
-      score: Number(item.rating?.score) || 0,
+      score: Number(item.rating?.score ?? item.score) || 0,
       ratingCount: Number(item.rating?.total) || 0,
       rank: Number(item.rank) || 0,
       tags: (Array.isArray(item.tags) ? item.tags : []).slice(0, 8)
