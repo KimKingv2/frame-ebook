@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#12101a">
-  <title>檔案瀏覽 · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/site.css?v=20261116-cloud-only-r2">
-  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261116-cloud-only-r2">
+  <title>連結與掃描 · FRAME Reader</title>
+  <link rel="stylesheet" href="/assets/site.css?v=20261116-cloud-only-r3">
+  <link rel="stylesheet" href="/assets/cloud-library.css?v=20261116-cloud-manager-tabs-r1">
 </head>
 <body>
   <main class="shell cloud-shell">
@@ -19,8 +19,8 @@
       <nav class="main-nav" aria-label="主要導覽">
         <a href="/">我的書架</a>
         <a href="/reading-stats/">閱讀時光</a>
-        <a class="active" href="/cloud/">檔案瀏覽</a>
       </nav>
+      <button id="cloud-settings-open" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="cloud-settings-dialog">連接與掃描</button>
       <span class="edition"><span class="edition-dot"></span> OPENLIST · PRIVATE</span>
     </header>
 
@@ -47,6 +47,11 @@
           <button id="cloud-settings-close" class="cloud-settings-close" type="button" aria-label="關閉設定與索引">×</button>
         </div>
         <div class="cloud-settings-dialog-body">
+          <nav class="cloud-manager-tabs" role="tablist" aria-label="連接與掃描管理分頁">
+            <button id="cloud-tab-connection" class="cloud-manager-tab" type="button" role="tab" aria-controls="cloud-manager-tab-connection" aria-selected="true" data-cloud-manager-tab="connection">連接與掃描</button>
+            <button id="cloud-tab-library" class="cloud-manager-tab" type="button" role="tab" aria-controls="cloud-manager-tab-library" aria-selected="false" data-cloud-manager-tab="library">雲端書庫</button>
+          </nav>
+          <div id="cloud-manager-tab-connection" class="cloud-manager-tab-panel" role="tabpanel" aria-labelledby="cloud-tab-connection">
       <section class="cloud-connection-panel" aria-label="三路 OpenList 連線設定">
         <div class="cloud-connection-heading">
           <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>三個伺服器端來源沿用相同目錄結構；電子書與漫畫分別設定根目錄，但各自保留獨立 D1 索引與掃描進度。登入後會自動載入上次使用來源的索引。</p></div>
@@ -123,13 +128,13 @@
           <pre id="cloud-index-log">尚無日誌。開始或續作掃描後，這裡會即時列出處理階段。</pre>
         </details>
       </section>
-        </div>
-      </dialog>
+          </div>
+          <div id="cloud-manager-tab-library" class="cloud-manager-tab-panel" role="tabpanel" aria-labelledby="cloud-tab-library" hidden>
+            <section class="cloud-directory-panel" aria-label="雲端書庫瀏覽">
       <div class="cloud-browser-heading">
-        <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>瀏覽雲端檔案</h2></div>
+        <div><p class="section-kicker">OPENLIST DIRECTORY</p><h2>雲端書庫</h2></div>
         <div class="cloud-browser-actions">
-          <button id="cloud-settings-open" class="quiet-button" type="button">連接與索引設定</button>
-          <button id="cloud-refresh" class="quiet-button" type="button">重新整理</button>
+          <button id="cloud-refresh" class="quiet-button" type="button">重新整理書庫</button>
           <button id="cloud-logout" class="quiet-button" type="button">登出</button>
         </div>
       </div>
@@ -156,6 +161,11 @@
         <div>✧</div><strong>這個資料夾目前沒有對應格式的檔案</strong><p>你可以切換其他資料夾，或在 OpenList 中整理書籍。</p>
       </div>
       <p id="cloud-browser-status" class="cloud-browser-status" role="status" aria-live="polite"></p>
+</section>
+          </div>
+        </div>
+      </dialog>
+
     </section>
 
     <section class="cloud-security-note">
@@ -165,6 +175,6 @@
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/cloud-library.js?v=20261116-cloud-only-r2"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261116-cloud-manager-tabs-r1"></script>
 </body>
 </html>
