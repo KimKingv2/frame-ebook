@@ -328,7 +328,7 @@
       document.body.classList.toggle('reader-drawer-open', !!open);
     }
     function closeSidebar() {
-      setSidebarOpen(false);
+      if (isMobileReader()) setSidebarOpen(false);
     }
     function setMobilePane(name) {
       if (!sidebar) return;
@@ -350,6 +350,7 @@
 
     window.frameReaderCloseSidebar = closeSidebar;
     setMobilePane('toc');
+    if (isMobileReader() && sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
 
     if (sidebarToggle) {
       sidebarToggle.addEventListener('click', function (event) {
