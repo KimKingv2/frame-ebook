@@ -289,13 +289,17 @@ async function checkSession() {
     if (!response.ok) throw new Error("無法確認 Cloudflare Access 登入狀態。");
     const data = await response.json();
     state.authenticated = !!data.authenticated;
-    state.databaseConfigured = !!data.databaseConfigured;
-    $("cloud-account-label").textContent = state.authenticated
-      ? "Cloudflare Access 已驗證 · 閱讀資料保存至 D1"
-      : "請先通過 Cloudflare Access 驗證。";
-    $("cloud-sync-status").textContent = state.authenticated
-      ? "已連線至雲端資料庫。所有統計依登入身分保存，跨裝置同步。"
-      : "尚未取得 Access 身分，無法讀取雲端統計。";
+    state.databaseConfigured = !!data.databaseConfigured && !!data.cloudReaderDataConfigured;
+    $("cloud-account-label").textContent = !state.authenticated
+      ? "尚未通過 Cloudflare Access 驗證"
+      : !state.databaseConfigured
+        ? "D1 或 Access 身分設定尚未完成"
+        : "Cloudflare Access 已驗證 · 閱讀資料保存至 D1";
+    $("cloud-sync-status").textContent = !state.authenticated
+      ? "尚未取得 Access 身分，無法讀取雲端統計。"
+      : !state.databaseConfigured
+        ? "請確認 FRAME_READER_DB、FRAME_READER_ACCESS_TEAM_DOMAIN 與 FRAME_READER_ACCESS_AUD 已設定。"
+        : "已連線至雲端資料庫。所有統計依登入身分保存，跨裝置同步。";
   } catch (error) {
     state.authenticated = false;
     $("cloud-account-label").textContent = "登入狀態讀取失敗";
