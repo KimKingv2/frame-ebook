@@ -124,7 +124,7 @@ export async function onRequestGet({ request, env }) {
         addedAt: 0,
         lastOpenedAt: Number(state.lastOpenedAt) || 0,
         pageCount: Number(metadata.pageCount) || 0,
-        language: String(metadata.language || ""),
+        language: String(metadata.language || row.book_language || ""),
         progress: state.progress || { percent: 0, label: "尚未閱讀", cfi: "", index: null },
         manualTitle: !!metadata.manualTitle,
         manualAuthor: !!metadata.manualAuthor,
