@@ -14,7 +14,16 @@ function infoboxText(infobox, keys) {
   for (const item of infobox) {
     const key = clean(item?.key, 80).toLowerCase();
     if (!keys.some(candidate => key.includes(candidate))) continue;
-    const value = Array.isArray(item?.value) ? item.value.join("、") : item?.value;
+    const rawValue = item?.value;
+    const value = Array.isArray(rawValue)
+      ? rawValue.map(part => {
+          if (typeof part === "string" || typeof part === "number") return String(part);
+          if (part && typeof part === "object") return [part.k, part.v].filter(Boolean).join("：");
+          return "";
+        }).filter(Boolean).join("、")
+      : rawValue && typeof rawValue === "object"
+        ? [rawValue.k, rawValue.v].filter(Boolean).join("：")
+        : rawValue;
     const normalized = clean(value, 240);
     if (normalized && !values.includes(normalized)) values.push(normalized);
   }
