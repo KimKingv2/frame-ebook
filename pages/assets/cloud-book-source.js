@@ -22,9 +22,10 @@ export async function fetchCloudBookFile(record) {
     provider: String(source.provider),
     library: String(source.library || record.shelf || "books"),
     root_path: String(source.rootPath || ""),
-    path: String(source.path || "")
+    path: String(source.path || ""),
+    delivery: "stream"
   });
-  const response = await fetch("/api/cloud/file?" + query.toString(), {
+  // The Foliate reader consumes a File/Blob via JavaScript fetch. Use same-origin\n  // streaming here; cross-origin 302 downloads require CORS on the final cloud host.\n  const response = await fetch("/api/cloud/file?" + query.toString(), {
     method: "GET",
     credentials: "same-origin",
     cache: "no-store"
