@@ -241,6 +241,7 @@ async function showBookDetails(id) {
   if (book.description) extraMetadata.push("簡介：" + book.description);
   $("detail-extra-metadata").textContent = extraMetadata.join("\n") || "尚未讀取到其他內部書籍資訊。";
   $("detail-extra-metadata").hidden = getBookShelf(book) !== "books" || extraMetadata.length === 0;
+  $("detail-reset-opf").hidden = getBookShelf(book) !== "books" || (!book.manualTitle && !book.manualAuthor);
 
   const bangumiSection = $("detail-bangumi-section");
   const bangumiStatus = $("detail-bangumi-status");
@@ -521,6 +522,30 @@ async function applyBangumiSubject(item, button) {
   }
 }
 
+async function restoreEpubMetadata() {
+  const id = state.dialogBookId;
+  const book = await getBook(id);
+  if (!book) return;
+  const button = $("detail-reset-opf");
+  button.disabled = true;
+  try {
+    await updateBook(id, {
+      title: book.bookTitle || "",
+      author: book.bookCreator || "",
+      manualTitle: false,
+      manualAuthor: false
+    });
+    $("book-dialog").close();
+    await refresh();
+    await showBookDetails(id);
+    $("library-status").textContent = "已恢復使用 EPUB 內部書名與作者。";
+  } catch (error) {
+    $("library-status").textContent = "恢復 EPUB 內部資訊失敗：" + (error.message || String(error));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function saveDetails(event) {
   event.preventDefault();
   if (!state.dialogBookId) return;
@@ -545,6 +570,9 @@ $("view-list").addEventListener("click", () => { state.view = "list"; render(); 
 $("detail-form").addEventListener("submit", event => { saveDetails(event).catch(error => { $("library-status").textContent = "雲端保存失敗：" + error.message; }); });
 $("detail-cancel").addEventListener("click", () => $("book-dialog").close());
 $("detail-link-open").addEventListener("click", () => { showLinkCandidates().catch(error => { $("detail-link-status").hidden = false; $("detail-link-status").textContent = error.message || String(error); }); });
+$("detail-reset-opf").addEventListener("click", () => {
+  restoreEpubMetadata().catch(error => { $("library-status").textContent = "恢復 EPUB 內部資訊失敗：" + (error.message || String(error)); });
+});
 $("detail-bangumi-search").addEventListener("click", () => {
   searchBangumi().catch(error => { $("detail-bangumi-status").textContent = "搜尋失敗：" + (error.message || String(error)); });
 });
