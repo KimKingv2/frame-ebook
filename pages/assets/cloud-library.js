@@ -234,6 +234,10 @@ async function saveSourceSettings() {
   if (!state.serverProfiles[provider]?.configured) {
     throw new Error(PROVIDER_LABELS[provider] + " 尚未在 Cloudflare Pages Variables／Secrets 完成伺服器端設定。");
   }
+  if(state.activeProvider==="local") {
+    const local = await import("/assets/local-openlist.js?v=20261116-local-r2");
+    local.logoutLocalOpenList();
+  }
   state.localConnectionReady = false;
   await persistActiveProvider(provider);
   state.editProvider = provider;
@@ -1502,6 +1506,11 @@ function renderItems() {
 async function openCloudBook(item) {
   if (state.busy.has(item.path)) return;
   const scope = indexScope();
+  if(scope.provider==="local"&&!state.localConnectionReady) {
+    $("cloud-browser-status").textContent="請先在「連接與掃描」登入本地 OpenList，閱讀室開啟書籍時也需要重新登入一次。";
+    openCloudSettings();
+    return;
+  }
   if (!isWithinRoot(item.path, scope.rootPath)) {
     $("cloud-browser-status").textContent = "檔案路徑超出目前書庫根目錄。";
     return;
