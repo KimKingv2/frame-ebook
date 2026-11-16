@@ -158,21 +158,16 @@
         <span class="cloud-sync-icon">☁</span>
         <div><strong>雲端閱讀資料</strong><p id="cloud-sync-status">正在從 Cloudflare D1 載入這個 Access 帳戶的閱讀紀錄……</p></div>
       </div>
-      <form id="cloud-login-form" class="cloud-login-form">
-        <label for="cloud-password">私人閱讀密碼</label>
-        <input type="password" id="cloud-password" autocomplete="current-password" placeholder="輸入 Cloudflare 設定的密碼">
-        <button type="submit" class="primary-link">登入並同步</button>
-      </form>
-      <div id="cloud-account-actions" class="cloud-account-actions" hidden>
-        <span id="cloud-account-label">雲端統計已連線</span>
-        <button type="button" id="cloud-sync-now" class="quiet-button">立即同步</button>
-        <button type="button" id="cloud-logout" class="quiet-button">登出</button>
+      <div id="cloud-account-actions" class="cloud-account-actions">
+        <span id="cloud-account-label">正在確認 Cloudflare Access 身分……</span>
+        <button type="button" id="cloud-refresh" class="quiet-button">重新載入雲端統計</button>
       </div>
+
     </section>
 
     <p class="stats-privacy-note">閱讀時間只在閱讀室位於前景且視窗有焦點時累積；連續 5 分鐘沒有操作會暫停計時。每日閱讀日以累積滿 1 分鐘計算。所有閱讀時間都直接寫入 Cloudflare D1，依 Cloudflare Access 身分隔離並跨裝置同步；瀏覽器不保存閱讀紀錄副本。</p>
 
-    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>PRIVATE READING INSIGHTS</span><span>YOUR DATA · YOUR DEVICE</span></footer>
+    <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>PRIVATE READING INSIGHTS</span><span>YOUR DATA · YOUR CLOUD</span></footer>
   </main>
 
   <dialog id="cloud-manager-dialog" class="cloud-manager-dialog" aria-labelledby="cloud-manager-title">
