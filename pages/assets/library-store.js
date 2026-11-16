@@ -250,19 +250,9 @@ async function setReadingSetting(key, value) {
   return data.value;
 }
 
-function importBookFile() {
-  return Promise.reject(new Error("已停用本機匯入。請先在「連接與掃描」選擇 Alist／OpenList 來源並掃描索引。"));
-}
-function deleteBook() {
-  return Promise.reject(new Error("雲端書籍請在 Alist／OpenList 管理原始檔案，書架會在下次掃描後自動更新。"));
-}
-function getPendingReadingEvents() { return Promise.resolve([]); }
-function markReadingEventsSynced() { return Promise.resolve(0); }
-function openDatabase() { return Promise.reject(new Error("FRAME Reader 已改為雲端資料模式，不再使用瀏覽器 IndexedDB。")); }
 
 export {
-  openDatabase, importBookFile, getBook, updateBook, deleteBook, listBooks,
-  cloudBookId, saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
-  recordReadingEvent, getReadingEvents, getPendingReadingEvents,
-  markReadingEventsSynced, getReadingSetting, setReadingSetting
+  getBook, updateBook, listBooks, cloudBookId,
+  saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
+  recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting
 };
