@@ -89,7 +89,7 @@ fn get_profile_and_password(
     let profile = profiles.into_iter().find(|item| item.id == profile_id)
         .ok_or_else(|| "找不到這個 WebDAV 來源設定。".to_string())?;
     let password = keychain_entry(&profile.id)?.get_password()
-        .map_err(|_| "無法從 macOS 鑰匙圈讀取密碼，請重新新增這個 WebDAV 來源。".to_string())?;
+        .map_err(|error| format!("無法從 macOS 鑰匙圈讀取密碼（{error:?}）。如果這個來源是在 0.1.0 版建立，請在 0.1.1 版重新新增來源。"))?;
     Ok((profile, password))
 }
 
