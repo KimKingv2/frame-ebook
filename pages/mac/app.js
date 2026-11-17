@@ -1,11 +1,11 @@
-import * as store from "/assets/library-store.js?v=20261117-preview-shelf-r2";
-import { createMacShelf } from "/mac/shelf.js?v=20261117-preview-shelf-r2";
+import * as store from "/assets/library-store.js?v=20261117-preview-shelf-r3";
+import { createMacShelf } from "/mac/shelf.js?v=20261117-preview-shelf-r3";
 import { startMacSync } from "/mac/sync.js?v=20261117-sync-r1";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
 const logState = { entries: [] };
 let macSyncManager = null;
-const state = { profiles: [], profileId: "", unlockedProfileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
+const state = { profiles: [], profileId: "", unlockedProfileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, directoryReloadPending: false, lastStatus: "" };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
 
 function errorText(error) {
@@ -234,9 +234,11 @@ async function loadDirectory() {
     state.entries = Array.isArray(entries) ? entries : [];
     state.unlockedProfileId = requestedProfileId;
     renderEntries(state.entries);
-    await refreshShelf();
     appendLog("INFO", "目錄讀取成功", requestedPath + " · " + state.entries.length + " 個項目");
+    // Finish the WebDAV navigation immediately. Shelf refresh/prefetch must
+    // never keep the browser in its loading state or block subsequent clicks.
     setStatus("WebDAV 已連線 · " + profile.name);
+    void refreshShelf({ prefetch: false });
   } catch (error) {
     if (requestedProfileId === state.profileId && requestedPath === state.path) {
       setStatus(error.message || String(error), true);
