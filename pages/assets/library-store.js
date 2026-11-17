@@ -67,10 +67,28 @@ function localTransaction(db, stores, mode, execute) {
   });
 }
 function queueLocalChange(tx, change) {
-  tx.objectStore("sync_queue").add({
-    ...change,
-    queuedAt: Date.now()
-  });
+  const queue = tx.objectStore("sync_queue");
+  const type = String(change.type || "");
+  const bookId = String(change.book?.id || change.annotation?.bookId || "");
+  let coalesceKey = "";
+  if (type === "state" && bookId) coalesceKey = "state:" + bookId;
+  else if ((type === "annotation" || type === "annotation_delete") && bookId) {
+    const annotationId = String(change.annotation?.id || change.id || "");
+    if (annotationId) coalesceKey = "annotation:" + bookId + "::" + annotationId;
+  } else if (type === "preference" && change.key) coalesceKey = "preference:" + String(change.key);
+
+  const record = { ...change, ...(coalesceKey ? { coalesceKey } : {}), queuedAt: Date.now() };
+  if (!coalesceKey) {
+    queue.add(record);
+    return;
+  }
+  const request = queue.getAll();
+  request.onsuccess = () => {
+    const existing = (request.result || []).filter(item => item.coalesceKey === coalesceKey)
+      .sort((a,b) => Number(b.queueId)-Number(a.queueId))[0];
+    if (existing) queue.put({ ...record, queueId: existing.queueId });
+    else queue.add(record);
+  };
 }
 function descriptorForQueue(book) {
   const source = book?.cloudSource || book?.source || book || {};
@@ -274,15 +292,26 @@ async function getLocalSyncQueue(limit = 50) {
       .slice(0, Math.max(1, Math.min(100, Number(limit)||50))));
   });
 }
-async function acknowledgeLocalSyncQueue(queueIds) {
-  const ids = (Array.isArray(queueIds) ? queueIds : []).map(Number).filter(Number.isSafeInteger);
-  if (!ids.length) return 0;
+async function acknowledgeLocalSyncQueue(entries) {
+  const items = (Array.isArray(entries) ? entries : []).map(item =>
+    typeof item === "object" && item ? { queueId:Number(item.queueId), queuedAt:Number(item.queuedAt) } :
+      { queueId:Number(item), queuedAt:null }
+  ).filter(item => Number.isSafeInteger(item.queueId));
+  if (!items.length) return 0;
   const db = await openLocalDatabase();
   await localTransaction(db, ["sync_queue"], "readwrite", tx => {
     const queue = tx.objectStore("sync_queue");
-    ids.forEach(id => queue.delete(id));
+    items.forEach(item => {
+      const request = queue.get(item.queueId);
+      request.onsuccess = () => {
+        const current = request.result;
+        if (current && (item.queuedAt == null || Number(current.queuedAt) === item.queuedAt)) {
+          queue.delete(item.queueId);
+        }
+      };
+    });
   });
-  return ids.length;
+  return items.length;
 }
 async function getLocalSyncMeta(key, fallback = null) {
   const db = await openLocalDatabase();
@@ -297,14 +326,6 @@ async function setLocalSyncMeta(key, value) {
     tx.objectStore("sync_meta").put({ key:String(key), value });
   });
   return value;
-}
-function sourceProfileMap(profiles, sourceMap = {}) {
-  const result = {};
-  for (const [sourceId, provider] of Object.entries(sourceMap || {})) {
-    const profile = (profiles || []).find(item => ["vps","worker","mobile"].includes(provider));
-    if (profile) result[sourceId] = String(profile.id);
-  }
-  return result;
 }
 function buildLocalDescriptor(book) {
   const source = book?.cloudSource || {};
@@ -468,9 +489,19 @@ async function mergeCloudSnapshot(snapshot) {
     }
   }
 
-  await localTransaction(db,["states","annotations","events","preferences","sync_queue","sync_meta"],"readwrite",tx=>{
-    const states=tx.objectStore("states"),annotations=tx.objectStore("annotations"),events=tx.objectStore("events"),preferences=tx.objectStore("preferences");
-    stateWrites.forEach(item=>states.put(item));
+  await localTransaction(db,["books","states","annotations","events","preferences","sync_queue","sync_meta"],"readwrite",tx=>{
+    const books=tx.objectStore("books"),states=tx.objectStore("states"),annotations=tx.objectStore("annotations"),events=tx.objectStore("events"),preferences=tx.objectStore("preferences");
+    stateWrites.forEach(item=>{
+      states.put(item);
+      const request=books.get(String(item.id));
+      request.onsuccess=()=>{
+        const book=request.result;
+        if(!book)return;
+        const state=item.state||{};
+        const updated={...book,...(state.metadata||{}),progress:state.progress||book.progress,appearance:state.appearance||book.appearance,lastOpenedAt:Number(state.lastOpenedAt)||book.lastOpenedAt||0};
+        books.put(updated);remember(updated);
+      };
+    });
     annotationWrites.forEach(item=>annotations.put(item));
     eventWrites.forEach(item=>events.put(item));
     preferenceWrites.forEach(item=>preferences.put(item));

@@ -26,7 +26,6 @@ function parseNativeResponse(raw) {
 }
 
 export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog = () => {} } = {}) {
-  if (window.__FRAME_MAC_SYNC_STARTED) return window.__FRAME_MAC_SYNC_MANAGER || null;
   if (!window.FRAME_LOCAL_APP || !window.__TAURI__?.core?.invoke) return null;
 
   let inFlight = null;
@@ -74,7 +73,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
       const query = new URLSearchParams({ source_id: sourceId });
       const result = await request("GET", API.catalog + "?" + query.toString());
       if (result.truncated) {
-        onLog("WARN", "雲端書架索引超過單次回傳上限", "來源：" + sourceId + "；最多同步 10,000 筆，請縮小 Cloudflare 書庫根目錄或分批處理。");
+        throw new Error("Cloudflare 書架索引超過 10,000 筆。為避免只匯入部分書架，已停止本次更新；請縮小雲端書庫根目錄後再重新整理。");
       }
       imported += await store.upsertSyncedCatalogItems(result.items || [], [profile]);
       await store.setLocalSyncMeta(metaKey, Date.now());
@@ -92,12 +91,12 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
     if (!queue.length) return 0;
     const bookMap = new Map((snapshot.books || []).map(book => [String(book.id), book]));
     const changes = [];
-    const queueIds = [];
+    const queueAcks = [];
     for (const item of queue) {
       const type = String(item.type || "");
       if (type === "event") {
         changes.push({ type, event: item.event });
-        queueIds.push(item.queueId);
+        queueAcks.push({ queueId:item.queueId, queuedAt:item.queuedAt });
         continue;
       }
       if (type === "preference") {
@@ -133,7 +132,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
     }
     if (!changes.length) return 0;
     const result = await request("POST", API.push, { changes });
-    await store.acknowledgeLocalSyncQueue(queueIds);
+    await store.acknowledgeLocalSyncQueue(queueAcks);
     onLog("INFO", "本機變更已推送至 Cloudflare", "處理 " + changes.length + " 筆；清除待同步佇列 " + queueIds.length + " 筆");
     return Number(result.accepted) || changes.length;
   }
