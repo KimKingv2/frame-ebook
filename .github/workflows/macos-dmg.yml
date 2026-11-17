@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - macos-desktop
+      - feat/cloud-sync-0.3.0
     paths:
       - "macos/**"
       - "pages/mac/**"
