@@ -1,0 +1,61 @@
+name: Build FRAME Ebook macOS DMG
+
+on:
+  push:
+    branches:
+      - macos-desktop
+    paths:
+      - "macos/**"
+      - "pages/mac/**"
+      - "pages/epub-lab/index.html"
+      - "pages/assets/library-store.js"
+      - "pages/assets/cloud-book-source.js"
+      - "pages/assets/epub-lab-comics-20261112.js"
+      - "pages/vendor/foliate-js/**"
+      - "pages/vendor/jszip/**"
+      - ".github/workflows/macos-dmg.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frame-ebook-macos
+  cancel-in-progress: true
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install universal macOS Rust targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install frontend tooling
+        working-directory: macos
+        run: npm install --no-audit --no-fund
+
+      - name: Build universal DMG
+        working-directory: macos
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm run tauri:build -- --target universal-apple-darwin
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-ebook-macos-universal-dmg
+          path: macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
