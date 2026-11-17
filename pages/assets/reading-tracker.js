@@ -1,4 +1,4 @@
-import { recordReadingEvent, localDayKey } from "/assets/library-store.js?v=20261116-cloud-only-r2";
+import { recordReadingEvent, localDayKey } from "/assets/library-store.js?v=20261117-filename-id-r2";
 
 const HEARTBEAT_MS = 30000;
 const IDLE_LIMIT_MS = 5 * 60 * 1000;
