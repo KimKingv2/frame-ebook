@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111018">
+  <title>FRAME Ebook · Mac</title>
+  <script>window.FRAME_LOCAL_APP = true;</script>
+  <link rel="stylesheet" href="/mac/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/mac/index.html"><span class="brand-mark">F</span><span>FRAME <b>EBOOK</b><small>LOCAL EDITION</small></span></a>
+      <div class="topbar-right">
+        <span id="connection-status" class="status-pill"><i></i> 本機就緒</span>
+        <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
+        <button id="add-profile" class="button primary" type="button">＋ 新增 WebDAV</button>
+      </div>
+    </header>
+    <main class="main">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">YOUR PRIVATE READING SPACE</p>
+          <h1>書籍在遠端，<em>閱讀留在本機。</em></h1>
+          <p>獨立 macOS 閱讀器。透過原生 WebDAV 連接 OpenList、NAS 或其他 WebDAV 服務，閱讀進度、書籤與註記保存在這台 Mac，不經 Cloudflare。</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true"><span>FRAME</span><b>READ<br>LOCAL</b></div>
+      </section>
+      <nav class="tabs" aria-label="主要功能">
+        <button class="tab is-active" data-tab="shelf" type="button">我的書架</button>
+        <button class="tab" data-tab="browser" type="button">WebDAV 檔案</button>
+        <span class="tab-note">MACOS · NATIVE NETWORK</span>
+      </nav>
+      <section id="shelf-panel" class="panel">
+        <div class="panel-heading">
+          <div><p class="section-kicker">LOCAL BOOKSHELF</p><h2>我的書架</h2><p>已加入本機書架的 EPUB 與 CBZ。閱讀進度、書籤及註記僅保存在此 Mac。</p></div>
+          <button id="go-browser" class="button subtle" type="button">瀏覽 WebDAV ↗</button>
+        </div>
+        <div id="shelf-grid" class="book-grid"></div>
+        <div id="shelf-empty" class="empty-state">
+          <div class="empty-icon">▤</div><h3>書架還是空的</h3>
+          <p>連接 WebDAV 後，瀏覽遠端資料夾，選擇 EPUB 或 CBZ 加入書架。</p>
+          <button class="button primary" data-open-browser type="button">開始瀏覽</button>
+        </div>
+      </section>
+      <section id="browser-panel" class="panel" hidden>
+        <div class="panel-heading browser-heading">
+          <div><p class="section-kicker">WEBDAV EXPLORER</p><h2>檔案來源</h2><p>目錄清單使用原生 PROPFIND；點選 EPUB／CBZ 即可加入書架並開始閱讀。</p></div>
+          <div class="browser-actions"><button id="parent-folder" class="button subtle" type="button">← 上一層</button><button id="refresh-folder" class="button subtle" type="button">重新整理</button><button id="add-folder-books" class="button primary" type="button">將本頁書籍加入書架</button></div>
+        </div>
+        <div class="path-bar"><span class="path-label">目前位置</span><code id="current-path">/</code><span id="folder-count" class="path-count"></span></div>
+        <div id="file-list" class="file-list"></div>
+        <div id="browser-empty" class="empty-state compact" hidden><div class="empty-icon">⌁</div><h3>這個資料夾沒有可顯示的檔案</h3><p>可進入子資料夾，或確認 WebDAV 根目錄是否設定正確。</p></div>
+      </section>
+    </main>
+    <footer><span>FRAME EBOOK · LOCAL EDITION</span><span>NO CLOUDFLARE · NO D1 · YOUR DATA STAYS ON THIS MAC</span></footer>
+  </div>
+  <dialog id="profile-dialog" class="profile-dialog">
+    <form id="profile-form">
+      <div class="dialog-head"><div><p class="section-kicker">NATIVE WEBDAV CONNECTION</p><h2>新增檔案來源</h2></div><button id="close-profile" class="dialog-close" type="button" aria-label="關閉">×</button></div>
+      <p class="dialog-intro">輸入 WebDAV 服務地址及唯讀帳號。密碼會儲存在 macOS 鑰匙圈，不會寫入網頁資料庫。</p>
+      <label>來源名稱<input id="profile-name" required maxlength="48" placeholder="我的 OpenList"></label>
+      <label>WebDAV 地址<input id="profile-url" required type="url" placeholder="https://example.com/dav/"></label>
+      <label>帳號<input id="profile-username" required autocomplete="username" placeholder="WebDAV 使用者名稱"></label>
+      <label>密碼<input id="profile-password" required type="password" autocomplete="new-password" placeholder="WebDAV 密碼"></label>
+      <div id="profile-error" class="form-error" role="status"></div>
+      <div class="dialog-actions"><button id="cancel-profile" class="button subtle" type="button">取消</button><button id="save-profile" class="button primary" type="submit">儲存並測試連線</button></div>
+    </form>
+  </dialog>
+  <script type="module" src="/mac/app.js"></script>
+</body>
+</html>
