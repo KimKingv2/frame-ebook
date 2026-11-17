@@ -76,6 +76,13 @@ function extension(path) {
   const match = String(path || "").match(/\.([^.\/]+)$/);
   return match ? match[1].toLowerCase() : "";
 }
+function libraryForEntry(entry) {
+  const ext = extension(entry?.path);
+  if (ext === "cbz") return "comics";
+  const folders = String(entry?.path || "").replace(/\\/g, "/").split("/").slice(0, -1);
+  const comicFolder = /(?:^|[\s._-])(?:comics?|manga|manhua|manhwa)(?:$|[\s._-])|漫畫|漫画|動漫|动漫|圖像小說|图像小说/i;
+  return folders.some(name => comicFolder.test(name)) ? "comics" : "books";
+}
 function baseTitle(name) { return String(name || "").replace(/\.(epub|cbz)$/i, ""); }
 function selectedProfile() { return state.profiles.find(item => item.id === state.profileId) || null; }
 function profileField(profile, camelName, snakeName) {
@@ -150,7 +157,7 @@ async function addBook(entry, openAfter = false, refresh = true, profileOverride
   if (!profile || !entry || entry.isDir) return;
   const ext = extension(entry.path);
   if (!BOOK_EXTENSIONS.has(ext)) return;
-  const library = ext === "cbz" ? "comics" : "books";
+  const library = libraryForEntry(entry);
   const scope = { provider: "webdav", profileId: profile.id, library };
   appendLog("INFO", "準備加入書籍", entry.path);
   const [id, sourceId] = await Promise.all([
@@ -184,7 +191,7 @@ function shouldSkipScanFolder(entry) {
 }
 function makeScannedBookRecord(entry, profile, sourceId) {
   const ext = extension(entry.path);
-  const library = ext === "cbz" ? "comics" : "books";
+  const library = libraryForEntry(entry);
   const folderPath = parentPath(entry.path);
   const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
   return store.cloudBookId({ provider:"webdav", profileId:profile.id, library }, entry.path).then(id => ({
