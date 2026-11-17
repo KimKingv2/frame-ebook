@@ -1,3 +1,24 @@
+function makeWebDavMemoryFile(raw, record) {
+  let bytes;
+  if (raw instanceof ArrayBuffer) {
+    bytes = new Uint8Array(raw);
+  } else if (ArrayBuffer.isView(raw)) {
+    bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  } else {
+    throw new Error("WebDAV EPUB 記憶體通道沒有回傳二進位資料。");
+  }
+  if (!bytes.byteLength) throw new Error("WebDAV 回傳的 EPUB 檔案是空的。");
+  const fileName = String(record.fileName || "book.epub");
+  return {
+    name: fileName,
+    type: "application/epub+zip",
+    size: bytes.byteLength,
+    lastModified: Number(record.lastModified) || Date.now(),
+    frameDeliveryMode: "webdav-native-ram",
+    frameMemoryBytes: bytes
+  };
+}
+
 function makeFile(blob, record, deliveryMode) {
   const fileName = String(record.fileName || "book." + String(record.format || "epub").toLowerCase());
   const mime = String(record.format || "").toUpperCase() === "CBZ"
@@ -79,7 +100,7 @@ export async function fetchCloudBookFile(record) {
   const source = record.cloudSource;
   if (String(source.provider || "") === "webdav") {
     const tauri = window.__TAURI__;
-    if (!tauri || !tauri.core || !tauri.core.invoke || !tauri.core.convertFileSrc) {
+    if (!tauri || !tauri.core || !tauri.core.invoke) {
       throw new Error("Mac 原生 WebDAV 通道尚未啟動，請重新開啟 FRAME Ebook。");
     }
     const profileId = String(source.profileId || "");
@@ -96,20 +117,11 @@ export async function fetchCloudBookFile(record) {
       return makeWebDavRangeFile(record, profileId, Number(size));
     }
 
-    const downloaded = await tauri.core.invoke("webdav_download_file", {
+    const raw = await tauri.core.invoke("webdav_download_file_memory", {
       profileId,
       path: String(source.path || "")
     });
-    if (!downloaded || !downloaded.path) throw new Error("WebDAV 沒有提供可讀取的本機暫存檔。");
-    try {
-      const localUrl = tauri.core.convertFileSrc(downloaded.path);
-      const response = await fetch(localUrl, { cache: "no-store" });
-      if (!response.ok) throw new Error("讀取本機暫存書檔失敗（HTTP " + response.status + "）。");
-      const blob = await response.blob();
-      return makeFile(blob, record, downloaded.redirected ? "webdav-302-direct" : "webdav-native");
-    } finally {
-      try { await tauri.core.invoke("delete_cached_file", { path: downloaded.path }); } catch (_) {}
-    }
+    return makeWebDavMemoryFile(raw, record);
   }
   if (String(source.provider || "") === "local") {
     const local = await import("/assets/local-openlist.js?v=20261116-local-r2");

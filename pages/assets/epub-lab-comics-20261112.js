@@ -20,7 +20,7 @@
   var annotationBusy = false;
   var libraryStorePromise = import('/assets/library-store.js?v=20261116-shared-local-r2');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
-  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261116-comic-epub-redirect-r3');
+  var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261117-webdav-ram-r1');
   var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
   var THEMES = {
     paper: { background: '#fffefa', foreground: '#29262d', colorScheme: 'light' },
@@ -1392,7 +1392,10 @@
     if (isCbz) {
       await import('/vendor/foliate-js/view.js');
     } else {
-      var zip = await window.JSZip.loadAsync(source, { checkCRC32: false });
+      var archiveData = source && source.frameMemoryBytes instanceof Uint8Array
+        ? source.frameMemoryBytes
+        : source;
+      var zip = await window.JSZip.loadAsync(archiveData, { checkCRC32: false });
       var epubModule = await import('/vendor/foliate-js/epub.js');
       parsedBook = await new epubModule.EPUB(makeLoader(zip)).init();
     }

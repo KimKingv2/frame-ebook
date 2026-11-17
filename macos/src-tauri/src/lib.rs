@@ -570,6 +570,87 @@ async fn webdav_download_file(
     })
 }
 
+
+// Download an EPUB archive into process memory and return its bytes over Tauri IPC.
+// The full book is never written to the app cache directory.
+#[tauri::command(rename_all = "camelCase")]
+async fn webdav_download_file_memory(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    profile_id: String,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    const MAX_IN_MEMORY_BOOK_SIZE: u64 = 1024 * 1024 * 1024;
+
+    let (profile, password) = get_profile_and_password(&app, &state, &profile_id)?;
+    let mut current = resource_url(&profile, &path, false)?;
+    let client = make_client()?;
+    let mut response = None;
+
+    for hop in 0..=6 {
+        let mut request = client.get(current.clone());
+        if hop == 0 {
+            request = request.basic_auth(&profile.username, Some(password.clone()));
+        }
+        let result = request.send().await
+            .map_err(|e| format!("WebDAV EPUB 記憶體讀取失敗：{e}"))?;
+        if result.status().is_redirection() {
+            let location = result.headers().get(header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "WebDAV EPUB 302 缺少 Location。".to_string())?;
+            let next = current.join(location)
+                .map_err(|e| format!("WebDAV EPUB 302 目的網址無效：{e}"))?;
+            validate_redirect(&next)?;
+            current = next;
+            continue;
+        }
+        if result.status() == StatusCode::UNAUTHORIZED {
+            return Err("WebDAV 驗證失敗，請檢查帳號與密碼。".into());
+        }
+        if !result.status().is_success() {
+            return Err(format!("WebDAV EPUB 讀取失敗（HTTP {}）。", result.status()));
+        }
+        response = Some(result);
+        break;
+    }
+
+    let response = response
+        .ok_or_else(|| "WebDAV EPUB 302 跳轉次數過多，已停止請求。".to_string())?;
+    let expected_size = response.content_length().unwrap_or(0);
+    if expected_size > MAX_IN_MEMORY_BOOK_SIZE {
+        return Err(format!(
+            "這本 EPUB 大小約 {:.1} GiB，超過目前 RAM 載入上限 1 GiB。為避免記憶體不足，已停止讀取。",
+            expected_size as f64 / 1024.0 / 1024.0 / 1024.0
+        ));
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut bytes = Vec::<u8>::new();
+    let mut received = 0u64;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("讀取 WebDAV EPUB 資料失敗：{e}"))?;
+        received = received.checked_add(chunk.len() as u64)
+            .ok_or_else(|| "EPUB 檔案大小超出允許範圍。".to_string())?;
+        if received > MAX_IN_MEMORY_BOOK_SIZE {
+            return Err("這本 EPUB 超過 RAM 載入上限 1 GiB，為避免記憶體不足已停止讀取。".into());
+        }
+        bytes.try_reserve(chunk.len())
+            .map_err(|e| format!("RAM 不足，無法繼續載入 EPUB：{e}"))?;
+        bytes.extend_from_slice(&chunk);
+    }
+
+    if expected_size > 0 && received != expected_size {
+        return Err(format!(
+            "EPUB 讀取不完整：預期 {expected_size} bytes，實際 {received} bytes。"
+        ));
+    }
+    if bytes.is_empty() {
+        return Err("WebDAV 回傳的 EPUB 檔案是空的。".into());
+    }
+
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 #[tauri::command(rename_all = "camelCase")]
 async fn delete_cached_file(app: AppHandle, path: String) -> Result<(), String> {
     let cache_dir = app_cache_dir(&app)?;
@@ -602,6 +683,7 @@ pub fn run() {
             webdav_get_file_size,
             webdav_read_range,
             webdav_download_file,
+            webdav_download_file_memory,
             delete_cached_file
         ])
         .run(tauri::generate_context!())
