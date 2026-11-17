@@ -30,7 +30,11 @@ function zipPath(value) {
   }
   return parts.join("/");
 }
-function relativeZipPath(base, href) { return zipPath((base ? base + "/" : "") + String(href || "")); }
+function relativeZipPath(base, href) {
+  let value = String(href || "").split(/[?#]/,1)[0];
+  try { value = decodeURIComponent(value); } catch (_) {}
+  return zipPath(value.startsWith("/") ? value : (base ? base + "/" : "") + value);
+}
 function mimeFromName(name) {
   const ext = String(name || "").split(".").pop().toLowerCase();
   return ({ jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif",bmp:"image/bmp",avif:"image/avif" })[ext] || "image/jpeg";
@@ -85,72 +89,132 @@ class NativeRangeReader {
     return stream;
   }
 }
-async function findEpubCover(entries) {
-  const byName = new Map(entries.filter(entry => !entry.directory).map(entry => [zipPath(entry.filename), entry]));
-  const container = byName.get("META-INF/container.xml");
-  if (!container) return null;
-  const containerText = await container.getData(new TextWriter("utf-8"));
-  const containerXml = new DOMParser().parseFromString(String(containerText || ""), "application/xml");
-  if (containerXml.getElementsByTagName("parsererror").length) return null;
-  const rootfile = containerXml.getElementsByTagName("rootfile")[0];
-  const opfPath = zipPath(rootfile?.getAttribute("full-path") || "");
-  const opfEntry = opfPath ? byName.get(opfPath) : null;
-  if (!opfEntry) return null;
-  const opfText = await opfEntry.getData(new TextWriter("utf-8"));
-  const opfXml = new DOMParser().parseFromString(String(opfText || ""), "application/xml");
-  if (opfXml.getElementsByTagName("parsererror").length) return null;
-  const manifest = Array.from(opfXml.getElementsByTagName("item"));
-  const metas = Array.from(opfXml.getElementsByTagName("meta"));
-  let coverId = "";
-  for (const meta of metas) {
-    const name = String(meta.getAttribute("name") || "").toLowerCase();
-    const property = String(meta.getAttribute("property") || "").toLowerCase();
-    if (name === "cover" || property === "cover-image") {
-      coverId = String(meta.getAttribute("content") || "").trim();
-      if (coverId) break;
+async function findEpubCover(zipEntries,onEvent=()=>{}) {
+  const byName=new Map(zipEntries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
+  const container=byName.get("META-INF/container.xml");
+  if(!container) {
+    onEvent("EPUB 封面解析：ZIP 中沒有 META-INF/container.xml。","WARN");
+    return null;
+  }
+  const containerStarted=performance.now();
+  onEvent("EPUB 封面解析：container.xml 解壓開始；壓縮 "+Number(container.compressedSize||0)+" bytes，原始 "+Number(container.uncompressedSize||0)+" bytes。");
+  const containerText=await container.getData(new TextWriter("utf-8"));
+  onEvent("EPUB 封面解析：container.xml 解壓完成；文字 "+String(containerText||"").length+" 字元；耗時 "+Math.round(performance.now()-containerStarted)+" ms。");
+  const containerXml=new DOMParser().parseFromString(String(containerText),"application/xml");
+  if(containerXml.getElementsByTagName("parsererror").length) {
+    onEvent("EPUB 封面解析：container.xml XML 格式錯誤。","WARN");
+    return null;
+  }
+  const rootfile=containerXml.getElementsByTagName("rootfile")[0];
+  const opfPath=zipPath(rootfile?.getAttribute("full-path")||"");
+  if(!opfPath) {
+    onEvent("EPUB 封面解析：container.xml 沒有有效 rootfile 路徑。","WARN");
+    return null;
+  }
+  onEvent("EPUB 封面解析：找到 OPF 路徑 "+opfPath+"。");
+  const opfEntry=byName.get(opfPath);
+  if(!opfEntry) {
+    onEvent("EPUB 封面解析：ZIP 中找不到 OPF 項目 "+opfPath+"。","WARN");
+    return null;
+  }
+  const opfStarted=performance.now();
+  onEvent("EPUB 封面解析：OPF 解壓開始；壓縮 "+Number(opfEntry.compressedSize||0)+" bytes，原始 "+Number(opfEntry.uncompressedSize||0)+" bytes。");
+  const opfText=await opfEntry.getData(new TextWriter("utf-8"));
+  onEvent("EPUB 封面解析：OPF 解壓完成；文字 "+String(opfText||"").length+" 字元；耗時 "+Math.round(performance.now()-opfStarted)+" ms。");
+  const opfXml=new DOMParser().parseFromString(String(opfText),"application/xml");
+  if(opfXml.getElementsByTagName("parsererror").length) {
+    onEvent("EPUB 封面解析：OPF XML 格式錯誤。","WARN");
+    return null;
+  }
+  const manifest=Array.from(opfXml.getElementsByTagName("item"));
+  const metaItems=Array.from(opfXml.getElementsByTagName("meta"));
+  let coverId="";
+  for(const meta of metaItems) {
+    const name=String(meta.getAttribute("name")||"").toLowerCase();
+    const property=String(meta.getAttribute("property")||"").toLowerCase();
+    if(name==="cover"||property==="cover-image") {
+      coverId=String(meta.getAttribute("content")||"").trim();
+      if(coverId)break;
     }
   }
-  let item = coverId ? manifest.find(node => node.getAttribute("id") === coverId) : null;
-  if (!item) item = manifest.find(node => (node.getAttribute("properties") || "").split(/\s+/).includes("cover-image"));
-  if (!item) item = manifest.find(node => /^image\//i.test(node.getAttribute("media-type") || "") && /cover|front/i.test(node.getAttribute("href") || ""));
-  const base = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/")) : "";
-  const coverName = item ? relativeZipPath(base, item.getAttribute("href")) : "";
-  const entry = coverName ? byName.get(coverName) : null;
-  if (entry) {
-    const mime = String(item.getAttribute("media-type") || mimeFromName(coverName)).toLowerCase();
-    if (mime.startsWith("image/") && mime !== "image/svg+xml") return { entry, mime };
+  let coverItem=coverId?manifest.find(item=>item.getAttribute("id")===coverId):null;
+  if(!coverItem)coverItem=manifest.find(item=>(item.getAttribute("properties")||"").split(/\s+/).includes("cover-image"));
+  if(!coverItem)coverItem=manifest.find(item=>/^image\//i.test(item.getAttribute("media-type")||"")&&/cover|front/i.test(item.getAttribute("href")||""));
+  if(!coverItem) {
+    onEvent("EPUB 封面解析：OPF 沒有指定封面 metadata；依照原版規則不會任意挑選內文圖片。","WARN");
+    return null;
   }
-  const images = entries.filter(entry => !entry.directory && IMAGE_EXT.test(entry.filename) &&
-    !/(^|\/)(__MACOSX|\.AppleDouble)\//i.test(entry.filename) && !/(^|\/)\._/.test(entry.filename));
-  images.sort((a,b) => natural(a.filename,b.filename));
-  const fallback = images.find(entry => /(^|[/_-])(cover|front)([/_.-]|$)/i.test(entry.filename)) || images[0];
-  return fallback ? { entry:fallback, mime:mimeFromName(fallback.filename) } : null;
+  const base=opfPath.includes("/")?opfPath.slice(0,opfPath.lastIndexOf("/")):"";
+  const coverPath=relativeZipPath(base,coverItem.getAttribute("href"));
+  const entry=byName.get(coverPath);
+  if(!entry) {
+    onEvent("EPUB 封面解析：ZIP 中找不到封面圖片 "+coverPath+"。","WARN");
+    return null;
+  }
+  const mime=String(coverItem.getAttribute("media-type")||mimeFromName(coverPath)||"").toLowerCase();
+  if(!mime.startsWith("image/")||mime==="image/svg+xml") {
+    onEvent("EPUB 封面解析：封面項目不是可用的點陣圖片。","WARN");
+    return null;
+  }
+  return {entry,mime};
 }
-function findCbzCover(entries) {
-  const images = entries.filter(entry => !entry.directory && IMAGE_EXT.test(entry.filename) &&
-    !/(^|\/)(__MACOSX|\.AppleDouble)\//i.test(entry.filename) && !/(^|\/)\._/.test(entry.filename));
-  images.sort((a,b) => natural(a.filename,b.filename));
-  const cover = images.find(entry => /(^|[/_-])(cover|front)([/_.-]|$)/i.test(entry.filename)) || images[0];
-  return cover ? { entry:cover, mime:mimeFromName(cover.filename) } : null;
+async function findCbzCover(zipEntries) {
+  const candidates=zipEntries.filter(entry=>!entry.directory&&
+    /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(entry.filename)&&
+    !/(^|\/)(__MACOSX|\.AppleDouble)\//i.test(entry.filename)&&
+    !/(^|\/)\._/.test(entry.filename));
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>a.filename.localeCompare(b.filename,undefined,{numeric:true,sensitivity:"base"}));
+  const selected=candidates.find(entry=>/(^|[/_-])(cover|front)([/_.-]|$)/i.test(entry.filename))||candidates[0];
+  return {entry:selected,mime:mimeFromName(selected.filename)||"image/jpeg"};
 }
 async function makeThumbnail(blob) {
-  if (!(blob instanceof Blob) || !blob.size || blob.size > 15 * 1024 * 1024) return null;
+  if(!(blob instanceof Blob)||!blob.size||blob.size>15*1024*1024)throw new Error("原始封面不存在或超過 15 MiB。");
   let bitmap;
   try {
-    bitmap = await createImageBitmap(blob);
-    const width = bitmap.width || bitmap.displayWidth, height = bitmap.height || bitmap.displayHeight;
-    if (!width || !height || width * height > 150000000) return null;
-    const scale = Math.min(1, 480 / Math.max(width,height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    const context = canvas.getContext("2d", { alpha:false });
-    if (!context) return null;
+    if(typeof createImageBitmap==="function")bitmap=await createImageBitmap(blob);
+    else {
+      const url=URL.createObjectURL(blob);
+      try {
+        const image=new Image();
+        image.src=url;
+        await image.decode();
+        const canvas=document.createElement("canvas");
+        const scale=Math.min(1,512/Math.max(image.naturalWidth,image.naturalHeight));
+        canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+        canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+        canvas.getContext("2d",{alpha:false}).drawImage(image,0,0,canvas.width,canvas.height);
+        let output=await new Promise(resolve=>canvas.toBlob(resolve,"image/webp",0.84));
+        let mime="image/webp";
+        if(!output){output=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.86));mime="image/jpeg";}
+        if(output)return {blob:output,mime};
+      } finally { URL.revokeObjectURL(url); }
+      throw new Error("封面圖片無法轉換。");
+    }
+  } catch(error) { throw new Error("封面圖片解碼失敗："+(error.message||error)); }
+  try {
+    const width=bitmap.width||bitmap.displayWidth;
+    const height=bitmap.height||bitmap.displayHeight;
+    if(!width||!height||width*height>150000000)throw new Error("封面圖片尺寸異常。");
+    const scale=Math.min(1,512/Math.max(width,height));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(width*scale));
+    canvas.height=Math.max(1,Math.round(height*scale));
+    const context=canvas.getContext("2d",{alpha:false});
+    if(!context)throw new Error("無法建立封面縮圖畫布。");
     context.drawImage(bitmap,0,0,canvas.width,canvas.height);
-    let output = await new Promise(resolve => canvas.toBlob(resolve,"image/webp",0.82));
-    if (!output || !output.size || output.size > COVER_LIMIT) output = await new Promise(resolve => canvas.toBlob(resolve,"image/jpeg",0.82));
-    return output && output.size && output.size <= COVER_LIMIT ? output : null;
-  } finally { try { bitmap?.close(); } catch (_) {} }
+    let output=await new Promise(resolve=>canvas.toBlob(resolve,"image/webp",0.84));
+    let mime="image/webp";
+    if(!output) {
+      output=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.86));
+      mime="image/jpeg";
+    }
+    if(!output||!output.size)throw new Error("瀏覽器無法產生封面縮圖。");
+    if(output.size>2*1024*1024)throw new Error("封面縮圖仍超過 2 MiB。");
+    return {blob:output,mime};
+  } finally {
+    try { bitmap.close(); } catch (_) {}
+  }
 }
 
 export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, getProfileId, isProfileUnlocked, filterBooks }) {
@@ -357,14 +421,17 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
       const reader=new NativeRangeReader(profileId,path,size,invoke);
       zip=new ZipReader(reader,{useWebWorkers:false,useCompressionStream:true});
       const entries=await zip.getEntries();
-      const found=format==="CBZ"?findCbzCover(entries):await findEpubCover(entries);
-      if(!found){appendLog("WARN","封面索引未找到可用圖片",path+" · Range "+reader.rangeCount+" 次");return false;}
+      const entries=await zip.getEntries();
+      appendLog("INFO","ZIP 中央目錄解析完成",entries.length+" 個項目；耗時 "+Math.round(performance.now()-started)+" ms");
+      const found=format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries,message=>appendLog("INFO",message));
+      if(!found){appendLog("WARN","封面解析完成：沒有找到可用圖片",path+" · Range "+reader.rangeCount+" 次／"+sizeLabel(reader.bytesRead));return false;}
+      appendLog("INFO","封面圖片讀取開始",found.entry.filename+"；壓縮 "+Number(found.entry.compressedSize||0)+" bytes，原始 "+Number(found.entry.uncompressedSize||0)+" bytes。");
       const original=await found.entry.getData(new BlobWriter(found.mime));
+      appendLog("INFO","封面圖片解壓完成",sizeLabel(original.size));
       const thumbnail=await makeThumbnail(original);
-      if(!thumbnail){appendLog("WARN","封面縮圖略過",path+" · 原始封面 "+sizeLabel(original.size));return false;}
-      await store.saveLocalBookCover(book.id,thumbnail);
+      await store.saveLocalBookCover(book.id,thumbnail.blob);
       appendLog("INFO","書架封面已預先擷取",path+"\nRange 次數："+reader.rangeCount+"\nRange 實收："+sizeLabel(reader.bytesRead)+
-        "\n縮圖："+sizeLabel(thumbnail.size)+"\n耗時："+Math.round(performance.now()-started)+" ms；原始書檔未下載");
+        "\n縮圖："+sizeLabel(thumbnail.blob.size)+"\n耗時："+Math.round(performance.now()-started)+" ms；原始書檔未下載");
       return true;
     }catch(error){appendLog("WARN","書架封面擷取失敗",path+"\n"+(error.message||String(error)));return false;}
     finally{try{await zip?.close?.();}catch(_){}}
