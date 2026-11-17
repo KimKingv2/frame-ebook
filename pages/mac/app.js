@@ -1,9 +1,9 @@
 import * as store from "/assets/library-store.js?v=20261117-mac-cover-r1";
+import { createMacShelf } from "/mac/shelf.js?v=20261117-folder-shelf-r2";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
 const logState = { entries: [] };
-const shelfCoverUrls = [];
-const state = { profiles: [], profileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
+const state = { profiles: [], profileId: "", unlockedProfileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
 
 function errorText(error) {
@@ -121,75 +121,13 @@ function formatSize(value) {
   if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
   return (bytes / 1024 / 1024).toFixed(bytes >= 1024 * 1024 * 1024 ? 2 : 1) + (bytes >= 1024 * 1024 * 1024 ? " GB" : " MB");
 }
-function clearShelfCoverUrls() {
-  shelfCoverUrls.forEach(url => URL.revokeObjectURL(url));
-  shelfCoverUrls.length = 0;
-}
-function makeShelfFallback(book) {
-  const fallback = document.createElement("div"); fallback.className = "book-cover-fallback";
-  const top = document.createElement("span"); top.className = "book-cover-fallback-top"; top.textContent = "FRAME READER";
-  const title = document.createElement("strong"); title.textContent = book.title || book.fileName || "未命名書籍";
-  const bottom = document.createElement("small"); bottom.textContent =
-    String(book.format || "").toUpperCase() === "CBZ" ? "COMIC EDITION" : "READING EDITION";
-  fallback.append(top, title, bottom);
-  return fallback;
-}
-function renderShelf(books) {
-  const grid = $("shelf-grid");
-  clearShelfCoverUrls();
-  grid.replaceChildren();
-  $("shelf-empty").hidden = books.length > 0;
-  books.forEach(book => {
-    const card = document.createElement("article"); card.className = "book-card";
-    const cover = document.createElement("div"); cover.className = "book-cover";
-    cover.setAttribute("role", "button"); cover.setAttribute("tabindex", "0");
-    cover.setAttribute("aria-label", "閱讀 " + (book.title || book.fileName || "未命名書籍"));
-    const openCover = () => openBook(book);
-    cover.addEventListener("click", openCover);
-    cover.addEventListener("keydown", event => {
-      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCover(); }
-    });
-    if (book.coverBlob instanceof Blob && book.coverBlob.size) {
-      const image = document.createElement("img");
-      image.className = "book-cover-image";
-      image.src = URL.createObjectURL(book.coverBlob);
-      shelfCoverUrls.push(image.src);
-      image.alt = (book.title || book.fileName || "書籍") + " 封面";
-      image.loading = "lazy"; image.decoding = "async";
-      image.addEventListener("error", () => { image.remove(); cover.prepend(makeShelfFallback(book)); }, { once: true });
-      cover.appendChild(image);
-    } else {
-      cover.appendChild(makeShelfFallback(book));
-    }
-    const badge = document.createElement("span"); badge.className = "book-cover-badge";
-    badge.textContent = String(book.format || "EPUB").toUpperCase();
-    const affordance = document.createElement("span"); affordance.className = "book-cover-open"; affordance.textContent = "↗";
-    cover.append(badge, affordance);
-
-    const info = document.createElement("div"); info.className = "book-info";
-    const heading = document.createElement("h3"); heading.textContent = book.title || book.fileName || "未命名書籍";
-    const description = document.createElement("p");
-    description.textContent = book.author || (String(book.format).toUpperCase() === "CBZ" ? "漫畫／圖像書" : "電子書");
-    const row = document.createElement("div"); row.className = "book-meta";
-    const source = document.createElement("span"); source.textContent = "WEBDAV";
-    const progress = Number(book.progress && book.progress.percent) || 0;
-    const size = document.createElement("span"); size.textContent = progress > 0 ? Math.round(progress) + "% 已讀" : formatSize(book.size);
-    row.append(source, size);
-    const actions = document.createElement("div"); actions.className = "book-actions";
-    const open = document.createElement("button"); open.className = "button primary"; open.type = "button"; open.textContent = "繼續閱讀";
-    open.addEventListener("click", () => openBook(book));
-    const remove = document.createElement("button"); remove.className = "button subtle"; remove.type = "button"; remove.textContent = "移除";
-    remove.addEventListener("click", async () => {
-      await store.removeLocalBook(book.id);
-      await refreshShelf();
-      setStatus("已從本機書架移除");
-    });
-    actions.append(open, remove);
-    info.append(heading, description, row, actions); card.append(cover, info); grid.appendChild(card);
-  });
-}
-async function refreshShelf() {
-  try { renderShelf(await store.listBooks()); }
+const shelf = createMacShelf({
+  store, invoke, appendLog, setStatus, openBook,
+  getProfileId: () => state.profileId,
+  isProfileUnlocked: profileId => state.unlockedProfileId === String(profileId || "")
+});
+async function refreshShelf({ prefetch = true } = {}) {
+  try { await shelf.refresh({ prefetch }); }
   catch (error) { setStatus(error.message || String(error), true); }
 }
 function readerUrl(book) {
@@ -203,7 +141,7 @@ function readerUrl(book) {
   return "/epub-lab/?" + query.toString();
 }
 function openBook(book) { window.location.href = readerUrl(book); }
-async function addBook(entry, openAfter = false) {
+async function addBook(entry, openAfter = false, refresh = true) {
   const profile = selectedProfile();
   if (!profile || !entry || entry.isDir) return;
   const ext = extension(entry.path);
@@ -212,6 +150,8 @@ async function addBook(entry, openAfter = false) {
   const scope = { provider: "webdav", profileId: profile.id, library };
   appendLog("INFO", "準備加入書籍", entry.path);
   const id = await store.cloudBookId(scope, entry.path);
+  const folderPath = parentPath(entry.path);
+  const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\\/+$/, "").split("/").pop();
   const record = {
     id, sourceType: "cloud", provider: "webdav", library, rootPath: "/",
     path: entry.path, fileName: entry.name, title: baseTitle(entry.name),
@@ -219,11 +159,11 @@ async function addBook(entry, openAfter = false) {
     size: Number(entry.size) || 0,
     progress: { percent: 0, label: "尚未閱讀", cfi: "", index: null },
     appearance: {},
-    cloudSource: { provider: "webdav", profileId: profile.id, library, rootPath: "/", path: entry.path }
+    cloudSource: { provider: "webdav", profileId: profile.id, library, rootPath: "/", path: entry.path, folderPath, folderTitle }
   };
   await store.addLocalBook(record);
   appendLog("INFO", "書籍已加入本機書架", entry.path);
-  await refreshShelf();
+  if (refresh) await refreshShelf();
   setStatus("已加入書架 · " + entry.name);
   if (openAfter) openBook(record);
 }
@@ -273,7 +213,9 @@ async function loadDirectory() {
       return;
     }
     state.entries = await invoke("webdav_list_directory", { profileId: profile.id, path: state.path });
+    state.unlockedProfileId = profile.id;
     renderEntries(state.entries);
+    await refreshShelf();
     appendLog("INFO", "目錄讀取成功", state.path + " · " + state.entries.length + " 個項目");
     setStatus("WebDAV 已連線 · " + profile.name);
   } catch (error) {
@@ -319,6 +261,7 @@ async function saveProfile(event) {
     $("profile-password").value = "";
     state.editingProfileId = "";
     await refreshProfiles(profile.id);
+    state.unlockedProfileId = profile.id;
     await invoke("webdav_list_directory", { profileId: profile.id, path: "/" });
     $("profile-dialog").close();
     state.path = "/";
@@ -400,6 +343,7 @@ $("close-profile").addEventListener("click", () => $("profile-dialog").close());
 $("cancel-profile").addEventListener("click", () => $("profile-dialog").close());
 $("profile-form").addEventListener("submit", saveProfile);
 $("profile-select").addEventListener("change", async event => {
+  state.unlockedProfileId = "";
   state.profileId = event.target.value;
   localStorage.setItem(profileStorageKey(), state.profileId);
   state.path = localStorage.getItem(pathStorageKey()) || "/";
@@ -417,11 +361,12 @@ $("refresh-folder").addEventListener("click", () => void loadDirectory());
 $("add-folder-books").addEventListener("click", async () => {
   const files = state.entries.filter(item => !item.isDir && BOOK_EXTENSIONS.has(extension(item.path)));
   let count = 0;
-  for (const file of files) { await addBook(file, false); count++; }
+  for (const file of files) { await addBook(file, false, false); count++; }
+  await refreshShelf();
   setStatus("已加入 " + count + " 本書籍");
 });
 async function boot() {
-  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.6 · 日誌僅保存在目前 App 記憶體");
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.7 · 日誌僅保存在目前 App 記憶體");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;

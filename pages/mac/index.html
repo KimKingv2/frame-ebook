@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111018">
   <title>FRAME Ebook · Mac</title>
   <script>window.FRAME_LOCAL_APP = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);</script>
-  <link rel="stylesheet" href="/mac/app.css?v=20261117-mac-cover-r1">
+  <link rel="stylesheet" href="/mac/app.css?v=20261117-folder-shelf-r2">
 </head>
 <body>
   <div class="app-shell">
@@ -34,16 +34,78 @@
         <span class="tab-note">MACOS · NATIVE NETWORK</span>
       </nav>
       <section id="shelf-panel" class="panel">
-        <div class="panel-heading">
-          <div><p class="section-kicker">LOCAL BOOKSHELF</p><h2>我的書架</h2><p>已加入本機書架的 EPUB 與 CBZ。閱讀進度、書籤及註記僅保存在此 Mac。</p></div>
-          <button id="go-browser" class="button subtle" type="button">瀏覽 WebDAV ↗</button>
+        <div id="shelf-overview">
+          <div class="panel-heading">
+            <div><p class="section-kicker">LOCAL BOOKSHELF</p><h2>我的書架</h2><p>依 WebDAV 原始資料夾整理；書檔留在遠端，封面縮圖與閱讀資料保存在此 Mac。</p></div>
+            <div class="shelf-heading-actions">
+              <button id="shelf-refresh" class="button subtle" type="button">重新整理</button>
+              <button id="go-browser" class="button subtle" type="button">瀏覽 WebDAV ↗</button>
+            </div>
+          </div>
+
+          <div class="shelf-stats" aria-label="本機書架統計">
+            <article><span>FOLDERS</span><strong id="shelf-folder-count">00</strong><small>收藏資料夾</small></article>
+            <article><span>IN PROGRESS</span><strong id="shelf-started-count">00</strong><small>正在閱讀</small></article>
+            <article><span>BOOKS</span><strong id="shelf-books-count">00</strong><small>電子書資料夾</small></article>
+            <article><span>COMICS</span><strong id="shelf-comics-count">00</strong><small>漫畫資料夾</small></article>
+          </div>
+
+          <section id="recent-section" class="recent-section" hidden>
+            <div class="shelf-section-heading"><div><p class="section-kicker">PICK UP WHERE YOU LEFT OFF</p><h3>最近閱讀</h3></div><span>從上次停下的地方接著讀</span></div>
+            <div id="recent-grid" class="book-grid recent-grid"></div>
+          </section>
+
+          <div class="shelf-toolbar">
+            <label class="shelf-search"><span aria-hidden="true">⌕</span><input id="shelf-search" type="search" placeholder="搜尋資料夾、書名或檔案名稱" autocomplete="off"></label>
+            <div class="shelf-toolbar-actions">
+              <label class="shelf-sort"><span>排序</span><select id="shelf-sort">
+                <option value="recent">最近閱讀</option>
+                <option value="added">最近加入</option>
+                <option value="title">名稱 A-Z</option>
+                <option value="progress">閱讀進度</option>
+              </select></label>
+              <div class="shelf-view-toggle" role="group" aria-label="書架檢視方式">
+                <button id="shelf-grid-view" type="button" aria-pressed="true" title="封面網格">▦</button>
+                <button id="shelf-list-view" type="button" aria-pressed="false" title="列表">☷</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="shelf-categories">
+            <section class="shelf-category" aria-labelledby="books-shelf-title">
+              <div class="shelf-category-heading"><div><p class="section-kicker">READING EDITION · EPUB</p><h3 id="books-shelf-title">電子書</h3><p>依原始資料夾顯示收藏作品</p></div></div>
+              <div id="books-grid" class="book-grid shelf-book-grid" hidden></div>
+              <div id="books-empty" class="category-empty" hidden>電子書架尚未收藏資料夾。</div>
+            </section>
+            <section class="shelf-category shelf-category-comics" aria-labelledby="comics-shelf-title">
+              <div class="shelf-category-heading"><div><p class="section-kicker">ILLUSTRATED EDITION · EPUB / CBZ</p><h3 id="comics-shelf-title">漫畫</h3><p>漫畫、固定版面 EPUB 與圖像小說</p></div></div>
+              <div id="comics-grid" class="book-grid shelf-book-grid" hidden></div>
+              <div id="comics-empty" class="category-empty" hidden>漫畫書架尚未收藏資料夾。</div>
+            </section>
+          </div>
+          <div id="shelf-empty" class="empty-state" hidden>
+            <div class="empty-icon">▤</div><h3>書架還是空的</h3>
+            <p>連接 WebDAV 後，瀏覽遠端資料夾，選擇 EPUB 或 CBZ 加入書架。</p>
+            <button class="button primary" data-open-browser type="button">開始瀏覽</button>
+          </div>
+          <p id="shelf-count-label" class="shelf-count-label"></p>
+          <p id="shelf-result-count" class="shelf-result-count"></p>
         </div>
-        <div id="shelf-grid" class="book-grid"></div>
-        <div id="shelf-empty" class="empty-state">
-          <div class="empty-icon">▤</div><h3>書架還是空的</h3>
-          <p>連接 WebDAV 後，瀏覽遠端資料夾，選擇 EPUB 或 CBZ 加入書架。</p>
-          <button class="button primary" data-open-browser type="button">開始瀏覽</button>
-        </div>
+
+        <section id="folder-detail" class="folder-detail" hidden aria-labelledby="folder-detail-title">
+          <div class="folder-detail-topline">
+            <button id="folder-detail-back" class="button subtle" type="button">← 返回我的書架</button>
+            <span id="folder-detail-count" class="folder-detail-count"></span>
+          </div>
+          <div class="folder-detail-heading">
+            <p class="section-kicker">YOUR FOLDER · BOOK COLLECTION</p>
+            <h2 id="folder-detail-title">資料夾</h2>
+            <p id="folder-detail-path" class="folder-detail-path"></p>
+            <p id="folder-detail-status" class="folder-detail-status"></p>
+          </div>
+          <div id="folder-books-grid" class="book-grid folder-books-grid"></div>
+          <div id="folder-detail-empty" class="category-empty" hidden>這個資料夾目前沒有可閱讀的書籍。</div>
+        </section>
       </section>
       <section id="browser-panel" class="panel" hidden>
         <div class="panel-heading browser-heading">
@@ -84,6 +146,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/mac/app.js?v=20261117-mac-cover-r1"></script>
+  <script type="module" src="/mac/app.js?v=20261117-folder-shelf-r2"></script>
 </body>
 </html>
