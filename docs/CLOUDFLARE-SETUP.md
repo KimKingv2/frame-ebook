@@ -128,6 +128,16 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 - Comic folder details include a Bangumi search panel. Search candidates are Bangumi book-type entries; the API's search filter does not expose a manga-only subcategory filter. Confirm the correct comic manually before applying it. The selected work's detail record is saved to the per-user `reader_comic_metadata` table and associated with each EPUB/CBZ file in that folder using each filename-derived Book ID. New volumes in the same indexed folder inherit the linked series metadata in the bookshelf grouping.
 - Bangumi metadata is separate from the local archive. Local CBZ cover extraction remains the primary cover source; the imported Bangumi image URL is stored only as source metadata and is not used to replace local covers.
 - The Bangumi v0 subject search endpoint is documented as experimental and may change. The application uses the public v0 endpoints and a descriptive User-Agent; it does not require a Bangumi account password or API token for this read-only workflow.
+
+**Cloudflare Access path overrides are required for native Mac requests.** Keep the existing hostname-wide Access application, but add these **Public** path overrides so the native Tauri HTTP client can reach its own token-authenticated endpoints without a browser Access cookie:
+
+- `/api/device/pair/start`
+- `/api/device/pair/poll`
+- `/api/device/sync/*`
+- `/api/device/revoke`
+
+Do **not** make `/api/device/pair/approve`, `/device-link/*`, the website, or any other API path public. The approval page and approval API must remain behind Access. Public device endpoints still require high-entropy one-time pairing secrets or revocable bearer device tokens; pairing creation is rate-limited by a one-way hash of the source IP. Cloudflare supports path-specific Public overrides, and a wildcard is required to cover subpaths. Verify these exact paths in the Access application's Public destination **Overrides** before attempting Mac pairing.
+
 ## 9. Native device pairing and incremental sync (FRAME Ebook 0.3.0)
 
 The Mac edition remains local-first. Its IndexedDB stores the working bookshelf, reading state, annotations, reading events, preferences and pending outbound changes. Native device pairing uses a one-time 8-character approval code from the Mac app. Approve it on the Access-protected `/device-link/` page while signed into the same Reader account. D1 stores only the SHA-256 hash of the device token; the Mac stores its token in a user-only configuration file with Unix mode `0600`. The WebDAV password is never part of this flow.

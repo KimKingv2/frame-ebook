@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS reader_device_pairings (
   pairing_hash TEXT PRIMARY KEY,
   user_code TEXT NOT NULL UNIQUE,
   device_name TEXT NOT NULL DEFAULT '',
+  client_ip_hash TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','claimed','expired')),
   user_id TEXT,
   device_id TEXT,
@@ -35,3 +36,6 @@ CREATE INDEX IF NOT EXISTS idx_reader_devices_user
 
 CREATE INDEX IF NOT EXISTS idx_reader_devices_token_active
   ON reader_devices(token_hash, revoked_at);
+
+CREATE INDEX IF NOT EXISTS idx_reader_device_pairings_ip_created
+  ON reader_device_pairings(client_ip_hash, created_at);

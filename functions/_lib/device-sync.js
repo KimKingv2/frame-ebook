@@ -50,8 +50,7 @@ export async function getConfiguredSourceMap(env) {
     if (!config || !config.base || !config.username) continue;
     try {
       const origin = new URL(config.base).origin.toLowerCase();
-      const username = String(config.username).trim().toLowerCase();
-      const id = "webdav:" + await sha256Text(origin + "\n" + username);
+      const id = "webdav:" + await sha256Text(origin);
       output[id] = provider;
     } catch (_) {}
   }

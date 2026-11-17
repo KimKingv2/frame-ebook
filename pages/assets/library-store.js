@@ -257,7 +257,9 @@ function localApi(path, options = {}) {
       const updatedAt = Number(body.updatedAt) || Date.now();
       return localTransaction(db, ["preferences", "sync_queue"], "readwrite", (tx, set) => {
         tx.objectStore("preferences").put({ key, value: body.value, updatedAt });
-        queueLocalChange(tx, { type: "preference", key, value: body.value, updatedAt });
+        if (["activeProvider", "activeLibrary", "roots", "goalMinutes"].includes(key)) {
+          queueLocalChange(tx, { type: "preference", key, value: body.value, updatedAt });
+        }
         set({ value: body.value, updatedAt });
       });
     }
@@ -420,6 +422,11 @@ async function mergeCloudSnapshot(snapshot) {
   const remoteAnnotations = Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
   const remoteEvents = Array.isArray(snapshot.events) ? snapshot.events : [];
   const remotePreferences = Array.isArray(snapshot.preferences) ? snapshot.preferences : [];
+  const remoteAnnotationDeletes = new Set((Array.isArray(snapshot.annotationDeletes) ? snapshot.annotationDeletes : [])
+    .map(value => {
+      const match = String(value || "").match(/^(cloud:[a-f0-9]{64}):(.*)$/);
+      return match ? match[1] + "::" + match[2] : "";
+    }).filter(Boolean));
   const localStates = new Map((local.states||[]).map(item=>[String(item.id),item]));
   const localAnnotations = new Map((local.annotations||[]).map(item=>[String(item.bookId)+"::"+String(item.id),item]));
   const localEvents = new Map((local.events||[]).map(item=>[String(item.id),item]));
@@ -461,7 +468,12 @@ async function mergeCloudSnapshot(snapshot) {
       annotationWrites.push({...annotation,bookId:String(book.id),key});
     }
   }
+  const annotationDeletesToApply = [];
   for(const [key,existing] of localAnnotations){
+    if(remoteAnnotationDeletes.has(key)){
+      annotationDeletesToApply.push(key);
+      continue;
+    }
     if(!remoteAnnotations.some(item=>String(item.book?.id||"")+"::"+String(item.annotation?.id||"")===key)){
       const [bookId]=key.split("::");
       const bookRecord=localBooks.get(bookId);
@@ -502,6 +514,7 @@ async function mergeCloudSnapshot(snapshot) {
         books.put(updated);remember(updated);
       };
     });
+    annotationDeletesToApply.forEach(key=>annotations.delete(key));
     annotationWrites.forEach(item=>annotations.put(item));
     eventWrites.forEach(item=>events.put(item));
     preferenceWrites.forEach(item=>preferences.put(item));
@@ -623,8 +636,7 @@ async function cloudBookId(scope, path) {
 
 async function webDavSourceId(profile) {
   const rawUrl = String(profile?.baseUrl || profile?.base_url || "").trim();
-  const username = String(profile?.username || "").trim().toLowerCase();
-  if (!rawUrl || !username) throw new Error("WebDAV 來源缺少網址或帳號，無法建立跨設備來源識別碼。");
+  if (!rawUrl) throw new Error("WebDAV 來源缺少網址，無法建立跨設備來源識別碼。");
   let origin;
   try {
     const parsed = new URL(rawUrl);
@@ -633,7 +645,7 @@ async function webDavSourceId(profile) {
   } catch (_) {
     throw new Error("WebDAV 來源網址無效，無法建立跨設備來源識別碼。");
   }
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(origin + "\n" + username));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(origin));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   return "webdav:" + hash;
 }

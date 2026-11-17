@@ -18,7 +18,17 @@ export async function onRequestPost({ request, env }) {
   const deviceName = String(body.deviceName || "FRAME Ebook").trim().slice(0, 80) || "FRAME Ebook";
   const now = Date.now();
   const expiresAt = now + 10 * 60 * 1000;
+  const clientIp = String(request.headers.get("CF-Connecting-IP") || "");
+  const clientIpHash = clientIp ? await sha256Text(clientIp) : "";
   try {
+    if (clientIpHash) {
+      const recent = await dbResult.db.prepare(
+        "SELECT COUNT(*) AS count FROM reader_device_pairings WHERE client_ip_hash=? AND created_at>?"
+      ).bind(clientIpHash, now - 15 * 60 * 1000).first();
+      if (Number(recent?.count) >= 5) {
+        return json({ error: "這個網路來源建立設備配對的次數過多，請 15 分鐘後再試。" }, 429);
+      }
+    }
     await dbResult.db.prepare(
       "DELETE FROM reader_device_pairings WHERE expires_at<? AND status<>'claimed'"
     ).bind(now).run();
@@ -29,8 +39,8 @@ export async function onRequestPost({ request, env }) {
       try {
         await dbResult.db.prepare(
           "INSERT INTO reader_device_pairings " +
-          "(pairing_hash,user_code,device_name,status,created_at,expires_at) VALUES (?,?,?,'pending',?,?)"
-        ).bind(pairingHash, userCode, deviceName, now, expiresAt).run();
+          "(pairing_hash,user_code,device_name,client_ip_hash,status,created_at,expires_at) VALUES (?,?,?,?,'pending',?,?)"
+        ).bind(pairingHash, userCode, deviceName, clientIpHash, now, expiresAt).run();
         return json({
           ok: true,
           deviceCode,
