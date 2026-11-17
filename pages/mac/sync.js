@@ -134,7 +134,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
     if (!changes.length) return 0;
     const result = await request("POST", API.push, { changes });
     await store.acknowledgeLocalSyncQueue(queueAcks);
-    onLog("INFO", "本機變更已推送至 Cloudflare", "處理 " + changes.length + " 筆；清除待同步佇列 " + queueIds.length + " 筆");
+    onLog("INFO", "本機變更已推送至 Cloudflare", "處理 " + changes.length + " 筆；清除待同步佇列 " + queueAcks.length + " 筆");
     return Number(result.accepted) || changes.length;
   }
 
