@@ -143,7 +143,16 @@ async function loadScanRoots(profileId) {
     }
   }
   state.scanRootsByProfile.set(String(profileId), next);
-  if (String(profileId) === String(state.profileId)) { state.scanRoots = { ...next }; updateScanRootInputs(); }
+  if (String(profileId) === String(state.profileId)) {
+    state.scanRoots = { ...next };
+    updateScanRootInputs();
+    for (const library of ["books","comics"]) {
+      try {
+        const progress = await store.getLocalSyncMeta(scanProgressKey(profileId,library),null);
+        renderScanSummary(library,progress,progress?.completed?"掃描完成":progress?.paused?"已暫停":progress?"可續掃":"尚未掃描");
+      } catch (_) {}
+    }
+  }
 }
 async function loadAllScanRoots() {
   state.scanRootsByProfile.clear();
@@ -269,15 +278,16 @@ async function addBook(entry, openAfter = false, refresh = true, profileOverride
   ]);
   const folderPath = parentPath(entry.path);
   const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
+  const rootPath = rootsForProfile(profile.id)[library];
   const record = {
-    id, sourceType: "cloud", provider: "webdav", library, rootPath: "/",
+    id, sourceType: "cloud", provider: "webdav", library, rootPath,
     path: entry.path, fileName: entry.name, title: baseTitle(entry.name), addedAt: Date.now(),
     lastModified: Date.parse(String(entry.modified || "")) || 0,
     author: "", format: ext.toUpperCase(), shelf: library,
     size: Number(entry.size) || 0,
     progress: { percent: 0, label: "尚未閱讀", cfi: "", index: null },
     appearance: {},
-    cloudSource: { provider: "webdav", profileId: profile.id, sourceId, library, rootPath: "/", path: entry.path, folderPath, folderTitle }
+    cloudSource: { provider: "webdav", profileId: profile.id, sourceId, library, rootPath, path: entry.path, folderPath, folderTitle }
   };
   await store.addLocalBook(record);
   appendLog("INFO", "書籍已加入本機書架", entry.path);
