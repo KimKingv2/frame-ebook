@@ -259,11 +259,12 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
       addImage(cover,members[0],false);
       if (!(members[0].coverBlob instanceof Blob)) cover.classList.add("folder-cover-empty");
     } else cover.appendChild(fallback(group.title,group.library === "comics" ? "CBZ":"EPUB"));
-    const badge = document.createElement("span"); badge.className="book-cover-badge"; badge.textContent=members.length+" 冊"; cover.appendChild(badge);
+    const badge = document.createElement("span"); badge.className="book-cover-badge"; badge.textContent=group.members.length+" 冊"; cover.appendChild(badge);
     return cover;
   }
   function folderCard(group, compact = false) {
     const card = document.createElement("article"); card.className="book-card folder-card"+(compact?" is-compact":"");
+    card.addEventListener("click",event=>{if(!event.target.closest("button"))openFolder(group);});
     card.appendChild(folderCover(group));
     const info=document.createElement("div"); info.className="book-info";
     const title=document.createElement("h3"); title.textContent=group.title;
