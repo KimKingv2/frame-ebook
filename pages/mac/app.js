@@ -154,7 +154,7 @@ async function addBook(entry, openAfter = false, refresh = true) {
   const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
   const record = {
     id, sourceType: "cloud", provider: "webdav", library, rootPath: "/",
-    path: entry.path, fileName: entry.name, title: baseTitle(entry.name),
+    path: entry.path, fileName: entry.name, title: baseTitle(entry.name), addedAt: Date.now(),
     author: "", format: ext.toUpperCase(), shelf: library,
     size: Number(entry.size) || 0,
     progress: { percent: 0, label: "尚未閱讀", cfi: "", index: null },

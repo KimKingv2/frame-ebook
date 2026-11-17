@@ -308,6 +308,8 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
   function renderFolder(groupsNow) {
     const folder=groupsNow.find(group=>group.key===state.activeFolderKey),active=!!folder;
     $("shelf-overview").hidden=active; $("folder-detail").hidden=!active;
+    const hero=document.querySelector(".hero"), tabs=document.querySelector(".tabs");
+    if(hero)hero.hidden=active; if(tabs)tabs.hidden=active;
     if(!active){state.activeFolderKey=null;return;}
     $("folder-detail-title").textContent=folder.title;
     $("folder-detail-path").textContent=folder.path;
