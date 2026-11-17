@@ -324,7 +324,27 @@ async fn webdav_list_directory(
         return Err("WebDAV 驗證失敗，請檢查帳號與密碼。".into());
     }
     if response.status() != StatusCode::MULTI_STATUS && !response.status().is_success() {
-        return Err(format!("WebDAV PROPFIND 失敗（HTTP {}）。", response.status()));
+        let status = response.status();
+        let server = response.headers()
+            .get(header::SERVER)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("未知");
+        let content_type = response.headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("未知");
+        let body = response.text().await.unwrap_or_else(|error| {
+            format!("無法讀取伺服器錯誤內容：{error}")
+        });
+        let body = body.trim();
+        let detail: String = if body.is_empty() {
+            "伺服器沒有提供錯誤內容。".to_string()
+        } else {
+            body.chars().take(1200).collect()
+        };
+        return Err(format!(
+            "WebDAV PROPFIND 失敗（HTTP {status}）。\\n伺服器：{server}\\n內容類型：{content_type}\\n回應內容：{detail}"
+        ));
     }
     let xml = response.text().await
         .map_err(|e| format!("讀取 WebDAV 目錄清單失敗：{e}"))?;
