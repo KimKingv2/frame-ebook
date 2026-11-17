@@ -6,7 +6,7 @@ const bookCache = new Map();
 
 
 const LOCAL_DB_NAME = "frame-ebook-macos";
-const LOCAL_DB_VERSION = 1;
+const LOCAL_DB_VERSION = 2;
 function isLocalMacApp() {
   return typeof window !== "undefined" && window.FRAME_LOCAL_APP === true;
 }
@@ -20,11 +20,134 @@ function openLocalDatabase() {
       if (!db.objectStoreNames.contains("annotations")) db.createObjectStore("annotations", { keyPath: "key" });
       if (!db.objectStoreNames.contains("events")) db.createObjectStore("events", { keyPath: "id" });
       if (!db.objectStoreNames.contains("preferences")) db.createObjectStore("preferences", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("sync_meta")) db.createObjectStore("sync_meta", { keyPath: "key" });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      migrateLegacyBookIds(db).then(() => resolve(db)).catch(error => {
+        try { db.close(); } catch (_) {}
+        reject(new Error("Mac 本機書籍識別遷移失敗，原始資料已保留：" + (error?.message || String(error))));
+      });
+    };
     request.onerror = () => reject(new Error("無法開啟 Mac 本機閱讀資料庫：" + (request.error?.message || "IndexedDB error")));
   });
 }
+
+async function filenameBookId(fileName) {
+  let identity = String(fileName || "").trim();
+  try { identity = identity.normalize("NFC"); } catch (_) {}
+  if (!identity || identity.includes("/") || identity.includes("\\\\") || identity.includes("\0")) {
+    throw new Error("書籍檔名無效，無法生成 Book ID。");
+  }
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  return "cloud:" + hash;
+}
+
+async function migrateLegacyBookIds(db) {
+  const marker = await localTransaction(db, ["sync_meta"], "readonly", (tx, set) => {
+    const request = tx.objectStore("sync_meta").get("legacyBookIdMigrationV1");
+    request.onsuccess = () => set(request.result || null);
+  });
+  if (marker?.completedAt) return marker;
+
+  const snapshot = await localTransaction(db, ["books", "states", "annotations", "events"], "readonly", (tx, set) => {
+    const values = {};
+    const names = ["books", "states", "annotations", "events"];
+    let remaining = names.length;
+    for (const name of names) {
+      const request = tx.objectStore(name).getAll();
+      request.onsuccess = () => {
+        values[name] = request.result || [];
+        remaining--;
+        if (!remaining) set(values);
+      };
+    }
+  });
+
+  const byTarget = new Map();
+  const targets = [];
+  for (const book of snapshot.books || []) {
+    const oldId = String(book.id || "");
+    const fileName = String(book.fileName || book.cloudSource?.path?.split("/").pop() || "");
+    if (!oldId || !fileName || !book.cloudSource || book.cloudSource.provider !== "webdav") continue;
+    const nextId = await filenameBookId(fileName);
+    if (oldId === nextId) continue;
+    const item = { oldId, nextId, book };
+    targets.push(item);
+    if (!byTarget.has(nextId)) byTarget.set(nextId, []);
+    byTarget.get(nextId).push(item);
+  }
+
+  const conflicted = new Set();
+  for (const [targetId, group] of byTarget) {
+    if (group.length > 1) group.forEach(item => conflicted.add(item.oldId));
+    if ((snapshot.books || []).some(book => String(book.id || "") === targetId && !group.some(item => item.oldId === targetId))) {
+      group.forEach(item => conflicted.add(item.oldId));
+    }
+  }
+
+  const mapping = new Map();
+  for (const item of targets) if (!conflicted.has(item.oldId)) mapping.set(item.oldId, item.nextId);
+  const migratedBooks = [];
+  for (const item of targets) {
+    if (conflicted.has(item.oldId)) {
+      migratedBooks.push({ ...item.book, idMigrationConflict: true });
+    } else {
+      migratedBooks.push({
+        ...item.book,
+        id: item.nextId,
+        migratedFromBookId: item.oldId,
+        cloudSource: { ...(item.book.cloudSource || {}), sourceId: item.book.cloudSource?.sourceId || "" }
+      });
+    }
+  }
+
+  const migratedStates = (snapshot.states || []).filter(item => mapping.has(String(item.id || "")))
+    .map(item => ({ ...item, id: mapping.get(String(item.id)) }));
+  const movedAnnotations = (snapshot.annotations || []).filter(item => mapping.has(String(item.bookId || "")))
+    .map(item => {
+      const bookId = mapping.get(String(item.bookId));
+      return { ...item, bookId, key: bookId + "::" + String(item.id || item.key?.split("::").pop() || "") };
+    });
+  const movedEvents = (snapshot.events || []).filter(item => mapping.has(String(item.bookId || "")))
+    .map(item => ({ ...item, bookId: mapping.get(String(item.bookId)) }));
+
+  const report = {
+    key: "legacyBookIdMigrationV1",
+    completedAt: Date.now(),
+    migrated: mapping.size,
+    conflicts: conflicted.size,
+    conflictBookIds: Array.from(conflicted).slice(0, 50)
+  };
+
+  await localTransaction(db, ["books", "states", "annotations", "events", "sync_meta"], "readwrite", tx => {
+    const books = tx.objectStore("books");
+    const states = tx.objectStore("states");
+    const annotations = tx.objectStore("annotations");
+    const events = tx.objectStore("events");
+    for (const item of migratedBooks) {
+      if (conflicted.has(String(item.migratedFromBookId || item.id))) books.put(item);
+      else {
+        books.put(item);
+        books.delete(String(item.migratedFromBookId));
+      }
+    }
+    for (const item of snapshot.states || []) {
+      const nextId = mapping.get(String(item.id || ""));
+      if (nextId) states.delete(String(item.id));
+    }
+    migratedStates.forEach(item => states.put(item));
+    for (const item of snapshot.annotations || []) {
+      if (mapping.has(String(item.bookId || ""))) annotations.delete(item.key);
+    }
+    movedAnnotations.forEach(item => annotations.put(item));
+    movedEvents.forEach(item => events.put(item));
+    tx.objectStore("sync_meta").put(report);
+  });
+  return report;
+}
+
 function localTransaction(db, stores, mode, execute) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(stores, mode);
@@ -244,32 +367,28 @@ async function cloudBookId(scope, path) {
       !["books", "comics"].includes(library) || !fileName.trim()) {
     throw new Error("雲端書籍識別資訊無效。");
   }
-
-  let identity;
-  if (provider === "webdav") {
-    const profileId = String(scope?.profileId || "").trim();
-    // WebDAV paths normally contain "/" separators. Validate path segments
-    // rather than rejecting slashes in the combined source/path identity.
-    const invalidPath = !filePath || filePath.includes("\0") ||
-      pathParts.some(part => !part || part === "." || part === "..");
-    const invalidProfileId = !profileId ||
-      profileId.includes("/") || profileId.includes("\\") ||
-      profileId.includes("\0") || profileId.includes("\n") || profileId.includes("\r");
-    if (invalidPath || invalidProfileId) {
-      throw new Error("書籍檔名或 WebDAV 來源資訊無效，無法生成 Book ID。");
-    }
-    identity = profileId + "\n" + filePath;
-  } else {
-    identity = fileName.trim();
-    if (!identity || identity.includes("/") || identity.includes("\\") || identity.includes("\0")) {
-      throw new Error("書籍檔名無效，無法生成 Book ID。");
-    }
+  if (provider === "webdav" && (!filePath || filePath.includes("\0") ||
+      pathParts.some(part => !part || part === "." || part === ".."))) {
+    throw new Error("WebDAV 書籍路徑無效。");
   }
+  return filenameBookId(fileName);
+}
 
-  try { identity = identity.normalize("NFC"); } catch (_) {}
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+async function webDavSourceId(profile) {
+  const rawUrl = String(profile?.baseUrl || profile?.base_url || "").trim();
+  const username = String(profile?.username || "").trim().toLowerCase();
+  if (!rawUrl || !username) throw new Error("WebDAV 來源缺少網址或帳號，無法建立跨設備來源識別碼。");
+  let origin;
+  try {
+    const parsed = new URL(rawUrl);
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error("invalid");
+    origin = parsed.origin.toLowerCase();
+  } catch (_) {
+    throw new Error("WebDAV 來源網址無效，無法建立跨設備來源識別碼。");
+  }
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(origin + "\\n" + username));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-  return "cloud:" + hash;
+  return "webdav:" + hash;
 }
 
 async function listBooks() {
@@ -528,7 +647,7 @@ async function setReadingSetting(key, value) {
 
 
 export {
-  getBook, updateBook, listBooks, cloudBookId, addLocalBook, saveLocalBookCover, removeLocalBook,
+  getBook, updateBook, listBooks, cloudBookId, webDavSourceId, addLocalBook, saveLocalBookCover, removeLocalBook,
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
   recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting
 };

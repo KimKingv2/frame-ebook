@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-mac-cover-r1";
+import * as store from "/assets/library-store.js?v=20261117-cloud-id-r1";
 import { createMacShelf } from "/mac/shelf.js?v=20261117-folder-shelf-r2";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
@@ -149,7 +149,10 @@ async function addBook(entry, openAfter = false, refresh = true) {
   const library = ext === "cbz" ? "comics" : "books";
   const scope = { provider: "webdav", profileId: profile.id, library };
   appendLog("INFO", "準備加入書籍", entry.path);
-  const id = await store.cloudBookId(scope, entry.path);
+  const [id, sourceId] = await Promise.all([
+    store.cloudBookId(scope, entry.path),
+    store.webDavSourceId(profile)
+  ]);
   const folderPath = parentPath(entry.path);
   const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
   const record = {
@@ -159,7 +162,7 @@ async function addBook(entry, openAfter = false, refresh = true) {
     size: Number(entry.size) || 0,
     progress: { percent: 0, label: "尚未閱讀", cfi: "", index: null },
     appearance: {},
-    cloudSource: { provider: "webdav", profileId: profile.id, library, rootPath: "/", path: entry.path, folderPath, folderTitle }
+    cloudSource: { provider: "webdav", profileId: profile.id, sourceId, library, rootPath: "/", path: entry.path, folderPath, folderTitle }
   };
   await store.addLocalBook(record);
   appendLog("INFO", "書籍已加入本機書架", entry.path);
