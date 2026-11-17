@@ -329,7 +329,7 @@
   <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261117-autoscan-r1"></script>
   <script type="module">
     if (window.FRAME_LOCAL_APP && window.__TAURI__?.core?.invoke) {
-      const { startMacSync } = await import("/mac/sync.js?v=20261117-sync-r1");
+      const { startMacSync } = await import("/mac/sync.js?v=20261117-sync-r2");
       const manager = startMacSync({
         invoke: (name, args = {}) => window.__TAURI__.core.invoke(name, args),
         getProfiles: () => window.__TAURI__.core.invoke("list_webdav_profiles"),
