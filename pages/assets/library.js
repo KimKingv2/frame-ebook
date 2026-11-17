@@ -1,4 +1,4 @@
-import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261116-metadata-r2";
+import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261117-filename-id-r2";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, linkTargetBookId: null, activeFolderKey: null };
