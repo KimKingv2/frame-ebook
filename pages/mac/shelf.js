@@ -153,7 +153,7 @@ async function makeThumbnail(blob) {
   } finally { try { bitmap?.close(); } catch (_) {} }
 }
 
-export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, getProfileId, isProfileUnlocked }) {
+export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, getProfileId, isProfileUnlocked, filterBooks }) {
   const state = { books:[], query:"", sort:"recent", view:"grid", activeFolderKey:null };
   const objectUrls = [];
   const attemptedCovers = new Set();
@@ -377,6 +377,14 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
     if(saved){state.books=await store.listBooks();render();}
     return saved;
   }
+  async function retryMissingCovers(){
+    const active=String(getProfileId()||"");
+    for(const book of state.books){
+      const source=book.cloudSource||{};
+      if(String(source.profileId||book.profileId||"")===active && !(book.coverBlob instanceof Blob)) attemptedCovers.delete(String(book.id||""));
+    }
+    return prefetchCovers();
+  }
   async function prefetchCovers(){
     if(coverQueuePromise)return coverQueuePromise;
     coverQueuePromise=(async()=>{
@@ -394,7 +402,9 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
     return coverQueuePromise;
   }
   async function refresh({prefetch=true}={}){
-    state.books=await store.listBooks();render();
+    const stored=await store.listBooks();
+    state.books=typeof filterBooks === "function" ? await filterBooks(stored) : stored;
+    render();
     if(prefetch)void prefetchCovers();
     return state.books;
   }
@@ -406,5 +416,5 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
     state.activeFolderKey=null;render();$("shelf-overview").scrollIntoView({behavior:"smooth",block:"start"});
   });
   $("shelf-refresh").addEventListener("click",()=>refresh({prefetch:true}).catch(error=>setStatus(error.message||String(error),true)));
-  return {refresh,render,prefetchCovers};
+  return {refresh,render,prefetchCovers,retryMissingCovers};
 }
