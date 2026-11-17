@@ -247,18 +247,33 @@ fn save_webdav_profile(
     if clean_name.is_empty() || clean_user.is_empty() || password.is_empty() {
         return Err("請完整填寫來源名稱、帳號與密碼。".into());
     }
+    let normalized_url = normalize_base_url(&base_url)?;
+    let mut profiles = read_profiles(&app)?;
+    // Reuse the existing profile ID for the same WebDAV account. This repairs
+    // 0.1.0 profiles whose metadata survived but whose mock keyring secret did not,
+    // while preserving bookshelf records that refer to the original profile ID.
+    let existing_index = profiles.iter().position(|item|
+        item.base_url == normalized_url && item.username == clean_user
+    );
     let profile = WebDavProfile {
-        id: Uuid::new_v4().to_string(),
+        id: existing_index
+            .map(|index| profiles[index].id.clone())
+            .unwrap_or_else(|| Uuid::new_v4().to_string()),
         name: clean_name.chars().take(48).collect(),
-        base_url: normalize_base_url(&base_url)?,
+        base_url: normalized_url,
         username: clean_user.chars().take(180).collect(),
     };
     keychain_entry(&profile.id)?.set_password(&password)
         .map_err(|e| format!("無法將密碼存入 macOS 鑰匙圈：{e}"))?;
-    let mut profiles = read_profiles(&app)?;
-    profiles.push(profile.clone());
+    if let Some(index) = existing_index {
+        profiles[index] = profile.clone();
+    } else {
+        profiles.push(profile.clone());
+    }
     if let Err(error) = write_profiles(&app, &profiles) {
-        if let Ok(entry) = keychain_entry(&profile.id) { let _ = entry.delete_credential(); }
+        if existing_index.is_none() {
+            if let Ok(entry) = keychain_entry(&profile.id) { let _ = entry.delete_credential(); }
+        }
         return Err(error);
     }
     Ok(profile)
