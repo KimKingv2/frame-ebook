@@ -131,11 +131,13 @@
                   <div class="cloud-root-field">
                     <label for="scan-books-root">電子書根目錄（只收 EPUB）</label>
                     <input id="scan-books-root" type="text" spellcheck="false" autocomplete="off" value="/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔">
+                    <button id="use-current-books-root" class="quiet-button" type="button">將目前瀏覽位置設為電子書根目錄</button>
                     <small id="scan-books-root-status">雲端目錄設定</small>
                   </div>
                   <div class="cloud-root-field">
                     <label for="scan-comics-root">漫畫根目錄（EPUB／CBZ）</label>
                     <input id="scan-comics-root" type="text" spellcheck="false" autocomplete="off" value="/中國移動雲盤/Kim King/11 Comic">
+                    <button id="use-current-comics-root" class="quiet-button" type="button">將目前瀏覽位置設為漫畫根目錄</button>
                     <small id="scan-comics-root-status">雲端目錄設定</small>
                   </div>
                 </div>
@@ -143,6 +145,9 @@
                   <button id="save-scan-roots" class="quiet-button" type="button">保存電子書／漫畫根目錄</button>
                   <span>設定保存在這台 Mac；切換 WebDAV 來源時各自保存。</span>
                 </div>
+              </div>
+              <div class="cloud-connection-actions">
+                <button id="test-webdav-connection" class="primary-link" type="button">測試連線並讀取兩個書庫 ↗</button>
               </div>
               <p id="scan-settings-status" class="cloud-source-status" role="status">請選擇 WebDAV 來源並確認兩條書庫根目錄。</p>
             </section>
