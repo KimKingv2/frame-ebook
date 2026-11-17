@@ -678,7 +678,7 @@ $("shelf-refresh").addEventListener("click", () => {
   void startAutomaticLibraryScan(selectedProfile()).catch(() => {});
 });
 async function boot() {
-  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.1 · 本機書架與 Cloudflare 多設備同步");
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.2 · WebDAV 自動掃描與 Cloudflare 多設備同步");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;
