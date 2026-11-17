@@ -5,6 +5,7 @@ on:
     branches:
       - macos-desktop
       - feat/cloud-sync-0.3.0
+      - feat/mac-main-ui-parity
     paths:
       - "macos/**"
       - "pages/mac/**"
