@@ -1,8 +1,10 @@
-import * as store from "/assets/library-store.js?v=20261117-device-link-r1";
+import * as store from "/assets/library-store.js?v=20261117-sync-r1";
 import { createMacShelf } from "/mac/shelf.js?v=20261117-folder-shelf-r2";
+import { startMacSync } from "/mac/sync.js?v=20261117-sync-r1";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
 const logState = { entries: [] };
+let macSyncManager = null;
 const state = { profiles: [], profileId: "", unlockedProfileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
 
@@ -136,7 +138,8 @@ function readerUrl(book) {
     book: String(book.id), provider: String(source.provider || "webdav"),
     library: String(source.library || book.shelf || "books"),
     root_path: String(source.rootPath || "/"), path: String(source.path || ""),
-    profile_id: String(source.profileId || "")
+    profile_id: String(source.profileId || ""),
+    source_id: String(source.sourceId || "")
   });
   return "/epub-lab/?" + query.toString();
 }
@@ -324,8 +327,13 @@ async function refreshCloudSyncDialog() {
     ? "已連結 Cloudflare · " + String(credentials.deviceName || "FRAME Ebook") + "（設備授權已保存於本機）"
     : "尚未連結雲端帳號。完成配對後，這台 Mac 才能參與多設備同步。";
   $("start-cloud-pair").hidden = linked;
+  $("sync-now-button").hidden = !linked;
+  $("sync-refresh-catalog-button").hidden = !linked;
   $("disconnect-cloud-sync").hidden = !linked;
   $("sync-pair-panel").hidden = true;
+  if (linked) {
+    try { await macSyncManager?.refreshStatus(); } catch (_) {}
+  }
 }
 async function beginCloudPairing() {
   cloudPairCancelled = false;
@@ -353,7 +361,11 @@ async function beginCloudPairing() {
           deviceToken: result.deviceToken,
           deviceName: result.deviceName || "FRAME Ebook · macOS"
         });
-        $("sync-account-status").textContent = "設備已成功連結 Cloudflare 帳號。多端同步引擎尚在接線中。";
+        $("sync-account-status").textContent = "設備已連結，正在執行首次雲端同步……";
+        if (macSyncManager) {
+          try { await macSyncManager.syncNow({ refreshCatalog: true }); }
+          catch (syncError) { $("sync-last-result").textContent = syncError.message || String(syncError); }
+        }
         $("sync-pair-panel").hidden = true;
         $("cancel-cloud-pair").hidden = true;
         $("start-cloud-pair").hidden = true;
@@ -427,6 +439,33 @@ $("copy-logs").addEventListener("click", async () => {
   }
 });
 
+$("sync-now-button").addEventListener("click", async () => {
+  const button = $("sync-now-button");
+  button.disabled = true;
+  $("sync-last-result").textContent = "正在推送本機變更並拉取其他設備資料……";
+  try {
+    const result = await macSyncManager?.syncNow();
+    $("sync-last-result").textContent = result
+      ? "完成 · 推送 " + result.pushed + " 筆、拉取 " + result.pulled + " 筆"
+      : "同步管理器尚未啟動。";
+  } catch (error) {
+    $("sync-last-result").textContent = error.message || String(error);
+  } finally { button.disabled = false; }
+});
+$("sync-refresh-catalog-button").addEventListener("click", async () => {
+  const button = $("sync-refresh-catalog-button");
+  button.disabled = true;
+  $("sync-last-result").textContent = "正在重新讀取 Cloudflare 書架索引……";
+  try {
+    const result = await macSyncManager?.syncNow({ refreshCatalog: true });
+    $("sync-last-result").textContent = result
+      ? "書架索引更新完成 · 推送 " + result.pushed + " 筆、拉取 " + result.pulled + " 筆"
+      : "同步管理器尚未啟動。";
+    await refreshShelf();
+  } catch (error) {
+    $("sync-last-result").textContent = error.message || String(error);
+  } finally { button.disabled = false; }
+});
 $("cloud-sync-button").addEventListener("click", async () => {
   await refreshCloudSyncDialog();
   $("sync-dialog").showModal();
@@ -472,6 +511,15 @@ async function boot() {
   }
   try {
     await refreshProfiles();
+    macSyncManager = startMacSync({
+      invoke: (name, args = {}) => window.__TAURI__.core.invoke(name, args),
+      getProfiles: () => state.profiles,
+      onStatus: message => {
+        const status = $("sync-last-result");
+        if (status) status.textContent = message;
+      },
+      onLog: (level, message, detail) => appendLog(level, message, detail)
+    });
     await refreshShelf();
     await pullNativeTransferDiagnostics();
     if (state.profileId) {
