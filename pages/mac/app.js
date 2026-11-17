@@ -376,14 +376,6 @@ async function boot() {
   }
   try {
     await refreshProfiles();
-    const migrationReport = await store.getBookIdMigrationReport();
-    if (migrationReport?.migrated) {
-      appendLog("INFO", "已完成本機書籍 ID 統一遷移", migrationReport.migrated + " 本書；閱讀進度、書籤、註釋與閱讀紀錄已重新對應。");
-    }
-    if (migrationReport?.conflicts) {
-      appendLog("WARN", "發現同名書籍 ID 衝突，已保留原始資料，未自動合併",
-        migrationReport.conflicts + " 筆資料需要人工確認。請勿刪除舊資料。");
-    }
     await refreshShelf();
     await pullNativeTransferDiagnostics();
     if (state.profileId) {

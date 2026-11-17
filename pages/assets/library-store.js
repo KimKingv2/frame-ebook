@@ -7,11 +7,13 @@ const bookCache = new Map();
 
 const LOCAL_DB_NAME = "frame-ebook-macos";
 const LOCAL_DB_VERSION = 2;
+let localDatabasePromise = null;
 function isLocalMacApp() {
   return typeof window !== "undefined" && window.FRAME_LOCAL_APP === true;
 }
 function openLocalDatabase() {
-  return new Promise((resolve, reject) => {
+  if (localDatabasePromise) return localDatabasePromise;
+  localDatabasePromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -24,130 +26,23 @@ function openLocalDatabase() {
     };
     request.onsuccess = () => {
       const db = request.result;
+      db.onversionchange = () => {
+        try { db.close(); } catch (_) {}
+        localDatabasePromise = null;
+      };
       migrateLegacyBookIds(db).then(() => resolve(db)).catch(error => {
         try { db.close(); } catch (_) {}
         reject(new Error("Mac 本機書籍識別遷移失敗，原始資料已保留：" + (error?.message || String(error))));
       });
     };
     request.onerror = () => reject(new Error("無法開啟 Mac 本機閱讀資料庫：" + (request.error?.message || "IndexedDB error")));
+    request.onblocked = () => reject(new Error("本機閱讀資料庫正在被舊版 App 連線佔用，請完全退出其他 FRAME Ebook 視窗後重試。"));
+  }).catch(error => {
+    localDatabasePromise = null;
+    throw error;
   });
+  return localDatabasePromise;
 }
-
-async function filenameBookId(fileName) {
-  let identity = String(fileName || "").trim();
-  try { identity = identity.normalize("NFC"); } catch (_) {}
-  if (!identity || identity.includes("/") || identity.includes("\\") || identity.includes("\0")) {
-    throw new Error("書籍檔名無效，無法生成 Book ID。");
-  }
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
-  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-  return "cloud:" + hash;
-}
-
-async function migrateLegacyBookIds(db) {
-  const marker = await localTransaction(db, ["sync_meta"], "readonly", (tx, set) => {
-    const request = tx.objectStore("sync_meta").get("legacyBookIdMigrationV1");
-    request.onsuccess = () => set(request.result || null);
-  });
-  if (marker?.completedAt) return marker;
-
-  const snapshot = await localTransaction(db, ["books", "states", "annotations", "events"], "readonly", (tx, set) => {
-    const values = {};
-    const names = ["books", "states", "annotations", "events"];
-    let remaining = names.length;
-    for (const name of names) {
-      const request = tx.objectStore(name).getAll();
-      request.onsuccess = () => {
-        values[name] = request.result || [];
-        remaining--;
-        if (!remaining) set(values);
-      };
-    }
-  });
-
-  const byTarget = new Map();
-  const targets = [];
-  for (const book of snapshot.books || []) {
-    const oldId = String(book.id || "");
-    const fileName = String(book.fileName || book.cloudSource?.path?.split("/").pop() || "");
-    if (!oldId || !fileName || !book.cloudSource || book.cloudSource.provider !== "webdav") continue;
-    const nextId = await filenameBookId(fileName);
-    if (oldId === nextId) continue;
-    const item = { oldId, nextId, book };
-    targets.push(item);
-    if (!byTarget.has(nextId)) byTarget.set(nextId, []);
-    byTarget.get(nextId).push(item);
-  }
-
-  const conflicted = new Set();
-  for (const [targetId, group] of byTarget) {
-    if (group.length > 1) group.forEach(item => conflicted.add(item.oldId));
-    if ((snapshot.books || []).some(book => String(book.id || "") === targetId && !group.some(item => item.oldId === targetId))) {
-      group.forEach(item => conflicted.add(item.oldId));
-    }
-  }
-
-  const mapping = new Map();
-  for (const item of targets) if (!conflicted.has(item.oldId)) mapping.set(item.oldId, item.nextId);
-  const migratedBooks = [];
-  for (const item of targets) {
-    if (conflicted.has(item.oldId)) {
-      migratedBooks.push({ ...item.book, idMigrationConflict: true });
-    } else {
-      migratedBooks.push({
-        ...item.book,
-        id: item.nextId,
-        migratedFromBookId: item.oldId,
-        cloudSource: { ...(item.book.cloudSource || {}), sourceId: item.book.cloudSource?.sourceId || "" }
-      });
-    }
-  }
-
-  const migratedStates = (snapshot.states || []).filter(item => mapping.has(String(item.id || "")))
-    .map(item => ({ ...item, id: mapping.get(String(item.id)) }));
-  const movedAnnotations = (snapshot.annotations || []).filter(item => mapping.has(String(item.bookId || "")))
-    .map(item => {
-      const bookId = mapping.get(String(item.bookId));
-      return { ...item, bookId, key: bookId + "::" + String(item.id || item.key?.split("::").pop() || "") };
-    });
-  const movedEvents = (snapshot.events || []).filter(item => mapping.has(String(item.bookId || "")))
-    .map(item => ({ ...item, bookId: mapping.get(String(item.bookId)) }));
-
-  const report = {
-    key: "legacyBookIdMigrationV1",
-    completedAt: Date.now(),
-    migrated: mapping.size,
-    conflicts: conflicted.size,
-    conflictBookIds: Array.from(conflicted).slice(0, 50)
-  };
-
-  await localTransaction(db, ["books", "states", "annotations", "events", "sync_meta"], "readwrite", tx => {
-    const books = tx.objectStore("books");
-    const states = tx.objectStore("states");
-    const annotations = tx.objectStore("annotations");
-    const events = tx.objectStore("events");
-    for (const item of migratedBooks) {
-      if (conflicted.has(String(item.migratedFromBookId || item.id))) books.put(item);
-      else {
-        books.put(item);
-        books.delete(String(item.migratedFromBookId));
-      }
-    }
-    for (const item of snapshot.states || []) {
-      const nextId = mapping.get(String(item.id || ""));
-      if (nextId) states.delete(String(item.id));
-    }
-    migratedStates.forEach(item => states.put(item));
-    for (const item of snapshot.annotations || []) {
-      if (mapping.has(String(item.bookId || ""))) annotations.delete(item.key);
-    }
-    movedAnnotations.forEach(item => annotations.put(item));
-    movedEvents.forEach(item => events.put(item));
-    tx.objectStore("sync_meta").put(report);
-  });
-  return report;
-}
-
 async function getBookIdMigrationReport() {
   if (!isLocalMacApp()) return null;
   const db = await openLocalDatabase();
