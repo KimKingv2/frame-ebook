@@ -72,10 +72,15 @@ export async function onRequestPost({ request, env }) {
   try { value = validate(key, body?.value); } catch (error) { return json({ error: error.message }, 400); }
   const now = Date.now();
   try {
-    await ctx.db.prepare(
-      "INSERT INTO reader_preferences (user_id,setting_key,value_json,updated_at) VALUES (?,?,?,?) " +
-      "ON CONFLICT(user_id,setting_key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at"
-    ).bind(ctx.userId, key, JSON.stringify(value), now).run();
+    await ctx.db.batch([
+      ctx.db.prepare(
+        "INSERT INTO reader_preferences (user_id,setting_key,value_json,updated_at) VALUES (?,?,?,?) " +
+        "ON CONFLICT(user_id,setting_key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at"
+      ).bind(ctx.userId, key, JSON.stringify(value), now),
+      ctx.db.prepare(
+        "INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) VALUES (?,'preference',?,'upsert',?,?)"
+      ).bind(ctx.userId,key,JSON.stringify({key,value}),now)
+    ]);
     return json({ ok: true, key, value, updatedAt: now });
   } catch (error) {
     return json({ error: "保存雲端偏好設定失敗：" + String(error?.message || error).slice(0, 160) }, 503);

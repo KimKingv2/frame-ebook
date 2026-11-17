@@ -37,17 +37,24 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const now = Date.now();
-    const statements = events.map(event => db.prepare(
-      "INSERT OR IGNORE INTO reader_reading_events " +
-      "(user_id,event_id,day_key,book_id,book_title,format,seconds,started_at,ended_at,local_hour,created_at) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?)"
-    ).bind(
-      identity.userId, String(event.id), String(event.dayKey), String(event.bookId),
-      String(event.bookTitle || "").slice(0, 240), String(event.format || "").toUpperCase().slice(0, 8),
-      Number(event.seconds), Number(event.startedAt), Number(event.endedAt), Number(event.localHour), now
-    ));
+    const statements = events.flatMap(event => [
+      db.prepare(
+        "INSERT OR IGNORE INTO reader_reading_events " +
+        "(user_id,event_id,day_key,book_id,book_title,format,seconds,started_at,ended_at,local_hour,created_at) " +
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+      ).bind(
+        identity.userId, String(event.id), String(event.dayKey), String(event.bookId),
+        String(event.bookTitle || "").slice(0, 240), String(event.format || "").toUpperCase().slice(0, 8),
+        Number(event.seconds), Number(event.startedAt), Number(event.endedAt), Number(event.localHour), now
+      ),
+      db.prepare(
+        "INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) " +
+        "SELECT ?,'event',?,'upsert',?,? WHERE changes()>0"
+      ).bind(identity.userId,String(event.id),JSON.stringify(event),now)
+    ]);
     const results = await db.batch(statements);
-    const accepted = results.reduce((sum, result) => sum + (Number(result.meta && result.meta.changes) || 0), 0);
+    const accepted = results.filter((result,index) => index % 2 === 0)
+      .reduce((sum, result) => sum + (Number(result.meta && result.meta.changes) || 0), 0);
     return json({ accepted, ignored: events.length - accepted });
   } catch (error) {
     return json({ error: "雲端閱讀紀錄寫入失敗：" + String(error?.message || error).slice(0, 180) }, 503);

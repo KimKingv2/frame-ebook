@@ -97,18 +97,26 @@ export async function onRequestPost({ request, env }) {
 
   const now = Date.now();
   try {
-    await context.db.prepare(
-      "INSERT INTO reader_annotations " +
-      "(user_id, book_id, annotation_id, provider, library, root_path, book_path, type, cfi, quote, note_text, color, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-      "ON CONFLICT(user_id, book_id, annotation_id) DO UPDATE SET " +
-      "provider=excluded.provider, library=excluded.library, root_path=excluded.root_path, book_path=excluded.book_path, " +
-      "type=excluded.type, cfi=excluded.cfi, quote=excluded.quote, note_text=excluded.note_text, color=excluded.color, updated_at=excluded.updated_at"
-    ).bind(
-      context.userId, context.book.bookId, id,
-      context.book.provider, context.book.library, context.book.rootPath, context.book.path,
-      type, cfi, quote, noteText, color, now, now
-    ).run();
+    await context.db.batch([
+      context.db.prepare(
+        "INSERT INTO reader_annotations " +
+        "(user_id, book_id, annotation_id, provider, library, root_path, book_path, type, cfi, quote, note_text, color, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+        "ON CONFLICT(user_id, book_id, annotation_id) DO UPDATE SET " +
+        "provider=excluded.provider, library=excluded.library, root_path=excluded.root_path, book_path=excluded.book_path, " +
+        "type=excluded.type, cfi=excluded.cfi, quote=excluded.quote, note_text=excluded.note_text, color=excluded.color, updated_at=excluded.updated_at"
+      ).bind(
+        context.userId, context.book.bookId, id,
+        context.book.provider, context.book.library, context.book.rootPath, context.book.path,
+        type, cfi, quote, noteText, color, Number(input && input.createdAt) || now, now
+      ),
+      context.db.prepare(
+        "INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) VALUES (?,'annotation',?,'upsert',?,?)"
+      ).bind(context.userId,context.book.bookId+":"+id,JSON.stringify({
+        book:{id:context.book.bookId,provider:context.book.provider==="local"?"vps":context.book.provider,library:context.book.library,rootPath:context.book.rootPath,path:context.book.path},
+        annotation:{id,bookId:context.book.bookId,type,cfi,quote,text:noteText,color,createdAt:Number(input && input.createdAt)||now,updatedAt:now}
+      }),now)
+    ]);
 
     return json({
       ok: true,
@@ -135,10 +143,17 @@ export async function onRequestDelete({ request, env }) {
   if (!id) return json({ error: "缺少標註識別碼。" }, 400);
 
   try {
-    const result = await context.db.prepare(
-      "DELETE FROM reader_annotations WHERE user_id=? AND book_id=? AND annotation_id=?"
-    ).bind(context.userId, context.book.bookId, id).run();
-    return json({ ok: true, deleted: Number(result.meta && result.meta.changes) || 0 });
+    const results = await context.db.batch([
+      context.db.prepare(
+        "DELETE FROM reader_annotations WHERE user_id=? AND book_id=? AND annotation_id=?"
+      ).bind(context.userId, context.book.bookId, id),
+      context.db.prepare(
+        "INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) VALUES (?,'annotation',?,'delete',?,?)"
+      ).bind(context.userId,context.book.bookId+":"+id,JSON.stringify({
+        book:{id:context.book.bookId,provider:context.book.provider==="local"?"vps":context.book.provider,library:context.book.library,rootPath:context.book.rootPath,path:context.book.path},id
+      }),Date.now())
+    ]);
+    return json({ ok: true, deleted: Number(results[0]?.meta?.changes) || 0 });
   } catch (error) {
     return json({ error: "雲端標註刪除失敗：" + cleanText(error && error.message, 180) }, 503);
   }

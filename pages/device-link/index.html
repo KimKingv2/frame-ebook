@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#12101a">
+  <title>連結設備 · FRAME Ebook</title>
+  <link rel="stylesheet" href="/assets/site.css?v=20261116-fan-stack-r6">
+  <style>
+    body{min-height:100vh;display:grid;place-items:center;padding:24px;background:#100f17;color:#f5f0ff}
+    .pair-shell{width:min(100%,560px);padding:34px;border:1px solid rgba(205,178,255,.18);border-radius:24px;background:#191722;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+    .pair-shell h1{font-size:clamp(28px,5vw,42px);margin:8px 0 14px}.pair-shell p{color:#b8b2c6;line-height:1.7}
+    .pair-code{font-size:30px;letter-spacing:.16em;font-weight:800;text-align:center;padding:18px;margin:18px 0;border:1px solid rgba(205,178,255,.25);border-radius:14px;background:#111018}
+    .pair-form{display:grid;gap:12px;margin-top:20px}.pair-form input{padding:14px;border-radius:10px;border:1px solid #4a4259;background:#111018;color:#fff;font-size:20px;letter-spacing:.12em;text-align:center}
+    .pair-form button{padding:13px 18px;border:0;border-radius:10px;background:#a78bfa;color:#17121f;font-weight:800;cursor:pointer}
+    .pair-status{min-height:28px;margin-top:12px}.pair-back{display:inline-block;margin-top:20px;color:#c4b5fd}
+  </style>
+</head>
+<body>
+  <main class="pair-shell">
+    <p class="eyebrow">DEVICE AUTHORIZATION</p>
+    <h1>連結新的閱讀設備</h1>
+    <p>請確認這個代碼是由你自己的 FRAME Ebook App 顯示。核准後，該設備就能同步你的書架與閱讀資料。配對代碼 10 分鐘後失效。</p>
+    <form id="pair-form" class="pair-form">
+      <label for="pair-code">Mac App 顯示的 8 位代碼</label>
+      <input id="pair-code" name="userCode" maxlength="9" minlength="8" autocomplete="one-time-code" placeholder="ABCD-2345" required>
+      <button type="submit" id="approve-button">核准並連結設備</button>
+    </form>
+    <p id="pair-status" class="pair-status" role="status">請輸入 Mac App 顯示的配對代碼。</p>
+    <a class="pair-back" href="/">返回 FRAME Ebook</a>
+  </main>
+  <script type="module">
+    const form=document.getElementById("pair-form");
+    const input=document.getElementById("pair-code");
+    const status=document.getElementById("pair-status");
+    const button=document.getElementById("approve-button");
+    const query=new URLSearchParams(location.search);
+    if(query.get("code")) input.value=query.get("code");
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();button.disabled=true;status.textContent="正在驗證並核准設備……";
+      try{
+        const response=await fetch("/api/device/pair/approve",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({userCode:input.value})});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok||data.ok!==true)throw new Error(data.error||("HTTP "+response.status));
+        form.hidden=true;status.textContent="設備已核准。請回到 Mac App，它會自動完成連結。";
+      }catch(error){status.textContent=error.message||String(error);}
+      finally{button.disabled=false;}
+    });
+  </script>
+</body>
+</html>
