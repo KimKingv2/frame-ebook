@@ -316,6 +316,30 @@ function buildLocalDescriptor(book) {
     path:String(source.path || book?.path || "")
   };
 }
+async function ensureLocalSourceIds(profiles = []) {
+  const profileMap = new Map();
+  for (const profile of profiles || []) {
+    profileMap.set(String(profile.id), await webDavSourceId(profile));
+  }
+  const db = await openLocalDatabase();
+  const local = await readLocalStores(["books"]);
+  let changed = 0;
+  await localTransaction(db, ["books"], "readwrite", tx => {
+    const books = tx.objectStore("books");
+    for (const book of local.books || []) {
+      const source = book.cloudSource || {};
+      if (source.provider !== "webdav" || source.sourceId) continue;
+      const sourceId = profileMap.get(String(source.profileId || book.profileId || ""));
+      if (!sourceId) continue;
+      const updated = { ...book, cloudSource: { ...source, sourceId } };
+      books.put(updated);
+      remember(updated);
+      changed++;
+    }
+  });
+  return changed;
+}
+
 async function upsertSyncedCatalogItems(items, profiles = []) {
   const profileSourceMap = {};
   for (const profile of profiles || []) {
@@ -674,7 +698,8 @@ async function getBook(bookOrId) {
         library: descriptor.library,
         rootPath: descriptor.rootPath,
         path: descriptor.path,
-        profileId: descriptor.profileId
+        profileId: descriptor.profileId,
+        sourceId: descriptor.sourceId || base.cloudSource?.sourceId || ""
       }
     };
     const remote = data.state || {};
@@ -839,7 +864,7 @@ async function setReadingSetting(key, value) {
 
 
 export {
-  getBook, updateBook, listBooks, cloudBookId, webDavSourceId, getBookIdMigrationReport, addLocalBook, saveLocalBookCover, removeLocalBook,
+  getBook, updateBook, listBooks, cloudBookId, webDavSourceId, getBookIdMigrationReport, ensureLocalSourceIds, addLocalBook, saveLocalBookCover, removeLocalBook,
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
   recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting,
   getLocalSyncQueue, acknowledgeLocalSyncQueue, getLocalSyncMeta, setLocalSyncMeta,
