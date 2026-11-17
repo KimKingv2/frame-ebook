@@ -887,11 +887,12 @@ $("parent-folder").addEventListener("click", () => {
 });
 $("refresh-folder").addEventListener("click", () => void loadDirectory());
 $("add-folder-books").addEventListener("click", async () => {
-  const files = state.entries.filter(item => !item.isDir && BOOK_EXTENSIONS.has(extension(item.path)));
+  const candidates = state.entries.filter(item => !item.isDir && BOOK_EXTENSIONS.has(extension(item.path)));
+  const files = candidates.filter(item => !!libraryForEntry(item));
   let count = 0;
   for (const file of files) { await addBook(file, false, false); count++; }
   await refreshShelf();
-  setStatus("已加入 " + count + " 本書籍");
+  setStatus("已加入 " + count + " 本書籍" + (candidates.length > files.length ? " · 已略過書庫根目錄以外的 " + (candidates.length-files.length) + " 個檔案" : ""));
 });
 $("shelf-refresh").addEventListener("click", () => {
   void refreshShelf({prefetch:false}).then(() => setStatus("已重新載入本機書架"));
