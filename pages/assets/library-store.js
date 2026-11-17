@@ -334,7 +334,7 @@ async function upsertSyncedCatalogItems(items, profiles = []) {
         if (previous.idMigrationConflict) return;
         const profileId = profileSourceMap[item.sourceId];
         const folderPath = String(item.parentPath || item.path || "/").replace(/\\/g,"/").replace(/[^/]+$/, "");
-        const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\\/+$/,"").split("/").pop();
+        const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/,"").split("/").pop();
         const source = {
           ...(previous.cloudSource || {}),
           provider:"webdav", profileId, sourceId:item.sourceId,
@@ -370,7 +370,7 @@ async function upsertSyncedCatalogItems(items, profiles = []) {
 }
 async function mergeCloudSnapshot(snapshot) {
   const db = await openLocalDatabase();
-  const local = await readLocalStores(["states","annotations","events","preferences"]);
+  const local = await readLocalStores(["books","states","annotations","events","preferences"]);
   const remoteStates = Array.isArray(snapshot.states) ? snapshot.states : [];
   const remoteAnnotations = Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
   const remoteEvents = Array.isArray(snapshot.events) ? snapshot.events : [];
@@ -379,6 +379,7 @@ async function mergeCloudSnapshot(snapshot) {
   const localAnnotations = new Map((local.annotations||[]).map(item=>[String(item.bookId)+"::"+String(item.id),item]));
   const localEvents = new Map((local.events||[]).map(item=>[String(item.id),item]));
   const localPreferences = new Map((local.preferences||[]).map(item=>[String(item.key),item]));
+  const localBooks = new Map((local.books||[]).map(item=>[String(item.id),item]));
   const stateWrites=[], annotationWrites=[], eventWrites=[], preferenceWrites=[], outgoing=[];
   const now=Date.now();
 
@@ -389,14 +390,15 @@ async function mergeCloudSnapshot(snapshot) {
     const localTime=Number(existing?.updatedAt||existing?.state?.lastOpenedAt)||0;
     const remoteTime=Number(remote.updatedAt||remote.state?.lastOpenedAt)||0;
     if(existing && localTime>remoteTime){
-      outgoing.push({type:"state",book:{...remote.book,sourceId:""},state:existing.state,updatedAt:localTime});
+      const bookRecord=localBooks.get(id);
+      if(bookRecord)outgoing.push({type:"state",book:buildLocalDescriptor(bookRecord),state:existing.state,updatedAt:localTime});
     }else{
       stateWrites.push({id,state:remote.state||{},updatedAt:remoteTime||now});
     }
   }
   for(const [id,existing] of localStates){
     if(!remoteStates.some(item=>String(item.book?.id||"")===id) && existing.state && Object.keys(existing.state).length){
-      const bookRecord=(await local.books?.find?.(x=>String(x.id)===id))||null;
+      const bookRecord=localBooks.get(id);
       if(bookRecord)outgoing.push({type:"state",book:buildLocalDescriptor(bookRecord),state:existing.state,updatedAt:Number(existing.updatedAt)||now});
     }
   }
@@ -408,7 +410,8 @@ async function mergeCloudSnapshot(snapshot) {
     const localTime=Number(existing?.updatedAt||existing?.createdAt)||0;
     const remoteTime=Number(annotation.updatedAt||annotation.createdAt)||0;
     if(existing && localTime>remoteTime){
-      outgoing.push({type:"annotation",book:{...book,sourceId:""},annotation:existing});
+      const bookRecord=localBooks.get(String(book.id||""));
+      if(bookRecord)outgoing.push({type:"annotation",book:buildLocalDescriptor(bookRecord),annotation:existing});
     }else{
       annotationWrites.push({...annotation,bookId:String(book.id),key});
     }
@@ -416,7 +419,7 @@ async function mergeCloudSnapshot(snapshot) {
   for(const [key,existing] of localAnnotations){
     if(!remoteAnnotations.some(item=>String(item.book?.id||"")+"::"+String(item.annotation?.id||"")===key)){
       const [bookId]=key.split("::");
-      const bookRecord=(local.books||[]).find(item=>String(item.id)===bookId);
+      const bookRecord=localBooks.get(bookId);
       if(bookRecord)outgoing.push({type:"annotation",book:buildLocalDescriptor(bookRecord),annotation:existing});
     }
   }
@@ -520,7 +523,6 @@ function normalizeDescriptor(book) {
     rootPath: String(source?.rootPath || source?.root_path || book?.rootPath || ""),
     path: String(source?.path || source?.bookPath || book?.path || ""),
     profileId: String(source?.profileId || source?.profile_id || book?.profileId || ""),
-    sourceId: String(source?.sourceId || source?.source_id || book?.sourceId || ""),
     sourceId: String(source?.sourceId || source?.source_id || book?.sourceId || "")
   };
   if (!descriptor.id || !descriptor.provider || !descriptor.library || !descriptor.rootPath || !descriptor.path) {
