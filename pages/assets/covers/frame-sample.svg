@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 960" role="img" aria-labelledby="title desc">
+<title id="title">FRAME Reader 示範封面</title><desc id="desc">午夜紫色背景，帶有抽象拱門與微光。</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#171324"/><stop offset=".55" stop-color="#45336f"/><stop offset="1" stop-color="#9b79d8"/></linearGradient><radialGradient id="glow"><stop stop-color="#e7d8ff" stop-opacity=".7"/><stop offset="1" stop-color="#b59bfa" stop-opacity="0"/></radialGradient><linearGradient id="arch" x2="0" y2="1"><stop stop-color="#d9c8ff" stop-opacity=".72"/><stop offset="1" stop-color="#9777d9" stop-opacity=".08"/></linearGradient></defs>
+<rect width="720" height="960" fill="url(#bg)"/><circle cx="500" cy="320" r="280" fill="url(#glow)"/>
+<path d="M110 820V450a250 250 0 0 1 500 0v370" fill="none" stroke="url(#arch)" stroke-width="3"/><path d="M175 820V470a185 185 0 0 1 370 0v350" fill="none" stroke="#e4d8ff" stroke-opacity=".28" stroke-width="2"/><path d="M242 820V488a118 118 0 0 1 236 0v332" fill="#181426" fill-opacity=".15" stroke="#e4d8ff" stroke-opacity=".3" stroke-width="2"/>
+<path d="M0 790Q180 730 350 800T720 780V960H0Z" fill="#171321" fill-opacity=".55"/>
+<text x="64" y="105" fill="#e8ddff" font-family="Arial,sans-serif" font-size="22" letter-spacing="8">FRAME READER</text>
+<text x="64" y="690" fill="#fff" font-family="Arial,sans-serif" font-size="62" font-weight="600">閱讀的</text><text x="64" y="765" fill="#fff" font-family="Arial,sans-serif" font-size="62" font-weight="600">新節奏</text>
+<text x="68" y="850" fill="#e1d4fa" font-family="Arial,sans-serif" font-size="18" letter-spacing="5">A PERSONAL READING SPACE</text>
+</svg>

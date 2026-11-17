@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 960" role="img" aria-labelledby="title desc">
+<title id="title">小說封面樣式示意</title><desc id="desc">深藍夜色與一輪暖金色月亮。</desc>
+<defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#101d35"/><stop offset="1" stop-color="#293f5a"/></linearGradient><radialGradient id="moon"><stop stop-color="#fff0c6"/><stop offset="1" stop-color="#d6a86c"/></radialGradient></defs>
+<rect width="720" height="960" fill="url(#bg)"/><circle cx="500" cy="310" r="150" fill="url(#moon)"/><circle cx="500" cy="310" r="190" fill="none" stroke="#f0d4a1" stroke-opacity=".2" stroke-width="2"/><path d="M0 690L130 520 230 640 365 455 490 640 590 500 720 670V960H0Z" fill="#142237"/><path d="M0 790L170 650 310 760 470 610 720 820V960H0Z" fill="#0b1728"/><text x="58" y="110" fill="#dcbf8b" font-size="20" letter-spacing="8" font-family="Arial,sans-serif">FICTION · COVER STUDY</text><text x="58" y="745" fill="#fff4df" font-size="66" font-family="serif">月色以北</text><text x="62" y="815" fill="#d9c7a8" font-size="18" letter-spacing="5" font-family="Arial,sans-serif">A STORY IN QUIET LIGHT</text>
+</svg>

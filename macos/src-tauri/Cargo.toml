@@ -1,0 +1,25 @@
+[package]
+name = "frame-ebook-macos"
+version = "0.2.7"
+description = "FRAME Ebook native macOS desktop reader"
+authors = ["KimKingv2"]
+edition = "2021"
+
+[lib]
+name = "frame_ebook_macos_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+tokio = { version = "1", features = ["fs", "io-util"] }
+futures-util = "0.3"
+roxmltree = "0.20"
+url = "2"
+percent-encoding = "2"
+uuid = { version = "1", features = ["v4"] }
