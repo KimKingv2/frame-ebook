@@ -32,7 +32,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg"],
-    "category": "public.app-category.books",
+    "category": "Reference",
     "shortDescription": "Local-first WebDAV EPUB reader",
     "longDescription": "FRAME Ebook is a local-first macOS reader for EPUB and CBZ books stored on WebDAV.",
     "macOS": {
