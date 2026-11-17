@@ -1,6 +1,6 @@
 [package]
 name = "frame-ebook-macos"
-version = "0.1.0"
+version = "0.1.1"
 description = "FRAME Ebook native macOS desktop reader"
 authors = ["KimKingv2"]
 edition = "2021"
