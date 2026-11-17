@@ -365,7 +365,7 @@ async function beginCloudPairing() {
   try {
     const start = await cloudPairRequest("/api/device/pair/start", { deviceName: "FRAME Ebook · macOS" });
     $("sync-user-code").textContent = start.userCode;
-    $("sync-verification-link").href = start.verificationUrl || "https://frame-ebook.pages.dev/device-link/";
+    $("sync-verification-link").href = start.verificationUrl || "https://cf-preview.frame-ebook-kim-preview-2026.pages.dev/device-link/";
     $("sync-pair-expiry").textContent = "請在 10 分鐘內完成核准。配對代碼只用一次。";
     $("sync-pair-panel").hidden = false;
     $("sync-account-status").textContent = "等待你在網頁版核准這台 Mac……";
