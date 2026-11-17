@@ -58,12 +58,12 @@
   </div>
   <dialog id="profile-dialog" class="profile-dialog">
     <form id="profile-form">
-      <div class="dialog-head"><div><p class="section-kicker">NATIVE WEBDAV CONNECTION</p><h2>新增檔案來源</h2></div><button id="close-profile" class="dialog-close" type="button" aria-label="關閉">×</button></div>
-      <p class="dialog-intro">輸入 WebDAV 服務地址及唯讀帳號。密碼會儲存在 macOS 鑰匙圈，不會寫入網頁資料庫。</p>
+      <div class="dialog-head"><div><p class="section-kicker">NATIVE WEBDAV CONNECTION</p><h2 id="profile-dialog-title">新增檔案來源</h2></div><button id="close-profile" class="dialog-close" type="button" aria-label="關閉">×</button></div>
+      <p id="profile-dialog-intro" class="dialog-intro">輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的記憶體，不會寫入鑰匙圈或磁碟。</p>
       <label>來源名稱<input id="profile-name" required maxlength="48" placeholder="我的 OpenList"></label>
       <label>WebDAV 地址<input id="profile-url" required type="url" placeholder="https://example.com/dav/"></label>
       <label>帳號<input id="profile-username" required autocomplete="username" placeholder="WebDAV 使用者名稱"></label>
-      <label>密碼<input id="profile-password" required type="password" autocomplete="new-password" placeholder="WebDAV 密碼"></label>
+      <label>密碼<input id="profile-password" required type="password" autocomplete="current-password" placeholder="WebDAV 密碼"></label>
       <div id="profile-error" class="form-error" role="status"></div>
       <div class="dialog-actions"><button id="cancel-profile" class="button subtle" type="button">取消</button><button id="save-profile" class="button primary" type="submit">儲存並測試連線</button></div>
     </form>

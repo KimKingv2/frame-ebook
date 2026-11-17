@@ -9,6 +9,65 @@ function makeFile(blob, record, deliveryMode) {
   return file;
 }
 
+function makeWebDavRangeFile(record, profileId, size) {
+  const tauri = window.__TAURI__;
+  const CHUNK_SIZE = 1024 * 1024;
+  const fileName = String(record.fileName || "comic.cbz");
+  const file = {
+    name: fileName,
+    type: "application/vnd.comicbook+zip",
+    size: Number(size),
+    lastModified: Number(record.lastModified) || Date.now(),
+    frameDeliveryMode: "webdav-native-range",
+    async arrayBuffer() {
+      return readBytes(0, file.size);
+    },
+    slice(start = 0, end = file.size) {
+      const normalize = (value, fallback) => {
+        const number = value === undefined ? fallback : Math.trunc(Number(value) || 0);
+        return number < 0 ? Math.max(0, file.size + number) : Math.min(file.size, Math.max(0, number));
+      };
+      const from = normalize(start, 0);
+      const to = Math.max(from, normalize(end, file.size));
+      return {
+        size: to - from,
+        async arrayBuffer() { return readBytes(from, to); }
+      };
+    }
+  };
+
+  async function readBytes(start, end) {
+    const length = end - start;
+    const output = new Uint8Array(length);
+    let offset = 0;
+    while (offset < length) {
+      const count = Math.min(CHUNK_SIZE, length - offset);
+      const raw = await tauri.core.invoke("webdav_read_range", {
+        profileId: String(profileId),
+        path: String(record.cloudSource.path || ""),
+        start: start + offset,
+        length: count
+      });
+      let chunk;
+      if (raw instanceof ArrayBuffer) {
+        chunk = new Uint8Array(raw);
+      } else if (ArrayBuffer.isView(raw)) {
+        chunk = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+      } else {
+        throw new Error("WebDAV Range 通道沒有回傳二進位資料。");
+      }
+      if (chunk.byteLength !== count) {
+        throw new Error("漫畫 Range 資料長度不符：預期 " + count + " bytes，實際 " + chunk.byteLength + " bytes。");
+      }
+      output.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return output.buffer;
+  }
+
+  return file;
+}
+
 async function responseError(response) {
   let data = {};
   try { data = await response.json(); } catch (_) {}
@@ -23,8 +82,22 @@ export async function fetchCloudBookFile(record) {
     if (!tauri || !tauri.core || !tauri.core.invoke || !tauri.core.convertFileSrc) {
       throw new Error("Mac 原生 WebDAV 通道尚未啟動，請重新開啟 FRAME Ebook。");
     }
+    const profileId = String(source.profileId || "");
+    const isCbz = String(record.format || "").toLowerCase() === "cbz"
+      || /\.cbz$/i.test(String(record.fileName || source.path || ""));
+    if (isCbz) {
+      const size = await tauri.core.invoke("webdav_get_file_size", {
+        profileId,
+        path: String(source.path || "")
+      });
+      if (!Number.isSafeInteger(Number(size)) || Number(size) <= 0) {
+        throw new Error("WebDAV 回報的 CBZ 檔案大小不正確。");
+      }
+      return makeWebDavRangeFile(record, profileId, Number(size));
+    }
+
     const downloaded = await tauri.core.invoke("webdav_download_file", {
-      profileId: String(source.profileId || ""),
+      profileId,
       path: String(source.path || "")
     });
     if (!downloaded || !downloaded.path) throw new Error("WebDAV 沒有提供可讀取的本機暫存檔。");

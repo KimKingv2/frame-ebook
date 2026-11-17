@@ -162,6 +162,12 @@ async function loadDirectory() {
   $("file-list").replaceChildren();
   $("current-path").textContent = state.path;
   try {
+    const authenticated = await invoke("webdav_has_password", { profileId: profile.id });
+    if (!authenticated) {
+      openProfileDialog(profile);
+      setStatus("請重新輸入「" + profile.name + "」的密碼；密碼只保留在 RAM。");
+      return;
+    }
     state.entries = await invoke("webdav_list_directory", { profileId: profile.id, path: state.path });
     renderEntries(state.entries);
     setStatus("WebDAV 已連線 · " + profile.name);
@@ -172,12 +178,22 @@ async function loadDirectory() {
     $("browser-empty").querySelector("p").textContent = error.message || String(error);
   } finally { state.busy = false; }
 }
-function openProfileDialog() {
+function openProfileDialog(existingProfile = null) {
   $("profile-error").textContent = "";
-  $("profile-name").value = "";
-  $("profile-url").value = "";
-  $("profile-username").value = "";
+  const isUnlock = !!existingProfile;
+  $("profile-name").value = existingProfile ? existingProfile.name : "";
+  $("profile-url").value = existingProfile ? existingProfile.baseUrl : "";
+  $("profile-username").value = existingProfile ? existingProfile.username : "";
   $("profile-password").value = "";
+  $("profile-name").readOnly = isUnlock;
+  $("profile-url").readOnly = isUnlock;
+  $("profile-username").readOnly = isUnlock;
+  $("profile-dialog-title").textContent = isUnlock ? "重新輸入 WebDAV 密碼" : "新增檔案來源";
+  $("profile-dialog-intro").textContent = isUnlock
+    ? "這個來源的密碼只保留在目前 App 的記憶體中。請重新輸入密碼以連線。"
+    : "輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的記憶體，不會寫入鑰匙圈或磁碟；完全退出 App 後需要重新輸入。";
+  $("save-profile").textContent = isUnlock ? "解鎖並測試連線" : "儲存並測試連線";
+  $("profile-password").setAttribute("autocomplete", isUnlock ? "current-password" : "new-password");
   $("profile-dialog").showModal();
 }
 async function saveProfile(event) {
@@ -191,6 +207,7 @@ async function saveProfile(event) {
       username: $("profile-username").value.trim(),
       password: $("profile-password").value
     });
+    $("profile-password").value = "";
     await refreshProfiles(profile.id);
     await invoke("webdav_list_directory", { profileId: profile.id, path: "/" });
     $("profile-dialog").close();
