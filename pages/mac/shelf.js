@@ -421,9 +421,8 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
       const reader=new NativeRangeReader(profileId,path,size,invoke);
       zip=new ZipReader(reader,{useWebWorkers:false,useCompressionStream:true});
       const entries=await zip.getEntries();
-      const entries=await zip.getEntries();
       appendLog("INFO","ZIP 中央目錄解析完成",entries.length+" 個項目；耗時 "+Math.round(performance.now()-started)+" ms");
-      const found=format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries,message=>appendLog("INFO",message));
+      const found=format==="CBZ"?await findCbzCover(entries):await findEpubCover(entries,(message,level)=>appendLog(level||"INFO",message));
       if(!found){appendLog("WARN","封面解析完成：沒有找到可用圖片",path+" · Range "+reader.rangeCount+" 次／"+sizeLabel(reader.bytesRead));return false;}
       appendLog("INFO","封面圖片讀取開始",found.entry.filename+"；壓縮 "+Number(found.entry.compressedSize||0)+" bytes，原始 "+Number(found.entry.uncompressedSize||0)+" bytes。");
       const original=await found.entry.getData(new BlobWriter(found.mime));
