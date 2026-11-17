@@ -1,7 +1,7 @@
 import * as store from "/assets/library-store.js?v=20261117-mac-local-r1";
 const $ = id => document.getElementById(id);
 const invoke = (name, args = {}) => window.__TAURI__.core.invoke(name, args);
-const state = { profiles: [], profileId: "", path: "/", entries: [], tab: "shelf", busy: false };
+const state = { profiles: [], profileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
 function setStatus(message, error = false) {
   const node = $("connection-status");
@@ -17,6 +17,11 @@ function extension(path) {
 }
 function baseTitle(name) { return String(name || "").replace(/\.(epub|cbz)$/i, ""); }
 function selectedProfile() { return state.profiles.find(item => item.id === state.profileId) || null; }
+function profileField(profile, camelName, snakeName) {
+  if (!profile || typeof profile !== "object") return "";
+  const value = profile[camelName] ?? profile[snakeName];
+  return value == null || String(value) === "undefined" ? "" : String(value);
+}
 function profileStorageKey() { return "frame-ebook-mac-active-profile"; }
 function pathStorageKey() { return "frame-ebook-mac-path-" + state.profileId; }
 function showTab(tab) {
@@ -36,7 +41,8 @@ function renderProfiles() {
   }
   state.profiles.forEach(profile => {
     const option = document.createElement("option");
-    option.value = profile.id; option.textContent = profile.name;
+    option.value = profile.id;
+    option.textContent = profileField(profile, "name", "name") || "未命名 WebDAV 來源";
     select.appendChild(option);
   });
   select.value = state.profileId;
@@ -181,18 +187,21 @@ async function loadDirectory() {
 function openProfileDialog(existingProfile = null) {
   $("profile-error").textContent = "";
   const isUnlock = !!existingProfile;
-  $("profile-name").value = existingProfile ? existingProfile.name : "";
-  $("profile-url").value = existingProfile ? existingProfile.baseUrl : "";
-  $("profile-username").value = existingProfile ? existingProfile.username : "";
+  state.editingProfileId = isUnlock ? profileField(existingProfile, "id", "id") : "";
+  $("profile-name").value = isUnlock ? profileField(existingProfile, "name", "name") : "";
+  $("profile-url").value = isUnlock ? profileField(existingProfile, "baseUrl", "base_url") : "";
+  $("profile-username").value = isUnlock ? profileField(existingProfile, "username", "username") : "";
   $("profile-password").value = "";
-  $("profile-name").readOnly = isUnlock;
-  $("profile-url").readOnly = isUnlock;
-  $("profile-username").readOnly = isUnlock;
+  // Keep the saved values prefilled, but let the user repair or edit them.
+  ["profile-name", "profile-url", "profile-username"].forEach(id => {
+    $(id).readOnly = false;
+    $(id).disabled = false;
+  });
   $("profile-dialog-title").textContent = isUnlock ? "重新輸入 WebDAV 密碼" : "新增檔案來源";
   $("profile-dialog-intro").textContent = isUnlock
-    ? "這個來源的密碼只保留在目前 App 的記憶體中。請重新輸入密碼以連線。"
-    : "輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的記憶體，不會寫入鑰匙圈或磁碟；完全退出 App 後需要重新輸入。";
-  $("save-profile").textContent = isUnlock ? "解鎖並測試連線" : "儲存並測試連線";
+    ? "來源名稱、WebDAV 地址及帳號都可以修改。密碼只保留在目前 App 的 RAM，完全退出後需要重新輸入。"
+    : "輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的 RAM，不會寫入鑰匙圈或磁碟。";
+  $("save-profile").textContent = isUnlock ? "儲存並重新連線" : "儲存並測試連線";
   $("profile-password").setAttribute("autocomplete", isUnlock ? "current-password" : "new-password");
   $("profile-dialog").showModal();
 }
@@ -202,12 +211,14 @@ async function saveProfile(event) {
   button.disabled = true; $("profile-error").textContent = "正在儲存並測試 WebDAV…";
   try {
     const profile = await invoke("save_webdav_profile", {
+      profileId: state.editingProfileId || null,
       name: $("profile-name").value.trim(),
       baseUrl: $("profile-url").value.trim(),
       username: $("profile-username").value.trim(),
       password: $("profile-password").value
     });
     $("profile-password").value = "";
+    state.editingProfileId = "";
     await refreshProfiles(profile.id);
     await invoke("webdav_list_directory", { profileId: profile.id, path: "/" });
     $("profile-dialog").close();

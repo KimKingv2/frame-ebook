@@ -249,6 +249,7 @@ fn webdav_has_password(state: State<'_, AppState>, profile_id: String) -> bool {
 fn save_webdav_profile(
     app: AppHandle,
     state: State<'_, AppState>,
+    profile_id: Option<String>,
     name: String,
     base_url: String,
     username: String,
@@ -261,9 +262,11 @@ fn save_webdav_profile(
     }
     let normalized_url = normalize_base_url(&base_url)?;
     let mut profiles = read_profiles(&app)?;
-    let existing_index = profiles.iter().position(|item|
-        item.base_url == normalized_url && item.username == clean_user
-    );
+    let existing_index = profile_id.as_deref()
+        .and_then(|id| profiles.iter().position(|item| item.id == id))
+        .or_else(|| profiles.iter().position(|item|
+            item.base_url == normalized_url && item.username == clean_user
+        ));
     let profile = WebDavProfile {
         id: existing_index
             .map(|index| profiles[index].id.clone())
