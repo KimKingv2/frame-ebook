@@ -1,7 +1,7 @@
 {
   "name": "frame-ebook-macos",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Native macOS build for FRAME Ebook",
   "scripts": {
     "tauri": "tauri",
