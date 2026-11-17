@@ -772,7 +772,7 @@ async fn cloud_sync_request(
     path: String,
     body: Option<String>,
 ) -> Result<String, String> {
-    const API_BASE: &str = "https://frame-ebook.pages.dev";
+    const API_BASE: &str = "https://cf-preview.frame-ebook-kim-preview-2026.pages.dev";
     let safe_path = path.trim();
     let public_pairing = matches!(safe_path, "/api/device/pair/start" | "/api/device/pair/poll");
     let protected_path = safe_path.starts_with("/api/device/sync") || safe_path == "/api/device/revoke";
@@ -791,7 +791,7 @@ async fn cloud_sync_request(
     let client = Client::builder()
         .connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(30))
-        .user_agent("FRAME-Ebook-macOS/0.3.0")
+        .user_agent("FRAME-Ebook-macOS/0.3.1-preview")
         .build()
         .map_err(|e| format!("建立 Cloudflare 同步連線失敗：{e}"))?;
     let mut request = client.request(request_method, &url)
