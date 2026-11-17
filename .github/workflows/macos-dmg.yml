@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -36,7 +36,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install universal macOS Rust targets
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
 
       - name: Install frontend tooling
         working-directory: macos
@@ -46,12 +46,12 @@ jobs:
         working-directory: macos
         env:
           APPLE_SIGNING_IDENTITY: "-"
-        run: npm run tauri:build -- --target universal-apple-darwin
+        run: npm run tauri:build -- --target aarch64-apple-darwin
 
-      - name: Upload DMG
+      - name: Upload Apple Silicon DMG
         uses: actions/upload-artifact@v4
         with:
-          name: frame-ebook-macos-universal-dmg
-          path: macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          name: frame-ebook-macos-arm64-dmg
+          path: macos/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 14
