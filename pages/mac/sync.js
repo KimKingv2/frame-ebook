@@ -25,7 +25,7 @@ function parseNativeResponse(raw) {
   return data;
 }
 
-export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog = () => {} } = {}) {
+export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog = () => {}, onCatalogUpdated = () => {} } = {}) {
   if (!window.FRAME_LOCAL_APP || !window.__TAURI__?.core?.invoke) return null;
 
   let inFlight = null;
@@ -79,6 +79,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
       await store.setLocalSyncMeta(metaKey, Date.now());
       onLog("INFO", "雲端書架索引已更新", (result.count || 0) + " 筆 · " + (profile.name || provider));
     }
+    if (imported) { try { onCatalogUpdated(imported); } catch (_) {} }
     if (unmatched.length) {
       onLog("WARN", "部分 Cloudflare 書庫尚未對應到這台 Mac 的 WebDAV 來源",
         unmatched.length + " 個來源沒有相同的網址網域與帳號。請確認 Mac WebDAV 與 Cloudflare AList 設定指向同一服務。");
@@ -101,7 +102,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
       }
       if (type === "preference") {
         changes.push({ type, key: item.key, value: item.value });
-        queueIds.push(item.queueId);
+        queueAcks.push({ queueId:item.queueId, queuedAt:item.queuedAt });
         continue;
       }
       const id = String(item.book?.id || item.annotation?.bookId || "");
@@ -128,7 +129,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
         onLog("WARN", "跳過未知的本機同步資料類型", type);
         continue;
       }
-      queueIds.push(item.queueId);
+      queueAcks.push({ queueId:item.queueId, queuedAt:item.queuedAt });
     }
     if (!changes.length) return 0;
     const result = await request("POST", API.push, { changes });

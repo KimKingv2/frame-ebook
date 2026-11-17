@@ -518,7 +518,8 @@ async function boot() {
         const status = $("sync-last-result");
         if (status) status.textContent = message;
       },
-      onLog: (level, message, detail) => appendLog(level, message, detail)
+      onLog: (level, message, detail) => appendLog(level, message, detail),
+      onCatalogUpdated: () => { void refreshShelf(); }
     });
     await refreshShelf();
     await pullNativeTransferDiagnostics();
