@@ -1,5 +1,5 @@
-import * as store from "/assets/library-store.js?v=20261117-sync-r1";
-import { createMacShelf } from "/mac/shelf.js?v=20261117-folder-shelf-r2";
+import * as store from "/assets/library-store.js?v=20261117-preview-shelf-r2";
+import { createMacShelf } from "/mac/shelf.js?v=20261117-preview-shelf-r2";
 import { startMacSync } from "/mac/sync.js?v=20261117-sync-r1";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
@@ -204,32 +204,53 @@ function renderEntries(entries) {
   });
 }
 async function loadDirectory() {
-  if (state.busy) return;
+  if (state.busy) {
+    // Keep the newest navigation request. The previous in-flight request must
+    // not silently swallow a folder click made while WebDAV is still loading.
+    state.directoryReloadPending = true;
+    return;
+  }
   const profile = selectedProfile();
   if (!profile) { setStatus("請先新增 WebDAV 來源", true); return; }
   state.busy = true;
+  const requestedPath = state.path;
+  const requestedProfileId = profile.id;
   setStatus("正在讀取 WebDAV…");
   $("file-list").replaceChildren();
-  $("current-path").textContent = state.path;
+  $("current-path").textContent = requestedPath;
   try {
-    const authenticated = await invoke("webdav_has_password", { profileId: profile.id });
+    const authenticated = await invoke("webdav_has_password", { profileId: requestedProfileId });
     if (!authenticated) {
       openProfileDialog(profile);
       setStatus("請重新輸入「" + profile.name + "」的密碼；密碼只保留在 RAM。");
       return;
     }
-    state.entries = await invoke("webdav_list_directory", { profileId: profile.id, path: state.path });
-    state.unlockedProfileId = profile.id;
+    const entries = await invoke("webdav_list_directory", { profileId: requestedProfileId, path: requestedPath });
+    // Ignore stale results if the user switched source or navigated elsewhere.
+    if (requestedProfileId !== state.profileId || requestedPath !== state.path) {
+      state.directoryReloadPending = true;
+      return;
+    }
+    state.entries = Array.isArray(entries) ? entries : [];
+    state.unlockedProfileId = requestedProfileId;
     renderEntries(state.entries);
     await refreshShelf();
-    appendLog("INFO", "目錄讀取成功", state.path + " · " + state.entries.length + " 個項目");
+    appendLog("INFO", "目錄讀取成功", requestedPath + " · " + state.entries.length + " 個項目");
     setStatus("WebDAV 已連線 · " + profile.name);
   } catch (error) {
-    setStatus(error.message || String(error), true);
-    $("browser-empty").hidden = false;
-    $("browser-empty").querySelector("h3").textContent = "無法讀取這個資料夾";
-    $("browser-empty").querySelector("p").textContent = error.message || String(error);
-  } finally { state.busy = false; }
+    if (requestedProfileId === state.profileId && requestedPath === state.path) {
+      setStatus(error.message || String(error), true);
+      $("browser-empty").hidden = false;
+      $("browser-empty").querySelector("h3").textContent = "無法讀取這個資料夾";
+      $("browser-empty").querySelector("p").textContent = error.message || String(error);
+    }
+  } finally {
+    state.busy = false;
+    if (state.directoryReloadPending) {
+      state.directoryReloadPending = false;
+      if (state.tab === "browser") void loadDirectory();
+    }
+  }
 }
 function openProfileDialog(existingProfile = null) {
   $("profile-error").textContent = "";
@@ -523,11 +544,9 @@ async function boot() {
     });
     await refreshShelf();
     await pullNativeTransferDiagnostics();
-    if (state.profileId) {
-      await loadDirectory();
-    } else {
-      setStatus("本機就緒 · 請新增 WebDAV 來源");
-    }
+    // Launch into the bookshelf. WebDAV is an explicit file-browser action,
+    // never an automatic startup request that can block the reading library.
+    setStatus(state.profileId ? "書架就緒 · WebDAV 來源已保存" : "本機就緒 · 尚未設定 WebDAV 來源");
   } catch (error) { setStatus(error.message || String(error), true); }
 }
 window.addEventListener("pageshow", event => {
