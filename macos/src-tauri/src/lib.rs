@@ -694,6 +694,133 @@ fn take_webdav_transfer_diagnostics(state: State<'_, AppState>) -> Vec<TransferD
         .unwrap_or_default()
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncCredentials {
+    device_id: String,
+    device_token: String,
+    device_name: String,
+}
+
+fn sync_credentials_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_config_dir(app)?.join("cloud-sync-credentials.json"))
+}
+
+fn read_sync_credentials(app: &AppHandle) -> Result<Option<SyncCredentials>, String> {
+    let path = sync_credentials_file(app)?;
+    if !path.exists() { return Ok(None); }
+    let bytes = fs::read(path).map_err(|e| format!("讀取雲端同步授權失敗：{e}"))?;
+    let value: SyncCredentials = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("解析雲端同步授權失敗：{e}"))?;
+    if value.device_id.trim().is_empty() || value.device_token.len() < 40 {
+        return Err("本機雲端同步授權檔案內容無效，請重新配對。".into());
+    }
+    Ok(Some(value))
+}
+
+fn write_sync_credentials(app: &AppHandle, value: &SyncCredentials) -> Result<(), String> {
+    if value.device_id.trim().is_empty() || value.device_token.len() < 40 || value.device_token.len() > 160 {
+        return Err("設備授權資料格式無效。".into());
+    }
+    let path = sync_credentials_file(app)?;
+    let bytes = serde_json::to_vec(value).map_err(|e| format!("序列化設備授權失敗：{e}"))?;
+    fs::write(&path, bytes).map_err(|e| format!("保存設備授權失敗：{e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("設定設備授權檔案權限失敗：{e}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn cloud_sync_get_credentials(app: AppHandle) -> Result<Option<SyncCredentials>, String> {
+    read_sync_credentials(&app)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn cloud_sync_save_credentials(
+    app: AppHandle,
+    device_id: String,
+    device_token: String,
+    device_name: String,
+) -> Result<(), String> {
+    let value = SyncCredentials {
+        device_id,
+        device_token,
+        device_name: device_name.chars().take(80).collect(),
+    };
+    write_sync_credentials(&app, &value)
+}
+
+#[tauri::command]
+fn cloud_sync_clear_credentials(app: AppHandle) -> Result<(), String> {
+    let path = sync_credentials_file(&app)?;
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("清除雲端同步授權失敗：{error}")),
+    }
+}
+
+#[tauri::command(rename_all = "camelCase")]
+async fn cloud_sync_request(
+    app: AppHandle,
+    method: String,
+    path: String,
+    body: Option<String>,
+) -> Result<String, String> {
+    const API_BASE: &str = "https://frame-ebook.pages.dev";
+    let safe_path = path.trim();
+    let public_pairing = matches!(safe_path, "/api/device/pair/start" | "/api/device/pair/poll");
+    let protected_path = safe_path.starts_with("/api/device/sync") || safe_path == "/api/device/revoke";
+    if !public_pairing && !protected_path {
+        return Err("拒絕呼叫未列入允許清單的雲端 API。".into());
+    }
+    if !safe_path.starts_with('/') || safe_path.contains("..") || safe_path.contains('#') {
+        return Err("雲端 API 路徑格式無效。".into());
+    }
+    let request_method = match method.to_ascii_uppercase().as_str() {
+        "GET" => Method::GET,
+        "POST" => Method::POST,
+        _ => return Err("雲端同步只允許 GET 或 POST。".into()),
+    };
+    let url = format!("{API_BASE}{safe_path}");
+    let client = Client::builder()
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(30))
+        .user_agent("FRAME-Ebook-macOS/0.3.0")
+        .build()
+        .map_err(|e| format!("建立 Cloudflare 同步連線失敗：{e}"))?;
+    let mut request = client.request(request_method, &url)
+        .header(header::ACCEPT, "application/json");
+    if protected_path {
+        let credentials = read_sync_credentials(&app)?
+            .ok_or_else(|| "這台 Mac 尚未連結 Cloudflare 帳號，請先完成設備配對。".to_string())?;
+        request = request.bearer_auth(credentials.device_token);
+    }
+    if let Some(value) = body {
+        if value.len() > 2 * 1024 * 1024 {
+            return Err("雲端同步請求超過 2 MiB 上限。".into());
+        }
+        request = request.header(header::CONTENT_TYPE, "application/json").body(value);
+    }
+    let response = request.send().await
+        .map_err(|e| format!("Cloudflare 同步請求失敗：{e}"))?;
+    let status = response.status();
+    let text = response.text().await
+        .map_err(|e| format!("讀取 Cloudflare 同步回應失敗：{e}"))?;
+    if text.len() > 4 * 1024 * 1024 {
+        return Err("Cloudflare 同步回應超過 4 MiB 上限。".into());
+    }
+    if !status.is_success() {
+        return Ok(serde_json::json!({ "ok": false, "httpStatus": status.as_u16(), "error": text }).to_string());
+    }
+    Ok(text)
+}
+
 #[tauri::command(rename_all = "camelCase")]
 async fn delete_cached_file(app: AppHandle, path: String) -> Result<(), String> {
     let cache_dir = app_cache_dir(&app)?;
@@ -728,6 +855,10 @@ pub fn run() {
             webdav_download_file,
             webdav_download_file_memory,
             take_webdav_transfer_diagnostics,
+            cloud_sync_get_credentials,
+            cloud_sync_save_credentials,
+            cloud_sync_clear_credentials,
+            cloud_sync_request,
             delete_cached_file
         ])
         .run(tauri::generate_context!())

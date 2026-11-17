@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-cloud-id-r1";
+import * as store from "/assets/library-store.js?v=20261117-device-link-r1";
 import { createMacShelf } from "/mac/shelf.js?v=20261117-folder-shelf-r2";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
@@ -303,6 +303,92 @@ async function pullNativeTransferDiagnostics() {
   } catch (error) { appendLog("ERROR", "讀取 WebDAV 傳輸診斷失敗", errorText(error)); }
 }
 
+
+let cloudPairCancelled = false;
+function parseNativeJson(raw) {
+  try { return typeof raw === "string" ? JSON.parse(raw) : raw; }
+  catch (_) { throw new Error("Cloudflare 回傳的資料不是有效 JSON。"); }
+}
+async function cloudPairRequest(path, body) {
+  const raw = await invoke("cloud_sync_request", {
+    method: "POST", path, body: JSON.stringify(body || {})
+  });
+  const data = parseNativeJson(raw);
+  if (data?.ok === false || data?.error) throw new Error(data.error || ("HTTP " + data.httpStatus));
+  return data;
+}
+async function refreshCloudSyncDialog() {
+  const credentials = await invoke("cloud_sync_get_credentials");
+  const linked = !!credentials?.deviceToken;
+  $("sync-account-status").textContent = linked
+    ? "已連結 Cloudflare · " + String(credentials.deviceName || "FRAME Ebook") + "（設備授權已保存於本機）"
+    : "尚未連結雲端帳號。完成配對後，這台 Mac 才能參與多設備同步。";
+  $("start-cloud-pair").hidden = linked;
+  $("disconnect-cloud-sync").hidden = !linked;
+  $("sync-pair-panel").hidden = true;
+}
+async function beginCloudPairing() {
+  cloudPairCancelled = false;
+  $("start-cloud-pair").disabled = true;
+  $("sync-account-status").textContent = "正在建立設備配對請求……";
+  $("sync-pair-panel").hidden = true;
+  $("cancel-cloud-pair").hidden = false;
+  try {
+    const start = await cloudPairRequest("/api/device/pair/start", { deviceName: "FRAME Ebook · macOS" });
+    $("sync-user-code").textContent = start.userCode;
+    $("sync-verification-link").href = start.verificationUrl || "https://frame-ebook.pages.dev/device-link/";
+    $("sync-pair-expiry").textContent = "請在 10 分鐘內完成核准。配對代碼只用一次。";
+    $("sync-pair-panel").hidden = false;
+    $("sync-account-status").textContent = "等待你在網頁版核准這台 Mac……";
+    const deadline = Number(start.expiresAt) || Date.now() + 10 * 60 * 1000;
+    while (!cloudPairCancelled && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      if (cloudPairCancelled) break;
+      const result = await cloudPairRequest("/api/device/pair/poll", { deviceCode: start.deviceCode });
+      if (result.status === "expired") throw new Error(result.error || "設備配對已過期。");
+      if (result.status === "claimed") throw new Error(result.error || "設備配對已被兌換。");
+      if (result.status === "approved" && result.deviceToken && result.deviceId) {
+        await invoke("cloud_sync_save_credentials", {
+          deviceId: result.deviceId,
+          deviceToken: result.deviceToken,
+          deviceName: result.deviceName || "FRAME Ebook · macOS"
+        });
+        $("sync-account-status").textContent = "設備已成功連結 Cloudflare 帳號。多端同步引擎尚在接線中。";
+        $("sync-pair-panel").hidden = true;
+        $("cancel-cloud-pair").hidden = true;
+        $("start-cloud-pair").hidden = true;
+        $("disconnect-cloud-sync").hidden = false;
+        appendLog("INFO", "Mac 已完成 Cloudflare 設備配對", "設備 ID：" + result.deviceId);
+        return;
+      }
+    }
+    if (cloudPairCancelled) {
+      $("sync-account-status").textContent = "已取消設備配對。";
+    } else {
+      throw new Error("設備配對逾時，請重新產生代碼。");
+    }
+  } catch (error) {
+    $("sync-account-status").textContent = error.message || String(error);
+    appendLog("ERROR", "Cloudflare 設備配對失敗", error.message || String(error));
+  } finally {
+    $("start-cloud-pair").disabled = false;
+    $("cancel-cloud-pair").hidden = true;
+  }
+}
+async function disconnectCloudSync() {
+  const credentials = await invoke("cloud_sync_get_credentials");
+  if (!credentials) return;
+  let revokeError = null;
+  try {
+    const raw = await invoke("cloud_sync_request", { method:"POST", path:"/api/device/revoke", body:JSON.stringify({}) });
+    const result = parseNativeJson(raw);
+    if (!result.ok) throw new Error(result.error || "撤銷設備授權失敗。");
+  } catch (error) { revokeError = error; }
+  await invoke("cloud_sync_clear_credentials");
+  await refreshCloudSyncDialog();
+  appendLog(revokeError ? "WARN" : "INFO", "已解除這台 Mac 的本機雲端連結", revokeError ? "遠端撤銷未確認：" + (revokeError.message || String(revokeError)) : "");
+}
+
 function currentLogText() {
   return logState.entries.map(entry =>
     "[" + entry.time + "] [" + entry.level + "] " + entry.message +
@@ -341,6 +427,16 @@ $("copy-logs").addEventListener("click", async () => {
   }
 });
 
+$("cloud-sync-button").addEventListener("click", async () => {
+  await refreshCloudSyncDialog();
+  $("sync-dialog").showModal();
+});
+$("close-sync").addEventListener("click", () => $("sync-dialog").close());
+$("start-cloud-pair").addEventListener("click", () => void beginCloudPairing());
+$("cancel-cloud-pair").addEventListener("click", () => { cloudPairCancelled = true; });
+$("disconnect-cloud-sync").addEventListener("click", () => void disconnectCloudSync().catch(error => {
+  $("sync-account-status").textContent = error.message || String(error);
+}));
 $("add-profile").addEventListener("click", openProfileDialog);
 $("close-profile").addEventListener("click", () => $("profile-dialog").close());
 $("cancel-profile").addEventListener("click", () => $("profile-dialog").close());

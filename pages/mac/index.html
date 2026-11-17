@@ -15,6 +15,7 @@
       <div class="topbar-right">
         <span id="connection-status" class="status-pill"><i></i> 本機就緒</span>
         <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
+        <button id="cloud-sync-button" class="button subtle" type="button">連結雲端</button>
         <button id="open-logs" class="button subtle" type="button">日誌 <span id="log-count">0</span></button>
         <button id="add-profile" class="button primary" type="button">＋ 新增 WebDAV</button>
       </div>
@@ -132,6 +133,29 @@
     </form>
   </dialog>
 
+  <dialog id="sync-dialog" class="logs-dialog">
+    <div class="logs-shell">
+      <div class="logs-head">
+        <div><p class="section-kicker">CLOUDFLARE DEVICE LINK</p><h2>多設備雲端同步</h2><p>使用網頁版已登入的帳號核准這台 Mac。WebDAV 密碼不會上傳。</p></div>
+        <button id="close-sync" class="dialog-close" type="button" aria-label="關閉">×</button>
+      </div>
+      <div class="sync-panel">
+        <p id="sync-account-status" role="status">尚未連結雲端帳號。</p>
+        <div id="sync-pair-panel" hidden>
+          <p>請在已登入 FRAME Ebook 網頁版的瀏覽器開啟以下頁面，輸入這組代碼：</p>
+          <p><a id="sync-verification-link" href="https://frame-ebook.pages.dev/device-link/" target="_blank" rel="noopener noreferrer">開啟設備核准頁面</a></p>
+          <strong id="sync-user-code" class="pair-code">----</strong>
+          <p id="sync-pair-expiry">代碼有效時間：10 分鐘</p>
+        </div>
+        <div class="dialog-actions">
+          <button id="start-cloud-pair" class="button primary" type="button">連結 Cloudflare 帳號</button>
+          <button id="cancel-cloud-pair" class="button subtle" type="button" hidden>取消配對</button>
+          <button id="disconnect-cloud-sync" class="button subtle" type="button" hidden>解除此設備</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="logs-dialog" class="logs-dialog">
     <div class="logs-shell">
       <div class="logs-head">
@@ -146,6 +170,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/mac/app.js?v=20261117-folder-shelf-r2"></script>
+  <script type="module" src="/mac/app.js?v=20261117-device-link-r1"></script>
 </body>
 </html>
