@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-filename-id-r2";
+import * as store from "/assets/library-store.js?v=20261117-autoscan-r1";
 import { createMacShelf } from "/mac/shelf.js?v=20261117-preview-shelf-r3";
 import { startMacSync } from "/mac/sync.js?v=20261117-sync-r1";
 const $ = id => document.getElementById(id);
@@ -186,7 +186,7 @@ function makeScannedBookRecord(entry, profile, sourceId) {
   const ext = extension(entry.path);
   const library = ext === "cbz" ? "comics" : "books";
   const folderPath = parentPath(entry.path);
-  const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\\/+$/, "").split("/").pop();
+  const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
   return store.cloudBookId({ provider:"webdav", profileId:profile.id, library }, entry.path).then(id => ({
     id, sourceType:"cloud", provider:"webdav", library, rootPath:"/",
     path:entry.path, fileName:entry.name, title:baseTitle(entry.name),
@@ -267,7 +267,7 @@ async function scanWebDavProfile(profile) {
         if (result.skipped) continue;
         if (result.error) {
           failedDirectories++;
-          appendLog("WARN", "自動掃描略過無法讀取的資料夾", result.path + "\\n" + errorText(result.error));
+          appendLog("WARN", "自動掃描略過無法讀取的資料夾", result.path + "\n" + errorText(result.error));
           if (result.path === "/") throw result.error;
           continue;
         }
@@ -275,7 +275,7 @@ async function scanWebDavProfile(profile) {
         for (const entry of result.entries) {
           if (entry.isDir) {
             if (!shouldSkipScanFolder(entry)) {
-              const nextPath = String(entry.path || "").replace(/\\\\/g, "/").replace(/\\/$/, "") || "/";
+              const nextPath = String(entry.path || "").replace(/\\/g, "/").replace(/\/$/, "") || "/";
               if (nextPath.startsWith("/") && !visited.has(nextPath) && !pendingDirectories.includes(nextPath)) {
                 pendingDirectories.push(nextPath);
               }
