@@ -470,7 +470,8 @@ async function runManualScan(libraries, options = {}) {
   }).finally(()=>{webDavScanPromise=null;});
   return webDavScanPromise;
 }
-\nfunction parentPath(path) {
+
+function parentPath(path) {
   const pieces = String(path || "/").replace(/\/+$/, "").split("/").filter(Boolean);
   pieces.pop();
   return pieces.length ? "/" + pieces.join("/") + "/" : "/";
