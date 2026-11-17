@@ -827,6 +827,37 @@ $("scan-manager-dialog").addEventListener("click",event=>{if(event.target===$("s
 document.querySelectorAll("[data-manager-tab]").forEach(button=>button.addEventListener("click",()=>showTab(button.dataset.managerTab)));
 document.querySelectorAll("[data-open-browser]").forEach(button=>button.addEventListener("click",()=>openScanManager("connection")));
 $("go-browser").addEventListener("click",()=>openScanManager("library"));
+$("use-current-books-root").addEventListener("click",()=>{
+  if(!state.profileId){$("scan-settings-status").textContent="請先選擇 WebDAV 來源。";return;}
+  $("scan-books-root").value=normalizeScanRoot(state.path);
+  $("scan-settings-status").textContent="已填入目前瀏覽位置，請保存目錄設定。";
+});
+$("use-current-comics-root").addEventListener("click",()=>{
+  if(!state.profileId){$("scan-settings-status").textContent="請先選擇 WebDAV 來源。";return;}
+  $("scan-comics-root").value=normalizeScanRoot(state.path);
+  $("scan-settings-status").textContent="已填入目前瀏覽位置，請保存目錄設定。";
+});
+$("test-webdav-connection").addEventListener("click",async()=>{
+  const profile=selectedProfile(),button=$("test-webdav-connection");
+  if(!profile){$("scan-settings-status").textContent="請先新增並選擇 WebDAV 來源。";return;}
+  button.disabled=true;$("scan-settings-status").textContent="正在測試 WebDAV 與兩個書庫根目錄…";
+  try{
+    const authenticated=await invoke("webdav_has_password",{profileId:profile.id});
+    if(!authenticated){openProfileDialog(profile);return;}
+    state.unlockedProfileId=String(profile.id);
+    const roots=await saveScanRoots();
+    const [books,comics]=await Promise.all([
+      invoke("webdav_list_directory",{profileId:profile.id,path:roots.books}),
+      invoke("webdav_list_directory",{profileId:profile.id,path:roots.comics})
+    ]);
+    appendLog("INFO","WebDAV 連線與書庫根目錄測試成功",
+      "電子書："+roots.books+" · "+books.length+" 個項目\\n漫畫："+roots.comics+" · "+comics.length+" 個項目");
+    $("scan-settings-status").textContent="連線成功。電子書目錄 "+books.length+" 個項目；漫畫目錄 "+comics.length+" 個項目。";
+  }catch(error){
+    appendLog("ERROR","WebDAV 連線／根目錄測試失敗",errorText(error));
+    $("scan-settings-status").textContent="測試失敗："+errorText(error);
+  }finally{button.disabled=false;}
+});
 $("save-scan-roots").addEventListener("click",async()=>{
   const button=$("save-scan-roots");button.disabled=true;
   try{await saveScanRoots();}catch(error){$("scan-settings-status").textContent=error.message||String(error);appendLog("ERROR","保存書庫目錄失敗",errorText(error));}
