@@ -15,6 +15,7 @@
       <div class="topbar-right">
         <span id="connection-status" class="status-pill"><i></i> 本機就緒</span>
         <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
+        <button id="open-logs" class="button subtle" type="button">日誌 <span id="log-count">0</span></button>
         <button id="add-profile" class="button primary" type="button">＋ 新增 WebDAV</button>
       </div>
     </header>
@@ -68,6 +69,21 @@
       <div class="dialog-actions"><button id="cancel-profile" class="button subtle" type="button">取消</button><button id="save-profile" class="button primary" type="submit">儲存並測試連線</button></div>
     </form>
   </dialog>
-  <script type="module" src="/mac/app.js"></script>
+
+  <dialog id="logs-dialog" class="logs-dialog">
+    <div class="logs-shell">
+      <div class="logs-head">
+        <div><p class="section-kicker">SESSION DIAGNOSTICS</p><h2>執行日誌</h2><p>記錄連線指令、目錄讀取與錯誤，最多保留最近 500 筆。</p></div>
+        <button id="close-logs" class="dialog-close" type="button" aria-label="關閉">×</button>
+      </div>
+      <div class="logs-toolbar">
+        <span>僅保存在目前 App 的記憶體，退出 App 後自動清除，不會寫入磁碟。</span>
+        <div><button id="copy-logs" class="button subtle" type="button">複製日誌</button><button id="clear-logs" class="button subtle" type="button">清空</button></div>
+      </div>
+      <pre id="log-output" class="logs-output" aria-live="polite"></pre>
+    </div>
+  </dialog>
+
+  <script type="module" src="/mac/app.js?v=20261117-mac-logs-r1"></script>
 </body>
 </html>

@@ -1,16 +1,73 @@
-import * as store from "/assets/library-store.js?v=20261117-mac-local-r1";
+import * as store from "/assets/library-store.js?v=20261117-mac-bookid-r2";
 const $ = id => document.getElementById(id);
-const invoke = (name, args = {}) => window.__TAURI__.core.invoke(name, args);
-const state = { profiles: [], profileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false };
+const LOG_LIMIT = 500;
+const logState = { entries: [] };
+const state = { profiles: [], profileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
+
+function errorText(error) {
+  if (error instanceof Error) return error.message || error.name;
+  if (typeof error === "string") return error;
+  try { return JSON.stringify(error); } catch (_) { return String(error); }
+}
+function renderLogs() {
+  const output = $("log-output");
+  const count = $("log-count");
+  if (count) count.textContent = String(logState.entries.length);
+  if (!output) return;
+  output.textContent = logState.entries.map(entry =>
+    "[" + entry.time + "] [" + entry.level + "] " + entry.message +
+    (entry.detail ? "\n" + entry.detail : "")
+  ).join("\n");
+  output.scrollTop = output.scrollHeight;
+}
+function appendLog(level, message, detail = "") {
+  const entry = {
+    time: new Date().toLocaleString("zh-TW", { hour12: false }),
+    level: String(level || "INFO").toUpperCase(),
+    message: String(message || ""),
+    detail: detail == null ? "" : String(detail)
+  };
+  logState.entries.push(entry);
+  if (logState.entries.length > LOG_LIMIT) logState.entries.splice(0, logState.entries.length - LOG_LIMIT);
+  renderLogs();
+  return entry;
+}
+async function invoke(name, args = {}) {
+  const started = performance.now();
+  const trackSuccess = name !== "webdav_read_range";
+  if (trackSuccess) appendLog("INFO", "原生指令開始：" + name);
+  try {
+    const result = await window.__TAURI__.core.invoke(name, args);
+    if (trackSuccess) appendLog("INFO", "原生指令完成：" + name + "（" + Math.round(performance.now() - started) + " ms）");
+    return result;
+  } catch (error) {
+    appendLog("ERROR", "原生指令失敗：" + name, errorText(error));
+    throw error;
+  }
+}
 function setStatus(message, error = false) {
+  const value = String(message || "");
+  if (value !== state.lastStatus || error) {
+    appendLog(error ? "ERROR" : "INFO", "狀態：" + value);
+    state.lastStatus = value;
+  }
   const node = $("connection-status");
   node.replaceChildren();
   const dot = document.createElement("i");
   node.appendChild(dot);
-  node.appendChild(document.createTextNode(" " + String(message || "")));
+  node.appendChild(document.createTextNode(" " + value));
   node.classList.toggle("is-error", !!error);
 }
+window.addEventListener("error", event => {
+  appendLog("ERROR", "前端 JavaScript 錯誤",
+    String(event.message || "未知錯誤") +
+    (event.filename ? " · " + event.filename : "") +
+    (event.lineno ? ":" + event.lineno + ":" + (event.colno || 0) : ""));
+});
+window.addEventListener("unhandledrejection", event => {
+  appendLog("ERROR", "未處理的非同步錯誤", errorText(event.reason));
+});
 function extension(path) {
   const match = String(path || "").match(/\.([^.\/]+)$/);
   return match ? match[1].toLowerCase() : "";
@@ -49,6 +106,7 @@ function renderProfiles() {
 }
 async function refreshProfiles(preferredId = "") {
   state.profiles = await invoke("list_webdav_profiles");
+  appendLog("INFO", "已載入 WebDAV 來源", state.profiles.length + " 個來源設定");
   const saved = preferredId || localStorage.getItem(profileStorageKey()) || "";
   state.profileId = state.profiles.some(item => item.id === saved) ? saved : (state.profiles[0] ? state.profiles[0].id : "");
   renderProfiles();
@@ -114,6 +172,7 @@ async function addBook(entry, openAfter = false) {
   if (!BOOK_EXTENSIONS.has(ext)) return;
   const library = ext === "cbz" ? "comics" : "books";
   const scope = { provider: "webdav", profileId: profile.id, library };
+  appendLog("INFO", "準備加入書籍", entry.path);
   const id = await store.cloudBookId(scope, entry.path);
   const record = {
     id, sourceType: "cloud", provider: "webdav", library, rootPath: "/",
@@ -125,6 +184,7 @@ async function addBook(entry, openAfter = false) {
     cloudSource: { provider: "webdav", profileId: profile.id, library, rootPath: "/", path: entry.path }
   };
   await store.addLocalBook(record);
+  appendLog("INFO", "書籍已加入本機書架", entry.path);
   await refreshShelf();
   setStatus("已加入書架 · " + entry.name);
   if (openAfter) openBook(record);
@@ -176,6 +236,7 @@ async function loadDirectory() {
     }
     state.entries = await invoke("webdav_list_directory", { profileId: profile.id, path: state.path });
     renderEntries(state.entries);
+    appendLog("INFO", "目錄讀取成功", state.path + " · " + state.entries.length + " 個項目");
     setStatus("WebDAV 已連線 · " + profile.name);
   } catch (error) {
     setStatus(error.message || String(error), true);
@@ -232,6 +293,45 @@ async function saveProfile(event) {
     $("profile-error").textContent = error.message || String(error);
   } finally { button.disabled = false; }
 }
+
+function currentLogText() {
+  return logState.entries.map(entry =>
+    "[" + entry.time + "] [" + entry.level + "] " + entry.message +
+    (entry.detail ? "\n" + entry.detail : "")
+  ).join("\n");
+}
+$("open-logs").addEventListener("click", () => {
+  renderLogs();
+  $("logs-dialog").showModal();
+});
+$("close-logs").addEventListener("click", () => $("logs-dialog").close());
+$("clear-logs").addEventListener("click", () => {
+  logState.entries.length = 0;
+  appendLog("INFO", "日誌已清空");
+});
+$("copy-logs").addEventListener("click", async () => {
+  const text = currentLogText();
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      throw new Error("Clipboard API unavailable");
+    }
+    appendLog("INFO", "已複製目前日誌");
+  } catch (_) {
+    const helper = document.createElement("textarea");
+    helper.value = text;
+    helper.setAttribute("readonly", "");
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    document.body.appendChild(helper);
+    helper.select();
+    const copied = document.execCommand("copy");
+    helper.remove();
+    appendLog(copied ? "INFO" : "ERROR", copied ? "已複製目前日誌" : "複製日誌失敗");
+  }
+});
+
 $("add-profile").addEventListener("click", openProfileDialog);
 $("close-profile").addEventListener("click", () => $("profile-dialog").close());
 $("cancel-profile").addEventListener("click", () => $("profile-dialog").close());
@@ -258,6 +358,7 @@ $("add-folder-books").addEventListener("click", async () => {
   setStatus("已加入 " + count + " 本書籍");
 });
 async function boot() {
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.4 · 日誌僅保存在目前 App 記憶體");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;
