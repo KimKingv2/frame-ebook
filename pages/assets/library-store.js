@@ -347,8 +347,15 @@ async function getBook(bookOrId) {
       }
     });
   }
-  return bookCache.get(String(bookOrId || "")) ||
-    (isLocalMacApp() ? readLocalData().books.find(item => String(item.id) === String(bookOrId || "")) || null : null);
+  const key = String(bookOrId || "");
+  const cached = bookCache.get(key);
+  if (cached) return cached;
+  if (isLocalMacApp()) {
+    const localBooks = await api("/api/reading/bookshelf", {}, "無法讀取本機書架。");
+    const localBook = (localBooks.items || []).find(item => String(item.id) === key);
+    return localBook ? remember(localBook) : null;
+  }
+  return null;
 }
 
 async function updateBook(id, patch = {}) {
