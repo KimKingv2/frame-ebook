@@ -328,11 +328,13 @@ async fn webdav_list_directory(
         let server = response.headers()
             .get(header::SERVER)
             .and_then(|value| value.to_str().ok())
-            .unwrap_or("未知");
+            .unwrap_or("未知")
+            .to_string();
         let content_type = response.headers()
             .get(header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
-            .unwrap_or("未知");
+            .unwrap_or("未知")
+            .to_string();
         let body = response.text().await.unwrap_or_else(|error| {
             format!("無法讀取伺服器錯誤內容：{error}")
         });
@@ -343,7 +345,7 @@ async fn webdav_list_directory(
             body.chars().take(1200).collect()
         };
         return Err(format!(
-            "WebDAV PROPFIND 失敗（HTTP {status}）。\\n伺服器：{server}\\n內容類型：{content_type}\\n回應內容：{detail}"
+            "WebDAV PROPFIND 失敗（HTTP {status}）。\n伺服器：{server}\n內容類型：{content_type}\n回應內容：{detail}"
         ));
     }
     let xml = response.text().await
