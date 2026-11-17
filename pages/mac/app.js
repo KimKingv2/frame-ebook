@@ -504,7 +504,7 @@ $("add-folder-books").addEventListener("click", async () => {
   setStatus("已加入 " + count + " 本書籍");
 });
 async function boot() {
-  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.7 · 日誌僅保存在目前 App 記憶體");
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.0 · 本機優先與 Cloudflare 多設備同步");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;
