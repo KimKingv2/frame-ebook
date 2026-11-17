@@ -1443,10 +1443,10 @@
       });
       var coverItem = coverId ? manifest.find(function (item) { return item.getAttribute('id') === coverId; }) : null;
       if (!coverItem) coverItem = manifest.find(function (item) {
-        return String(item.getAttribute('properties') || '').split(/\\s+/).includes('cover-image');
+        return String(item.getAttribute('properties') || '').split(/\s+/).includes('cover-image');
       });
       if (!coverItem) coverItem = manifest.find(function (item) {
-        return /^image\\//i.test(item.getAttribute('media-type') || '') &&
+        return /^image\//i.test(item.getAttribute('media-type') || '') &&
           /cover|front/i.test(item.getAttribute('href') || '');
       });
       var base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
@@ -1454,7 +1454,7 @@
       var coverEntry = coverPath ? zip.file(coverPath) : null;
       if (!coverEntry) {
         var names = Object.keys(zip.files || {}).filter(function (name) {
-          return /\\.(?:jpe?g|png|webp|gif|bmp)$/i.test(name) && !zip.files[name].dir;
+          return /\.(?:jpe?g|png|webp|gif|bmp)$/i.test(name) && !zip.files[name].dir;
         });
         var chosen = names.find(function (name) { return /(^|[/_-])(cover|front)([/_.-]|$)/i.test(name); }) || names[0];
         if (chosen) coverEntry = zip.file(chosen);
