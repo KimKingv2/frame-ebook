@@ -36,7 +36,7 @@ function openLocalDatabase() {
 async function filenameBookId(fileName) {
   let identity = String(fileName || "").trim();
   try { identity = identity.normalize("NFC"); } catch (_) {}
-  if (!identity || identity.includes("/") || identity.includes("\\\\") || identity.includes("\0")) {
+  if (!identity || identity.includes("/") || identity.includes("\\") || identity.includes("\0")) {
     throw new Error("書籍檔名無效，無法生成 Book ID。");
   }
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
@@ -146,6 +146,15 @@ async function migrateLegacyBookIds(db) {
     tx.objectStore("sync_meta").put(report);
   });
   return report;
+}
+
+async function getBookIdMigrationReport() {
+  if (!isLocalMacApp()) return null;
+  const db = await openLocalDatabase();
+  return localTransaction(db, ["sync_meta"], "readonly", (tx, set) => {
+    const request = tx.objectStore("sync_meta").get("legacyBookIdMigrationV1");
+    request.onsuccess = () => set(request.result || null);
+  });
 }
 
 function localTransaction(db, stores, mode, execute) {
@@ -386,7 +395,7 @@ async function webDavSourceId(profile) {
   } catch (_) {
     throw new Error("WebDAV 來源網址無效，無法建立跨設備來源識別碼。");
   }
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(origin + "\\n" + username));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(origin + "\n" + username));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   return "webdav:" + hash;
 }
@@ -647,7 +656,7 @@ async function setReadingSetting(key, value) {
 
 
 export {
-  getBook, updateBook, listBooks, cloudBookId, webDavSourceId, addLocalBook, saveLocalBookCover, removeLocalBook,
+  getBook, updateBook, listBooks, cloudBookId, webDavSourceId, getBookIdMigrationReport, addLocalBook, saveLocalBookCover, removeLocalBook,
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
   recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting
 };
