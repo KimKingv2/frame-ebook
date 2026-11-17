@@ -1748,7 +1748,8 @@
       provider: params.get('provider'),
       library: params.get('library'),
       rootPath: params.get('root_path'),
-      path: params.get('path')
+      path: params.get('path'),
+      profileId: params.get('profile_id')
     };
     var store = await libraryStorePromise;
     var record = await store.getBook(descriptor);
@@ -1757,9 +1758,11 @@
       setText('reader-status', '本地端口需在閱讀室重新登入一次。');
       await ensureLocalReaderLogin();
     }
-    setText('reader-status', record.cloudSource && record.cloudSource.provider === 'local'
-      ? '正在透過本地 OpenList 讀取書檔……'
-      : '正在透過伺服器端 Alist／OpenList 讀取書檔……');
+    setText('reader-status', record.cloudSource && record.cloudSource.provider === 'webdav'
+      ? '正在透過 Mac 原生 WebDAV 通道讀取書檔……'
+      : (record.cloudSource && record.cloudSource.provider === 'local'
+        ? '正在透過本地 OpenList 讀取書檔……'
+        : '正在透過伺服器端 Alist／OpenList 讀取書檔……'));
     setText('engine-status', '正在載入雲端書籍');
     var sourceModule = await cloudBookSourcePromise;
     var source = await sourceModule.fetchCloudBookFile(record);
