@@ -84,11 +84,14 @@ function extension(path) {
   return match ? match[1].toLowerCase() : "";
 }
 function libraryForEntry(entry) {
-  const ext = extension(entry?.path);
-  if (ext === "cbz") return "comics";
-  const folders = String(entry?.path || "").replace(/\\/g, "/").split("/").slice(0, -1);
-  const comicFolder = /(?:^|[\s._-])(?:comics?|manga|manhua|manhwa)(?:$|[\s._-])|漫畫|漫画|動漫|动漫|圖像小說|图像小说/i;
-  return folders.some(name => comicFolder.test(name)) ? "comics" : "books";
+  const profile = selectedProfile();
+  if (!profile) return "";
+  const path = String(entry?.path || "");
+  const ext = extension(path);
+  const roots = rootsForProfile(profile.id);
+  if (ext === "epub" && pathWithinRoot(path, roots.books)) return "books";
+  if ((ext === "epub" || ext === "cbz") && pathWithinRoot(path, roots.comics)) return "comics";
+  return "";
 }
 function baseTitle(name) { return String(name || "").replace(/\.(epub|cbz)$/i, ""); }
 function selectedProfile() { return state.profiles.find(item => item.id === state.profileId) || null; }
@@ -102,14 +105,14 @@ function pathStorageKey() { return "frame-ebook-mac-path-" + state.profileId; }
 function scanRootsKey(profileId) { return "webdav-scan-roots:" + String(profileId || ""); }
 function scanProgressKey(profileId, library) { return "webdav-scan-progress:" + String(profileId || "") + ":" + library; }
 function normalizeScanRoot(value) {
-  const raw = String(value || "").trim().replace(/\\\\/g, "/");
-  if (!raw.startsWith("/") || raw.includes("\\0")) throw new Error("書庫根目錄必須是以 / 開頭的絕對路徑。");
+  const raw = String(value || "").trim().replace(/\\/g, "/");
+  if (!raw.startsWith("/") || raw.includes("\0")) throw new Error("書庫根目錄必須是以 / 開頭的絕對路徑。");
   const parts = raw.split("/").filter(Boolean);
   if (parts.some(part => part === "..")) throw new Error("書庫根目錄不能包含 ..。");
   return "/" + parts.filter(part => part !== ".").join("/");
 }
 function normalizeRemotePath(value) {
-  const raw = String(value || "").replace(/\\\\/g, "/");
+  const raw = String(value || "").replace(/\\/g, "/");
   const parts = raw.split("/").filter(Boolean);
   if (parts.some(part => part === "..")) return "";
   return "/" + parts.filter(part => part !== ".").join("/");
@@ -224,7 +227,6 @@ async function refreshProfiles(preferredId = "") {
     state.path = localStorage.getItem(pathStorageKey()) || "/";
   }
   await loadAllScanRoots();
-  renderManagerProfiles();
 }
 function formatSize(value) {
   const bytes = Number(value) || 0;
@@ -258,6 +260,7 @@ async function addBook(entry, openAfter = false, refresh = true, profileOverride
   const ext = extension(entry.path);
   if (!BOOK_EXTENSIONS.has(ext)) return;
   const library = libraryForEntry(entry);
+  if (!library) throw new Error("這個檔案不在已設定的電子書／漫畫根目錄內，因此不會加入書架。請先調整「連接與掃描」中的目錄設定。");
   const scope = { provider: "webdav", profileId: profile.id, library };
   appendLog("INFO", "準備加入書籍", entry.path);
   const [id, sourceId] = await Promise.all([
@@ -544,7 +547,7 @@ async function loadDirectory() {
     state.busy = false;
     if (state.directoryReloadPending) {
       state.directoryReloadPending = false;
-      if (state.tab === "browser") void loadDirectory();
+      if (state.tab === "library") void loadDirectory();
     }
   }
 }
@@ -849,7 +852,7 @@ $("add-folder-books").addEventListener("click", async () => {
   setStatus("已加入 " + count + " 本書籍");
 });
 $("shelf-refresh").addEventListener("click", () => {
-  void startAutomaticLibraryScan(selectedProfile()).catch(() => {});
+  void refreshShelf({prefetch:false}).then(() => setStatus("已重新載入本機書架"));
 });
 async function boot() {
   appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.3 · 本機書架與手動書庫掃描");
