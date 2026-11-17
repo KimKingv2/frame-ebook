@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-filename-id-r2";
+import * as store from "/assets/library-store.js?v=20261117-autoscan-r1";
 
 const API = {
   snapshot: "/api/device/sync/snapshot",
