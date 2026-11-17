@@ -3,12 +3,12 @@ use percent_encoding::percent_decode_str;
 use reqwest::{header, redirect::Policy, Client, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fs,
     net::IpAddr,
     path::PathBuf,
     sync::Mutex,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
@@ -43,10 +43,31 @@ struct DownloadedFile {
     redirected: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TransferDiagnostic {
+    path: String,
+    source_host: String,
+    redirect_statuses: Vec<u16>,
+    final_status: u16,
+    final_host: String,
+    bytes_received: u64,
+    elapsed_ms: u64,
+}
+
 #[derive(Default)]
 struct AppState {
     // WebDAV passwords exist only for the lifetime of this app process.
     passwords: Mutex<HashMap<String, String>>,
+    // Transfer diagnostics are RAM-only and drained by the Mac UI when it returns from the reader.
+    transfer_diagnostics: Mutex<VecDeque<TransferDiagnostic>>,
+}
+
+fn record_transfer_diagnostic(state: &AppState, item: TransferDiagnostic) {
+    if let Ok(mut diagnostics) = state.transfer_diagnostics.lock() {
+        if diagnostics.len() >= 100 { diagnostics.pop_front(); }
+        diagnostics.push_back(item);
+    }
 }
 
 fn app_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -167,7 +188,7 @@ fn make_client() -> Result<Client, String> {
         .redirect(Policy::none())
         .connect_timeout(Duration::from_secs(20))
         .timeout(Duration::from_secs(300))
-        .user_agent("FRAME-Ebook-macOS/0.1")
+        .user_agent("FRAME-Ebook-macOS/0.2.6")
         .build()
         .map_err(|e| format!("建立 WebDAV 連線失敗：{e}"))
 }
@@ -584,8 +605,12 @@ async fn webdav_download_file_memory(
 
     let (profile, password) = get_profile_and_password(&app, &state, &profile_id)?;
     let mut current = resource_url(&profile, &path, false)?;
+    let source_host = current.host_str().unwrap_or("").to_string();
+    let started_at = Instant::now();
     let client = make_client()?;
     let mut response = None;
+    let mut redirect_statuses = Vec::new();
+    let mut final_status = 0u16;
 
     for hop in 0..=6 {
         let mut request = client.get(current.clone());
@@ -595,6 +620,7 @@ async fn webdav_download_file_memory(
         let result = request.send().await
             .map_err(|e| format!("WebDAV EPUB 記憶體讀取失敗：{e}"))?;
         if result.status().is_redirection() {
+            redirect_statuses.push(result.status().as_u16());
             let location = result.headers().get(header::LOCATION)
                 .and_then(|value| value.to_str().ok())
                 .ok_or_else(|| "WebDAV EPUB 302 缺少 Location。".to_string())?;
@@ -604,6 +630,7 @@ async fn webdav_download_file_memory(
             current = next;
             continue;
         }
+        final_status = result.status().as_u16();
         if result.status() == StatusCode::UNAUTHORIZED {
             return Err("WebDAV 驗證失敗，請檢查帳號與密碼。".into());
         }
@@ -648,7 +675,23 @@ async fn webdav_download_file_memory(
         return Err("WebDAV 回傳的 EPUB 檔案是空的。".into());
     }
 
+    record_transfer_diagnostic(&state, TransferDiagnostic {
+        path: path.clone(),
+        source_host,
+        redirect_statuses,
+        final_status,
+        final_host: current.host_str().unwrap_or("").to_string(),
+        bytes_received: received,
+        elapsed_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
+    });
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+fn take_webdav_transfer_diagnostics(state: State<'_, AppState>) -> Vec<TransferDiagnostic> {
+    state.transfer_diagnostics.lock()
+        .map(|mut diagnostics| diagnostics.drain(..).collect())
+        .unwrap_or_default()
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -684,6 +727,7 @@ pub fn run() {
             webdav_read_range,
             webdav_download_file,
             webdav_download_file_memory,
+            take_webdav_transfer_diagnostics,
             delete_cached_file
         ])
         .run(tauri::generate_context!())

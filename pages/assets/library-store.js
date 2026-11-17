@@ -289,6 +289,33 @@ async function addLocalBook(book) {
   return remember(book);
 }
 
+async function saveLocalBookCover(id, blob) {
+  if (!isLocalMacApp()) return false;
+  const key = String(id || "");
+  if (!key || !(blob instanceof Blob) || !blob.size || blob.size > 2 * 1024 * 1024) {
+    throw new Error("封面縮圖資料無效或超過 2 MiB。");
+  }
+  const db = await openLocalDatabase();
+  await localTransaction(db, ["books"], "readwrite", (tx, set) => {
+    const objectStore = tx.objectStore("books");
+    const request = objectStore.get(key);
+    request.onsuccess = () => {
+      const book = request.result;
+      if (!book) { set(false); return; }
+      const updated = {
+        ...book,
+        coverBlob: blob,
+        coverMime: blob.type || "image/webp",
+        coverUpdatedAt: Date.now()
+      };
+      objectStore.put(updated);
+      remember(updated);
+      set(true);
+    };
+  });
+  return true;
+}
+
 async function removeLocalBook(id) {
   if (!isLocalMacApp()) throw new Error("只能在 FRAME Ebook Mac 版管理本機書架。");
   const key = String(id || "");
@@ -501,7 +528,7 @@ async function setReadingSetting(key, value) {
 
 
 export {
-  getBook, updateBook, listBooks, cloudBookId, addLocalBook, removeLocalBook,
+  getBook, updateBook, listBooks, cloudBookId, addLocalBook, saveLocalBookCover, removeLocalBook,
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
   recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting
 };

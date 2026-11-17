@@ -1,7 +1,8 @@
-import * as store from "/assets/library-store.js?v=20261117-mac-bookid-r2";
+import * as store from "/assets/library-store.js?v=20261117-mac-cover-r1";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
 const logState = { entries: [] };
+const shelfCoverUrls = [];
 const state = { profiles: [], profileId: "", editingProfileId: "", path: "/", entries: [], tab: "shelf", busy: false, lastStatus: "" };
 const BOOK_EXTENSIONS = new Set(["epub", "cbz"]);
 
@@ -35,7 +36,7 @@ function appendLog(level, message, detail = "") {
 }
 async function invoke(name, args = {}) {
   const started = performance.now();
-  const trackSuccess = name !== "webdav_read_range";
+  const trackSuccess = !["webdav_read_range", "take_webdav_transfer_diagnostics"].includes(name);
   if (trackSuccess) appendLog("INFO", "原生指令開始：" + name);
   try {
     const result = await window.__TAURI__.core.invoke(name, args);
@@ -120,22 +121,59 @@ function formatSize(value) {
   if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
   return (bytes / 1024 / 1024).toFixed(bytes >= 1024 * 1024 * 1024 ? 2 : 1) + (bytes >= 1024 * 1024 * 1024 ? " GB" : " MB");
 }
+function clearShelfCoverUrls() {
+  shelfCoverUrls.forEach(url => URL.revokeObjectURL(url));
+  shelfCoverUrls.length = 0;
+}
+function makeShelfFallback(book) {
+  const fallback = document.createElement("div"); fallback.className = "book-cover-fallback";
+  const top = document.createElement("span"); top.className = "book-cover-fallback-top"; top.textContent = "FRAME READER";
+  const title = document.createElement("strong"); title.textContent = book.title || book.fileName || "未命名書籍";
+  const bottom = document.createElement("small"); bottom.textContent =
+    String(book.format || "").toUpperCase() === "CBZ" ? "COMIC EDITION" : "READING EDITION";
+  fallback.append(top, title, bottom);
+  return fallback;
+}
 function renderShelf(books) {
   const grid = $("shelf-grid");
+  clearShelfCoverUrls();
   grid.replaceChildren();
   $("shelf-empty").hidden = books.length > 0;
   books.forEach(book => {
     const card = document.createElement("article"); card.className = "book-card";
     const cover = document.createElement("div"); cover.className = "book-cover";
-    const label = document.createElement("span"); label.textContent = String(book.format || "EPUB").toUpperCase();
-    const title = document.createElement("strong"); title.textContent = book.title || book.fileName || "未命名書籍";
-    cover.append(label, title);
+    cover.setAttribute("role", "button"); cover.setAttribute("tabindex", "0");
+    cover.setAttribute("aria-label", "閱讀 " + (book.title || book.fileName || "未命名書籍"));
+    const openCover = () => openBook(book);
+    cover.addEventListener("click", openCover);
+    cover.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCover(); }
+    });
+    if (book.coverBlob instanceof Blob && book.coverBlob.size) {
+      const image = document.createElement("img");
+      image.className = "book-cover-image";
+      image.src = URL.createObjectURL(book.coverBlob);
+      shelfCoverUrls.push(image.src);
+      image.alt = (book.title || book.fileName || "書籍") + " 封面";
+      image.loading = "lazy"; image.decoding = "async";
+      image.addEventListener("error", () => { image.remove(); cover.prepend(makeShelfFallback(book)); }, { once: true });
+      cover.appendChild(image);
+    } else {
+      cover.appendChild(makeShelfFallback(book));
+    }
+    const badge = document.createElement("span"); badge.className = "book-cover-badge";
+    badge.textContent = String(book.format || "EPUB").toUpperCase();
+    const affordance = document.createElement("span"); affordance.className = "book-cover-open"; affordance.textContent = "↗";
+    cover.append(badge, affordance);
+
     const info = document.createElement("div"); info.className = "book-info";
-    const heading = document.createElement("h3"); heading.textContent = book.title || book.fileName;
-    const meta = document.createElement("p"); meta.textContent = (book.cloudSource && book.cloudSource.path || "") + (book.progress && book.progress.percent ? " · " + Math.round(book.progress.percent) + "% 已讀" : "");
+    const heading = document.createElement("h3"); heading.textContent = book.title || book.fileName || "未命名書籍";
+    const description = document.createElement("p");
+    description.textContent = book.author || (String(book.format).toUpperCase() === "CBZ" ? "漫畫／圖像書" : "電子書");
     const row = document.createElement("div"); row.className = "book-meta";
     const source = document.createElement("span"); source.textContent = "WEBDAV";
-    const size = document.createElement("span"); size.textContent = formatSize(book.size);
+    const progress = Number(book.progress && book.progress.percent) || 0;
+    const size = document.createElement("span"); size.textContent = progress > 0 ? Math.round(progress) + "% 已讀" : formatSize(book.size);
     row.append(source, size);
     const actions = document.createElement("div"); actions.className = "book-actions";
     const open = document.createElement("button"); open.className = "button primary"; open.type = "button"; open.textContent = "繼續閱讀";
@@ -147,7 +185,7 @@ function renderShelf(books) {
       setStatus("已從本機書架移除");
     });
     actions.append(open, remove);
-    info.append(heading, meta, row, actions); card.append(cover, info); grid.appendChild(card);
+    info.append(heading, description, row, actions); card.append(cover, info); grid.appendChild(card);
   });
 }
 async function refreshShelf() {
@@ -294,6 +332,31 @@ async function saveProfile(event) {
   } finally { button.disabled = false; }
 }
 
+function formatTransferSize(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024 * 1024) return Math.round(value / 1024) + " KB";
+  return (value / 1024 / 1024).toFixed(value >= 1024 * 1024 * 1024 ? 2 : 1) +
+    (value >= 1024 * 1024 * 1024 ? " GB" : " MB");
+}
+async function pullNativeTransferDiagnostics() {
+  try {
+    const items = await invoke("take_webdav_transfer_diagnostics");
+    (Array.isArray(items) ? items : []).forEach(item => {
+      const redirects = Array.isArray(item.redirectStatuses) ? item.redirectStatuses : [];
+      const chain = redirects.concat(Number(item.finalStatus) || 0).filter(Boolean).map(status => "HTTP " + status).join(" → ");
+      const is302 = redirects.includes(302);
+      appendLog("INFO", "WebDAV EPUB 傳輸完成" + (is302 ? " · 302 直連" : ""),
+        String(item.path || "") +
+        "\n狀態鏈：" + (chain || "無狀態資料") +
+        "\n302 跳轉：" + redirects.filter(status => status === 302).length + " 次；所有 3xx 跳轉：" + redirects.length + " 次" +
+        "\n來源主機：" + String(item.sourceHost || "未知") +
+        "\n最終主機：" + String(item.finalHost || "未知") +
+        "\n實收：" + formatTransferSize(item.bytesReceived) +
+        "；耗時：" + Number(item.elapsedMs || 0) + " ms；書檔傳送到 RAM");
+    });
+  } catch (error) { appendLog("ERROR", "讀取 WebDAV 傳輸診斷失敗", errorText(error)); }
+}
+
 function currentLogText() {
   return logState.entries.map(entry =>
     "[" + entry.time + "] [" + entry.level + "] " + entry.message +
@@ -358,7 +421,7 @@ $("add-folder-books").addEventListener("click", async () => {
   setStatus("已加入 " + count + " 本書籍");
 });
 async function boot() {
-  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.4 · 日誌僅保存在目前 App 記憶體");
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.2.6 · 日誌僅保存在目前 App 記憶體");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;
@@ -366,6 +429,7 @@ async function boot() {
   try {
     await refreshProfiles();
     await refreshShelf();
+    await pullNativeTransferDiagnostics();
     if (state.profileId) {
       await loadDirectory();
     } else {
@@ -373,4 +437,7 @@ async function boot() {
     }
   } catch (error) { setStatus(error.message || String(error), true); }
 }
+window.addEventListener("pageshow", event => {
+  if (event.persisted) { void refreshShelf(); void pullNativeTransferDiagnostics(); }
+});
 void boot();

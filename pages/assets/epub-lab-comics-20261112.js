@@ -18,7 +18,7 @@
   var editingAnnotation = null;
   var Overlayer = null;
   var annotationBusy = false;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261116-shared-local-r2');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261117-mac-cover-r1');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261117-webdav-ram-r1');
   var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
@@ -1372,6 +1372,105 @@
     applyAppearance();
     updateLayoutControlState();
   }
+  function normalizedZipPath(base, href) {
+    var raw = String(href || '').split('#')[0].split('?')[0].replace(/\\/g, '/');
+    try { raw = decodeURIComponent(raw); } catch (error) {}
+    var parts = (String(base || '') + raw).split('/');
+    var clean = [];
+    parts.forEach(function (part) {
+      if (!part || part === '.') return;
+      if (part === '..') clean.pop();
+      else clean.push(part);
+    });
+    return clean.join('/');
+  }
+
+  async function makeMacCoverThumbnail(blob) {
+    if (!(blob instanceof Blob) || !blob.size || blob.size > 15 * 1024 * 1024) return null;
+    var bitmap;
+    try {
+      bitmap = await createImageBitmap(blob);
+      var width = bitmap.width || bitmap.displayWidth;
+      var height = bitmap.height || bitmap.displayHeight;
+      if (!width || !height || width * height > 150000000) return null;
+      var scale = Math.min(1, 480 / Math.max(width, height));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      var context = canvas.getContext('2d', { alpha: false });
+      if (!context) return null;
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      var output = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/webp', 0.82); });
+      if (!output || !output.size || output.size > 2 * 1024 * 1024) {
+        output = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/jpeg', 0.82); });
+      }
+      return output && output.size && output.size <= 2 * 1024 * 1024 ? output : null;
+    } catch (error) {
+      console.info('[FRAME Ebook] EPUB 封面縮圖略過：', error);
+      return null;
+    } finally {
+      try { if (bitmap) bitmap.close(); } catch (error) {}
+    }
+  }
+
+  async function saveMacEpubCover(zip, bookId, initialRecord) {
+    if (!window.FRAME_LOCAL_APP || !bookId || (initialRecord && initialRecord.coverBlob)) return;
+    try {
+      var containerEntry = zip.file('META-INF/container.xml');
+      if (!containerEntry) return;
+      var containerText = await containerEntry.async('string');
+      var containerXml = new DOMParser().parseFromString(containerText, 'application/xml');
+      var rootfile = containerXml.getElementsByTagName('rootfile')[0];
+      var opfPath = String(rootfile && rootfile.getAttribute('full-path') || '');
+      if (!opfPath || containerXml.getElementsByTagName('parsererror').length) return;
+      var opfEntry = zip.file(opfPath);
+      if (!opfEntry) return;
+      var opfText = await opfEntry.async('string');
+      var opfXml = new DOMParser().parseFromString(opfText, 'application/xml');
+      if (opfXml.getElementsByTagName('parsererror').length) return;
+      var elements = Array.from(opfXml.getElementsByTagName('*'));
+      var manifest = elements.filter(function (node) { return node.localName === 'item'; });
+      var metas = elements.filter(function (node) { return node.localName === 'meta'; });
+      var coverId = '';
+      metas.some(function (meta) {
+        var name = String(meta.getAttribute('name') || '').toLowerCase();
+        var property = String(meta.getAttribute('property') || '').toLowerCase();
+        if (name === 'cover' || property === 'cover-image') {
+          coverId = String(meta.getAttribute('content') || '').trim();
+          return !!coverId;
+        }
+        return false;
+      });
+      var coverItem = coverId ? manifest.find(function (item) { return item.getAttribute('id') === coverId; }) : null;
+      if (!coverItem) coverItem = manifest.find(function (item) {
+        return String(item.getAttribute('properties') || '').split(/\\s+/).includes('cover-image');
+      });
+      if (!coverItem) coverItem = manifest.find(function (item) {
+        return /^image\\//i.test(item.getAttribute('media-type') || '') &&
+          /cover|front/i.test(item.getAttribute('href') || '');
+      });
+      var base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+      var coverPath = coverItem ? normalizedZipPath(base, coverItem.getAttribute('href')) : '';
+      var coverEntry = coverPath ? zip.file(coverPath) : null;
+      if (!coverEntry) {
+        var names = Object.keys(zip.files || {}).filter(function (name) {
+          return /\\.(?:jpe?g|png|webp|gif|bmp)$/i.test(name) && !zip.files[name].dir;
+        });
+        var chosen = names.find(function (name) { return /(^|[/_-])(cover|front)([/_.-]|$)/i.test(name); }) || names[0];
+        if (chosen) coverEntry = zip.file(chosen);
+      }
+      if (!coverEntry) return;
+      var coverBlob = await coverEntry.async('blob');
+      var thumbnail = await makeMacCoverThumbnail(coverBlob);
+      if (!thumbnail) return;
+      var store = await libraryStorePromise;
+      await store.saveLocalBookCover(bookId, thumbnail);
+      console.info('[FRAME Ebook] 已保存 EPUB 封面縮圖至本機書架：' + thumbnail.size + ' bytes');
+    } catch (error) {
+      console.info('[FRAME Ebook] EPUB 封面擷取失敗：', error);
+    }
+  }
+
   async function openEpub(source, name, bookId, initialRecord) {
     await flushLibraryProgress();
     await readingTrackerPromise.then(function (tracker) { return tracker.stop(); });
@@ -1417,6 +1516,9 @@
     viewport.appendChild(view);
     await view.open(isCbz ? source : parsedBook);
     parsedBook = view.book;
+    if (!isCbz && window.FRAME_LOCAL_APP) {
+      void saveMacEpubCover(zip, bookId, initialRecord);
+    }
 
     var overlayModule = await overlayerModulePromise;
     Overlayer = overlayModule.Overlayer;
