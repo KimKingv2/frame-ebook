@@ -265,3 +265,7 @@ footer{display:flex;justify-content:space-between;padding:18px 38px;border-top:1
   #scan-all,#scan-pause{grid-column:1/-1}
   .cloud-index-log-toolbar{align-items:flex-start;flex-direction:column}
 }
+
+.cloud-connection-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cloud-connection-actions button{min-height:34px;padding:0 12px;font-size:8px}
+.cloud-root-field button{min-height:30px;padding:0 9px;font-size:7px}
