@@ -298,11 +298,11 @@ async function scanWebDavProfile(profile) {
     await refreshShelf({ prefetch:false });
     appendLog("INFO", "WebDAV 自動掃描完成",
       "來源：" + (profile.name || profileId) +
-      "\\n已掃描資料夾：" + scannedDirectories +
-      "\\n找到 EPUB／CBZ：" + discoveredFiles +
-      "\\n新增：" + added + "；更新：" + updated + "；未變更：" + unchanged +
-      "\\n檔名衝突略過：" + conflicts + "；無權限／讀取失敗資料夾：" + failedDirectories +
-      (limited ? "\\n已達安全掃描上限，下一次啟動可繼續完整掃描。" : ""));
+      "\n已掃描資料夾：" + scannedDirectories +
+      "\n找到 EPUB／CBZ：" + discoveredFiles +
+      "\n新增：" + added + "；更新：" + updated + "；未變更：" + unchanged +
+      "\n檔名衝突略過：" + conflicts + "；無權限／讀取失敗資料夾：" + failedDirectories +
+      (limited ? "\n已達安全掃描上限，下一次啟動可繼續完整掃描。" : ""));
     setStatus("書架更新完成 · " + discoveredFiles + " 本 · 新增 " + added + " 本" +
       (conflicts ? " · 檔名衝突 " + conflicts : ""));
     void shelf.prefetchCovers();
