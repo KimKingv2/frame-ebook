@@ -351,9 +351,9 @@ async function ensureLocalSourceIds(profiles = []) {
     const books = tx.objectStore("books");
     for (const book of local.books || []) {
       const source = book.cloudSource || {};
-      if (source.provider !== "webdav" || source.sourceId) continue;
+      if (source.provider !== "webdav") continue;
       const sourceId = profileMap.get(String(source.profileId || book.profileId || ""));
-      if (!sourceId) continue;
+      if (!sourceId || source.sourceId === sourceId) continue;
       const updated = { ...book, cloudSource: { ...source, sourceId } };
       books.put(updated);
       remember(updated);

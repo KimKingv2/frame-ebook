@@ -82,7 +82,7 @@ export function startMacSync({ invoke, getProfiles, onStatus = () => {}, onLog =
     if (imported) { try { onCatalogUpdated(imported); } catch (_) {} }
     if (unmatched.length) {
       onLog("WARN", "部分 Cloudflare 書庫尚未對應到這台 Mac 的 WebDAV 來源",
-        unmatched.length + " 個來源沒有相同的網址網域與帳號。請確認 Mac WebDAV 與 Cloudflare AList 設定指向同一服務。");
+        unmatched.length + " 個來源未能唯一對應到 Cloudflare Provider。請確認該網域只配置一個 Cloudflare AList Provider，且 Mac WebDAV 與其指向同一主機。");
     }
     return imported;
   }

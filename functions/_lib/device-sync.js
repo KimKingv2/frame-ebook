@@ -45,13 +45,20 @@ export async function getDeviceContext(request, env) {
 
 export async function getConfiguredSourceMap(env) {
   const output = {};
+  const ambiguous = new Set();
   for (const provider of ["vps", "worker", "mobile"]) {
     const config = getOpenListConfig(env, provider, "books");
     if (!config || !config.base || !config.username) continue;
     try {
       const origin = new URL(config.base).origin.toLowerCase();
       const id = "webdav:" + await sha256Text(origin);
-      output[id] = provider;
+      if (ambiguous.has(id)) continue;
+      if (output[id] && output[id] !== provider) {
+        delete output[id];
+        ambiguous.add(id);
+      } else {
+        output[id] = provider;
+      }
     } catch (_) {}
   }
   return output;

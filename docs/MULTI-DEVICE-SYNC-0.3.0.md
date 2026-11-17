@@ -26,7 +26,7 @@ Mac 0.2.7 previously used `profileId + path` for WebDAV IDs. The 0.3.0 foundatio
 
 ## Stable source identity
 
-A WebDAV source is identified separately from a book. The initial client-side source key is a SHA-256 digest of the normalized URL origin and lower-cased username. It is not a credential and does not contain the WebDAV password. Local `profileId` remains device-local for native WebDAV operations.
+A WebDAV source is identified separately from a book. The source key is a SHA-256 digest of the normalized URL origin only. It is not a credential and does not contain a username or WebDAV password. This lets a local WebDAV account differ from the Cloudflare server-side read-only API account. If multiple Cloudflare providers share the same origin, the server marks that source as ambiguous and refuses to guess. Local `profileId` remains device-local for native WebDAV operations.
 
 Before a source can participate in cloud sync, the server must verify that its source identity maps to an authorized configured catalog provider or register an explicitly approved source mapping. The raw WebDAV URL and username must not be sent to D1 as sync secrets.
 

@@ -30,8 +30,8 @@ export async function onRequestPost({ request, env }) {
       }
     }
     await dbResult.db.prepare(
-      "DELETE FROM reader_device_pairings WHERE expires_at<? AND status<>'claimed'"
-    ).bind(now).run();
+      "DELETE FROM reader_device_pairings WHERE (expires_at<? AND status<>'claimed') OR (status='claimed' AND claimed_at<?)"
+    ).bind(now, now - 30 * 24 * 60 * 60 * 1000).run();
     for (let attempt = 0; attempt < 5; attempt++) {
       const deviceCode = randomUrlToken(32);
       const pairingHash = await sha256Text(deviceCode);
