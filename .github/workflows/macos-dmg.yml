@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: frame-ebook-macos-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-macos:
     runs-on: macos-26
@@ -42,6 +46,14 @@ jobs:
       - name: Install frontend tooling
         working-directory: macos
         run: npm install --no-audit --no-fund
+
+      - name: Validate frontend JavaScript
+        working-directory: macos
+        run: |
+          node --check --input-type=module < ../pages/mac/app.js
+          node --check --input-type=module < ../pages/mac/shelf.js
+          node --check --input-type=module < ../pages/mac/sync.js
+          node --check --input-type=module < ../pages/assets/library-store.js
 
       - name: Build universal DMG
         working-directory: macos
