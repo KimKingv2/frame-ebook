@@ -699,7 +699,7 @@ async function getBook(bookOrId) {
         rootPath: descriptor.rootPath,
         path: descriptor.path,
         profileId: descriptor.profileId,
-        sourceId: descriptor.sourceId || base.cloudSource?.sourceId || ""
+        sourceId: descriptor.sourceId
       }
     };
     const remote = data.state || {};
@@ -723,7 +723,8 @@ async function getBook(bookOrId) {
         library: descriptor.library,
         rootPath: descriptor.rootPath,
         path: descriptor.path,
-        profileId: descriptor.profileId
+        profileId: descriptor.profileId,
+        sourceId: descriptor.sourceId || base.cloudSource?.sourceId || ""
       }
     });
   }
