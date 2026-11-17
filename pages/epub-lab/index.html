@@ -326,6 +326,19 @@
   <script src="/assets/cloud-manager-overlay.js?v=20261116-cloud-manager-r1"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261117-mac-cover-r1"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261117-sync-r1"></script>
+  <script type="module">
+    if (window.FRAME_LOCAL_APP && window.__TAURI__?.core?.invoke) {
+      const { startMacSync } = await import("/mac/sync.js?v=20261117-sync-r1");
+      const manager = startMacSync({
+        invoke: (name, args = {}) => window.__TAURI__.core.invoke(name, args),
+        getProfiles: () => window.__TAURI__.core.invoke("list_webdav_profiles"),
+        onLog: (level, message, detail) => {
+          if (level === "ERROR") console.error("[FRAME Sync]", message, detail || "");
+        }
+      });
+      window.__FRAME_MAC_SYNC_MANAGER = manager || window.__FRAME_MAC_SYNC_MANAGER;
+    }
+  </script>
 </body>
 </html>

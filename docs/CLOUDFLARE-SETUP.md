@@ -23,6 +23,8 @@ npx wrangler d1 execute frame-reader-db --remote --file=migrations/0006_remove_l
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0007_book_metadata_and_bangumi.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0008_shared_provider_catalog.sql
 npx wrangler d1 execute frame-reader-db --remote --file=migrations/0009_ensure_reader_annotations.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0010_device_sync.sql
+npx wrangler d1 execute frame-reader-db --remote --file=migrations/0011_incremental_sync_changes.sql
 ```
 
 For an existing Production database, apply only migrations that are still missing, in numeric order. In particular, if the Reading Room shows `D1_ERROR: no such table: reader_annotations`, run migration `0009_ensure_reader_annotations.sql` against the Production database `frame-reader-db`. It uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, so an already existing annotation table and its saved rows are left untouched. Do not reset or recreate the database.
@@ -126,4 +128,10 @@ The server-side VPS Alist, OpenList Worker and Mobile Device Alist providers now
 - Comic folder details include a Bangumi search panel. Search candidates are Bangumi book-type entries; the API's search filter does not expose a manga-only subcategory filter. Confirm the correct comic manually before applying it. The selected work's detail record is saved to the per-user `reader_comic_metadata` table and associated with each EPUB/CBZ file in that folder using each filename-derived Book ID. New volumes in the same indexed folder inherit the linked series metadata in the bookshelf grouping.
 - Bangumi metadata is separate from the local archive. Local CBZ cover extraction remains the primary cover source; the imported Bangumi image URL is stored only as source metadata and is not used to replace local covers.
 - The Bangumi v0 subject search endpoint is documented as experimental and may change. The application uses the public v0 endpoints and a descriptive User-Agent; it does not require a Bangumi account password or API token for this read-only workflow.
+## 9. Native device pairing and incremental sync (FRAME Ebook 0.3.0)
 
+The Mac edition remains local-first. Its IndexedDB stores the working bookshelf, reading state, annotations, reading events, preferences and pending outbound changes. Native device pairing uses a one-time 8-character approval code from the Mac app. Approve it on the Access-protected `/device-link/` page while signed into the same Reader account. D1 stores only the SHA-256 hash of the device token; the Mac stores its token in a user-only configuration file with Unix mode `0600`. The WebDAV password is never part of this flow.
+
+Apply migrations `0010_device_sync.sql` and `0011_incremental_sync_changes.sql` after the existing migrations and before deploying the 0.3.0 Pages Functions. Do not reset or recreate the Production D1 database. The Mac can only synchronize a WebDAV source whose URL origin and username match one of the server-side Alist/OpenList provider configurations, and whose books are present in the completed D1 cloud catalog. Complete the Cloudflare library scan first. The first device sync imports the indexed catalog and reading data; later syncs push bounded local batches and pull only change rows after the saved cursor. Use **重新整理雲端書架** in the Mac app after completing a new Cloudflare library scan. Original EPUB/CBZ archives and WebDAV passwords are not synchronized. Cover thumbnails remain per-device IndexedDB cache.
+
+Device token revocation is available from the linked Mac itself. If a device is lost, revoke its `reader_devices` row by setting `revoked_at` in D1; the device will no longer be accepted by the sync API. A web-based device management screen is not included in this first iteration.

@@ -141,6 +141,7 @@
       </div>
       <div class="sync-panel">
         <p id="sync-account-status" role="status">尚未連結雲端帳號。</p>
+        <p id="sync-last-result" class="sync-last-result" role="status">首次配對後會自動下載書架索引並同步閱讀資料。</p>
         <div id="sync-pair-panel" hidden>
           <p>請在已登入 FRAME Ebook 網頁版的瀏覽器開啟以下頁面，輸入這組代碼：</p>
           <p><a id="sync-verification-link" href="https://frame-ebook.pages.dev/device-link/" target="_blank" rel="noopener noreferrer">開啟設備核准頁面</a></p>
@@ -149,6 +150,8 @@
         </div>
         <div class="dialog-actions">
           <button id="start-cloud-pair" class="button primary" type="button">連結 Cloudflare 帳號</button>
+          <button id="sync-now-button" class="button primary" type="button" hidden>立即同步</button>
+          <button id="sync-refresh-catalog-button" class="button subtle" type="button" hidden>重新整理雲端書架</button>
           <button id="cancel-cloud-pair" class="button subtle" type="button" hidden>取消配對</button>
           <button id="disconnect-cloud-sync" class="button subtle" type="button" hidden>解除此設備</button>
         </div>
@@ -170,6 +173,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/mac/app.js?v=20261117-device-link-r1"></script>
+  <script type="module" src="/mac/app.js?v=20261117-sync-r1"></script>
 </body>
 </html>
