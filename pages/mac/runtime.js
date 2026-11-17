@@ -3,6 +3,9 @@
   window.FRAME_LOCAL_APP = isMac;
   if (!isMac) return;
   document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("a[href='/']").forEach(function (node) {
+      node.setAttribute("href", "/mac/index.html");
+    });
     document.querySelectorAll(".cloud-manager-trigger, a[href='/reading-stats/'], #cloud-manager-dialog").forEach(function (node) {
       node.hidden = true;
       node.setAttribute("aria-hidden", "true");

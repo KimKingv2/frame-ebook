@@ -19,10 +19,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: frame-ebook-macos
-  cancel-in-progress: true
-
 jobs:
   build-macos:
     runs-on: macos-14

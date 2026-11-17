@@ -94,7 +94,7 @@ fn get_profile_and_password(
 }
 
 fn is_local_host(host: &str) -> bool {
-    let clean = host.trim_matches(['[', ']']);
+    let clean = host.trim_start_matches('[').trim_end_matches(']');
     if clean.eq_ignore_ascii_case("localhost") || clean.ends_with(".local") { return true; }
     if let Ok(ip) = clean.parse::<IpAddr>() {
         return match ip {
