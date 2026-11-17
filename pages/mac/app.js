@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-preview-shelf-r3";
+import * as store from "/assets/library-store.js?v=20261117-filename-id-r2";
 import { createMacShelf } from "/mac/shelf.js?v=20261117-preview-shelf-r3";
 import { startMacSync } from "/mac/sync.js?v=20261117-sync-r1";
 const $ = id => document.getElementById(id);
