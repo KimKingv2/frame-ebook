@@ -151,7 +151,7 @@ async function addBook(entry, openAfter = false, refresh = true) {
   appendLog("INFO", "準備加入書籍", entry.path);
   const id = await store.cloudBookId(scope, entry.path);
   const folderPath = parentPath(entry.path);
-  const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\\/+$/, "").split("/").pop();
+  const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\/+$/, "").split("/").pop();
   const record = {
     id, sourceType: "cloud", provider: "webdav", library, rootPath: "/",
     path: entry.path, fileName: entry.name, title: baseTitle(entry.name),
