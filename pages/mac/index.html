@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111018">
   <title>FRAME Ebook · Mac</title>
   <script>window.FRAME_LOCAL_APP = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);</script>
-  <link rel="stylesheet" href="/mac/app.css?v=20261117-folder-shelf-r2">
+  <link rel="stylesheet" href="/mac/app.css?v=20261117-main-ui-scan-r1">
 </head>
 <body>
   <div class="app-shell">
@@ -14,10 +14,7 @@
       <a class="brand" href="/mac/index.html"><span class="brand-mark">F</span><span>FRAME <b>EBOOK</b><small>LOCAL EDITION</small></span></a>
       <div class="topbar-right">
         <span id="connection-status" class="status-pill"><i></i> 本機就緒</span>
-        <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
-        <button id="cloud-sync-button" class="button subtle" type="button">連結雲端</button>
-        <button id="open-logs" class="button subtle" type="button">日誌 <span id="log-count">0</span></button>
-        <button id="add-profile" class="button primary" type="button">＋ 新增 WebDAV</button>
+        <button id="open-scan-manager" class="cloud-manager-trigger" type="button" aria-haspopup="dialog" aria-controls="scan-manager-dialog">連接與掃描</button>
       </div>
     </header>
     <main class="main">
@@ -29,11 +26,6 @@
         </div>
         <div class="hero-orbit" aria-hidden="true"><span>FRAME</span><b>READ<br>LOCAL</b></div>
       </section>
-      <nav class="tabs" aria-label="主要功能">
-        <button class="tab is-active" data-tab="shelf" type="button">我的書架</button>
-        <button class="tab" data-tab="browser" type="button">WebDAV 檔案</button>
-        <span class="tab-note">MACOS · NATIVE NETWORK</span>
-      </nav>
       <section id="shelf-panel" class="panel">
         <div id="shelf-overview">
           <div class="panel-heading">
@@ -86,8 +78,8 @@
           </div>
           <div id="shelf-empty" class="empty-state" hidden>
             <div class="empty-icon">▤</div><h3>書架還是空的</h3>
-            <p>連接 WebDAV 後，首頁會自動掃描遠端資料夾並加入 EPUB／CBZ；無需逐本手動加入。</p>
-            <button class="button primary" data-open-browser type="button">開始瀏覽</button>
+            <p>在「連接與掃描」設定電子書與漫畫根目錄，再手動執行掃描。掃描完成後，書籍會保留在這個本機書架。</p>
+            <button class="button primary" data-open-browser type="button">連接與掃描</button>
           </div>
           <p id="shelf-count-label" class="shelf-count-label"></p>
           <p id="shelf-result-count" class="shelf-result-count"></p>
@@ -108,15 +100,107 @@
           <div id="folder-detail-empty" class="category-empty" hidden>這個資料夾目前沒有可閱讀的書籍。</div>
         </section>
       </section>
-      <section id="browser-panel" class="panel" hidden>
-        <div class="panel-heading browser-heading">
-          <div><p class="section-kicker">WEBDAV EXPLORER</p><h2>檔案來源</h2><p>目錄清單使用原生 PROPFIND；點選 EPUB／CBZ 即可加入書架並開始閱讀。</p></div>
-          <div class="browser-actions"><button id="parent-folder" class="button subtle" type="button">← 上一層</button><button id="refresh-folder" class="button subtle" type="button">重新整理</button><button id="add-folder-books" class="button primary" type="button">將本頁書籍加入書架</button></div>
+      <dialog id="scan-manager-dialog" class="cloud-manager-dialog" aria-labelledby="scan-manager-title">
+        <div class="cloud-settings-dialog-head">
+          <div><p class="section-kicker">CONNECTION &amp; INDEX MANAGER</p><h2 id="scan-manager-title">連接與掃描</h2></div>
+          <button id="close-scan-manager" class="cloud-manager-close" type="button" aria-label="關閉連接與掃描">×</button>
         </div>
-        <div class="path-bar"><span class="path-label">目前位置</span><code id="current-path">/</code><span id="folder-count" class="path-count"></span></div>
-        <div id="file-list" class="file-list"></div>
-        <div id="browser-empty" class="empty-state compact" hidden><div class="empty-icon">⌁</div><h3>這個資料夾沒有可顯示的檔案</h3><p>可進入子資料夾，或確認 WebDAV 根目錄是否設定正確。</p></div>
-      </section>
+        <div class="cloud-settings-dialog-body">
+          <nav class="cloud-manager-tabs" role="tablist" aria-label="連接與掃描管理分頁">
+            <button class="cloud-manager-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="manager-connection-panel" data-manager-tab="connection">連接與掃描</button>
+            <button class="cloud-manager-tab" type="button" role="tab" aria-selected="false" aria-controls="manager-library-panel" data-manager-tab="library">雲端書庫</button>
+          </nav>
+          <div id="manager-connection-panel" class="cloud-manager-tab-panel" role="tabpanel">
+            <section class="cloud-connection-panel" aria-label="WebDAV 連線設定">
+              <div class="cloud-connection-heading">
+                <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>使用 Mac 原生 WebDAV 連線。密碼只保留在 App 執行期間的 RAM，不會寫入鑰匙圈或同步到 Cloudflare。</p></div>
+                <div class="cloud-connection-actions">
+                  <button id="cloud-sync-button" class="quiet-button" type="button">多設備同步</button>
+                </div>
+              </div>
+              <div class="manager-profile-row">
+                <label for="profile-select">目前使用的 WebDAV 來源</label>
+                <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
+                <button id="add-profile" class="quiet-button" type="button">新增來源</button>
+                <button id="edit-profile" class="quiet-button" type="button">編輯來源</button>
+              </div>
+              <div class="cloud-root-settings">
+                <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
+                <p>兩個根目錄分開掃描，分類只依照根目錄決定，不再從整個 WebDAV 根目錄猜測。只索引檔案資訊與封面，不會下載整本書到磁碟。</p>
+                <div class="cloud-roots-grid">
+                  <div class="cloud-root-field">
+                    <label for="scan-books-root">電子書根目錄（只收 EPUB）</label>
+                    <input id="scan-books-root" type="text" spellcheck="false" autocomplete="off" value="/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔">
+                    <small id="scan-books-root-status">雲端目錄設定</small>
+                  </div>
+                  <div class="cloud-root-field">
+                    <label for="scan-comics-root">漫畫根目錄（EPUB／CBZ）</label>
+                    <input id="scan-comics-root" type="text" spellcheck="false" autocomplete="off" value="/中國移動雲盤/Kim King/11 Comic">
+                    <small id="scan-comics-root-status">雲端目錄設定</small>
+                  </div>
+                </div>
+                <div class="cloud-root-save-row">
+                  <button id="save-scan-roots" class="quiet-button" type="button">保存電子書／漫畫根目錄</button>
+                  <span>設定保存在這台 Mac；切換 WebDAV 來源時各自保存。</span>
+                </div>
+              </div>
+              <p id="scan-settings-status" class="cloud-source-status" role="status">請選擇 WebDAV 來源並確認兩條書庫根目錄。</p>
+            </section>
+            <section class="cloud-index-panel" aria-label="書庫索引管理">
+              <div class="cloud-index-heading">
+                <div class="cloud-index-copy">
+                  <p class="section-kicker">LOCAL BOOKSHELF INDEX</p>
+                  <h3>書庫掃描與索引</h3>
+                  <p>依照電子書／漫畫各自的根目錄遞迴掃描；資料夾內的 EPUB／CBZ 會合併成首頁的一張資料夾卡，封面最多三冊疊放。掃描可暫停並保存進度，重新開啟 App 不會自動重掃。</p>
+                </div>
+                <div class="cloud-index-actions"><span id="scan-index-status" class="cloud-index-status">尚未建立索引</span></div>
+              </div>
+              <div class="cloud-index-scan-actions">
+                <button id="scan-books" class="primary-link" type="button">掃描／續掃電子書 ↗</button>
+                <button id="scan-books-full" class="quiet-button" type="button">完整重掃電子書</button>
+                <button id="scan-comics" class="primary-link" type="button">掃描／續掃漫畫 ↗</button>
+                <button id="scan-comics-full" class="quiet-button" type="button">完整重掃漫畫</button>
+                <button id="scan-all" class="quiet-button" type="button">依序掃描電子書＋漫畫</button>
+                <button id="scan-pause" class="quiet-button" type="button" disabled>暫停目前掃描</button>
+                <button id="scan-retry-covers" class="quiet-button" type="button">重試失敗封面</button>
+              </div>
+              <div class="cloud-index-summary-grid">
+                <article class="cloud-index-summary-card">
+                  <div><strong>電子書索引進度</strong><span id="scan-books-status">尚未掃描</span></div>
+                  <pre id="scan-books-summary">掃描根目錄：/</pre>
+                </article>
+                <article class="cloud-index-summary-card">
+                  <div><strong>漫畫索引進度</strong><span id="scan-comics-status">尚未掃描</span></div>
+                  <pre id="scan-comics-summary">掃描根目錄：/</pre>
+                </article>
+              </div>
+              <details class="cloud-index-log" open>
+                <summary>即時掃描日誌 <span id="scan-log-count">0 筆</span></summary>
+                <div class="cloud-index-log-toolbar">
+                  <span>逐步記錄目錄遍歷、書架寫入、封面 Range 擷取與錯誤；資料與掃描游標保存在這台 Mac。</span>
+                  <div>
+                    <button id="open-logs" class="quiet-button" type="button">完整日誌 <span id="log-count">0</span></button>
+                    <button id="scan-log-copy" class="quiet-button" type="button">複製日誌</button>
+                    <button id="scan-log-clear" class="quiet-button" type="button">清空</button>
+                  </div>
+                </div>
+                <pre id="scan-log-output">尚無日誌。開始或續作掃描後，這裡會即時列出處理階段。</pre>
+              </details>
+            </section>
+          </div>
+          <div id="manager-library-panel" class="cloud-manager-tab-panel" role="tabpanel" hidden>
+            <section id="browser-panel" class="panel cloud-directory-panel">
+              <div class="cloud-browser-heading">
+                <div><p class="section-kicker">WEBDAV BOOK INDEX</p><h2>雲端書庫</h2><p>瀏覽目前 WebDAV 來源的原始資料夾。新增或移動書檔後，回到「連接與掃描」執行指定分類掃描，更新首頁書架。</p></div>
+                <div class="browser-actions"><button id="parent-folder" class="button subtle" type="button">← 上一層</button><button id="refresh-folder" class="button subtle" type="button">重新整理</button><button id="add-folder-books" class="button primary" type="button">將本頁書籍加入書架</button></div>
+              </div>
+              <div class="path-bar"><span class="path-label">目前位置</span><code id="current-path">/</code><span id="folder-count" class="path-count"></span></div>
+              <div id="file-list" class="file-list"></div>
+              <div id="browser-empty" class="empty-state compact" hidden><div class="empty-icon">⌁</div><h3>這個資料夾沒有可顯示的檔案</h3><p>可進入子資料夾，或確認 WebDAV 根目錄是否設定正確。</p></div>
+            </section>
+          </div>
+        </div>
+      </dialog>
     </main>
     <footer><span>FRAME EBOOK · LOCAL EDITION</span><span>NO CLOUDFLARE · NO D1 · YOUR DATA STAYS ON THIS MAC</span></footer>
   </div>
@@ -173,6 +257,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/mac/app.js?v=20261117-autoscan-r2"></script>
+  <script type="module" src="/mac/app.js?v=20261117-main-ui-scan-r1"></script>
 </body>
 </html>
