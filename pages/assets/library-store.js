@@ -6,7 +6,7 @@ const bookCache = new Map();
 
 
 const LOCAL_DB_NAME = "frame-ebook-macos";
-const LOCAL_DB_VERSION = 2;
+const LOCAL_DB_VERSION = 3;
 let localDatabasePromise = null;
 function isLocalMacApp() {
   return typeof window !== "undefined" && window.FRAME_LOCAL_APP === true;
@@ -23,6 +23,7 @@ function openLocalDatabase() {
       if (!db.objectStoreNames.contains("events")) db.createObjectStore("events", { keyPath: "id" });
       if (!db.objectStoreNames.contains("preferences")) db.createObjectStore("preferences", { keyPath: "key" });
       if (!db.objectStoreNames.contains("sync_meta")) db.createObjectStore("sync_meta", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("sync_queue")) db.createObjectStore("sync_queue", { keyPath: "queueId", autoIncrement: true });
     };
     request.onsuccess = () => {
       const db = request.result;
@@ -65,6 +66,24 @@ function localTransaction(db, stores, mode, execute) {
     catch (error) { try { transaction.abort(); } catch (_) {} reject(error); }
   });
 }
+function queueLocalChange(tx, change) {
+  tx.objectStore("sync_queue").add({
+    ...change,
+    queuedAt: Date.now()
+  });
+}
+function descriptorForQueue(book) {
+  const source = book?.cloudSource || book?.source || book || {};
+  return {
+    id: String(book?.id || source?.id || ""),
+    sourceId: String(source?.sourceId || book?.sourceId || ""),
+    profileId: String(source?.profileId || book?.profileId || ""),
+    library: String(source?.library || book?.library || book?.shelf || ""),
+    rootPath: String(source?.rootPath || book?.rootPath || ""),
+    path: String(source?.path || book?.path || "")
+  };
+}
+
 function localApi(path, options = {}) {
   return openLocalDatabase().then(db => {
     const url = new URL(path, window.location.href);
@@ -93,7 +112,7 @@ function localApi(path, options = {}) {
     if (pathname === "/api/reading/state" && method === "POST") {
       const id = String(body.book && body.book.id || "");
       if (!id) return Promise.reject(new Error("本機閱讀資料缺少書籍識別碼。"));
-      return localTransaction(db, ["states", "books"], "readwrite", (tx, set) => {
+      return localTransaction(db, ["states", "books", "sync_queue"], "readwrite", (tx, set) => {
         const states = tx.objectStore("states");
         const books = tx.objectStore("books");
         const stateRequest = states.get(id);
@@ -111,20 +130,24 @@ function localApi(path, options = {}) {
             appearance: { ...(previous.appearance || {}), ...(patch.appearance || {}) },
             metadata: { ...(previous.metadata || {}), ...(patch.metadata || {}) }
           };
-          states.put({ id, state });
+          const updatedAt = Date.now();
+          states.put({ id, state, updatedAt });
           if (book) {
-            books.put({
+            const updatedBook = {
               ...book,
               ...(state.metadata || {}),
               progress: state.progress || book.progress,
               appearance: state.appearance || book.appearance,
               lastOpenedAt: Number(state.lastOpenedAt) || book.lastOpenedAt || 0
-            });
+            };
+            books.put(updatedBook);
+            remember(updatedBook);
           }
+          queueLocalChange(tx, { type: "state", book: descriptorForQueue(book || body.book), state, updatedAt });
           set({ state });
         };
         stateRequest.onsuccess = () => { previous = stateRequest.result?.state || {}; stateReady = true; save(); };
-        bookRequest.onsuccess = () => { book = bookRequest.result || null; bookReady = true; save(); };
+        bookRequest.onsuccess = () => { book = bookRequest.result || body.book || null; bookReady = true; save(); };
       });
     }
     if (pathname === "/api/reading/annotations" && method === "GET") {
@@ -139,27 +162,33 @@ function localApi(path, options = {}) {
     }
     if (pathname === "/api/reading/annotations" && method === "POST") {
       const annotation = body.annotation || {};
-      const bookId = String(body.book && body.book.id || annotation.bookId || "");
+      const book = body.book || {};
+      const bookId = String(book.id || annotation.bookId || "");
       if (!bookId || !annotation.id) return Promise.reject(new Error("本機標註缺少必要識別資訊。"));
-      const next = { ...annotation, bookId, key: bookId + "::" + String(annotation.id) };
-      return localTransaction(db, ["annotations"], "readwrite", (tx, set) => {
+      const updatedAt = Date.now();
+      const next = { ...annotation, bookId, updatedAt, key: bookId + "::" + String(annotation.id) };
+      return localTransaction(db, ["annotations", "sync_queue"], "readwrite", (tx, set) => {
         tx.objectStore("annotations").put(next);
+        queueLocalChange(tx, { type: "annotation", book: descriptorForQueue(book), annotation: { ...annotation, bookId, updatedAt } });
         const { key, ...saved } = next;
         set({ annotation: saved });
       });
     }
     if (pathname === "/api/reading/annotations" && method === "DELETE") {
-      const bookId = String(body.book && body.book.id || "");
+      const book = body.book || {};
+      const bookId = String(book.id || "");
       const id = String(body.id || "");
-      return localTransaction(db, ["annotations"], "readwrite", (tx, set) => {
+      return localTransaction(db, ["annotations", "sync_queue"], "readwrite", (tx, set) => {
         tx.objectStore("annotations").delete(bookId + "::" + id);
+        queueLocalChange(tx, { type: "annotation_delete", book: descriptorForQueue(book), id, updatedAt: Date.now() });
         set({ ok: true });
       });
     }
     if (pathname === "/api/reading/events" && method === "POST") {
       const incoming = Array.isArray(body.events) ? body.events : [];
-      return localTransaction(db, ["events"], "readwrite", (tx, set) => {
+      return localTransaction(db, ["events", "books", "sync_queue"], "readwrite", (tx, set) => {
         const events = tx.objectStore("events");
+        const books = tx.objectStore("books");
         let accepted = 0;
         let remaining = incoming.length;
         if (!remaining) { set({ accepted: 0 }); return; }
@@ -167,7 +196,15 @@ function localApi(path, options = {}) {
           if (!event || !event.id) { remaining--; if (!remaining) set({ accepted }); return; }
           const request = events.get(String(event.id));
           request.onsuccess = () => {
-            if (!request.result) { events.put(event); accepted++; }
+            if (!request.result) {
+              events.put(event);
+              accepted++;
+              const bookRequest = books.get(String(event.bookId || ""));
+              bookRequest.onsuccess = () => {
+                const book = bookRequest.result;
+                if (book) queueLocalChange(tx, { type: "event", event, book: descriptorForQueue(book) });
+              };
+            }
             remaining--;
             if (!remaining) set({ accepted });
           };
@@ -199,14 +236,260 @@ function localApi(path, options = {}) {
     if (pathname === "/api/reading/preferences" && method === "POST") {
       const key = String(body.key || "");
       if (!key) return Promise.reject(new Error("本機偏好設定缺少欄位名稱。"));
-      return localTransaction(db, ["preferences"], "readwrite", (tx, set) => {
-        tx.objectStore("preferences").put({ key, value: body.value });
-        set({ value: body.value });
+      const updatedAt = Number(body.updatedAt) || Date.now();
+      return localTransaction(db, ["preferences", "sync_queue"], "readwrite", (tx, set) => {
+        tx.objectStore("preferences").put({ key, value: body.value, updatedAt });
+        queueLocalChange(tx, { type: "preference", key, value: body.value, updatedAt });
+        set({ value: body.value, updatedAt });
       });
     }
     return Promise.reject(new Error("Mac 本機模式尚未實作這項資料操作：" + pathname));
   });
 }
+
+
+async function readLocalStores(names) {
+  const db = await openLocalDatabase();
+  return localTransaction(db, names, "readonly", (tx, set) => {
+    const output = {};
+    let remaining = names.length;
+    if (!remaining) { set(output); return; }
+    names.forEach(name => {
+      const request = tx.objectStore(name).getAll();
+      request.onsuccess = () => {
+        output[name] = request.result || [];
+        remaining--;
+        if (!remaining) set(output);
+      };
+    });
+  });
+}
+async function getLocalSyncQueue(limit = 50) {
+  const db = await openLocalDatabase();
+  return localTransaction(db, ["sync_queue"], "readonly", (tx, set) => {
+    const store = tx.objectStore("sync_queue");
+    const request = store.getAll();
+    request.onsuccess = () => set((request.result || [])
+      .sort((a,b) => Number(a.queueId)-Number(b.queueId))
+      .slice(0, Math.max(1, Math.min(100, Number(limit)||50))));
+  });
+}
+async function acknowledgeLocalSyncQueue(queueIds) {
+  const ids = (Array.isArray(queueIds) ? queueIds : []).map(Number).filter(Number.isSafeInteger);
+  if (!ids.length) return 0;
+  const db = await openLocalDatabase();
+  await localTransaction(db, ["sync_queue"], "readwrite", tx => {
+    const queue = tx.objectStore("sync_queue");
+    ids.forEach(id => queue.delete(id));
+  });
+  return ids.length;
+}
+async function getLocalSyncMeta(key, fallback = null) {
+  const db = await openLocalDatabase();
+  return localTransaction(db, ["sync_meta"], "readonly", (tx,set) => {
+    const request = tx.objectStore("sync_meta").get(String(key));
+    request.onsuccess = () => set(request.result ? request.result.value : fallback);
+  });
+}
+async function setLocalSyncMeta(key, value) {
+  const db = await openLocalDatabase();
+  await localTransaction(db, ["sync_meta"], "readwrite", tx => {
+    tx.objectStore("sync_meta").put({ key:String(key), value });
+  });
+  return value;
+}
+function sourceProfileMap(profiles, sourceMap = {}) {
+  const result = {};
+  for (const [sourceId, provider] of Object.entries(sourceMap || {})) {
+    const profile = (profiles || []).find(item => ["vps","worker","mobile"].includes(provider));
+    if (profile) result[sourceId] = String(profile.id);
+  }
+  return result;
+}
+function buildLocalDescriptor(book) {
+  const source = book?.cloudSource || {};
+  return {
+    id:String(book?.id || ""),
+    sourceId:String(source.sourceId || book?.sourceId || ""),
+    library:String(source.library || book?.library || ""),
+    rootPath:String(source.rootPath || book?.rootPath || ""),
+    path:String(source.path || book?.path || "")
+  };
+}
+async function upsertSyncedCatalogItems(items, profiles = []) {
+  const profileSourceMap = {};
+  for (const profile of profiles || []) {
+    const sourceId = await webDavSourceId(profile);
+    profileSourceMap[sourceId] = String(profile.id);
+  }
+  const valid = (Array.isArray(items) ? items : []).filter(item => profileSourceMap[item.sourceId]);
+  if (!valid.length) return 0;
+  const db = await openLocalDatabase();
+  await localTransaction(db, ["books"], "readwrite", tx => {
+    const books = tx.objectStore("books");
+    valid.forEach(item => {
+      const request = books.get(String(item.id));
+      request.onsuccess = () => {
+        const previous = request.result || {};
+        if (previous.idMigrationConflict) return;
+        const profileId = profileSourceMap[item.sourceId];
+        const folderPath = String(item.parentPath || item.path || "/").replace(/\\/g,"/").replace(/[^/]+$/, "");
+        const folderTitle = folderPath === "/" ? "根目錄" : folderPath.replace(/\\/+$/,"").split("/").pop();
+        const source = {
+          ...(previous.cloudSource || {}),
+          provider:"webdav", profileId, sourceId:item.sourceId,
+          library:item.library, rootPath:item.rootPath, path:item.path,
+          folderPath, folderTitle
+        };
+        const next = {
+          ...previous,
+          id:String(item.id), sourceType:"cloud", provider:"webdav", profileId,
+          library:item.library, shelf:item.library, rootPath:item.rootPath, path:item.path,
+          fileName:item.fileName, format:item.format, size:Number(item.size)||0,
+          lastModified:item.modifiedAt ? (Date.parse(item.modifiedAt)||0) : 0,
+          title:previous.manualTitle && previous.title ? previous.title : String(item.title || item.fileName || "未命名書籍"),
+          author:previous.manualAuthor && previous.author ? previous.author : String(item.author || ""),
+          language:String(item.language || previous.language || ""),
+          description:String(item.description || previous.description || ""),
+          publisher:String(item.publisher || previous.publisher || ""),
+          publishedAt:String(item.publishedAt || previous.publishedAt || ""),
+          identifier:String(item.identifier || previous.identifier || ""),
+          subjects:Array.isArray(item.subjects) ? item.subjects : (previous.subjects || []),
+          cloudCoverHash:item.coverHash || null, cloudCoverStatus:item.coverStatus || "",
+          cloudSource:source,
+          addedAt:Number(previous.addedAt)||Date.now(),
+          progress:previous.progress || {percent:0,label:"尚未閱讀",cfi:"",index:null},
+          appearance:previous.appearance || {}
+        };
+        books.put(next);
+        remember(next);
+      };
+    });
+  });
+  return valid.length;
+}
+async function mergeCloudSnapshot(snapshot) {
+  const db = await openLocalDatabase();
+  const local = await readLocalStores(["states","annotations","events","preferences"]);
+  const remoteStates = Array.isArray(snapshot.states) ? snapshot.states : [];
+  const remoteAnnotations = Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
+  const remoteEvents = Array.isArray(snapshot.events) ? snapshot.events : [];
+  const remotePreferences = Array.isArray(snapshot.preferences) ? snapshot.preferences : [];
+  const localStates = new Map((local.states||[]).map(item=>[String(item.id),item]));
+  const localAnnotations = new Map((local.annotations||[]).map(item=>[String(item.bookId)+"::"+String(item.id),item]));
+  const localEvents = new Map((local.events||[]).map(item=>[String(item.id),item]));
+  const localPreferences = new Map((local.preferences||[]).map(item=>[String(item.key),item]));
+  const stateWrites=[], annotationWrites=[], eventWrites=[], preferenceWrites=[], outgoing=[];
+  const now=Date.now();
+
+  for(const remote of remoteStates){
+    const id=String(remote.book?.id||"");
+    if(!id)continue;
+    const existing=localStates.get(id);
+    const localTime=Number(existing?.updatedAt||existing?.state?.lastOpenedAt)||0;
+    const remoteTime=Number(remote.updatedAt||remote.state?.lastOpenedAt)||0;
+    if(existing && localTime>remoteTime){
+      outgoing.push({type:"state",book:{...remote.book,sourceId:""},state:existing.state,updatedAt:localTime});
+    }else{
+      stateWrites.push({id,state:remote.state||{},updatedAt:remoteTime||now});
+    }
+  }
+  for(const [id,existing] of localStates){
+    if(!remoteStates.some(item=>String(item.book?.id||"")===id) && existing.state && Object.keys(existing.state).length){
+      const bookRecord=(await local.books?.find?.(x=>String(x.id)===id))||null;
+      if(bookRecord)outgoing.push({type:"state",book:buildLocalDescriptor(bookRecord),state:existing.state,updatedAt:Number(existing.updatedAt)||now});
+    }
+  }
+  for(const remote of remoteAnnotations){
+    const annotation=remote.annotation||{},book=remote.book||{};
+    const key=String(book.id||"")+"::"+String(annotation.id||"");
+    if(!key.includes("::")||!annotation.id)continue;
+    const existing=localAnnotations.get(key);
+    const localTime=Number(existing?.updatedAt||existing?.createdAt)||0;
+    const remoteTime=Number(annotation.updatedAt||annotation.createdAt)||0;
+    if(existing && localTime>remoteTime){
+      outgoing.push({type:"annotation",book:{...book,sourceId:""},annotation:existing});
+    }else{
+      annotationWrites.push({...annotation,bookId:String(book.id),key});
+    }
+  }
+  for(const [key,existing] of localAnnotations){
+    if(!remoteAnnotations.some(item=>String(item.book?.id||"")+"::"+String(item.annotation?.id||"")===key)){
+      const [bookId]=key.split("::");
+      const bookRecord=(local.books||[]).find(item=>String(item.id)===bookId);
+      if(bookRecord)outgoing.push({type:"annotation",book:buildLocalDescriptor(bookRecord),annotation:existing});
+    }
+  }
+  for(const remote of remoteEvents){
+    if(!remote?.id)continue;
+    if(!localEvents.has(String(remote.id)))eventWrites.push(remote);
+  }
+  for(const [id,event] of localEvents){
+    if(!remoteEvents.some(item=>String(item.id)===id))outgoing.push({type:"event",event});
+  }
+  for(const remote of remotePreferences){
+    const existing=localPreferences.get(String(remote.key));
+    if(existing && Number(existing.updatedAt||0)>Number(remote.updatedAt||0)){
+      outgoing.push({type:"preference",key:existing.key,value:existing.value,updatedAt:existing.updatedAt});
+    }else{
+      preferenceWrites.push({key:remote.key,value:remote.value,updatedAt:Number(remote.updatedAt)||now});
+    }
+  }
+  for(const [key,existing] of localPreferences){
+    if(!remotePreferences.some(item=>String(item.key)===key)){
+      outgoing.push({type:"preference",key,value:existing.value,updatedAt:Number(existing.updatedAt)||now});
+    }
+  }
+
+  await localTransaction(db,["states","annotations","events","preferences","sync_queue","sync_meta"],"readwrite",tx=>{
+    const states=tx.objectStore("states"),annotations=tx.objectStore("annotations"),events=tx.objectStore("events"),preferences=tx.objectStore("preferences");
+    stateWrites.forEach(item=>states.put(item));
+    annotationWrites.forEach(item=>annotations.put(item));
+    eventWrites.forEach(item=>events.put(item));
+    preferenceWrites.forEach(item=>preferences.put(item));
+    outgoing.forEach(change=>queueLocalChange(tx,change));
+    tx.objectStore("sync_meta").put({key:"cloudSyncInitialized",value:true});
+    tx.objectStore("sync_meta").put({key:"cloudSyncCursor",value:Number(snapshot.cursor)||0});
+  });
+  return {states:stateWrites.length,annotations:annotationWrites.length,events:eventWrites.length,preferences:preferenceWrites.length,queued:outgoing.length};
+}
+async function applyRemoteSyncChanges(changes) {
+  const list=Array.isArray(changes)?changes:[];
+  if(!list.length)return 0;
+  const db=await openLocalDatabase();
+  const local=await readLocalStores(["books"]);
+  const bookMap=new Map((local.books||[]).map(item=>[String(item.id),item]));
+  await localTransaction(db,["states","annotations","events","preferences","books"],"readwrite",tx=>{
+    const states=tx.objectStore("states"),annotations=tx.objectStore("annotations"),events=tx.objectStore("events"),preferences=tx.objectStore("preferences"),books=tx.objectStore("books");
+    for(const change of list){
+      const payload=change.payload||{};
+      if(change.entityType==="state"&&payload.book?.id){
+        const id=String(payload.book.id),state=payload.state||{};
+        states.put({id,state,updatedAt:Number(change.createdAt)||Date.now()});
+        const book=bookMap.get(id);
+        if(book){
+          const updated={...book,...(state.metadata||{}),progress:state.progress||book.progress,appearance:state.appearance||book.appearance,lastOpenedAt:Number(state.lastOpenedAt)||book.lastOpenedAt||0};
+          books.put(updated);remember(updated);
+        }
+      }else if(change.entityType==="annotation"&&change.operation==="upsert"&&payload.annotation){
+        const annotation=payload.annotation,bookId=String(annotation.bookId||payload.book?.id||"");
+        annotations.put({...annotation,bookId,key:bookId+"::"+String(annotation.id)});
+      }else if(change.entityType==="annotation"&&change.operation==="delete"){
+        const bookId=String(payload.book?.id||""),id=String(payload.id||"");
+        if(bookId&&id)annotations.delete(bookId+"::"+id);
+      }else if(change.entityType==="event"&&payload.id){
+        events.put(payload);
+      }else if(change.entityType==="preference"&&payload.key){
+        preferences.put({key:String(payload.key),value:payload.value,updatedAt:Number(change.createdAt)||Date.now()});
+      }
+    }
+  });
+  return list.length;
+}
+async function getLocalSyncSnapshot() {
+  return readLocalStores(["books","states","annotations","events","preferences"]);
+}
+
 
 async function readJson(response, fallback) {
   let data = {};
@@ -236,7 +519,9 @@ function normalizeDescriptor(book) {
     library: String(source?.library || book?.library || book?.shelf || ""),
     rootPath: String(source?.rootPath || source?.root_path || book?.rootPath || ""),
     path: String(source?.path || source?.bookPath || book?.path || ""),
-    profileId: String(source?.profileId || source?.profile_id || book?.profileId || "")
+    profileId: String(source?.profileId || source?.profile_id || book?.profileId || ""),
+    sourceId: String(source?.sourceId || source?.source_id || book?.sourceId || ""),
+    sourceId: String(source?.sourceId || source?.source_id || book?.sourceId || "")
   };
   if (!descriptor.id || !descriptor.provider || !descriptor.library || !descriptor.rootPath || !descriptor.path) {
     throw new Error("缺少有效的 Alist／OpenList 雲端書籍識別資訊。請返回書架重新開啟。");
@@ -252,7 +537,8 @@ function descriptorQuery(book) {
     library: d.library,
     root_path: d.rootPath,
     path: d.path,
-    profile_id: d.profileId
+    profile_id: d.profileId,
+    source_id: d.sourceId
   });
 }
 
@@ -553,5 +839,7 @@ async function setReadingSetting(key, value) {
 export {
   getBook, updateBook, listBooks, cloudBookId, webDavSourceId, getBookIdMigrationReport, addLocalBook, saveLocalBookCover, removeLocalBook,
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
-  recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting
+  recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting,
+  getLocalSyncQueue, acknowledgeLocalSyncQueue, getLocalSyncMeta, setLocalSyncMeta,
+  upsertSyncedCatalogItems, mergeCloudSnapshot, applyRemoteSyncChanges, getLocalSyncSnapshot
 };
