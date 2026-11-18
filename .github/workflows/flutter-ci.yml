@@ -52,7 +52,7 @@ jobs:
           index = web / "index.html"
           html = index.read_text(encoding="utf-8")
           pattern = re.compile(
-              r"_flutter\\.loader\\.load\\(\\{\\s*serviceWorkerSettings:\\s*\\{.*?\\}\\s*\\}\\);",
+              r"_flutter\.loader\.load\(\{\s*serviceWorkerSettings:\s*\{.*?\}\s*\}\);",
               re.DOTALL,
           )
           replacement = "_flutter.loader.load({config: {canvasKitVariant: 'full'}});"
