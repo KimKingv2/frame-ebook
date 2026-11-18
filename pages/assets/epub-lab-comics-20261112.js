@@ -100,10 +100,10 @@
     var point = getReaderWindowPoint(event, sourceDoc);
     if (!point) return false;
 
-    // Top 0–20% is reserved for switching between normal and immersive fullscreen.
+    // Top 0–20% toggles native browser fullscreen directly.
     // The remaining 20–100% is split into left/right page-turn zones.
     if (point.relativeY < point.rect.height * 0.2) {
-      if (isReaderFullscreen()) toggleImmersiveFullscreen();
+      toggleReaderFullscreen();
     } else {
       turnReaderPage(point.x < point.rect.left + point.rect.width / 2 ? -1 : 1);
     }
@@ -1812,28 +1812,15 @@
     if (!workspace || !button) return;
     var active = document.fullscreenElement === workspace ||
       document.webkitFullscreenElement === workspace;
-    if (!active) workspace.classList.remove('reader-immersive-mode', 'reader-immersive-exiting');
     button.classList.toggle('is-fullscreen-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
     button.setAttribute('aria-label', active ? '退出全螢幕閱讀' : '進入全螢幕閱讀');
     button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
   }
-  function toggleImmersiveFullscreen() {
-    var workspace = el('reading-workspace');
-    if (!workspace || !isReaderFullscreen()) return;
-
-    // Switch the reader chrome in one layout pass. Animating the heading,
-    // controls, or viewport dimensions makes Foliate repaginate repeatedly
-    // and produces a flash when leaving immersive fullscreen.
-    var wasImmersive = workspace.classList.contains('reader-immersive-mode');
-    workspace.classList.toggle('reader-immersive-mode', !wasImmersive);
-    workspace.classList.remove('reader-immersive-exiting');
-    scheduleReaderLayoutRefresh();
-  }
   async function toggleReaderFullscreen() {
     var workspace = el('reading-workspace');
     if (!workspace) return;
-    var active = document.fullscreenElement || document.webkitFullscreenElement;
+    var active = isReaderFullscreen();
     try {
       if (active) {
         if (document.exitFullscreen) await document.exitFullscreen();
