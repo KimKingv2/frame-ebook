@@ -151,10 +151,11 @@ export async function onRequestGet({ request, env }) {
         fileName: row.name,
         title: metadata.manualTitle && metadata.title ? metadata.title :
           (row.library === "comics"
-            ? String(comicMetadata?.nameCn || comicMetadata?.name || importedTitle || fallbackTitle)
-            : (importedTitle || fallbackTitle)),
+            ? String(comicMetadata?.nameCn || comicMetadata?.name || importedTitle || metadata.title || fallbackTitle)
+            : String(importedTitle || metadata.title || fallbackTitle)),
         author: metadata.manualAuthor ? String(metadata.author || "") :
-          String(comicMetadata?.author || row.book_creator || ""),
+          String((row.library === "comics" ? comicMetadata?.author : "") ||
+            row.book_creator || metadata.author || ""),
         bookTitle: importedTitle,
         bookCreator: String(row.book_creator || ""),
         description: String(row.book_description || ""),
