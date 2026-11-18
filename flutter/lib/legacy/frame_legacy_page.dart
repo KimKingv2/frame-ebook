@@ -7,5 +7,6 @@ import 'frame_legacy_page_stub.dart'
 Widget buildFrameLegacyPage({
   required Uri uri,
   required String title,
+  bool showToolbar = true,
 }) =>
-    platform.buildFrameLegacyPage(uri: uri, title: title);
+    platform.buildFrameLegacyPage(uri: uri, title: title, showToolbar: showToolbar);
