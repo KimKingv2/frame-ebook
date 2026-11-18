@@ -287,7 +287,12 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
 
   Widget _coverStack(FrameShelfEntry entry) {
     final members = entry.sortedMembers();
-    if (members.length <= 1) return _cover(members.first);
+    if (members.length <= 1) {
+      final book = members.first;
+      return _coverHash(book).isEmpty
+          ? const _FolderCoverEmpty()
+          : _cover(book);
+    }
     final visible = members.take(3).toList();
     final visual = visible.length == 3
         ? [visible[1], visible[0], visible[2]]
@@ -296,11 +301,14 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       builder: (context, bounds) {
         final w = bounds.maxWidth;
         final h = bounds.maxHeight;
+        // Match the original CSS z-index: left sheet, right sheet, then
+        // the smaller center cover above both side covers.
+        final paintOrder = visual.length == 3 ? [0, 2, 1] : [0, 1];
         return Stack(
           clipBehavior: Clip.hardEdge,
           children: [
-            for (var i = 0; i < visual.length; i++)
-              _stackSheet(visual[i], i, w, h, visual.length),
+            for (final index in paintOrder)
+              _stackSheet(visual[index], index, w, h, visual.length),
           ],
         );
       },
@@ -315,7 +323,11 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     final top = center ? .08 : -.02;
     final sheetWidth = center ? .58 : .78;
     final sheetHeight = center ? .84 : 1.04;
-    final angle = center ? 0.0 : (index == 0 ? -.14 : .14);
+    final angle = center
+        ? 0.0
+        : (count == 2
+            ? -.122173
+            : (index == 0 ? -.139626 : .139626));
     return Positioned(
       left: w * left,
       top: h * top,
@@ -323,18 +335,28 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       height: h * sheetHeight,
       child: Transform.rotate(
         angle: angle,
-        alignment: Alignment.bottomCenter,
+        alignment: const Alignment(0, .76),
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: const Color(0xFFF3EFE8),
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: const Color(0x88F5F0FA)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x44000000), blurRadius: 12, offset: Offset(0, 5)),
-            ],
+            color: center ? Colors.transparent : const Color(0xFFF3EFE8),
+            borderRadius: center ? BorderRadius.zero : BorderRadius.circular(3),
+            border: center
+                ? Border.all(color: Colors.transparent, width: 0)
+                : Border.all(color: const Color(0x88F5F0FA)),
+            boxShadow: center
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x44000000),
+                      blurRadius: 12,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
           ),
-          child: _cover(book, contain: center),
+          child: _coverHash(book).isEmpty
+              ? const _StackCoverFallback()
+              : _cover(book, contain: center),
         ),
       ),
     );
@@ -382,7 +404,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AspectRatio(
-          aspectRatio: 3 / 4,
+          aspectRatio: folder || isVolume ? 2 / 3 : 3 / 4,
           child: InkWell(
             onTap: () => folder ? _openFolder(entry) : _openReader(book),
             child: Stack(
@@ -500,9 +522,9 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       child: Row(
         children: [
           SizedBox(
-            width: 76,
+            width: 60,
             child: AspectRatio(
-              aspectRatio: 3 / 4,
+              aspectRatio: folder || isVolume ? 2 / 3 : 3 / 4,
               child: InkWell(
                 onTap: () => folder ? _openFolder(entry) : _openReader(book),
                 child: ClipRRect(
@@ -985,6 +1007,53 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     );
   }
 
+  Widget _gridSliver(
+    int itemCount,
+    Widget Function(int index) itemBuilder,
+  ) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    const horizontalPadding = 48.0;
+    const gap = 13.0;
+    final availableWidth = (viewportWidth - horizontalPadding).clamp(0.0, double.infinity);
+    final columns = viewportWidth <= 520
+        ? 2
+        : viewportWidth <= 760
+            ? 3
+            : ((availableWidth + gap) / (142 + gap)).floor().clamp(1, 12);
+    final rowCount = (itemCount + columns - 1) ~/ columns;
+
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, rowIndex) {
+            final firstIndex = rowIndex * columns;
+            return Padding(
+              padding: EdgeInsets.only(bottom: rowIndex == rowCount - 1 ? 0 : 19),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var column = 0; column < columns; column++)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: column == columns - 1 ? 0 : gap,
+                        ),
+                        child: firstIndex + column < itemCount
+                            ? itemBuilder(firstIndex + column)
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+          childCount: rowCount,
+        ),
+      ),
+    );
+  }
+
   List<Widget> _shelfSlivers(bool comics) {
     final all = _entries.where((entry) => entry.isComic == comics).toList();
     final visible = _shelf(comics);
@@ -1063,20 +1132,9 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       );
     } else {
       result.add(
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _card(visible[index]),
-              childCount: visible.length,
-            ),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 190,
-              mainAxisExtent: 365,
-              crossAxisSpacing: 13,
-              mainAxisSpacing: 18,
-            ),
-          ),
+        _gridSliver(
+          visible.length,
+          (index) => _card(visible[index]),
         ),
       );
     }
@@ -1136,20 +1194,9 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       );
     } else {
       result.add(
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _card(folder, volume: volumes[index]),
-              childCount: volumes.length,
-            ),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 190,
-              mainAxisExtent: 365,
-              crossAxisSpacing: 13,
-              mainAxisSpacing: 18,
-            ),
-          ),
+        _gridSliver(
+          volumes.length,
+          (index) => _card(folder, volume: volumes[index]),
         ),
       );
     }
@@ -1338,6 +1385,91 @@ class _CoverCache {
   void clear() => _items.clear();
 }
 
+class _FolderCoverEmpty extends StatelessWidget {
+  const _FolderCoverEmpty();
+
+  @override
+  Widget build(BuildContext context) => const CustomPaint(
+        painter: _FolderCoverEmptyPainter(),
+        child: SizedBox.expand(),
+      );
+}
+
+class _FolderCoverEmptyPainter extends CustomPainter {
+  const _FolderCoverEmptyPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFD9D1C4),
+    );
+    final green = Path()
+      ..moveTo(size.width * .58, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * .61)
+      ..close();
+    canvas.drawPath(green, Paint()..color = const Color(0xFF355047));
+    final terracotta = Path()
+      ..moveTo(0, size.height * .74)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width * .34, size.height)
+      ..close();
+    canvas.drawPath(terracotta, Paint()..color = const Color(0xFFC58C70));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _StackCoverFallback extends StatelessWidget {
+  const _StackCoverFallback();
+
+  @override
+  Widget build(BuildContext context) => const CustomPaint(
+        painter: _StackCoverFallbackPainter(),
+        child: SizedBox.expand(),
+      );
+}
+
+class _StackCoverFallbackPainter extends CustomPainter {
+  const _StackCoverFallbackPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFD9D1C4),
+    );
+    final diameter = size.width * .68;
+    final topCircle = Rect.fromLTWH(
+      size.width * .24,
+      size.height * .18,
+      diameter,
+      diameter,
+    );
+    canvas.drawOval(topCircle, Paint()..color = const Color(0xFF355047));
+
+    final ringDiameter = size.width * .72;
+    final ringRect = Rect.fromLTWH(
+      -size.width * .16,
+      size.height - ringDiameter + size.height * .22,
+      ringDiameter,
+      ringDiameter,
+    );
+    canvas.drawOval(
+      ringRect,
+      Paint()
+        ..color = const Color(0xFF9E7C55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _CoverLoading extends StatelessWidget {
   const _CoverLoading();
 
@@ -1365,7 +1497,7 @@ class _CoverFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
         decoration: const BoxDecoration(
           gradient: RadialGradient(
             center: Alignment(0.35, -0.65),
@@ -1385,7 +1517,8 @@ class _CoverFallback extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFFF5EFFB),
-                fontSize: 15,
+                fontFamily: 'Georgia',
+                fontSize: 14,
                 height: 1.45,
                 fontWeight: FontWeight.w500,
               ),
