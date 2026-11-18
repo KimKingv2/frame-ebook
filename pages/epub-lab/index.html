@@ -157,7 +157,7 @@
         </select>
         </label>
         </div>
-        <p id="reading-mode-note" class="layout-note">雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。左右留白也會同步調整雙頁中央的頁縫。</p>
+        <p id="reading-mode-note" class="layout-note">雙頁頁縫固定為 7%；此選項只調整整組頁面的左右外側留白。窄螢幕仍會自動切回單頁。</p>
         </section>
         <section class="appearance-group comic-group" aria-label="漫畫與圖像閱讀">
         <div class="appearance-group-heading"><span>漫畫與圖像</span><small>COMIC READING</small></div>
@@ -317,7 +317,7 @@
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261118-flutter-bridge-r1"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261118-layout-r1"></script>
   <script type="module">
     if (window.FRAME_LOCAL_APP && window.__TAURI__?.core?.invoke) {
       const { startMacSync } = await import("/mac/sync.js?v=20261117-sync-r1");

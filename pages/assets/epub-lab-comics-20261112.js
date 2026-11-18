@@ -1304,11 +1304,11 @@
     } else if (!view) {
       note.textContent = '圖像閱讀設定會在載入 CBZ 或固定版面 EPUB 後啟用。';
     } else if (appearance.readingMode === 'scrolled') {
-      note.textContent = '連續捲動模式；頁面欄數與上下留白會在切回分頁時恢復。';
+      note.textContent = '連續捲動模式；左右外側留白設定只在分頁模式生效。';
     } else if (appearance.pageLayout === '2') {
-      note.textContent = '雙頁優先：橫向寬螢幕呈現雙頁，直向畫面自動切回單頁。';
+      note.textContent = '雙頁優先：橫向寬螢幕呈現雙頁，中央頁縫固定為 7%；左右留白由上方設定控制。直向畫面自動切回單頁。';
     } else {
-      note.textContent = '單頁翻頁模式，適合窄螢幕或逐頁專注閱讀。';
+      note.textContent = '單頁翻頁模式；頁面外側左右留白由上方設定控制。';
     }
   }
   function updateLayoutControlState() {
@@ -1335,10 +1335,12 @@
     }
 
     if (view && view.renderer && !view.isFixedLayout) {
-      // Keep the two axes independent. Foliate expects a CSS length for
-      // vertical margin and a percentage for horizontal page gap.
+      // Keep the axes independent: vertical margin stays in pixels,
+      // while the two-page gutter is fixed at 7% and outer margins stay adjustable.
       view.renderer.setAttribute('margin', appearance.verticalMargin + 'px');
-      view.renderer.setAttribute('gap', appearance.horizontalMargin + '%');
+      // Keep the page gutter consistent; the user setting now controls only outer margins.
+      view.renderer.setAttribute('gap', '7%');
+      view.renderer.setAttribute('outer-margin', appearance.horizontalMargin + '%');
       if (appearance.readingMode === 'scrolled') {
         view.renderer.setAttribute('flow', 'scrolled');
       } else {
@@ -1489,7 +1491,7 @@
     var isCbz = /\.cbz$/i.test(String(source && source.name || name || ''));
     var parsedBook;
     if (isCbz) {
-      await import('/vendor/foliate-js/view.js');
+      await import('/vendor/foliate-js/view.js?v=20261118-layout-r1');
     } else {
       var archiveData = source && source.frameMemoryBytes instanceof Uint8Array
         ? source.frameMemoryBytes
@@ -1893,7 +1895,7 @@
   }
 
   setText('engine-status', featureSummary());
-  import('/vendor/foliate-js/view.js').then(async function () {
+  import('/vendor/foliate-js/view.js?v=20261118-layout-r1').then(async function () {
     setText('engine-status', featureSummary() + ' · Foliate ready');
     var params = new URLSearchParams(window.location.search);
     var bookId = params.get('book');

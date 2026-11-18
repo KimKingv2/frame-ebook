@@ -423,7 +423,7 @@ class View {
 // NOTE: everything here assumes the so-called "negative scroll type" for RTL
 export class Paginator extends HTMLElement {
     static observedAttributes = [
-        'flow', 'gap', 'margin',
+        'flow', 'gap', 'margin', 'outer-margin',
         'max-inline-size', 'max-block-size', 'max-column-count',
     ]
     #root = this.attachShadow({ mode: 'closed' })
@@ -472,15 +472,16 @@ export class Paginator extends HTMLElement {
             --_max-column-count-portrait: 1;
             --_max-column-count-spread: var(--_max-column-count);
             --_half-gap: calc(var(--_gap) / 2);
+            --_outer-margin: 7%;
             --_max-width: calc(var(--_max-inline-size) * var(--_max-column-count-spread));
             --_max-height: var(--_max-block-size);
             display: grid;
             grid-template-columns:
-                minmax(var(--_half-gap), 1fr)
+                var(--_outer-margin)
                 var(--_half-gap)
-                minmax(0, calc(var(--_max-width) - var(--_gap)))
+                minmax(0, calc(100% - var(--_outer-margin) - var(--_outer-margin) - var(--_gap)))
                 var(--_half-gap)
-                minmax(var(--_half-gap), 1fr);
+                var(--_outer-margin);
             grid-template-rows:
                 minmax(var(--_margin), 1fr)
                 minmax(0, var(--_max-height))
@@ -489,6 +490,12 @@ export class Paginator extends HTMLElement {
                 --_max-column-count-spread: var(--_max-column-count-portrait);
                 --_max-width: var(--_max-block-size);
                 --_max-height: calc(var(--_max-inline-size) * var(--_max-column-count-spread));
+                grid-template-columns:
+                    minmax(var(--_half-gap), 1fr)
+                    var(--_half-gap)
+                    minmax(0, calc(var(--_max-width) - var(--_gap)))
+                    var(--_half-gap)
+                    minmax(var(--_half-gap), 1fr);
             }
             @container (orientation: portrait) {
                 & {
@@ -632,6 +639,7 @@ export class Paginator extends HTMLElement {
                 break
             case 'gap':
             case 'margin':
+            case 'outer-margin':
             case 'max-block-size':
             case 'max-column-count':
                 this.#top.style.setProperty('--_' + name, value)
