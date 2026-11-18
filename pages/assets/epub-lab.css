@@ -3982,7 +3982,10 @@ html.flutter-reader-embed body.reader-immersive-open .reading-workspace {
   max-width:100%;
   overflow:hidden;
   color:#c7b5fb;
-  font:500 11px/1.45 inherit;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:500;
+  line-height:1.45;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
