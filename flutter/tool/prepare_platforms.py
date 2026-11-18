@@ -82,9 +82,53 @@ window.addEventListener('flutter-first-frame', function () {
         path.write_text(html, encoding="utf-8")
 
 
+
+def patch_android_reader_view(root: Path) -> None:
+    source_dir = Path(__file__).resolve().parent / "android"
+    package_dir = root / "android/app/src/main/java/com/kimkingv2/frame_ebook"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "FrameEbookDirectTransport.java",
+        "FrameEbookNativeReaderFactory.java",
+        "FrameEbookNativeReaderView.java",
+    ):
+        source = source_dir / name
+        if not source.is_file():
+            raise FileNotFoundError(f"Native Android reader source not found: {source}")
+        (package_dir / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    candidates = list((root / "android/app/src/main").rglob("MainActivity.kt"))
+    if len(candidates) != 1:
+        raise FileNotFoundError("Expected exactly one generated Flutter MainActivity.kt.")
+    activity = candidates[0]
+    content = activity.read_text(encoding="utf-8")
+    if "FrameEbookNativeReaderFactory" not in content:
+        content = content.replace(
+            "import io.flutter.embedding.android.FlutterActivity",
+            "import io.flutter.embedding.android.FlutterActivity\\n"
+            "import io.flutter.embedding.engine.FlutterEngine",
+        )
+        content = content.replace(
+            "class MainActivity : FlutterActivity()",
+            """class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "frame_ebook/native_reader",
+            FrameEbookNativeReaderFactory(flutterEngine.dartExecutor.binaryMessenger)
+        )
+    }
+}""",
+        )
+        if "FrameEbookNativeReaderFactory" not in content:
+            raise ValueError("Could not register the native Android Reader WebView.")
+        activity.write_text(content, encoding="utf-8")
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     patch_android_manifest(root / "android/app/src/main/AndroidManifest.xml")
+    patch_android_reader_view(root)
     patch_web_index(root / "web/index.html")
     for name in ("DebugProfile.entitlements", "Release.entitlements"):
         patch_macos_entitlements(root / "macos/Runner" / name)

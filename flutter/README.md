@@ -44,3 +44,8 @@ Native self-use defaults to `https://frame-ebook.pages.dev`; this can also be ov
 - `flutter build apk`
 
 GitHub Actions generates platform scaffolding in each CI job and applies the Android release INTERNET permission plus the macOS App Sandbox outgoing-network entitlement. Flutter Web output is not connected to the production Cloudflare Pages deployment. Do not open the Web artifact's `index.html` directly with `file://`: the Web app must be served over HTTPS from the same protected hostname as the existing Pages Functions, so Cloudflare Access cookies and same-origin `/api/*` calls work. The startup screen now explains this instead of leaving a blank page. Do not change the production Pages build output from `pages/` until full feature parity passes and the user explicitly approves cutover.
+
+
+### Android Reading Room transport
+
+The Android legacy Reading Room bridge uses a native WebView with an HTTP resource interceptor. It converts the existing same-origin `/api/cloud/file` stream/redirect request into the protected Pages 302 lookup, follows the signed HTTPS storage redirect with the Access cookie only on the Pages request, strips credentials on cross-origin hops, and returns the upstream response as a native streaming `InputStream`. This avoids relaying large archives through Pages and avoids creating a disk cache or temporary archive. The original Reader JS still owns EPUB/CBZ parsing and its normal D1 progress/annotation APIs.
