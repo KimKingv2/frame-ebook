@@ -32,7 +32,14 @@ class FrameReaderState {
   }) {
     final next = toJson();
     if (progress != null) {
-      next['progress'] = {...this.progress, ...progress};
+      next['progress'] = {
+        'percent': 0,
+        'label': '尚未閱讀',
+        'cfi': '',
+        'index': null,
+        ...this.progress,
+        ...progress,
+      };
     }
     if (appearance != null) {
       next['appearance'] = {...this.appearance, ...appearance};
