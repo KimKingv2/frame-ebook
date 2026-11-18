@@ -348,7 +348,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                   'F',
                   style: TextStyle(
                     color: Colors.white,
-                    fontFamily: 'Georgia',
+                    fontFamily: 'NotoSansTC',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -609,7 +609,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                     '${all.length.toString().padLeft(2, '0')} ITEMS',
                     style: const TextStyle(
                       color: Color(0xFFD3C2F5),
-                      fontFamily: 'Georgia',
+                      fontFamily: 'NotoSansTC',
                       fontSize: 24,
                     ),
                   ),
@@ -781,7 +781,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                   count.toString().padLeft(2, '0'),
                   style: const TextStyle(
                     color: Color(0xFFD3C2F5),
-                    fontFamily: 'Georgia',
+                    fontFamily: 'NotoSansTC',
                     fontSize: 23,
                   ),
                 ),
@@ -1089,7 +1089,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
           borderRadius: BorderRadius.circular(5),
           child: LinearProgressIndicator(
             minHeight: 3,
-            value: folder ? null : percent / 100,
+            value: percent / 100,
             backgroundColor: const Color(0xFF383044),
             color: _accentStrong,
           ),
@@ -1416,7 +1416,7 @@ class _StatTile extends StatelessWidget {
             value.toString().padLeft(2, '0'),
             style: const TextStyle(
               color: Color(0xFFE9E1F4),
-              fontFamily: 'Georgia',
+              fontFamily: 'NotoSansTC',
               fontSize: 27,
               height: 1,
             ),
