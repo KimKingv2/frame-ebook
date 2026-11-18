@@ -144,15 +144,18 @@ export async function onRequestGet({ request, env }) {
       const seriesKey = [row.library,rootPath,folderPath].join("\\n");
       const comicMetadata = comicMetadataMap.get(id) || comicSeriesMetadataMap.get(seriesKey) || null;
       const importedTitle = String(row.book_title || "");
-      const fallbackTitle = folderTitle || String(row.name).replace(/\.(epub|cbz)$/i,"");
+      // A folder name is a grouping label, never a volume title. Use each
+      // file's own EPUB metadata (or saved reader metadata), then series data
+      // for metadata-light comic archives, and finally that file's stem.
+      const fallbackTitle = String(row.name).replace(/\.(epub|cbz)$/i,"");
       const item = {
         id, sourceType: "cloud",
         provider: row.provider, library: row.library, rootPath, path,
         fileName: row.name,
         title: metadata.manualTitle && metadata.title ? metadata.title :
-          (row.library === "comics"
-            ? String(comicMetadata?.nameCn || comicMetadata?.name || importedTitle || metadata.title || fallbackTitle)
-            : String(importedTitle || metadata.title || fallbackTitle)),
+          String(importedTitle || metadata.title ||
+            (row.library === "comics" ? (comicMetadata?.nameCn || comicMetadata?.name) : "") ||
+            fallbackTitle),
         author: metadata.manualAuthor ? String(metadata.author || "") :
           String((row.library === "comics" ? comicMetadata?.author : "") ||
             row.book_creator || metadata.author || ""),
