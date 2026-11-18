@@ -1039,6 +1039,21 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
       appendIndexLog("建立首次掃描工作與 D1 進度記錄。","success");
     }
 
+    // Resume any cover jobs left by an earlier paused batch before traversing
+    // more folders. This is independent of the directory scan cursor.
+    const pendingBeforeResume=await fetchPendingCovers(scope,1);
+    if(Number(pendingBeforeResume.total||0)>0) {
+      appendIndexLog("發現上次已寫入 D1 的待處理封面："+Number(pendingBeforeResume.total)+" 本；先處理封面，再繼續目錄掃描。","warning");
+      const previousCoverResult=await processPendingCovers(scope,180000,scanState);
+      batch.coverProcessed+=previousCoverResult.processed;
+      batch.coverMissing+=previousCoverResult.missing;
+      batch.coverFailed+=previousCoverResult.failed;
+      batch.coverRemaining=previousCoverResult.remaining;
+      if(previousCoverResult.remaining) {
+        appendIndexLog("上次封面佇列尚餘 "+previousCoverResult.remaining+" 本；後續批次會再接續處理。","warning");
+      }
+    }
+
     const maxEntriesPerBatch=500,maxFoldersPerBatch=500,maxDurationMs=7500000,pageSize=100;
     const seen=new Set(Array.isArray(scanState.seenFolders)?scanState.seenFolders:[scope.rootPath]);
 
@@ -1197,7 +1212,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
         batch.coverMissing=coverResult.missing;
         batch.coverFailed=coverResult.failed;
         batch.coverRemaining=coverResult.remaining;
-        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\\n尚有 "+coverResult.remaining+" 本封面待處理，會自動續做。",false);
+        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\n尚有 "+coverResult.remaining+" 本封面待處理，會自動續做。",false);
       }
     } else if(state.scanPauseReason==="close") {
       appendIndexLog("管理視窗已關閉；未處理封面保留在 D1 佇列，之後可按「掃描／續掃」接續。","warning");
