@@ -1,4 +1,4 @@
-import { getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261117-filename-id-r2";
+import { getReadingSetting, setReadingSetting } from "/assets/library-store.js?v=20261118-preference-metadata-fix-r1";
 
 const $ = id => document.getElementById(id);
 const state = { period:"month", calendarDate:new Date(), goalMinutes:30, authenticated:false, databaseConfigured:false };
