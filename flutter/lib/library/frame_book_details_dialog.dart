@@ -344,7 +344,7 @@ class _FrameBookDetailsDialogState extends State<FrameBookDetailsDialog> {
               const SizedBox(height: 13),
               _label('收藏分類'),
               DropdownButtonFormField<String>(
-                value: _shelf,
+                initialValue: _shelf,
                 items: const [
                   DropdownMenuItem(value: 'books', child: Text('電子書')),
                   DropdownMenuItem(value: 'comics', child: Text('漫畫')),
@@ -457,7 +457,7 @@ class _FrameBookDetailsDialogState extends State<FrameBookDetailsDialog> {
                 const SizedBox(height: 10),
                 _label('選擇要接收舊資料的卷冊'),
                 DropdownButtonFormField<String>(
-                  value: _linkTargetId,
+                  initialValue: _linkTargetId,
                   items: _volumes
                       .map((volume) => DropdownMenuItem(
                             value: volume.id,

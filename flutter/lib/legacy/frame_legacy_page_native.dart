@@ -36,7 +36,7 @@ class _NativeLegacyPageState extends State<_NativeLegacyPage> {
             if (mounted) setState(() => _progress = value);
           },
           onWebResourceError: (error) {
-            if (error.isForMainFrame && mounted) {
+            if (error.isForMainFrame == true && mounted) {
               setState(() => _error = error.description);
             }
           },

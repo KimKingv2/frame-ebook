@@ -150,7 +150,7 @@ class FrameShelfEntry {
   final FrameBook first;
   final List<FrameBook> members;
 
-  bool get isFolder => members.length > 0 && first.folderPath.isNotEmpty;
+  bool get isFolder => members.isNotEmpty && first.folderPath.isNotEmpty;
   bool get isComic => first.isComic;
   int get lastOpenedAt =>
       members.fold<int>(0, (value, item) => item.lastOpenedAt > value ? item.lastOpenedAt : value);
