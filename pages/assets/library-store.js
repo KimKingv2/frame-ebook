@@ -900,6 +900,21 @@ async function addLocalBooks(input) {
           ...book,
           title: previous?.manualTitle && previous.title ? previous.title : (book.title || previous?.title || ""),
           author: previous?.manualAuthor && previous.author ? previous.author : (book.author || previous?.author || ""),
+          authors: Array.isArray(book.authors) && book.authors.length ? book.authors : (previous?.authors || []),
+          language: book.language || previous?.language || "",
+          description: book.description || previous?.description || "",
+          publisher: book.publisher || previous?.publisher || "",
+          publishedAt: book.publishedAt || previous?.publishedAt || "",
+          identifier: book.identifier || previous?.identifier || "",
+          subjects: Array.isArray(book.subjects) && book.subjects.length ? book.subjects : (previous?.subjects || []),
+          series: book.series || previous?.series || "",
+          seriesIndex: book.seriesIndex || previous?.seriesIndex || "",
+          seriesType: book.seriesType || previous?.seriesType || "",
+          volume: book.volume || previous?.volume || "",
+          genre: book.genre || previous?.genre || "",
+          web: book.web || previous?.web || "",
+          rights: book.rights || previous?.rights || "",
+          pageCount: Number(book.pageCount) || Number(previous?.pageCount) || 0,
           progress: previous?.progress || book.progress || { percent:0, label:"尚未閱讀", cfi:"", index:null },
           appearance: previous?.appearance || book.appearance || {},
           lastOpenedAt: Number(previous?.lastOpenedAt) || Number(book.lastOpenedAt) || 0,
@@ -908,12 +923,18 @@ async function addLocalBooks(input) {
           coverMime: previous?.coverMime || book.coverMime,
           coverUpdatedAt: previous?.coverUpdatedAt || book.coverUpdatedAt
         };
+        const metadataKeys=["title","author","authors","language","description","publisher","publishedAt",
+          "identifier","subjects","series","seriesIndex","seriesType","volume","genre","web","rights","pageCount"];
+        const metadataChanged=!!previous && metadataKeys.some(key=>
+          JSON.stringify(previous[key] ?? null)!==JSON.stringify(next[key] ?? null)
+        );
         const same = previous &&
           String(previous.path || "") === String(next.path || "") &&
           Number(previous.size || 0) === Number(next.size || 0) &&
           Number(previous.lastModified || 0) === Number(next.lastModified || 0) &&
           String(previous.fileName || "") === String(next.fileName || "") &&
-          String(oldSource.profileId || previous.profileId || "") === String(nextSource.profileId || book.profileId || "");
+          String(oldSource.profileId || previous.profileId || "") === String(nextSource.profileId || book.profileId || "") &&
+          !metadataChanged;
         if (same) {
           stats.unchanged++;
           remember(previous);

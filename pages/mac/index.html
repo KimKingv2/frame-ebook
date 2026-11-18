@@ -113,7 +113,7 @@
           <div id="manager-connection-panel" class="cloud-manager-tab-panel" role="tabpanel">
             <section class="cloud-connection-panel" aria-label="WebDAV 連線設定">
               <div class="cloud-connection-heading">
-                <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>使用 Mac 原生 WebDAV 連線。密碼只保留在 App 執行期間的 RAM，不會寫入鑰匙圈或同步到 Cloudflare。</p></div>
+                <div><p class="section-kicker">CONNECTION PROFILES</p><h3>書庫連線設定</h3><p>使用 Mac 原生 WebDAV 連線。密碼安全保存在這台 Mac 的 macOS 密碼管理工具，App 會自動取回；不會上傳 Cloudflare。</p></div>
                 <div class="cloud-connection-actions">
                   <button id="cloud-sync-button" class="quiet-button" type="button">多設備同步</button>
                 </div>
@@ -215,7 +215,7 @@
   <dialog id="profile-dialog" class="profile-dialog">
     <form id="profile-form">
       <div class="dialog-head"><div><p class="section-kicker">NATIVE WEBDAV CONNECTION</p><h2 id="profile-dialog-title">新增檔案來源</h2></div><button id="close-profile" class="dialog-close" type="button" aria-label="關閉">×</button></div>
-      <p id="profile-dialog-intro" class="dialog-intro">輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的記憶體，不會寫入鑰匙圈或磁碟。</p>
+      <p id="profile-dialog-intro" class="dialog-intro">輸入 WebDAV 服務地址及唯讀帳號。密碼安全保存在這台 Mac 的 macOS 密碼管理工具，不會上傳 Cloudflare。</p>
       <label>來源名稱<input id="profile-name" required maxlength="48" placeholder="我的 OpenList"></label>
       <label>WebDAV 地址<input id="profile-url" required type="url" placeholder="https://example.com/dav/"></label>
       <label>帳號<input id="profile-username" required autocomplete="username" placeholder="WebDAV 使用者名稱"></label>
@@ -265,6 +265,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="/mac/app.js?v=20261117-main-ui-scan-r3"></script>
+  <script type="module" src="/mac/app.js?v=20261118-metadata-reconnect-r1"></script>
 </body>
 </html>

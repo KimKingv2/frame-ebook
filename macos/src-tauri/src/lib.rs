@@ -878,12 +878,7 @@ async fn cloud_sync_request(
         _ => return Err("雲端同步只允許 GET 或 POST。".into()),
     };
     let url = format!("{API_BASE}{safe_path}");
-    let client = Client::builder()
-        .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(30))
-        .user_agent("FRAME-Ebook-macOS/0.3.1")
-        .build()
-        .map_err(|e| format!("建立 Cloudflare 同步連線失敗：{e}"))?;
+    let client = make_sync_client()?;
     let mut request = client.request(request_method, &url)
         .header(header::ACCEPT, "application/json");
     if protected_path {
@@ -897,16 +892,46 @@ async fn cloud_sync_request(
         }
         request = request.header(header::CONTENT_TYPE, "application/json").body(value);
     }
+    // Pair-start is a POST that creates a row; do not replay it on HTTP errors.
     let response = request.send().await
         .map_err(|e| format!("Cloudflare 同步請求失敗：{e}"))?;
     let status = response.status();
+    let content_type = response.headers().get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok()).unwrap_or("unknown").to_string();
+    let cf_ray = response.headers().get("cf-ray")
+        .and_then(|value| value.to_str().ok()).unwrap_or("").to_string();
+    let redirect_target = response.headers().get(header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|location| response.url().join(location).ok())
+        .map(|target| format!("{}{}", target.host_str().unwrap_or(""), target.path()))
+        .unwrap_or_default();
+    let final_path = response.url().path().to_string();
     let text = response.text().await
         .map_err(|e| format!("讀取 Cloudflare 同步回應失敗：{e}"))?;
     if text.len() > 4 * 1024 * 1024 {
         return Err("Cloudflare 同步回應超過 4 MiB 上限。".into());
     }
-    if !status.is_success() {
-        return Ok(serde_json::json!({ "ok": false, "httpStatus": status.as_u16(), "error": text }).to_string());
+    let preview: String = text.split_whitespace().collect::<Vec<_>>().join(" ")
+        .chars().take(600).collect();
+    let valid_json = serde_json::from_str::<serde_json::Value>(&text).is_ok();
+    if status.is_redirection() || !valid_json || !status.is_success() {
+        let error = if status.is_redirection() {
+            format!("Cloudflare API 發生 HTTP {} 重新導向；已停止自動跳轉。", status)
+        } else if !valid_json {
+            format!("Cloudflare API 回傳的不是有效 JSON（HTTP {}）。", status)
+        } else {
+            format!("Cloudflare API 請求失敗（HTTP {}）。", status)
+        };
+        return Ok(serde_json::json!({
+            "ok": false,
+            "httpStatus": status.as_u16(),
+            "contentType": content_type,
+            "finalPath": final_path,
+            "redirectTarget": redirect_target,
+            "cfRay": cf_ray,
+            "error": error,
+            "bodyPreview": preview
+        }).to_string());
     }
     Ok(text)
 }

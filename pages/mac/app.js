@@ -1,6 +1,6 @@
-import * as store from "/assets/library-store.js?v=20261118-root-scope-fix-r1";
-import { createMacShelf } from "/mac/shelf.js?v=20261118-root-scope-fix-r1";
-import { startMacSync } from "/mac/sync.js?v=20261117-sync-r2";
+import * as store from "/assets/library-store.js?v=20261118-metadata-reconnect-r1";
+import { createMacShelf } from "/mac/shelf.js?v=20261118-metadata-reconnect-r1";
+import { startMacSync } from "/mac/sync.js?v=20261118-sync-diagnostics-r1";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
 const logState = { entries: [] };
@@ -294,21 +294,35 @@ function shouldSkipScanFolder(entry) {
   const name = String(entry?.name || "").trim().toLowerCase();
   return !name || SKIP_SCAN_FOLDERS.has(name);
 }
-function makeScannedBookRecord(entry, profile, sourceId, library, rootPath) {
+async function makeScannedBookRecord(entry, profile, sourceId, library, rootPath) {
   const ext = extension(entry.path);
   const folderPath = parentPath(entry.path);
   const folderTitle = folderPath === rootPath
     ? (rootPath === "/" ? "根目錄" : rootPath.split("/").filter(Boolean).pop())
     : (folderPath.replace(/\/+$/, "").split("/").pop() || "根目錄");
-  return store.cloudBookId({ provider:"webdav", profileId:profile.id, library }, entry.path).then(id => ({
+  const [id,metadataResult] = await Promise.all([
+    store.cloudBookId({ provider:"webdav", profileId:profile.id, library }, entry.path),
+    shelf.extractBookMetadata(profile.id,entry)
+  ]);
+  const metadata=metadataResult?.metadata||{};
+  return {
     id, sourceType:"cloud", provider:"webdav", library, rootPath,
-    path:entry.path, fileName:entry.name, title:baseTitle(entry.name),
+    path:entry.path, fileName:entry.name, title:metadata.title||"",
     addedAt:Date.now(), lastModified:Date.parse(String(entry.modified || "")) || 0,
-    author:"", format:ext.toUpperCase(), shelf:library, size:Number(entry.size)||0,
+    author:metadata.author||"", authors:metadata.authors||[],
+    language:metadata.language||"", description:metadata.description||"",
+    publisher:metadata.publisher||"", publishedAt:metadata.publishedAt||"",
+    identifier:metadata.identifier||"", subjects:metadata.subjects||[],
+    series:metadata.series||"", seriesIndex:metadata.seriesIndex||"",
+    seriesType:metadata.seriesType||"", volume:metadata.volume||"",
+    genre:metadata.genre||"", web:metadata.web||"", rights:metadata.rights||"",
+    pageCount:Number(metadata.pageCount)||0, rating:metadata.rating||"",
+    _metadataExtracted:!!metadataResult?.extracted,
+    format:ext.toUpperCase(), shelf:library, size:Number(entry.size)||0,
     progress:{percent:0,label:"尚未閱讀",cfi:"",index:null}, appearance:{},
     cloudSource:{provider:"webdav",profileId:profile.id,sourceId,library,rootPath,
       path:entry.path,folderPath,folderTitle}
-  }));
+  };
 }
 async function listDirectoryForScan(profileId, path) {
   let lastError = null;
@@ -333,7 +347,7 @@ function renderScanSummary(library, progress, statusText) {
     "已檢查資料夾："+Number(progress?.scannedDirectories||0),
     "找到書籍："+Number(progress?.discoveredFiles||0),
     "新增："+Number(progress?.added||0)+"；更新："+Number(progress?.updated||0)+"；未變更："+Number(progress?.unchanged||0),
-    "檔名衝突略過："+Number(progress?.conflicts||0)+"；無法讀取資料夾："+Number(progress?.failedDirectories||0),
+    "檔名衝突略過："+Number(progress?.conflicts||0)+"；metadata 已擷取："+Number(progress?.metadataExtracted||0)+" 本；無法讀取資料夾："+Number(progress?.failedDirectories||0),
     progress?.paused ? "狀態：已暫停，可按掃描／續掃繼續。" :
       progress?.completed ? "狀態：索引完成，已保存至本機書架。" :
       progress ? "狀態：尚有 "+(progress.pendingDirectories||[]).length+" 個資料夾待掃描。" : "尚未開始掃描。"
@@ -361,9 +375,10 @@ async function scanWebDavProfile(profile, library, { forceRescan = false } = {})
     progress = {version:1,rootPath,scanMode:forceRescan?"完整重掃":"手動掃描",
       pendingDirectories:[rootPath],visitedDirectories:[],seenFilePaths:[],failedPaths:[],
       scannedDirectories:0,discoveredFiles:0,added:0,updated:0,unchanged:0,conflicts:0,
-      failedDirectories:0,completed:false,paused:false,startedAt:Date.now()};
+      failedDirectories:0,metadataExtracted:0,completed:false,paused:false,startedAt:Date.now()};
   } else {
     progress.seenFilePaths=Array.isArray(progress.seenFilePaths)?progress.seenFilePaths:[];
+    progress.metadataExtracted=Number(progress.metadataExtracted)||0;
     progress.failedPaths=Array.isArray(progress.failedPaths)?progress.failedPaths:[];
     progress.paused=false;
     progress.scanMode="續掃";
@@ -425,7 +440,10 @@ async function scanWebDavProfile(profile, library, { forceRescan = false } = {})
         progress.seenFilePaths=Array.isArray(progress.seenFilePaths)?progress.seenFilePaths:[];
         if(!progress.seenFilePaths.includes(filePath))progress.seenFilePaths.push(filePath);
         progress.discoveredFiles++; filesThisRun++;
-        batch.push(await makeScannedBookRecord({...entry,path:filePath},profile,sourceId,library,rootPath));
+        const record=await makeScannedBookRecord({...entry,path:filePath},profile,sourceId,library,rootPath);
+        if(record._metadataExtracted)progress.metadataExtracted++;
+        delete record._metadataExtracted;
+        batch.push(record);
         if(batch.length>=50)await flush();
         if(filesThisRun>=maxFiles)break;
       }
@@ -457,7 +475,7 @@ async function scanWebDavProfile(profile, library, { forceRescan = false } = {})
     appendLog("INFO","WebDAV 書庫掃描完成","分類："+(library==="books"?"電子書":"漫畫")+"\n根目錄："+rootPath+
       "\n已掃描資料夾："+progress.scannedDirectories+"\n找到 EPUB／CBZ："+progress.discoveredFiles+
       "\n新增："+progress.added+"；更新："+progress.updated+"；未變更："+progress.unchanged+
-      "\n檔名衝突略過："+progress.conflicts+"；無權限／讀取失敗資料夾："+progress.failedDirectories);
+      "\nmetadata 已擷取："+progress.metadataExtracted+" 本\n檔名衝突略過："+progress.conflicts+"；無權限／讀取失敗資料夾："+progress.failedDirectories);
     $("scan-index-status").textContent="掃描完成 · 書架已更新"; renderScanSummary(library,progress,"掃描完成");
     setStatus("書架已更新 · "+(library==="books"?"電子書":"漫畫")+" "+progress.discoveredFiles+" 本");
     void shelf.prefetchCovers();
@@ -606,8 +624,8 @@ function openProfileDialog(existingProfile = null) {
   });
   $("profile-dialog-title").textContent = isUnlock ? "重新輸入 WebDAV 密碼" : "新增檔案來源";
   $("profile-dialog-intro").textContent = isUnlock
-    ? "來源名稱、WebDAV 地址及帳號都可以修改。密碼只保留在目前 App 的 RAM，完全退出後需要重新輸入。"
-    : "輸入 WebDAV 服務地址及唯讀帳號。密碼僅保留在 App 執行期間的 RAM，不會寫入鑰匙圈或磁碟。";
+    ? "來源名稱、WebDAV 地址及帳號都可以修改。密碼會安全保存在這台 Mac 的 macOS 密碼管理工具，App 會自動取回並重新連線。"
+    : "輸入 WebDAV 服務地址及唯讀帳號。密碼會保存在這台 Mac 的 macOS 密碼管理工具，不會上傳 Cloudflare。";
   $("save-profile").textContent = isUnlock ? "儲存並重新連線" : "儲存並測試連線";
   $("profile-password").setAttribute("autocomplete", isUnlock ? "current-password" : "new-password");
   $("profile-dialog").showModal();
@@ -672,14 +690,27 @@ async function pullNativeTransferDiagnostics() {
 let cloudPairCancelled = false;
 function parseNativeJson(raw) {
   try { return typeof raw === "string" ? JSON.parse(raw) : raw; }
-  catch (_) { throw new Error("Cloudflare 回傳的資料不是有效 JSON。"); }
+  catch (_) {
+    const preview=String(raw||"").replace(/\s+/g," ").slice(0,360);
+    throw new Error("Cloudflare 回應不是 JSON。原始回應摘要："+(preview||"（空白）"));
+  }
 }
 async function cloudPairRequest(path, body) {
   const raw = await invoke("cloud_sync_request", {
     method: "POST", path, body: JSON.stringify(body || {})
   });
   const data = parseNativeJson(raw);
-  if (data?.ok === false || data?.error) throw new Error(data.error || ("HTTP " + data.httpStatus));
+  if (data?.ok === false || data?.error) {
+    const details=[
+      data.error||"Cloudflare API 請求失敗。",
+      data.httpStatus?"HTTP "+data.httpStatus:"",
+      data.contentType?"Content-Type："+data.contentType:"",
+      data.redirectTarget?"重新導向："+data.redirectTarget:"",
+      data.cfRay?"CF-Ray："+data.cfRay:"",
+      data.bodyPreview?"回應摘要："+data.bodyPreview:""
+    ].filter(Boolean);
+    throw new Error(details.join("\n"));
+  }
   return data;
 }
 async function refreshCloudSyncDialog() {
@@ -929,7 +960,7 @@ $("shelf-refresh").addEventListener("click", () => {
   void refreshShelf({prefetch:false}).then(() => setStatus("已重新載入本機書架"));
 });
 async function boot() {
-  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.3 · 本機書架與手動書庫掃描");
+  appendLog("INFO", "FRAME Ebook 已啟動", "版本 0.3.4 · 掃描 metadata、本機憑證與自動重連");
   if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
     setStatus("原生桌面通道未啟動", true);
     return;

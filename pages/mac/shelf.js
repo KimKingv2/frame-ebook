@@ -158,6 +158,68 @@ async function findEpubCover(zipEntries,onEvent=()=>{}) {
   }
   return {entry,mime};
 }
+function xmlNodesByName(document,name) {
+  return Array.from(document.getElementsByTagName("*")).filter(node => String(node.localName || node.nodeName.split(":").pop()).toLowerCase() === String(name).toLowerCase());
+}
+function xmlValue(document,name) {
+  const node=xmlNodesByName(document,name).find(item=>String(item.textContent||"").trim());
+  return node ? String(node.textContent||"").replace(/\s+/g," ").trim() : "";
+}
+function uniqueMetadataList(values) {
+  const seen=new Set();
+  return values.map(value=>String(value||"").replace(/\s+/g," ").trim()).filter(value=>{
+    if(!value)return false; const key=value.toLocaleLowerCase(); if(seen.has(key))return false; seen.add(key); return true;
+  });
+}
+function parseEpubMetadataDocument(document) {
+  if(!document || document.getElementsByTagName("parsererror").length)return {};
+  const creators=uniqueMetadataList(xmlNodesByName(document,"creator").map(node=>node.textContent));
+  const contributors=uniqueMetadataList(xmlNodesByName(document,"contributor").map(node=>node.textContent));
+  const subjects=uniqueMetadataList(xmlNodesByName(document,"subject").map(node=>node.textContent));
+  const metadata={};
+  const fields={title:"title",language:"language",publisher:"publisher",description:"description",publishedAt:"date",identifier:"identifier",rights:"rights",source:"source",type:"type",format:"format"};
+  for(const [key,tag] of Object.entries(fields)){const value=xmlValue(document,tag);if(value)metadata[key]=value;}
+  if(creators.length){metadata.authors=creators;metadata.author=creators.join("、");}
+  if(contributors.length)metadata.contributors=contributors;
+  if(subjects.length)metadata.subjects=subjects;
+  const metas=xmlNodesByName(document,"meta");
+  const findMeta=predicate=>metas.find(node=>predicate(String(node.getAttribute("property")||"").toLowerCase(),String(node.getAttribute("name")||"").toLowerCase(),String(node.getAttribute("content")||node.textContent||"").trim()));
+  const collection=findMeta(property=>property==="belongs-to-collection");
+  const legacySeries=findMeta((_,name)=>name==="calibre:series"||name==="series");
+  const series=String(collection?.getAttribute("content")||collection?.textContent||legacySeries?.getAttribute("content")||"").trim();
+  if(series)metadata.series=series;
+  const position=findMeta((property,name)=>property==="group-position"||name==="calibre:series_index"||name==="series_index");
+  const seriesIndex=String(position?.getAttribute("content")||position?.textContent||"").trim();
+  if(seriesIndex)metadata.seriesIndex=seriesIndex;
+  const rating=findMeta((_,name)=>name==="calibre:rating"||name==="rating");
+  if(rating?.getAttribute("content"))metadata.rating=String(rating.getAttribute("content")).trim();
+  return metadata;
+}
+async function readEpubMetadata(zipEntries) {
+  const byName=new Map(zipEntries.filter(entry=>!entry.directory).map(entry=>[zipPath(entry.filename),entry]));
+  const container=byName.get("META-INF/container.xml"); if(!container)return {};
+  const containerText=await container.getData(new TextWriter("utf-8"));
+  const containerXml=new DOMParser().parseFromString(String(containerText||""),"application/xml");
+  if(containerXml.getElementsByTagName("parsererror").length)return {};
+  const rootfile=xmlNodesByName(containerXml,"rootfile")[0]; const opfPath=zipPath(rootfile?.getAttribute("full-path")||"");
+  if(!opfPath)return {}; const opfEntry=byName.get(opfPath); if(!opfEntry)return {};
+  const opfText=await opfEntry.getData(new TextWriter("utf-8"));
+  return parseEpubMetadataDocument(new DOMParser().parseFromString(String(opfText||""),"application/xml"));
+}
+async function readComicInfoMetadata(zipEntries) {
+  const entry=zipEntries.find(item=>!item.directory&&String(item.filename||"").split("/").pop().toLowerCase()==="comicinfo.xml");
+  if(!entry)return {};
+  const source=await entry.getData(new TextWriter("utf-8")); const document=new DOMParser().parseFromString(String(source||""),"application/xml");
+  if(document.getElementsByTagName("parsererror").length)return {};
+  const fields={title:"Title",publisher:"Publisher",imprint:"Imprint",publishedAt:"Year",language:"LanguageISO",description:"Summary",series:"Series",seriesIndex:"Number",volume:"Volume",genre:"Genre",web:"Web",communityRating:"CommunityRating"};
+  const metadata={}; for(const [key,tag] of Object.entries(fields)){const value=xmlValue(document,tag);if(value)metadata[key]=value;}
+  const people=["Writer","Penciller","Inker","Colorist","Letterer","Editor","Translator"];
+  const creators=uniqueMetadataList(people.flatMap(tag=>xmlNodesByName(document,tag).map(node=>node.textContent)));
+  if(creators.length){metadata.authors=creators;metadata.author=creators.join("、");}
+  const tags=uniqueMetadataList(["Genre","Tags"].flatMap(tag=>xmlNodesByName(document,tag).flatMap(node=>String(node.textContent||"").split(/[;,]/))));
+  if(tags.length)metadata.subjects=tags; const pages=xmlNodesByName(document,"Page").length; if(pages)metadata.pageCount=pages;
+  return metadata;
+}
 async function findCbzCover(zipEntries) {
   const candidates=zipEntries.filter(entry=>!entry.directory&&
     /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(entry.filename)&&
@@ -435,6 +497,27 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
     }catch(error){appendLog("WARN","書架封面擷取失敗",path+"\n"+(error.message||String(error)));return false;}
     finally{try{await zip?.close?.();}catch(_){}}
   }
+  async function extractBookMetadata(profileId,entry){
+    const path=String(entry?.path||""); const format=String(path.split(".").pop()||"").toLowerCase();
+    if(!path||!["epub","cbz"].includes(format))return {metadata:{},extracted:false,rangeCount:0,bytesRead:0};
+    let size=Number(entry.size)||0;
+    try{
+      if(!Number.isSafeInteger(size)||size<=0)size=Number(await invoke("webdav_get_file_size",{profileId,path}))||0;
+      if(!Number.isSafeInteger(size)||size<=0)throw new Error("WebDAV 未提供有效的書檔大小，無法讀取 ZIP metadata。");
+      const reader=new NativeRangeReader(profileId,path,size,invoke); let zip;
+      try{
+        zip=new ZipReader(reader,{useWebWorkers:false,useCompressionStream:true});
+        const entries=await zip.getEntries();
+        const metadata=format==="epub"?await readEpubMetadata(entries):await readComicInfoMetadata(entries);
+        const extracted=Object.keys(metadata).length>0;
+        if(extracted)appendLog("INFO","書籍 metadata 已從檔案擷取",path+"\n書名："+(metadata.title||"未提供")+"\n作者："+(metadata.author||"未提供")+"\n欄位："+Object.keys(metadata).join("、")+"\nRange："+reader.rangeCount+" 次／"+sizeLabel(reader.bytesRead));
+        return {metadata,extracted,rangeCount:reader.rangeCount,bytesRead:reader.bytesRead};
+      }finally{try{await zip?.close?.();}catch(_){}}
+    }catch(error){
+      appendLog("WARN","掃描時讀取書籍 metadata 失敗",path+"\n"+(error?.message||String(error))+"\n本次仍會加入書架，顯示名稱會回退到檔名。");
+      return {metadata:{},extracted:false,rangeCount:0,bytesRead:0};
+    }
+  }
   async function ensureCover(book){
     const id=String(book?.id||"");if(!id)return false;
     if(coverJobs.has(id))return coverJobs.get(id);
@@ -482,5 +565,5 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
     state.activeFolderKey=null;render();$("shelf-overview").scrollIntoView({behavior:"smooth",block:"start"});
   });
   $("shelf-refresh").addEventListener("click",()=>refresh({prefetch:true}).catch(error=>setStatus(error.message||String(error),true)));
-  return {refresh,render,prefetchCovers,retryMissingCovers};
+  return {refresh,render,prefetchCovers,retryMissingCovers,extractBookMetadata};
 }

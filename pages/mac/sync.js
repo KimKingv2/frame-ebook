@@ -1,4 +1,4 @@
-import * as store from "/assets/library-store.js?v=20261117-autoscan-r1";
+import * as store from "/assets/library-store.js?v=20261118-metadata-reconnect-r1";
 
 const API = {
   snapshot: "/api/device/sync/snapshot",
@@ -12,7 +12,10 @@ const SYNC_INTERVAL_MS = 60 * 1000;
 function parseNativeResponse(raw) {
   let data;
   try { data = typeof raw === "string" ? JSON.parse(raw) : raw; }
-  catch (_) { throw new Error("Cloudflare 同步回應不是有效 JSON。"); }
+  catch (_) {
+    const preview=String(raw||"").replace(/\s+/g," ").slice(0,360);
+    throw new Error("Cloudflare 同步回應不是 JSON。回應摘要："+(preview||"（空白）"));
+  }
   if (!data || typeof data !== "object") throw new Error("Cloudflare 同步回應格式無效。");
   if (data.ok === false || data.error) {
     let message = String(data.error || ("HTTP " + (data.httpStatus || "unknown")));
