@@ -20,6 +20,15 @@ class FrameEbookApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         fontFamily: 'NotoSansTC',
+        // The bundled Noto subset keeps the Web payload manageable. Use
+        // installed Traditional Chinese fonts for glyphs outside that subset.
+        fontFamilyFallback: const [
+          'PingFang TC',
+          'Heiti TC',
+          'Microsoft JhengHei',
+          'Noto Sans CJK TC',
+          'sans-serif',
+        ],
         colorScheme: ColorScheme.fromSeed(
           seedColor: violet,
           brightness: Brightness.dark,
