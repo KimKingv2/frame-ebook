@@ -2,9 +2,9 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/cloud/frame_cloud_models.dart';
-import '../lib/cloud/frame_cloud_repository.dart';
-import '../lib/core/frame_api_client.dart';
+import 'package:frame_ebook/cloud/frame_cloud_models.dart';
+import 'package:frame_ebook/cloud/frame_cloud_repository.dart';
+import 'package:frame_ebook/core/frame_api_client.dart';
 
 class _FakeApi implements FrameApiClient {
   final List<String> getRequests = [];
