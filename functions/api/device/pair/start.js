@@ -1,5 +1,5 @@
-import { json } from "../../_lib/common.js";
-import { databaseOrError, randomUrlToken, sha256Text } from "../../_lib/device-sync.js";
+import { json } from "../../../_lib/common.js";
+import { databaseOrError, randomUrlToken, sha256Text } from "../../../_lib/device-sync.js";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function makeUserCode() {
