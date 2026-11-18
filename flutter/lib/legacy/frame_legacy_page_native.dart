@@ -8,14 +8,20 @@ import 'package:webview_flutter/webview_flutter.dart';
 Widget buildFrameLegacyPage({
   required Uri uri,
   required String title,
+  bool showToolbar = true,
 }) =>
-    _NativeLegacyPage(uri: uri, title: title);
+    _NativeLegacyPage(uri: uri, title: title, showToolbar: showToolbar);
 
 class _NativeLegacyPage extends StatefulWidget {
-  const _NativeLegacyPage({required this.uri, required this.title});
+  const _NativeLegacyPage({
+    required this.uri,
+    required this.title,
+    required this.showToolbar,
+  });
 
   final Uri uri;
   final String title;
+  final bool showToolbar;
 
   @override
   State<_NativeLegacyPage> createState() => _NativeLegacyPageState();
@@ -156,20 +162,22 @@ class _NativeLegacyPageState extends State<_NativeLegacyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF12101A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1B1825),
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            tooltip: '重新載入',
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+      appBar: widget.showToolbar
+          ? AppBar(
+              backgroundColor: const Color(0xFF1B1825),
+              title: Text(widget.title),
+              actions: [
+                IconButton(
+                  tooltip: '重新載入',
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            )
+          : null,
       body: Column(
         children: [
-          if (_progress < 100)
+          if (widget.showToolbar && _progress < 100)
             LinearProgressIndicator(
               value: _progress == 0 ? null : _progress / 100,
               color: const Color(0xFF9875EC),
@@ -189,7 +197,7 @@ class _NativeLegacyPageState extends State<_NativeLegacyPage> {
                 ),
               ),
             ),
-          if (_isAndroid && _error == null)
+          if (widget.showToolbar && _isAndroid && _error == null)
             Container(
               width: double.infinity,
               color: const Color(0xFF171420),
