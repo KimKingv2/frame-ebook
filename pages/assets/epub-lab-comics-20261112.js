@@ -1815,21 +1815,68 @@
   }
   var readerEmbedStyleSnapshot = null;
 
+  function restoreReaderEmbedAttribute(element, value) {
+    if (!element) return;
+    if (value === null) element.removeAttribute('style');
+    else element.setAttribute('style', value);
+  }
+
   function setReaderEmbedFrameImmersive(active) {
     if (!flutterReaderEmbed || window.parent === window) return;
+    var parentWindow = window.parent;
+    var parentDocument = parentWindow.document;
     var frame = window.frameElement;
     if (!frame || !frame.style) return;
 
     if (active) {
       if (!readerEmbedStyleSnapshot) {
+        var parentBody = parentDocument.body;
+        var ancestors = [];
+        var ancestor = frame.parentElement;
+        while (ancestor) {
+          ancestors.push({
+            element: ancestor,
+            style: ancestor.getAttribute('style')
+          });
+          if (ancestor === parentBody) break;
+          ancestor = ancestor.parentElement;
+        }
         readerEmbedStyleSnapshot = {
           frame: frame.getAttribute('style'),
-          html: window.parent.document.documentElement.getAttribute('style'),
-          body: window.parent.document.body
-            ? window.parent.document.body.getAttribute('style')
-            : null
+          html: parentDocument.documentElement.getAttribute('style'),
+          body: parentBody ? parentBody.getAttribute('style') : null,
+          ancestors: ancestors
         };
       }
+
+      // Flutter Web places HtmlElementView inside compositor wrappers. A fixed
+      // iframe can still be clipped or trapped by transforms/stacking contexts
+      // on those ancestors. Neutralize those constraints temporarily while
+      // preserving every original inline style for an exact exit restoration.
+      readerEmbedStyleSnapshot.ancestors.forEach(function (entry) {
+        var element = entry.element;
+        var style = element.style;
+        var computed = parentWindow.getComputedStyle(element);
+        if (computed.position === 'static') {
+          style.setProperty('position', 'relative', 'important');
+        }
+        style.setProperty('z-index', '2147483647', 'important');
+        style.setProperty('transform', 'none', 'important');
+        style.setProperty('filter', 'none', 'important');
+        style.setProperty('backdrop-filter', 'none', 'important');
+        style.setProperty('perspective', 'none', 'important');
+        style.setProperty('contain', 'none', 'important');
+        style.setProperty('content-visibility', 'visible', 'important');
+        style.setProperty('will-change', 'auto', 'important');
+        style.setProperty('overflow', 'visible', 'important');
+        style.setProperty('overflow-x', 'visible', 'important');
+        style.setProperty('overflow-y', 'visible', 'important');
+        style.setProperty('clip-path', 'none', 'important');
+        style.setProperty('mask', 'none', 'important');
+        style.setProperty('isolation', 'auto', 'important');
+        style.setProperty('opacity', '1', 'important');
+        style.setProperty('mix-blend-mode', 'normal', 'important');
+      });
 
       var frameStyle = frame.style;
       frameStyle.setProperty('position', 'fixed', 'important');
@@ -1847,26 +1894,21 @@
       frameStyle.setProperty('z-index', '2147483647', 'important');
       frameStyle.setProperty('background', '#12101a', 'important');
       frameStyle.setProperty('transform', 'none', 'important');
-      window.parent.document.documentElement.style.setProperty('overflow', 'hidden', 'important');
-      if (window.parent.document.body) {
-        window.parent.document.body.style.setProperty('overflow', 'hidden', 'important');
+      parentDocument.documentElement.style.setProperty('overflow', 'hidden', 'important');
+      if (parentDocument.body) {
+        parentDocument.body.style.setProperty('overflow', 'hidden', 'important');
       }
       return;
     }
 
     if (!readerEmbedStyleSnapshot) return;
     var snapshot = readerEmbedStyleSnapshot;
-    if (snapshot.frame === null) frame.removeAttribute('style');
-    else frame.setAttribute('style', snapshot.frame);
-
-    var parentHtml = window.parent.document.documentElement;
-    var parentBody = window.parent.document.body;
-    if (snapshot.html === null) parentHtml.removeAttribute('style');
-    else parentHtml.setAttribute('style', snapshot.html);
-    if (parentBody) {
-      if (snapshot.body === null) parentBody.removeAttribute('style');
-      else parentBody.setAttribute('style', snapshot.body);
-    }
+    restoreReaderEmbedAttribute(frame, snapshot.frame);
+    snapshot.ancestors.slice().reverse().forEach(function (entry) {
+      restoreReaderEmbedAttribute(entry.element, entry.style);
+    });
+    restoreReaderEmbedAttribute(parentDocument.documentElement, snapshot.html);
+    restoreReaderEmbedAttribute(parentDocument.body, snapshot.body);
     readerEmbedStyleSnapshot = null;
   }
 
