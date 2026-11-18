@@ -9,7 +9,7 @@
   <script src="/assets/reader-embed-mode.js?v=20261118-r1"></script>
   <script src="/mac/runtime.js"></script>
   <title>Reading Room · FRAME Reader</title>
-  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261118-immersive-viewport-r2">
+  <link rel="stylesheet" href="/assets/epub-lab.css?v=20261118-reading-progress-r1">
 </head>
 <body>
   <div class="app-shell">
@@ -52,8 +52,8 @@
             <p id="book-author" class="book-author">從雲端書架開啟已掃描索引的書籍。</p>
           </div>
           <div class="book-progress">
-            <strong id="progress-percent">0%</strong>
-            <span id="progress-detail">等待閱讀</span>
+            <strong id="progress-detail">等待閱讀</strong>
+            <span id="progress-percent" class="reader-sr-only">全書 0%</span>
             <div id="reader-quick-actions" class="reader-quick-actions">
               <button id="reader-bookmark-toggle" class="reader-bookmark-toggle" type="button" data-no-page-turn disabled aria-pressed="false" aria-label="將目前閱讀位置加入書籤" title="將目前閱讀位置加入書籤">
                 <svg class="reader-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l5-2.18V18.6L7 20V5h10v6h2V5c0-1.1-.9-2-2-2z"/><path d="M19 13h-2v3h-3v2h3v3h2v-3h3v-2h-3z"/></svg>
@@ -290,7 +290,26 @@
 
             <section class="reader-controls" aria-label="頁面導覽">
               <button id="prev-page" type="button" disabled>← 上一頁</button>
-              <span class="reader-controls-hint">翻頁也可以使用鍵盤方向鍵</span>
+              <div id="reader-progress-panel" class="reader-progress-panel" aria-label="閱讀進度">
+                <div id="reader-chapter-progress-row" class="reader-progress-row reader-progress-row--chapter" hidden>
+                  <div class="reader-progress-meta">
+                    <span id="reader-chapter-progress-label">本章進度</span>
+                    <strong id="reader-chapter-progress-percent">0%</strong>
+                  </div>
+                  <div id="reader-chapter-progress-track" class="reader-progress-track" role="progressbar" aria-label="本章進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="reader-chapter-progress-bar"></span>
+                  </div>
+                </div>
+                <div class="reader-progress-row reader-progress-row--book">
+                  <div class="reader-progress-meta">
+                    <span>全書進度</span>
+                    <strong id="reader-book-progress-percent">0%</strong>
+                  </div>
+                  <div id="reader-book-progress-track" class="reader-progress-track" role="progressbar" aria-label="全書進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="reader-book-progress-bar"></span>
+                  </div>
+                </div>
+              </div>
               <button id="next-page" type="button" disabled>下一頁 →</button>
             </section>
           </div>
@@ -326,7 +345,7 @@
   <script src="/vendor/jszip/jszip.min.js"></script>
   <script src="/assets/epub-compat.js"></script>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261118-one-step-immersive-r1"></script>
+  <script type="module" src="/assets/epub-lab-comics-20261112.js?v=20261118-dual-progress-r1"></script>
   <script type="module">
     if (window.FRAME_LOCAL_APP && window.__TAURI__?.core?.invoke) {
       const { startMacSync } = await import("/mac/sync.js?v=20261117-sync-r1");
