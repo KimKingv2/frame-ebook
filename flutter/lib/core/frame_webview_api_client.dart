@@ -43,7 +43,7 @@ class FrameWebViewApiClient implements FrameApiClient {
   Uri _resolve(String path) {
     if (!path.startsWith('/api/') ||
         path.startsWith('//') ||
-        path.contains('\\\\') ||
+        path.contains('\\') ||
         path.contains('\\u0000')) {
       throw const FrameApiException(message: 'FRAME API 路徑無效。');
     }
