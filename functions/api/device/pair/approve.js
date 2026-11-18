@@ -1,5 +1,5 @@
-import { getAccessIdentity, isSameOrigin, json } from "../../_lib/common.js";
-import { databaseOrError } from "../../_lib/device-sync.js";
+import { getAccessIdentity, isSameOrigin, json } from "../../../_lib/common.js";
+import { databaseOrError } from "../../../_lib/device-sync.js";
 
 function normalizeCode(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
