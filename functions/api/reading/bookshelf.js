@@ -149,7 +149,10 @@ export async function onRequestGet({ request, env }) {
         id, sourceType: "cloud",
         provider: row.provider, library: row.library, rootPath, path,
         fileName: row.name,
-        title: metadata.manualTitle && metadata.title ? metadata.title : (importedTitle || fallbackTitle),
+        title: metadata.manualTitle && metadata.title ? metadata.title :
+          (row.library === "comics"
+            ? String(comicMetadata?.nameCn || comicMetadata?.name || importedTitle || fallbackTitle)
+            : (importedTitle || fallbackTitle)),
         author: metadata.manualAuthor ? String(metadata.author || "") :
           String(comicMetadata?.author || row.book_creator || ""),
         bookTitle: importedTitle,
