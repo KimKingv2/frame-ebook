@@ -534,7 +534,7 @@ class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
                     Expanded(child: Align(
                       alignment: Alignment.bottomCenter,
                       child: FractionallySizedBox(
-                        heightFactor: (number(items[i]['seconds']) / maxValue).clamp(0.015, 1.0),
+                        heightFactor: (number(items[i]['seconds']) / maxValue).clamp(0.015, 1.0).toDouble(),
                         widthFactor: 0.72,
                         alignment: Alignment.bottomCenter,
                         child: Container(decoration: BoxDecoration(
