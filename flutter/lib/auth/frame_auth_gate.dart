@@ -20,8 +20,9 @@ class FrameAuthGate extends StatefulWidget {
 
 class _FrameAuthGateState extends State<FrameAuthGate> {
   late final Uri _baseUri;
-  late final FrameApiClient _api;
+  FrameApiClient? _api;
   WebViewController? _webController;
+  String? _startupError;
 
   bool _checking = true;
   bool _sessionCheckInProgress = false;
@@ -35,7 +36,14 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
   @override
   void initState() {
     super.initState();
-    _baseUri = FrameAppConfig.apiBaseUri;
+    try {
+      _baseUri = FrameAppConfig.apiBaseUri;
+    } catch (error) {
+      _startupError = error.toString();
+      _checking = false;
+      return;
+    }
+
     if (kIsWeb) {
       _api = createFrameApiClient(baseUri: _baseUri);
       unawaited(_checkSession());
@@ -63,9 +71,14 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
           },
           onPageFinished: _onPageFinished,
           onWebResourceError: (error) {
-            if (error.isForMainFrame != true || !mounted) return;
+            if (error.isForMainFrame == false || !mounted) return;
+            final failedUri = Uri.tryParse(error.url);
+            final failedLocation = failedUri == null
+                ? ''
+                : ' · ${failedUri.host}${failedUri.path}';
             setState(() {
-              _webError = '${error.description}（錯誤碼 ${error.errorCode}）';
+              _webError =
+                  '${error.description}（錯誤碼 ${error.errorCode}$failedLocation）';
               _pageReady = true;
               _checking = false;
             });
@@ -85,12 +98,14 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
 
   @override
   void dispose() {
-    _api.close();
+    _api?.close();
     super.dispose();
   }
 
   Future<void> _loadNativeEntry() async {
     try {
+      final api = _api;
+      if (api is FrameWebViewApiClient) await api.ready;
       await _webController?.loadRequest(_baseUri);
     } catch (error) {
       if (!mounted) return;
@@ -145,7 +160,7 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
           );
         }
       }
-      final session = await _api.getJson('/api/auth/session');
+      final session = await _api!.getJson('/api/auth/session');
       if (session['authenticated'] != true ||
           session['accessEnabled'] != true) {
         throw const FrameApiException(
@@ -200,9 +215,13 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (_startupError != null) {
+      return _StartupErrorScreen(message: _startupError!);
+    }
+
     if (kIsWeb) {
       if (_checking) return const _AuthLoadingScreen();
-      if (_authenticated) return FrameApiScope(api: _api, child: widget.child);
+      if (_authenticated) return FrameApiScope(api: _api!, child: widget.child);
       return _AccessWebNotice(error: _error, onRetry: _checkSession);
     }
 
@@ -218,7 +237,7 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
         ),
         if (_authenticated)
           Positioned.fill(
-            child: FrameApiScope(api: _api, child: widget.child),
+            child: FrameApiScope(api: _api!, child: widget.child),
           )
         else
           Positioned.fill(
@@ -235,6 +254,60 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
       ],
     );
   }
+}
+
+
+class _StartupErrorScreen extends StatelessWidget {
+  const _StartupErrorScreen({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFF12101A),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _FrameWordmark(),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'FRAME Ebook 無法啟動',
+                    style: TextStyle(
+                      color: Color(0xFFF4F0FA),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFFFB7B7),
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Web 版必須由 HTTPS 網站提供，並部署在與 FRAME Ebook Pages Functions 相同的受保護網域。請勿直接以 file:// 開啟 ZIP 裡的 index.html。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFAAA2B8),
+                      height: 1.6,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _AuthLoadingScreen extends StatelessWidget {
