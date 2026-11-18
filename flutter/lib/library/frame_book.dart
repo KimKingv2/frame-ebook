@@ -144,6 +144,32 @@ class FrameBook {
   }
 }
 
+
+int _compareNaturalFileNames(String first, String second) {
+  final firstParts = RegExp(r'\d+|\D+')
+      .allMatches(first.toLowerCase())
+      .map((match) => match.group(0)!)
+      .toList();
+  final secondParts = RegExp(r'\d+|\D+')
+      .allMatches(second.toLowerCase())
+      .map((match) => match.group(0)!)
+      .toList();
+  final length = firstParts.length < secondParts.length
+      ? firstParts.length
+      : secondParts.length;
+  for (var index = 0; index < length; index += 1) {
+    final left = firstParts[index];
+    final right = secondParts[index];
+    final leftNumber = BigInt.tryParse(left);
+    final rightNumber = BigInt.tryParse(right);
+    final comparison = leftNumber != null && rightNumber != null
+        ? leftNumber.compareTo(rightNumber)
+        : left.compareTo(right);
+    if (comparison != 0) return comparison;
+  }
+  return firstParts.length.compareTo(secondParts.length);
+}
+
 class FrameShelfEntry {
   FrameShelfEntry(this.first) : members = [first];
 
@@ -211,7 +237,7 @@ class FrameShelfEntry {
   List<FrameBook> sortedMembers() {
     final result = [...members];
     result.sort((a, b) {
-      final byName = a.fileName.toLowerCase().compareTo(b.fileName.toLowerCase());
+      final byName = _compareNaturalFileNames(a.fileName, b.fileName);
       if (byName != 0) return byName;
       return a.path.compareTo(b.path);
     });
