@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
+import '../core/frame_api_client.dart';
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
