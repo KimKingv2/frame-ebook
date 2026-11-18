@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/frame_api_scope.dart';
@@ -10,6 +11,7 @@ import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
 import 'frame_book_details_dialog.dart';
 import 'frame_library_repository.dart';
+import 'frame_reader_screen.dart';
 
 const _bg = Color(0xFF12101A);
 const _panel = Color(0xFF1B1825);
@@ -152,20 +154,35 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
   Future<void> _openStats() =>
       _openPage(_base.replace(path: '/reading-stats/'), '閱讀時光');
 
-  Future<void> _openReader(FrameBook book) => _openPage(
-        _base.replace(
-          path: '/epub-lab/',
-          queryParameters: {
-            'book': book.id,
-            'provider': book.provider,
-            'library': book.library,
-            'root_path': book.rootPath,
-            'path': book.path,
-          },
+  Future<void> _openReader(FrameBook book) async {
+    if (kIsWeb) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => FrameReaderScreen(book: book),
         ),
-        '閱讀室',
-        toolbar: false,
       );
+      if (mounted) unawaited(_load(showLoading: false));
+      return;
+    }
+
+    final descriptor = book.descriptor();
+    final query = <String, String>{
+      'book': book.id,
+      'provider': book.provider,
+      'library': book.library,
+      'root_path': book.rootPath,
+      'path': book.path,
+    };
+    final profileId = descriptor['profileId']?.toString() ?? '';
+    final sourceId = descriptor['sourceId']?.toString() ?? '';
+    if (profileId.isNotEmpty) query['profile_id'] = profileId;
+    if (sourceId.isNotEmpty) query['source_id'] = sourceId;
+    await _openPage(
+      _base.replace(path: '/epub-lab/', queryParameters: query),
+      '閱讀室',
+      toolbar: false,
+    );
+  }
 
   Future<void> _showDetails(FrameBook book) async {
     final result = await showDialog<String>(
