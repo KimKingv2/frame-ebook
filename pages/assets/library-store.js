@@ -451,6 +451,84 @@ async function getLocalSyncMeta(key, fallback = null) {
     request.onsuccess = () => set(request.result ? request.result.value : fallback);
   });
 }
+
+async function reconcileLocalBooksForRoots(profileRoots = []) {
+  if (!isLocalMacApp()) return { books:[], updated:0, removed:0 };
+  const configs = new Map();
+  for (const item of Array.isArray(profileRoots) ? profileRoots : []) {
+    const profileId = String(item?.profileId || "");
+    if (!profileId) continue;
+    configs.set(profileId, {
+      booksRoot:String(item.booksRoot || item.books || "/"),
+      comicsRoot:String(item.comicsRoot || item.comics || "/")
+    });
+  }
+  const normalize = value => {
+    const raw=String(value||"").replace(/\\/g,"/");
+    const parts=raw.split("/").filter(Boolean);
+    if (!raw.startsWith("/") || parts.some(part=>part==="..")) return "";
+    return "/"+parts.filter(part=>part!==".").join("/");
+  };
+  const within = (path,root) => root==="/" ? path.startsWith("/") : path===root || path.startsWith(root+"/");
+  const db=await openLocalDatabase();
+  let output=[],updated=0,removed=0;
+  await localTransaction(db,["books"],"readwrite",(tx,set)=>{
+    const books=tx.objectStore("books"),request=books.getAll();
+    request.onsuccess=()=>{
+      for(const book of request.result||[]){
+        const source=book.cloudSource||{};
+        if((source.provider||book.provider)!=="webdav"){output.push(book);continue;}
+        const profileId=String(source.profileId||book.profileId||"");
+        const roots=configs.get(profileId);
+        if(!roots){output.push(book);continue;}
+        const path=normalize(source.path||book.path||"");
+        const booksRoot=normalize(roots.booksRoot),comicsRoot=normalize(roots.comicsRoot);
+        const ext=String((book.fileName||path.split("/").pop()||"").split(".").pop()||"").toLowerCase();
+        let library="",rootPath="";
+        if(path && ext==="epub" && booksRoot && within(path,booksRoot)){library="books";rootPath=booksRoot;}
+        else if(path && (ext==="epub"||ext==="cbz") && comicsRoot && within(path,comicsRoot)){library="comics";rootPath=comicsRoot;}
+        if(!library){
+          books.delete(String(book.id));bookCache.delete(String(book.id));removed++;continue;
+        }
+        const nextSource={...source,library,rootPath,path};
+        const changed=String(source.library||book.library||book.shelf||"")!==library ||
+          String(source.rootPath||book.rootPath||"")!==rootPath ||
+          String(source.path||book.path||"")!==path ||
+          String(book.library||"")!==library || String(book.shelf||"")!==library;
+        if(changed){
+          const next={...book,library,shelf:library,rootPath,path,cloudSource:nextSource};
+          books.put(next);remember(next);output.push(next);updated++;
+        }else output.push(book);
+      }
+      set({books:output,updated,removed});
+    };
+  });
+  return {books:output,updated,removed};
+}
+async function cleanupLocalBooksAfterScan(options = {}) {
+  if (!isLocalMacApp()) return 0;
+  const profileId=String(options.profileId||""),rootPath=String(options.rootPath||"/");
+  const keepPaths=new Set((Array.isArray(options.keepPaths)?options.keepPaths:[]).map(value=>String(value||"").replace(/\\/g,"/").replace(/\/+$/,"")));
+  if(!profileId||!rootPath.startsWith("/"))throw new Error("掃描清理範圍無效。");
+  const within=(path,root)=>root==="/" ? path.startsWith("/") : path===root || path.startsWith(root+"/");
+  const db=await openLocalDatabase();let removed=0;
+  await localTransaction(db,["books"],"readwrite",(tx,set)=>{
+    const books=tx.objectStore("books"),request=books.getAll();
+    request.onsuccess=()=>{
+      for(const book of request.result||[]){
+        const source=book.cloudSource||{};
+        if((source.provider||book.provider)!=="webdav"||String(source.profileId||book.profileId||"")!==profileId)continue;
+        const path=String(source.path||book.path||"").replace(/\\/g,"/").replace(/\/+$/,"");
+        if(path.startsWith("/")&&within(path,rootPath)&&!keepPaths.has(path)){
+          books.delete(String(book.id));bookCache.delete(String(book.id));removed++;
+        }
+      }
+      set(removed);
+    };
+  });
+  return removed;
+}
+
 async function setLocalSyncMeta(key, value) {
   const db = await openLocalDatabase();
   await localTransaction(db, ["sync_meta"], "readwrite", tx => {
@@ -1100,5 +1178,5 @@ export {
   saveAnnotation, listAnnotations, deleteAnnotation, localDayKey,
   recordReadingEvent, getReadingEvents, getReadingSetting, setReadingSetting,
   getLocalSyncQueue, acknowledgeLocalSyncQueue, getLocalSyncMeta, setLocalSyncMeta,
-  upsertSyncedCatalogItems, mergeCloudSnapshot, applyRemoteSyncChanges, getLocalSyncSnapshot
+  reconcileLocalBooksForRoots, cleanupLocalBooksAfterScan, upsertSyncedCatalogItems, mergeCloudSnapshot, applyRemoteSyncChanges, getLocalSyncSnapshot
 };
