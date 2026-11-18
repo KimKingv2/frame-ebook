@@ -3269,9 +3269,6 @@ html.flutter-reader-embed .appearance-panel[open] {
   z-index:2400;
 }
 html.flutter-reader-embed .reader-layout {
-html.flutter-reader-embed .reading-workspace.reader-sidebar-collapsed .reader-layout {
-  grid-template-columns:minmax(0,1fr);
-}
   display:grid;
   flex:1;
   grid-template-columns:250px minmax(0,1fr);
@@ -3279,6 +3276,9 @@ html.flutter-reader-embed .reading-workspace.reader-sidebar-collapsed .reader-la
   gap:12px;
   height:100%;
   min-height:0;
+}
+html.flutter-reader-embed .reading-workspace.reader-sidebar-collapsed .reader-layout {
+  grid-template-columns:minmax(0,1fr);
 }
 html.flutter-reader-embed .reader-sidebar {
   position:relative;
