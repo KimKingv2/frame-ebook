@@ -1015,11 +1015,15 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     const horizontalPadding = 48.0;
     const gap = 13.0;
     final availableWidth = (viewportWidth - horizontalPadding).clamp(0.0, double.infinity);
+    final minimumCardWidth = viewportWidth <= 980 ? 132.0 : 142.0;
+    final columnGap = viewportWidth <= 520 ? 11.0 : gap;
     final columns = viewportWidth <= 520
         ? 2
         : viewportWidth <= 760
             ? 3
-            : ((availableWidth + gap) / (142 + gap)).floor().clamp(1, 12);
+            : ((availableWidth + columnGap) / (minimumCardWidth + columnGap))
+                .floor()
+                .clamp(1, 12);
     final rowCount = (itemCount + columns - 1) ~/ columns;
 
     return SliverPadding(
@@ -1037,7 +1041,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.only(
-                          right: column == columns - 1 ? 0 : gap,
+                          right: column == columns - 1 ? 0 : columnGap,
                         ),
                         child: firstIndex + column < itemCount
                             ? itemBuilder(firstIndex + column)
