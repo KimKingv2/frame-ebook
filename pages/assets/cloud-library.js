@@ -2,7 +2,10 @@ import { ZipReader, BlobWriter, TextWriter } from "/vendor/foliate-js/vendor/zip
 
 const $ = id => document.getElementById(id);
 const isManagerEmbed = new URLSearchParams(window.location.search).get("manager") === "1" && window.parent !== window;
-let embeddedManagerVisible = false;
+// Flutter opens this page in a dedicated same-origin iframe and does not
+// need a separate parent postMessage handshake. Open the manager as soon as
+// the Cloudflare Access session check succeeds.
+let embeddedManagerVisible = isManagerEmbed;
 if (isManagerEmbed) document.documentElement.classList.add("cloud-manager-embed");
 const DEFAULT_ROOTS = {
   books: "/中國移動雲盤/Kim King/04 Boooooks/01 Books 歸檔",
