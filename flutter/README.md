@@ -1,6 +1,6 @@
 # FRAME Ebook Flutter
 
-The Flutter client is being rebuilt against the exact product behaviour in the repository's main branch. Main is the sole feature and visual reference. The three targets are Web, macOS and Android. The existing Pages app and its backend remain online and unchanged throughout the migration.
+The Flutter client is being rebuilt against the exact product behaviour in the repository's main branch. Main is the sole feature and visual reference. The three targets are Web, macOS and Android.
 
 ## Main-branch source map
 
@@ -12,9 +12,20 @@ The Flutter client is being rebuilt against the exact product behaviour in the r
 
 The required feature-by-feature acceptance list is `docs/MAIN-PARITY-INVENTORY.md`.
 
+## Font assets
+
+All three Flutter targets bundle **Noto Sans TC** so Traditional Chinese, Latin text and UI labels render consistently without runtime font requests to Google Fonts. The font is fetched by `tool/prepare_fonts.py` from a pinned revision of the official `notofonts/noto-cjk` repository and checked against its Git blob SHA before use. Its SIL Open Font License is included as `assets/fonts/OFL.txt`.
+
+Before dependency resolution or a local build, run:
+
+```sh
+python3 tool/prepare_fonts.py
+flutter pub get
+```
+
 ## Current implementation stage
 
-The Flutter shell now checks the existing Cloudflare Access session, retrieves the real D1 bookshelf, groups folder volumes using the main-branch key, renders separate EPUB and Comics shelves, recent reading, search, sort, grid/list modes, folder navigation, cover thumbnails from the private R2 endpoint and basic metadata editing.
+The Flutter shell checks the existing Cloudflare Access session, retrieves the real D1 bookshelf, groups folder volumes using the main-branch key, renders separate EPUB and Comics shelves, recent reading, search, sort, grid/list modes, folder navigation, cover thumbnails from the private R2 endpoint and basic metadata editing.
 
 Until a feature is ported and parity-tested, the existing same-origin main page remains available as a compatibility bridge for the original Cloud Manager, Reading Room and Reading Statistics. These bridges do not change the backend or create a second data model. They are transitional, not a claim that the feature has already been rewritten in Flutter.
 
@@ -24,6 +35,7 @@ The home shelf reads only existing APIs. The original EPUB/CBZ files remain in A
 
 From this directory:
 
+- `python3 tool/prepare_fonts.py`
 - `flutter pub get`
 - `flutter run -d macos`
 - `flutter run -d chrome`
@@ -43,8 +55,7 @@ Native self-use defaults to `https://frame-ebook.pages.dev`; this can also be ov
 - `flutter build macos`
 - `flutter build apk`
 
-GitHub Actions generates platform scaffolding in each CI job and applies the Android release INTERNET permission plus the macOS App Sandbox outgoing-network entitlement. Flutter Web output is not connected to the production Cloudflare Pages deployment. Do not open the Web artifact's `index.html` directly with `file://`: the Web app must be served over HTTPS from the same protected hostname as the existing Pages Functions, so Cloudflare Access cookies and same-origin `/api/*` calls work. The startup screen now explains this instead of leaving a blank page. Do not change the production Pages build output from `pages/` until full feature parity passes and the user explicitly approves cutover.
-
+GitHub Actions generates platform scaffolding and verifies the pinned font asset in each CI job. It applies the Android release INTERNET permission plus the macOS App Sandbox outgoing-network entitlement. Changes to Flutter source on `main` build and publish the Web artifact to `pages/flutter-preview/`; the default root page remains a separate legacy route until a deliberate root-path cutover. Do not open the Web artifact's `index.html` directly with `file://`: the Web app must be served over HTTPS from the same protected hostname as the existing Pages Functions, so Cloudflare Access cookies and same-origin `/api/*` calls work.
 
 ### Android Reading Room transport
 

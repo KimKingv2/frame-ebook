@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - feat/flutter-three-platform
+      - main
+    paths:
+      - "flutter/**"
+      - ".github/workflows/flutter-ci.yml"
   pull_request:
     paths:
       - "flutter/**"
@@ -25,6 +29,9 @@ jobs:
       - name: Configure release network permissions
         working-directory: flutter
         run: python3 tool/prepare_platforms.py
+      - name: Prepare bundled Traditional Chinese font
+        working-directory: flutter
+        run: python3 tool/prepare_fonts.py
       - name: Resolve dependencies
         working-directory: flutter
         run: flutter pub get
@@ -79,6 +86,11 @@ jobs:
                       item.unlink()
           print("Kept the full CanvasKit runtime only; disabled persistent Flutter service-worker caching.")
           PY
+      - name: Verify bundled font is present in Web output
+        working-directory: flutter
+        run: |
+          test -s build/web/assets/assets/fonts/NotoSansTC-VF.ttf
+          grep -q '"family":"NotoSansTC"' build/web/assets/FontManifest.json
       - name: Upload Web preview artifact
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +114,9 @@ jobs:
       - name: Configure release network permissions
         working-directory: flutter
         run: python3 tool/prepare_platforms.py
+      - name: Prepare bundled Traditional Chinese font
+        working-directory: flutter
+        run: python3 tool/prepare_fonts.py
       - name: Resolve dependencies
         working-directory: flutter
         run: flutter pub get
@@ -131,6 +146,9 @@ jobs:
       - name: Configure release network permissions
         working-directory: flutter
         run: python3 tool/prepare_platforms.py
+      - name: Prepare bundled Traditional Chinese font
+        working-directory: flutter
+        run: python3 tool/prepare_fonts.py
       - name: Resolve dependencies
         working-directory: flutter
         run: flutter pub get
@@ -197,3 +215,43 @@ jobs:
           fi
           git commit -m "Deploy Flutter Web Preview"
           git push origin HEAD:cf-preview
+
+  deploy-production:
+    name: Publish Flutter Web to Cloudflare Production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Flutter Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frame-ebook-flutter-web
+          path: flutter-web-production
+
+      - name: Checkout Production branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: production
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add Flutter Web under /flutter-preview/
+        run: |
+          rm -rf production/pages/flutter-preview
+          mkdir -p production/pages/flutter-preview
+          cp -a flutter-web-production/. production/pages/flutter-preview/
+
+      - name: Commit Flutter Web Production
+        working-directory: production
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/flutter-preview
+          if git diff --cached --quiet; then
+            echo "Flutter Web Production is already up to date."
+            exit 0
+          fi
+          git commit -m "Deploy Flutter Web Production"
+          git push origin HEAD:main

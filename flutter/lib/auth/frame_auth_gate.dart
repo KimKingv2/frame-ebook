@@ -563,7 +563,7 @@ class _FrameWordmark extends StatelessWidget {
                   'F',
                   style: TextStyle(
                     color: Colors.white,
-                    fontFamily: 'Georgia',
+                    fontFamily: 'NotoSansTC',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),

@@ -23,3 +23,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: NotoSansTC
+      fonts:
+        - asset: assets/fonts/NotoSansTC-VF.ttf
+          weight: 400
+  assets:
+    - assets/fonts/OFL.txt

@@ -19,6 +19,7 @@ class FrameEbookApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        fontFamily: 'NotoSansTC',
         colorScheme: ColorScheme.fromSeed(
           seedColor: violet,
           brightness: Brightness.dark,
