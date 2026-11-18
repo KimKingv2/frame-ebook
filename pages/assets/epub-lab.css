@@ -3559,3 +3559,44 @@ html.flutter-reader-embed .reading-session-indicator {
 .reading-workspace:fullscreen.reader-immersive-mode .reader-quick-actions {
   display:none !important;
 }
+
+
+/* Native fullscreen buttons must keep the exact same skin as the regular
+   reader header. Only their row placement changes with the fullscreen layout. */
+#reading-workspace:fullscreen .reader-quick-actions > #reader-sidebar-toggle,
+#reading-workspace:fullscreen .reader-quick-actions > #reader-fullscreen {
+  border:1px solid rgba(180,154,225,.24) !important;
+  border-radius:8px !important;
+  color:#dcd2ed !important;
+  background:rgba(45,37,60,.82) !important;
+  box-shadow:none !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-appearance-toggle {
+  border:1px solid rgba(167,139,250,.46) !important;
+  border-radius:8px !important;
+  color:#eee6ff !important;
+  background:linear-gradient(135deg,rgba(87,66,126,.78),rgba(48,37,68,.95)) !important;
+  box-shadow:none !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle {
+  border:1px solid rgba(167,139,250,.42) !important;
+  border-radius:8px !important;
+  color:#e9ddff !important;
+  background:rgba(65,49,91,.88) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle[aria-pressed="true"] {
+  border-color:rgba(204,177,255,.7) !important;
+  color:#fff !important;
+  background:linear-gradient(135deg,rgba(100,76,148,.96),rgba(55,42,79,.96)) !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > button:hover:not(:disabled) {
+  border-color:#a88be4 !important;
+  background:#392d50 !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-appearance-toggle:hover:not(:disabled) {
+  background:linear-gradient(135deg,rgba(87,66,126,.78),rgba(48,37,68,.95)) !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle[aria-pressed="true"]:hover:not(:disabled) {
+  background:linear-gradient(135deg,rgba(100,76,148,.96),rgba(55,42,79,.96)) !important;
+}
