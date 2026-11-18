@@ -4,28 +4,68 @@
   var diagnostic = null;
   var apiRequests = [];
   var runtimeErrors = [];
+  var contextCalls = [];
+  var xhrOpenCount = 0;
+  var xhrSendCount = 0;
   var nativeFetch = window.fetch;
 
-  function show(messageText) {
-    if (message && message.isConnected) message.textContent = messageText;
+  function addLimited(list, value, max) {
+    list.push(String(value).replace(/\s+/g, " ").slice(0, 180));
+    if (list.length > max) list.shift();
+  }
+
+  function show(value) {
+    if (message && message.isConnected) message.textContent = value;
   }
 
   function recordError(value) {
-    if (runtimeErrors.length < 4) {
-      runtimeErrors.push(String(value).replace(/\s+/g, " ").slice(0, 120));
+    if (runtimeErrors.length < 4) addLimited(runtimeErrors, value, 4);
+  }
+
+  function recordApi(value) {
+    addLimited(apiRequests, value, 8);
+  }
+
+  // Observe the actual rendering context requests made during Flutter startup.
+  // Do not call getContext ourselves: that could create or influence a context.
+  function instrumentCanvasContext(proto, label) {
+    if (!proto || !proto.getContext || proto.getContext.__frameDiagWrapped) return;
+    var original = proto.getContext;
+    function wrappedGetContext(type) {
+      var context = null;
+      var error = "";
+      try {
+        context = original.apply(this, arguments);
+        return context;
+      } catch (caught) {
+        error = String(caught);
+        throw caught;
+      } finally {
+        var target = this && this.tagName === "CANVAS" ? "canvas" : label;
+        var size = "";
+        try {
+          size = this.width + "x" + this.height;
+        } catch (_) {}
+        addLimited(
+          contextCalls,
+          target + ".getContext(" + String(type) + ")=" +
+            (context ? "OK" : "NULL") + (error ? ":" + error : "") + "@" + size,
+          12
+        );
+      }
     }
+    wrappedGetContext.__frameDiagWrapped = true;
+    proto.getContext = wrappedGetContext;
   }
 
-  function recordApi(method, url, status, type, redirected, elapsed) {
-    var line = method + " " + url + " -> " + status +
-      " [" + (type || "unknown") + "]" +
-      (redirected ? " REDIRECTED" : "") + " " + elapsed + "ms";
-    apiRequests.push(line);
-    if (apiRequests.length > 8) apiRequests.shift();
+  if (window.HTMLCanvasElement) {
+    instrumentCanvasContext(HTMLCanvasElement.prototype, "htmlCanvas");
+  }
+  if (window.OffscreenCanvas) {
+    instrumentCanvasContext(OffscreenCanvas.prototype, "offscreenCanvas");
   }
 
-  // Flutter's package:http BrowserClient uses XMLHttpRequest.
-  // Instrument it before Flutter bootstraps, without reading request/response bodies.
+  // Flutter package:http may use XMLHttpRequest. Record at send time, then update on completion.
   if (window.XMLHttpRequest) {
     var xhrOpen = XMLHttpRequest.prototype.open;
     var xhrSend = XMLHttpRequest.prototype.send;
@@ -37,6 +77,10 @@
           parsed.pathname.indexOf("/api/") === 0;
         this.__frameDiagMethod = String(method || "GET").toUpperCase();
         this.__frameDiagUrl = parsed.pathname + parsed.search;
+        if (this.__frameDiagApi) {
+          xhrOpenCount++;
+          this.__frameDiagId = "xhr" + xhrOpenCount;
+        }
       } catch (_) {
         this.__frameDiagApi = false;
       }
@@ -47,6 +91,11 @@
       if (this.__frameDiagApi) {
         var xhr = this;
         var started = Date.now();
+        var label = xhr.__frameDiagId + " " +
+          (xhr.__frameDiagMethod || "GET") + " " +
+          (xhr.__frameDiagUrl || "/api/?");
+        xhrSendCount++;
+        recordApi(label + " SENT");
         xhr.addEventListener("loadend", function () {
           var type = "";
           var redirected = false;
@@ -56,12 +105,9 @@
               new URL(xhr.responseURL, window.location.href).pathname.indexOf("/cdn-cgi/access/") === 0);
           } catch (_) {}
           recordApi(
-            xhr.__frameDiagMethod || "GET",
-            xhr.__frameDiagUrl || "/api/?",
-            "HTTP" + xhr.status,
-            type,
-            redirected,
-            Date.now() - started
+            label + " -> HTTP" + xhr.status + " [" + type + "]" +
+            (redirected ? " REDIRECTED" : "") + " " +
+            (Date.now() - started) + "ms"
           );
         }, { once: true });
       }
@@ -69,7 +115,7 @@
     };
   }
 
-  // Also observe fetch-based API calls, if the app adds any later.
+  // Keep visibility into any fetch-based API requests too.
   if (typeof nativeFetch === "function") {
     window.fetch = function (input, init) {
       var rawUrl = typeof input === "string" ? input :
@@ -85,27 +131,20 @@
       var isApi = parsed.origin === window.location.origin &&
         parsed.pathname.indexOf("/api/") === 0;
       var started = Date.now();
+      if (isApi) recordApi("FETCH " + String(method).toUpperCase() + " " + parsed.pathname + " SENT");
       var request = nativeFetch.apply(this, arguments);
       if (!isApi) return request;
       return request.then(function (response) {
         recordApi(
-          String(method).toUpperCase(),
-          parsed.pathname + parsed.search,
-          "HTTP" + response.status,
-          response.headers.get("content-type") || "",
-          response.redirected,
-          Date.now() - started
+          "FETCH " + String(method).toUpperCase() + " " + parsed.pathname +
+          " -> HTTP" + response.status + " [" +
+          (response.headers.get("content-type") || "") + "] " +
+          (Date.now() - started) + "ms"
         );
         return response;
       }, function (error) {
-        recordApi(
-          String(method).toUpperCase(),
-          parsed.pathname + parsed.search,
-          "FAILED",
-          String(error).slice(0, 60),
-          false,
-          Date.now() - started
-        );
+        recordApi("FETCH " + String(method).toUpperCase() + " " +
+          parsed.pathname + " FAILED " + String(error).slice(0, 70));
         throw error;
       });
     };
@@ -136,42 +175,28 @@
     return Math.round(rect.width) + "x" + Math.round(rect.height);
   }
 
-  function canvasInfo(canvas) {
-    var rect = canvas.getBoundingClientRect();
-    var css = window.getComputedStyle(canvas);
-    var result = Math.round(rect.width) + "x" + Math.round(rect.height) +
-      "css/" + canvas.width + "x" + canvas.height + "px" +
-      ";display=" + css.display +
-      ";visibility=" + css.visibility +
-      ";opacity=" + css.opacity;
-    var gl = null;
-    try {
-      gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-      if (gl) {
-        var attrs = gl.getContextAttributes();
-        result += ";webgl=" + (gl.getParameter(gl.VERSION) || "yes") +
-          ";contextLost=" + gl.isContextLost() +
-          ";preserve=" + (attrs ? attrs.preserveDrawingBuffer : "unknown");
-      } else {
-        result += ";webgl=none";
-      }
-    } catch (error) {
-      result += ";webgl-check-error=" + String(error).slice(0, 70);
-    }
-    return result;
-  }
-
   function collectRuntime() {
     var views = allNodes("flutter-view");
     var panes = allNodes("flt-glass-pane");
     var canvases = allNodes("canvas");
+    var canvas = "not-found";
+    if (canvases.length) {
+      var el = canvases[0];
+      var rect = el.getBoundingClientRect();
+      var css = getComputedStyle(el);
+      canvas = Math.round(rect.width) + "x" + Math.round(rect.height) +
+        "css/" + el.width + "x" + el.height + "px" +
+        ";display=" + css.display +
+        ";visibility=" + css.visibility +
+        ";opacity=" + css.opacity;
+    }
     return {
-      viewport: window.innerWidth + "x" + window.innerHeight,
-      dpr: window.devicePixelRatio || 1,
+      viewport: innerWidth + "x" + innerHeight,
+      dpr: devicePixelRatio || 1,
       flutterView: views.length ? sizeOf(views[0]) : "not-found",
       glassPane: panes.length ? sizeOf(panes[0]) : "not-found",
       canvasCount: canvases.length,
-      canvas: canvases.length ? canvasInfo(canvases[0]) : "not-found",
+      canvas: canvas,
       canvasKit: window.flutterCanvasKit ? "loaded" : "not-on-window"
     };
   }
@@ -204,8 +229,7 @@
     if (!navigator.serviceWorker) return Promise.resolve("unsupported");
     return navigator.serviceWorker.getRegistrations().then(function (registrations) {
       var controller = navigator.serviceWorker.controller;
-      var controllerPath = controller ?
-        new URL(controller.scriptURL).pathname : "none";
+      var controllerPath = controller ? new URL(controller.scriptURL).pathname : "none";
       var relevant = registrations.map(function (registration) {
         return new URL(registration.scope).pathname;
       }).filter(function (scope) {
@@ -223,23 +247,13 @@
       diagnostic = document.createElement("pre");
       diagnostic.id = "frame-runtime-diagnostic";
       diagnostic.style.cssText = [
-        "position:fixed",
-        "left:8px",
-        "right:8px",
-        "bottom:8px",
-        "z-index:100000",
-        "max-height:34vh",
-        "overflow:auto",
-        "margin:0",
-        "padding:8px 10px",
-        "border:1px solid rgba(197,173,255,.45)",
-        "border-radius:7px",
-        "background:rgba(18,16,26,.97)",
-        "color:#e5dcfa",
+        "position:fixed","left:8px","right:8px","bottom:8px",
+        "z-index:100000","max-height:36vh","overflow:auto",
+        "margin:0","padding:8px 10px",
+        "border:1px solid rgba(197,173,255,.45)","border-radius:7px",
+        "background:rgba(18,16,26,.97)","color:#e5dcfa",
         "font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace",
-        "white-space:pre-wrap",
-        "overflow-wrap:anywhere",
-        "pointer-events:none"
+        "white-space:pre-wrap","overflow-wrap:anywhere","pointer-events:none"
       ].join(";");
       document.body.appendChild(diagnostic);
     }
@@ -249,24 +263,22 @@
   window.addEventListener("flutter-first-frame", function () {
     firstFrame = true;
     if (message && message.isConnected) message.remove();
-
     var info = collectRuntime();
     Promise.all([checkSession(), serviceWorkerInfo()]).then(function (results) {
-      // Wait for the initial bookshelf request to finish before printing the log.
       window.setTimeout(function () {
-        var calls = apiRequests.length ? apiRequests.join(" | ") : "none-observed";
-        var errors = runtimeErrors.length ? runtimeErrors.join(" | ") : "none";
         addDiagnostic([
           "FRAME_DIAG|firstFrame=1|viewport=" + info.viewport + "|dpr=" + info.dpr,
           "flutterView=" + info.flutterView + "|glassPane=" + info.glassPane,
           "canvasCount=" + info.canvasCount + "|canvas=" + info.canvas,
           "canvasKit=" + info.canvasKit,
+          "contextCalls=" + (contextCalls.length ? contextCalls.join(" ; ") : "none"),
           "session=" + results[0],
-          "api=" + calls,
+          "xhrOpen=" + xhrOpenCount + "|xhrSend=" + xhrSendCount,
+          "api=" + (apiRequests.length ? apiRequests.join(" ; ") : "none-observed"),
           "serviceWorker=" + results[1],
-          "runtimeErrors=" + errors
+          "runtimeErrors=" + (runtimeErrors.length ? runtimeErrors.join(" ; ") : "none")
         ]);
-      }, 2200);
+      }, 2600);
     });
   }, { once: true });
 
