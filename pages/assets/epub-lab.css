@@ -3522,3 +3522,40 @@ html.flutter-reader-embed .reading-session-indicator {
     padding:0 2px !important;
   }
 }
+
+
+/* Preserve the actual immersive state after the regular fullscreen header reset. */
+.reading-workspace:fullscreen.reader-immersive-mode .book-heading {
+  display:block !important;
+  flex:0 0 0 !important;
+  width:0 !important;
+  height:0 !important;
+  min-height:0 !important;
+  max-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  opacity:0 !important;
+  transform:none !important;
+  pointer-events:none !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .book-heading > div:first-child,
+.reading-workspace:fullscreen.reader-immersive-mode .book-progress > strong,
+.reading-workspace:fullscreen.reader-immersive-mode .book-progress > span {
+  display:none !important;
+  opacity:0 !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .book-progress {
+  display:block !important;
+  position:static !important;
+  width:0 !important;
+  height:0 !important;
+  min-width:0 !important;
+  max-width:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+}
+.reading-workspace:fullscreen.reader-immersive-mode .reader-quick-actions {
+  display:none !important;
+}
