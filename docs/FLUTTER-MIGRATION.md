@@ -1,6 +1,6 @@
 # FRAME Ebook Flutter migration
 
-Status: main-branch baseline has been restored; Flutter Access integration and the first D1-backed bookshelf implementation are in progress.
+Status: Flutter Web/macOS/Android shell, D1-backed bookshelf and Flutter-native reading statistics are implemented. The full legacy Reading Room and Cloud Manager remain available through embedded compatibility views while their Flutter-native replacements are built.
 
 ## Non-negotiable parity rule
 
@@ -33,7 +33,7 @@ Do not recreate or reset D1, change migrations, or move original archives to Clo
 
 ## Reader and compatibility bridge
 
-The main Reading Room currently uses the vendored Foliate.js engine for EPUB and fixed-layout/CBZ content, with JSZip/ZIP readers and custom controls. During the UI port, native targets may open the original same-origin Pages Reader in a WebView and Web may open the original route in a separate tab. This bridge deliberately preserves all existing Reader controls while the Flutter reader shell is built; it is a transition mechanism, not a completed Flutter-native reader implementation.
+The main Reading Room currently uses the vendored Foliate.js engine for EPUB and fixed-layout/CBZ content, with JSZip/ZIP readers and custom controls. The current Flutter integration embeds the original same-origin Pages Reader inside Flutter navigation: Web uses a same-origin iframe and native targets use the app's WebView. This bridge preserves all existing Reader controls while the Flutter reader is built; it is a transition mechanism, not a completed Flutter-native reader implementation.
 
 Original EPUB/CBZ archives are read-only source files. Do not create full-archive temporary files or persist archive contents/page images to the internal SSD. Keep active archive bytes in memory and use bounded memory/page caching where the source and engine permit it. A transport success is not proof that memory-only behaviour has been achieved; inspect and test actual filesystem writes.
 
@@ -42,6 +42,7 @@ Original EPUB/CBZ archives are read-only source files. Do not create full-archiv
 - Cloudflare Access session gate and native WebView login bridge.
 - Shared existing Pages API client for Web and native targets.
 - D1-backed home bookshelf and main's folder-volume grouping.
+- Flutter-native reading statistics backed by the existing D1 stats/preferences APIs, including period summaries, daily goal, reading streaks, calendar, trends, top books, time bands, recent sessions and JSON/CSV data export.
 - Recent reading, four sort modes, search, grid/list, books/comics categories and folder detail navigation.
 - R2 cover retrieval with bounded in-memory cache.
 - Basic title, author and shelf metadata editing.
@@ -85,8 +86,9 @@ These items must still pass CI and device verification before being treated as c
 
 ### F4 — Personal reading data parity
 - [ ] Preserve reading preferences, annotations, reading-time events, history and statistics.
-- [ ] Preserve foreground/idle tracking, goal, streaks, calendar and charts.
-- [ ] Preserve JSON and CSV export.
+- [x] Flutter statistics screen reads the existing D1 stats/preferences APIs and renders period summaries, goal, streaks, calendar, trends, top books, time-of-day and recent sessions.
+- [ ] Validate foreground/idle event aggregation against the original tracker on all three targets.
+- [ ] Preserve native file-based JSON and CSV export on Web, macOS and Android. Current Flutter statistics screen copies JSON/CSV text to the clipboard.
 
 ### F5 — Three-platform release
 - [ ] Separate Flutter Web preview and browser Access validation.

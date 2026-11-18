@@ -3,12 +3,14 @@ import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../core/frame_api_client.dart';
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
 import '../cloud/frame_cloud_manager_screen.dart';
 import 'frame_book_details_dialog.dart';
+import '../stats/frame_reading_stats_screen.dart';
 import 'frame_library_repository.dart';
 
 const _bg = Color(0xFF12101A);
@@ -31,6 +33,7 @@ class FrameBookshelfScreen extends StatefulWidget {
 class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
     with WidgetsBindingObserver {
   FrameLibraryRepository? _repository;
+  FrameApiClient? _api;
   List<FrameBook> _books = <FrameBook>[];
   final Map<String, Future<Uint8List>> _coverRequests =
       <String, Future<Uint8List>>{};
@@ -55,7 +58,8 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
     super.didChangeDependencies();
     if (!_apiReady) {
       _apiReady = true;
-      _repository = FrameLibraryRepository(FrameApiScope.of(context));
+      _api = FrameApiScope.of(context);
+      _repository = FrameLibraryRepository(_api!);
       unawaited(_refresh());
     }
   }
@@ -158,6 +162,16 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
     return _coverRequests.putIfAbsent(
       hash,
       () => _repository!.loadCover(hash),
+    );
+  }
+
+  void _openStats() {
+    final api = _api;
+    if (api == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FrameReadingStatsScreen(api: api),
+      ),
     );
   }
 
@@ -385,7 +399,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _navText('我的書架', true, () => _leaveFolder()),
-              _navText('閱讀時光', false, () => _openLegacy('/reading-stats/', '閱讀時光')),
+              _navText('閱讀時光', false, () => _openStats()),
               _navText('閱讀室', false, () => _openLegacy('/epub-lab/', '閱讀室')),
               OutlinedButton(
                 onPressed: () => _openCloudManager(),

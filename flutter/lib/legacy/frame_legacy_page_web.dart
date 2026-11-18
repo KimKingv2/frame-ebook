@@ -1,5 +1,11 @@
+import 'dart:ui_web' as ui_web;
+
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:web/web.dart' as web;
+
+final Map<String, web.HTMLIFrameElement> _legacyFrames =
+    <String, web.HTMLIFrameElement>{};
+int _nextLegacyFrameId = 0;
 
 Widget buildFrameLegacyPage({
   required Uri uri,
@@ -7,19 +13,62 @@ Widget buildFrameLegacyPage({
 }) =>
     _WebLegacyPage(uri: uri, title: title);
 
-class _WebLegacyPage extends StatelessWidget {
+class _WebLegacyPage extends StatefulWidget {
   const _WebLegacyPage({required this.uri, required this.title});
 
   final Uri uri;
   final String title;
 
-  Future<void> _open(BuildContext context) async {
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('無法開啟原版 FRAME Reader 頁面。')),
-      );
+  @override
+  State<_WebLegacyPage> createState() => _WebLegacyPageState();
+}
+
+class _WebLegacyPageState extends State<_WebLegacyPage> {
+  late final String _viewType;
+  late final web.HTMLIFrameElement _iframe;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewType = 'frame-ebook-legacy-${_nextLegacyFrameId++}';
+    _iframe = web.HTMLIFrameElement()
+      ..src = widget.uri.toString()
+      ..title = widget.title
+      ..allow = 'fullscreen; clipboard-read; clipboard-write'
+      ..allowFullscreen = true
+      ..referrerPolicy = 'same-origin';
+    _iframe.style
+      ..border = '0'
+      ..width = '100%'
+      ..height = '100%'
+      ..display = 'block';
+    _legacyFrames[_viewType] = _iframe;
+    ui_web.platformViewRegistry.registerViewFactory(
+      _viewType,
+      (int viewId) => _legacyFrames[_viewType] ?? web.HTMLDivElement(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _WebLegacyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uri != widget.uri) {
+      _iframe.src = widget.uri.toString();
     }
+    if (oldWidget.title != widget.title) {
+      _iframe.title = widget.title;
+    }
+  }
+
+  void _reload() {
+    _iframe.src = widget.uri.toString();
+  }
+
+  @override
+  void dispose() {
+    _legacyFrames.remove(_viewType);
+    _iframe.src = 'about:blank';
+    super.dispose();
   }
 
   @override
@@ -28,50 +77,16 @@ class _WebLegacyPage extends StatelessWidget {
       backgroundColor: const Color(0xFF12101A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1B1825),
-        title: Text(title),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.open_in_new_rounded,
-                  color: Color(0xFFC5ADFF),
-                  size: 38,
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFFF4F0FA),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  '此功能正在移植。為保留 main 版完整操作與資料相容，目前先開啟同網域原版頁面；書架與 Flutter 導覽仍留在這個分頁。',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFFAAA2B8),
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                FilledButton.icon(
-                  onPressed: () => _open(context),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('在新分頁開啟'),
-                ),
-              ],
-            ),
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            tooltip: '重新載入',
+            onPressed: _reload,
+            icon: const Icon(Icons.refresh),
           ),
-        ),
+        ],
       ),
+      body: HtmlElementView(viewType: _viewType),
     );
   }
 }
