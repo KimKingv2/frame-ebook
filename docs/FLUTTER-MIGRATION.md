@@ -1,6 +1,6 @@
 # FRAME Ebook Flutter migration
 
-Status: main-branch baseline has been restored; Flutter Access integration and the first D1-backed bookshelf implementation are in progress.
+Status: Flutter Web/macOS/Android shell and the first D1-backed bookshelf are implemented. The full legacy Reading Room, Cloud Manager and Statistics are now being brought into Flutter navigation through same-origin embedded compatibility views while their Flutter-native replacements are built.
 
 ## Non-negotiable parity rule
 
