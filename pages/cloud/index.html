@@ -144,7 +144,8 @@
           <h3>清空 FRAME Ebook 雲端資料</h3>
           <p>永久清除共用 D1 中的所有書籍索引、掃描進度、閱讀進度、閱讀外觀與偏好、筆記／高亮／書籤、閱讀時光、漫畫 Bangumi 關聯、裝置配對與同步紀錄；並刪除 R2 中的封面快取。</p>
           <p class="cloud-danger-scope">這是整個 FRAME Ebook 專案的全域清除，會影響使用同一份 D1 的所有 Access 帳戶與裝置。清除後需要重新掃描書庫，原本的閱讀紀錄與標註無法復原。</p>
-          <p>不會刪除 Alist／OpenList 裡的原始 EPUB／CBZ 檔案，也不會修改 Cloudflare Access、Pages Variables／Secrets、D1 資料表結構或 GitHub 程式碼。</p>
+          <p>不會刪除 Alist／OpenList 裡的原始 EPUB／CBZ 檔案，也不會修改 Cloudflare Access、Pages Variables／Secrets、D1 資料表結構、GitHub 程式碼或其他 FRAME 專案共用的 KV Token 快取。</p>
+          <p>各台 Mac App／瀏覽器獨立保存的本機 IndexedDB 不在雲端清除範圍內；若本機仍有舊快取，需要在該裝置另外清除。</p>
         </div>
         <label for="cloud-reset-confirmation">輸入 <code>DELETE ALL FRAME EBOOK DATA</code> 才能啟用清除</label>
         <input id="cloud-reset-confirmation" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="DELETE ALL FRAME EBOOK DATA">
