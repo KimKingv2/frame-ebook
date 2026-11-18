@@ -883,16 +883,21 @@ async function retryFailedCovers(scope) {
   const data=await readJsonResponse(response,"重設失敗封面佇列失敗。");
   return Number(data.retried||0);
 }
-async function processPendingCovers(scope,maxDurationMs=120000,scanState=null) {
+async function processPendingCovers(scope,maxDurationMs=120000,scanState=null,options={}) {
   const started=Date.now();
   let processed=0,failed=0,missing=0;
+  const shouldStop=()=>state.scanPauseRequested&&
+    !(options.continueAfterManualPause===true&&state.scanPauseReason==="manual");
   appendIndexLog("封面索引開始：使用 HTTP Range 讀取 ZIP 封面資料，不下載整本書。");
   appendIndexLog("封面分類："+LIBRARY_LABELS[scope.library]+"；根目錄："+scope.rootPath);
-  while(Date.now()-started<maxDurationMs&&!state.scanPauseRequested) {
+  if(state.scanPauseRequested&&state.scanPauseReason==="manual"&&options.continueAfterManualPause===true) {
+    appendIndexLog("目錄掃描已手動暫停；繼續處理已寫入 D1 的封面佇列，不再讀取新目錄。","warning");
+  }
+  while(Date.now()-started<maxDurationMs&&!shouldStop()) {
     const queue=await fetchPendingCovers(scope,8);
     if(!queue.items.length)break;
     for(const item of queue.items) {
-      if(Date.now()-started>=maxDurationMs||state.scanPauseRequested)break;
+      if(Date.now()-started>=maxDurationMs||shouldStop())break;
       setIndexProgress("正在建立封面索引："+item.path+"（已處理 "+processed+" 本）");
       appendIndexLog("正在處理封面："+item.path);
       const coverStartedAt=performance.now();
@@ -998,7 +1003,7 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
         scanState.pausedByUser=false;
         scanState.resumeOnNextOpen=false;
         await saveIndexScanState(scanState,scope);
-        const coverResult=await processPendingCovers(scope,180000,scanState);
+        const coverResult=await processPendingCovers(scope,180000,scanState,{continueAfterManualPause:true});
         batch.coverProcessed=coverResult.processed;
         batch.coverMissing=coverResult.missing;
         batch.coverFailed=coverResult.failed;
@@ -1180,18 +1185,22 @@ async function runIndexScan(targetLibrary=state.activeLibrary,fromAll=false,opti
       appendIndexLog("本批結束："+reason+"；進度已保存，可再次點擊續掃。","warning");
     }
 
-    if(!state.scanPauseRequested) {
+    // A manual pause stops directory traversal, not covers already queued
+    // for files successfully written to D1. Closing the manager stops both.
+    if(!state.scanPauseRequested||state.scanPauseReason==="manual") {
       const coverQueue=await fetchPendingCovers(scope,1);
       batch.coverRemaining=Number(coverQueue.total||0);
       const coverBudget=Math.min(150000,Math.max(0,7500000-(Date.now()-startedAt)));
       if(batch.coverRemaining>0&&coverBudget>10000) {
-        const coverResult=await processPendingCovers(scope,coverBudget,scanState);
+        const coverResult=await processPendingCovers(scope,coverBudget,scanState,{continueAfterManualPause:true});
         batch.coverProcessed=coverResult.processed;
         batch.coverMissing=coverResult.missing;
         batch.coverFailed=coverResult.failed;
         batch.coverRemaining=coverResult.remaining;
-        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\n尚有 "+coverResult.remaining+" 本封面待處理，會自動續做。",false);
+        if(coverResult.remaining)setIndexProgress(indexScanProgressText(scanState,batch,true)+"\\n尚有 "+coverResult.remaining+" 本封面待處理，會自動續做。",false);
       }
+    } else if(state.scanPauseReason==="close") {
+      appendIndexLog("管理視窗已關閉；未處理封面保留在 D1 佇列，之後可按「掃描／續掃」接續。","warning");
     }
     outcome={ok:true,completed:!!scanState.completed&&Number(batch.coverRemaining||0)===0,paused:!!state.scanPauseRequested,coverRemaining:Number(batch.coverRemaining||0)};
     return outcome;
@@ -1324,13 +1333,19 @@ async function retryCurrentLibraryCovers() {
 }
 function pauseIndexScan(reason="manual") {
   if(!state.scanRunning&&!state.scanAllRunning)return;
-  if(!state.scanPauseRequested)state.scanPauseReason=reason==="manual"?"manual":"close";
+  // Closing the manager is stronger than a prior manual directory pause:
+  // finish the in-flight request, then leave the remaining cover queue for later.
+  if(reason==="manual") {
+    if(!state.scanPauseRequested)state.scanPauseReason="manual";
+  } else {
+    state.scanPauseReason="close";
+  }
   state.scanPauseRequested=true;
   const button=$("cloud-scan-pause");
   if(button)button.disabled=true;
   setIndexProgress(reason==="manual"
-    ?"已要求手動暫停；目前目錄頁或封面工作完成並保存 D1 游標後就會停止。"
-    :"已關閉掃描視窗；目前工作完成後會保存 D1 游標。下次開啟後，按「掃描／續掃」手動繼續。");
+    ?"已要求暫停目錄掃描；目前目錄頁保存後，會繼續處理已寫入 D1 的封面佇列。"
+    :"已關閉掃描視窗；目前工作完成後會保存 D1 游標，剩餘封面保留在佇列。下次開啟後按「掃描／續掃」繼續。");
 }
 
 async function checkSession() {
