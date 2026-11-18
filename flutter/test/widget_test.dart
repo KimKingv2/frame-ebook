@@ -1,49 +1,15 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frame_ebook/core/frame_api_client.dart';
-import 'package:frame_ebook/core/frame_api_scope.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_bookshelf_screen.dart';
-import 'package:material_ui/material_ui.dart';
-
-class _FakeFrameApi implements FrameApiClient {
-  @override
-  Future<Map<String, dynamic>> getJson(String path) async =>
-      {'ok': true, 'items': <dynamic>[]};
-
-  @override
-  Future<Map<String, dynamic>> postJson(
-    String path,
-    Map<String, dynamic> body,
-  ) async =>
-      {'ok': true};
-
-  @override
-  Future<Uint8List> getBytes(String path) async => Uint8List(0);
-
-  @override
-  void close() {}
-}
 
 void main() {
-  testWidgets('shows the main-branch FRAME bookshelf empty states', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1100, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await tester.pumpWidget(
-      FrameApiScope(
-        api: _FakeFrameApi(),
-        child: const MaterialApp(home: FrameBookshelfScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('FRAME  READER'), findsOneWidget);
-    expect(find.text('我的書架'), findsOneWidget);
-    expect(find.text('兩種收藏，各自成架'), findsOneWidget);
-    expect(find.text('電子書架尚未收藏作品'), findsOneWidget);
-    expect(find.text('漫畫書架尚未收藏作品'), findsOneWidget);
+  test('Flutter bookshelf uses the exact same-origin Reader homepage', () {
+    final uri = frameBookshelfUri();
+    expect(uri.path, '/');
+    expect(uri.query, isEmpty);
+    expect(uri.fragment, isEmpty);
+    expect(uri.scheme, anyOf('https', 'http'));
+    expect(uri.host, isNotEmpty);
   });
 
   test('groups volumes by provider, library, root and folder, matching main', () {
