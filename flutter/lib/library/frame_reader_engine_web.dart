@@ -40,13 +40,14 @@ class _WebFrameReaderEngine extends StatefulWidget {
 class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
   late final String _viewType;
   late final web.HTMLIFrameElement _iframe;
+  bool _frameLoaded = false;
+  final List<String> _pendingCommands = <String>[];
 
   @override
   void initState() {
     super.initState();
     _viewType = 'frame-ebook-reader-engine-${_nextReaderFrameId++}';
     _iframe = web.HTMLIFrameElement()
-      ..src = widget.uri.toString()
       ..title = widget.title
       ..allow = 'fullscreen; clipboard-read; clipboard-write'
       ..allowFullscreen = true
@@ -58,19 +59,40 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
       ..display = 'block'
       ..backgroundColor = '#12101a';
     _readerFrames[_viewType] = _iframe;
+    _iframe.addEventListener(
+      'load',
+      ((web.Event event) {
+        _frameLoaded = true;
+        final pending = List<String>.from(_pendingCommands);
+        _pendingCommands.clear();
+        for (final command in pending) {
+          _postCommand(command);
+        }
+      }).toJS,
+    );
     widget.handle.attach(_sendCommand);
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
       (int viewId) => _readerFrames[_viewType] ?? web.HTMLDivElement(),
     );
+    _iframe.src = widget.uri.toString();
   }
 
   void _sendCommand(String command) {
     if (command == 'reload') {
+      _frameLoaded = false;
+      _pendingCommands.clear();
       _iframe.src = widget.uri.toString();
       return;
     }
+    if (!_frameLoaded) {
+      _pendingCommands.add(command);
+      return;
+    }
+    _postCommand(command);
+  }
 
+  void _postCommand(String command) {
     final target = _iframe.contentWindow;
     if (target == null) return;
     final message = jsonEncode({
@@ -84,6 +106,8 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
   void didUpdateWidget(covariant _WebFrameReaderEngine oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uri != widget.uri) {
+      _frameLoaded = false;
+      _pendingCommands.clear();
       _iframe.src = widget.uri.toString();
     }
     if (oldWidget.title != widget.title) {
