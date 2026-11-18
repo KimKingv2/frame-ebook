@@ -39,7 +39,46 @@ jobs:
         run: flutter test
       - name: Build Web
         working-directory: flutter
-        run: flutter build web
+        run: flutter build web --base-href /flutter-preview/
+      - name: Trim Flutter Web output for Pages Preview
+        working-directory: flutter
+        run: |
+          python3 - <<'PY'
+          import re
+          import shutil
+          from pathlib import Path
+
+          web = Path("build/web")
+          index = web / "index.html"
+          html = index.read_text(encoding="utf-8")
+          pattern = re.compile(
+              r"_flutter\\.loader\\.load\\(\\{\\s*serviceWorkerSettings:\\s*\\{.*?\\}\\s*\\}\\);",
+              re.DOTALL,
+          )
+          replacement = "_flutter.loader.load({config: {canvasKitVariant: 'full'}});"
+          html, count = pattern.subn(replacement, html, count=1)
+          if count != 1:
+              raise SystemExit("Could not disable Flutter's generated service worker safely.")
+          index.write_text(html, encoding="utf-8")
+
+          service_worker = web / "flutter_service_worker.js"
+          if service_worker.exists():
+              service_worker.unlink()
+          source_map = web / "flutter.js.map"
+          if source_map.exists():
+              source_map.unlink()
+
+          canvaskit = web / "canvaskit"
+          if not (canvaskit / "canvaskit.js").is_file() or not (canvaskit / "canvaskit.wasm").is_file():
+              raise SystemExit("Full CanvasKit runtime files are missing.")
+          for item in canvaskit.iterdir():
+              if item.name not in {"canvaskit.js", "canvaskit.wasm"}:
+                  if item.is_dir():
+                      shutil.rmtree(item)
+                  else:
+                      item.unlink()
+          print("Kept the full CanvasKit runtime only; disabled persistent Flutter service-worker caching.")
+          PY
       - name: Upload Web preview artifact
         uses: actions/upload-artifact@v4
         with:
@@ -105,3 +144,56 @@ jobs:
           path: flutter/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+  deploy-preview:
+    name: Publish Flutter Web to Cloudflare Preview
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/flutter-three-platform'
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Flutter Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frame-ebook-flutter-web
+          path: flutter-web-preview
+
+      - name: Checkout Cloudflare Preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: cf-preview
+          path: preview
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add Flutter Web under /flutter-preview/
+        run: |
+          rm -rf preview/pages/flutter-preview
+          mkdir -p preview/pages/flutter-preview
+          cp -a flutter-web-preview/. preview/pages/flutter-preview/
+
+          python3 - <<'PY'
+          from pathlib import Path
+          headers = Path("preview/pages/_headers")
+          content = headers.read_text(encoding="utf-8")
+          old = "script-src 'self';"
+          new = "script-src 'self' 'wasm-unsafe-eval';"
+          if old in content:
+              content = content.replace(old, new, 1)
+          elif new not in content:
+              raise SystemExit("Could not locate the Preview CSP script-src directive.")
+          headers.write_text(content, encoding="utf-8")
+          PY
+
+      - name: Commit Flutter Web Preview
+        working-directory: preview
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/flutter-preview pages/_headers
+          if git diff --cached --quiet; then
+            echo "Flutter Web Preview is already up to date."
+            exit 0
+          fi
+          git commit -m "Deploy Flutter Web Preview"
+          git push origin HEAD:cf-preview
