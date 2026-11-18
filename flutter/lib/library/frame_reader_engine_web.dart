@@ -5,7 +5,7 @@ import 'dart:ui_web' as ui_web;
 import 'package:material_ui/material_ui.dart';
 import 'package:web/web.dart' as web;
 
-import 'frame_reader_engine.dart';
+import 'frame_reader_engine_handle.dart';
 
 final Map<String, web.HTMLIFrameElement> _readerFrames =
     <String, web.HTMLIFrameElement>{};
