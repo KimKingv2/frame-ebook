@@ -1155,20 +1155,151 @@
       flushLibraryProgress();
     }, 5000);
   }
+  function setReaderProgressMeter(name, percent) {
+    var value = Math.max(0, Math.min(100, Number(percent) || 0));
+    var bar = el(name + '-bar');
+    var track = el(name + '-track');
+    setText(name + '-percent', Math.round(value) + '%');
+    if (bar) bar.style.width = value + '%';
+    if (track) track.setAttribute('aria-valuenow', String(Math.round(value)));
+  }
+
+  function textOffsetBeforeElement(doc, element) {
+    if (!doc || !element || !element.nodeType) return 0;
+    var root = doc.body || doc.documentElement;
+    if (!root || element === root) return 0;
+    try {
+      var range = doc.createRange();
+      range.selectNodeContents(root);
+      range.setEndBefore(element);
+      return range.toString().length;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function textOffsetAtRange(doc, range) {
+    if (!doc || !range || !range.startContainer) return null;
+    var root = doc.body || doc.documentElement;
+    if (!root) return null;
+    try {
+      var position = doc.createRange();
+      position.selectNodeContents(root);
+      position.setEnd(range.startContainer, range.startOffset);
+      return position.toString().length;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function chapterProgressFromTOC(detail) {
+    var book = view && view.book;
+    var item = detail && detail.tocItem;
+    var index = Number(detail && detail.index);
+    var range = detail && detail.range;
+    if (!book || !item || !item.href || !range || !Number.isInteger(index) ||
+        typeof book.resolveHref !== 'function' || !Array.isArray(book.sections)) return null;
+
+    var doc = range.startContainer && range.startContainer.ownerDocument;
+    if (!doc) return null;
+    var items = flattenTOC(book.toc || []);
+    var href = String(item.href);
+    var itemIndex = items.findIndex(function (entry) { return entry.href === href; });
+    if (itemIndex < 0) return null;
+    var nextItem = items.slice(itemIndex + 1).find(function (entry) {
+      return entry.href && entry.href !== href;
+    });
+
+    var start = book.resolveHref(href);
+    var end = nextItem ? book.resolveHref(nextItem.href) : null;
+    if (!start || !Number.isInteger(start.index) || start.index > index) return null;
+
+    var sections = book.sections;
+    var weights = sections.map(function (section) {
+      return section && section.linear !== 'no' && Number(section.size) > 0
+        ? Number(section.size) : 0;
+    });
+    var totalSize = weights.reduce(function (sum, size) { return sum + size; }, 0);
+    if (!(totalSize > 0) || !weights[index]) return null;
+
+    var prefix = [0];
+    weights.forEach(function (size) { prefix.push(prefix[prefix.length - 1] + size); });
+    var root = doc.body || doc.documentElement;
+    var textLength = root && root.textContent ? root.textContent.length : 0;
+    if (!textLength) return null;
+
+    var currentOffset = textOffsetAtRange(doc, range);
+    if (currentOffset == null) return null;
+    var currentLocal = Math.max(0, Math.min(1, currentOffset / textLength));
+
+    var startLocal = 0;
+    if (start.index === index) {
+      var startAnchor = typeof start.anchor === 'function' ? start.anchor(doc) : null;
+      if (startAnchor && startAnchor.nodeType) {
+        startLocal = Math.max(0, Math.min(1, textOffsetBeforeElement(doc, startAnchor) / textLength));
+      }
+    }
+
+    var endIndex = end && Number.isInteger(end.index) ? end.index : sections.length;
+    var endLocal = 0;
+    if (endIndex === index) {
+      var endAnchor = typeof end.anchor === 'function' ? end.anchor(doc) : null;
+      if (endAnchor && endAnchor.nodeType) {
+        endLocal = Math.max(0, Math.min(1, textOffsetBeforeElement(doc, endAnchor) / textLength));
+      }
+    }
+    if (endIndex < index || endIndex < start.index || endIndex > sections.length) return null;
+
+    var startPosition = prefix[start.index] + weights[start.index] * startLocal;
+    var endPosition = endIndex === sections.length
+      ? totalSize
+      : prefix[endIndex] + weights[endIndex] * endLocal;
+    var currentPosition = prefix[index] + weights[index] * currentLocal;
+    if (!(endPosition > startPosition)) return null;
+    return Math.max(0, Math.min(100,
+      ((currentPosition - startPosition) / (endPosition - startPosition)) * 100));
+  }
+
   function updateLocation(detail) {
     if (!detail || restoring) return;
     var progressPatch = {};
+    var book = view && view.book;
+    var bookPercent = null;
+
     if (typeof detail.fraction === 'number' && isFinite(detail.fraction)) {
-      var percent = Math.max(0, Math.min(100, Math.round(detail.fraction * 100)));
-      setText('progress-percent', percent + '%');
-      var section = detail.section;
-      var label = section && section.total
-        ? '章節 ' + (section.current + 1) + ' / ' + section.total
-        : (typeof detail.index === 'number' ? '第 ' + (detail.index + 1) + ' 頁' : '閱讀位置已更新');
-      setText('progress-detail', label);
-      progressPatch.percent = percent;
-      progressPatch.label = label;
+      bookPercent = Math.max(0, Math.min(100, detail.fraction * 100));
+    } else if (book && Array.isArray(book.sections) && Number.isInteger(detail.index) && book.sections.length) {
+      bookPercent = Math.max(0, Math.min(100, ((detail.index + 1) / book.sections.length) * 100));
     }
+
+    var tocItem = detail.tocItem;
+    var chapterName = tocItem && tocItem.label
+      ? titleText(tocItem.label)
+      : (Number.isInteger(detail.index) ? '第 ' + (detail.index + 1) + ' 節' : '閱讀位置已更新');
+
+    if (bookPercent != null) {
+      var roundedBookPercent = Math.round(bookPercent);
+      setText('progress-percent', '全書 ' + roundedBookPercent + '%');
+      setReaderProgressMeter('reader-book-progress', bookPercent);
+      progressPatch.percent = roundedBookPercent;
+      progressPatch.label = chapterName;
+    }
+
+    var chapterPercent = chapterProgressFromTOC(detail);
+    var chapterLabel = tocItem && tocItem.href ? '本章進度' : '本節進度';
+    if (chapterPercent == null && typeof detail.sectionFraction === 'number' && isFinite(detail.sectionFraction)) {
+      chapterPercent = Math.max(0, Math.min(100, detail.sectionFraction * 100));
+    }
+    var chapterRow = el('reader-chapter-progress-row');
+    if (chapterPercent != null) {
+      if (chapterRow) chapterRow.hidden = false;
+      setText('reader-chapter-progress-label', chapterLabel);
+      setReaderProgressMeter('reader-chapter-progress', chapterPercent);
+    } else if (chapterRow) {
+      chapterRow.hidden = true;
+    }
+    setText('progress-detail', chapterName);
+
     if (detail.cfi) {
       progressPatch.cfi = detail.cfi;
       setText('reader-status', '閱讀位置正在保存至雲端 D1……');
@@ -1178,9 +1309,9 @@
       cfi: detail.cfi || (view && view.isFixedLayout && Number.isInteger(detail.index)
         ? 'frame-fixed:' + detail.index : ''),
       index: Number.isInteger(detail.index) ? detail.index : null,
-      percent: typeof detail.fraction === 'number' ? Math.round(detail.fraction * 100) : 0,
-      label: (progressPatch.label || '閱讀位置') + (typeof detail.fraction === 'number'
-        ? ' · ' + Math.round(detail.fraction * 100) + '%' : '')
+      percent: bookPercent == null ? 0 : Math.round(bookPercent),
+      label: (progressPatch.label || '閱讀位置') + (bookPercent == null
+        ? '' : ' · ' + Math.round(bookPercent) + '%')
     };
     syncBookmarkButton();
     if (Object.keys(progressPatch).length) queueLibraryProgress(progressPatch);

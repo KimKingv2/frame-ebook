@@ -3958,3 +3958,119 @@ html.flutter-reader-embed body.reader-immersive-open .reading-workspace {
   max-height:none !important;
   z-index:2147483647 !important;
 }
+
+
+/* Compact two-level reading progress panel. */
+.reader-sr-only {
+  position:absolute !important;
+  width:1px !important;
+  height:1px !important;
+  padding:0 !important;
+  margin:-1px !important;
+  overflow:hidden !important;
+  clip:rect(0,0,0,0) !important;
+  white-space:nowrap !important;
+  border:0 !important;
+}
+.book-progress {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  max-width:min(38vw,300px);
+}
+.book-progress strong {
+  max-width:100%;
+  overflow:hidden;
+  color:#c7b5fb;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:500;
+  line-height:1.45;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.reader-controls {
+  display:grid;
+  grid-template-columns:minmax(116px,1fr) minmax(220px,300px) minmax(116px,1fr);
+  align-items:center;
+  gap:12px;
+}
+.reader-controls > #prev-page { justify-self:start; }
+.reader-controls > #next-page { justify-self:end; }
+.reader-progress-panel {
+  display:grid;
+  width:100%;
+  min-width:0;
+  gap:8px;
+  padding:0 10px;
+}
+.reader-progress-row {
+  display:grid;
+  min-width:0;
+  gap:4px;
+}
+.reader-progress-row[hidden] { display:none !important; }
+.reader-progress-meta {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  color:#a69bb6;
+  font-size:9px;
+  line-height:1.25;
+  letter-spacing:.2px;
+}
+.reader-progress-meta strong {
+  flex:none;
+  color:#d5c6f7;
+  font-size:9px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+}
+.reader-progress-track {
+  width:100%;
+  height:4px;
+  overflow:hidden;
+  border-radius:99px;
+  background:rgba(171,151,202,.14);
+}
+.reader-progress-track > span {
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#8b6bd0,#c2a7ff);
+  transition:width .22s ease;
+}
+.reader-progress-row--book .reader-progress-track { height:3px; }
+.reader-progress-row--book .reader-progress-track > span {
+  background:linear-gradient(90deg,#665187,#8d73b8);
+}
+@media(max-width:720px) {
+  .reader-controls {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-rows:auto auto;
+    column-gap:8px;
+    row-gap:10px;
+  }
+  .reader-controls > #prev-page {
+    grid-column:1;
+    grid-row:1;
+    justify-self:stretch;
+  }
+  .reader-controls > #next-page {
+    grid-column:2;
+    grid-row:1;
+    justify-self:stretch;
+  }
+  .reader-progress-panel {
+    grid-column:1 / -1;
+    grid-row:2;
+    max-width:none;
+    padding:0 8px;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .reader-progress-track > span { transition:none; }
+}
