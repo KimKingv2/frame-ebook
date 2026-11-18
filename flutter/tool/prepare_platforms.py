@@ -78,8 +78,17 @@ html, body { margin: 0; min-height: 100%; background: #12101a; }
 """
         (path.parent / "frame-boot.js").write_text(boot_script, encoding="utf-8")
         boot = """<div id="frame-boot-message">FRAME Ebook 正在啟動……</div>
-<script src="frame-boot.js" defer></script>"""
+<script src="frame-boot.js"></script>"""
         html = html[:body_start] + "\n" + boot + html[body_start:]
+        path.write_text(html, encoding="utf-8")
+    else:
+        # Keep the first-frame listener synchronous. Flutter's async bootstrap
+        # can otherwise render before a deferred listener is installed, leaving
+        # the static startup overlay visible forever.
+        html = html.replace(
+            '<script src="frame-boot.js" defer></script>',
+            '<script src="frame-boot.js"></script>',
+        )
         path.write_text(html, encoding="utf-8")
 
 
