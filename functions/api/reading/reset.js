@@ -55,6 +55,7 @@ export async function onRequestPost({ request, env }) {
   let identity;
   try {
     identity = await getAccessIdentity(request, env);
+    if (!identity?.userId) throw new Error("Cloudflare Access 使用者識別資訊無效。");
   } catch (error) {
     return json({
       error: error?.message || "Cloudflare Access 身分驗證失敗。"
