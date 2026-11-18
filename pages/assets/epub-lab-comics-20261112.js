@@ -1686,6 +1686,56 @@
     setText('reading-live-label', detail.stopped ? '本次閱讀已暫停' : '正在記錄本次閱讀');
   });
 
+  // The Flutter Web host owns the outer toolbar and sends narrowly scoped
+  // commands to this same-origin iframe. Foliate remains the reader engine.
+  var flutterReaderEmbed = new URLSearchParams(window.location.search).get('embed') === 'flutter';
+  if (flutterReaderEmbed && window.parent !== window) {
+    window.addEventListener('message', function (event) {
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      var message = event.data;
+      if (typeof message === 'string') {
+        try { message = JSON.parse(message); } catch (error) { return; }
+      }
+      if (!message || message.channel !== 'frame-ebook-reader') return;
+      switch (message.command) {
+        case 'toggle-sidebar':
+          if (el('reader-sidebar-toggle')) el('reader-sidebar-toggle').click();
+          break;
+        case 'toggle-appearance':
+          if (el('reader-appearance-toggle')) el('reader-appearance-toggle').click();
+          break;
+        case 'toggle-bookmark':
+          toggleCurrentBookmark().catch(function (error) {
+            setText('reader-status', '切換書籤失敗：' + (error.message || String(error)));
+          });
+          break;
+        case 'previous-page':
+          turnReaderPage(-1);
+          break;
+        case 'next-page':
+          turnReaderPage(1);
+          break;
+        case 'toggle-fullscreen':
+          toggleReaderFullscreen();
+          break;
+        case 'show-toc':
+        case 'show-notes':
+        case 'show-bookmarks':
+          if (el('reader-sidebar-toggle') &&
+              el('reader-sidebar') &&
+              !el('reader-sidebar').classList.contains('is-open') &&
+              window.matchMedia('(max-width: 820px)').matches) {
+            el('reader-sidebar-toggle').click();
+          }
+          var paneName = message.command === 'show-notes' ? 'notes' :
+            (message.command === 'show-bookmarks' ? 'bookmarks' : 'toc');
+          var paneButton = document.querySelector('[data-reader-pane="' + paneName + '"]');
+          if (paneButton) paneButton.click();
+          break;
+      }
+    });
+  }
+
   bindReaderRoomControls();
   loadAppearance({});
   bindAnnotationControls();
