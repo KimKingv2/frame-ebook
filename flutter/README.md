@@ -1,25 +1,32 @@
-# FRAME Ebook Flutter client
+# FRAME Ebook Flutter
 
-The shared Flutter client targets Web, macOS and Android. It is isolated from the existing Cloudflare Pages output in the sibling pages directory.
+This is the Flutter client being built to reproduce the existing application in the repository's main branch across Web, macOS and Android.
 
-On the first setup, generate platform folders from the Flutter SDK in this directory with: flutter create --platforms=web,macos,android --org com.kimkingv2 --project-name frame_ebook .
+The source of truth for product behaviour and visual parity is the current main branch:
 
-## Current milestone: 302 / Range Lab
+- Home bookshelf: pages/index.html and pages/assets/library.js
+- OpenList connection, browsing and scanning: pages/cloud/index.html and pages/assets/cloud-library.js
+- Book metadata and bookshelf data: pages/assets/library-store.js and functions/api/reading/*
+- EPUB / CBZ Reading Room: pages/epub-lab/index.html and pages/assets/epub-lab-comics-20261112.js
+- Reading-time tracking and statistics: pages/assets/reading-tracker.js and pages/assets/reading-stats.js
 
-The first screen is a transport proof of concept. It sends GET with Range bytes=0-1023, accepts optional HTTP Basic Authentication in process memory only, and retains at most 4 KB of response bytes.
-
-The native transport manually handles 301, 302, 303, 307 and 308. It resolves relative Location values, limits the redirect chain, blocks HTTPS-to-HTTP downgrade, and strips Authorization, Cookie and Proxy-Authorization on cross-origin hops.
-
-The Web transport uses the browser Fetch API through package:http BrowserClient. Browsers follow redirects themselves. A cross-origin final response must pass CORS. Expose Content-Range and Accept-Ranges if Flutter Web needs to inspect those response headers.
+The current Flutter screen is still a transport proof-of-concept. It is not the finished product and does not yet have feature parity. Do not remove or change the existing Pages application while porting the interface and features.
 
 ## Run
 
-From this directory, run flutter pub get, then flutter run -d macos, flutter run -d chrome, or flutter run -d followed by the Android device ID.
+From this directory:
 
-Use a file URL, not a WebDAV directory URL. The test does not persist the URL, credentials, response body or downloaded archive.
+- flutter pub get
+- flutter run -d macos
+- flutter run -d chrome
+- flutter run -d <Android device ID>
 
-Before testing a device build, run flutter analyze and flutter test. Build targets are flutter build web, flutter build macos and flutter build apk.
+## Build
 
-## Deployment boundary
+- flutter analyze
+- flutter test
+- flutter build web
+- flutter build macos
+- flutter build apk
 
-Do not change the existing Cloudflare Pages build output from pages during this milestone. The current Web application must remain available as the transition and reference version. Flutter Web will be deployed to a separate preview target until feature parity and CORS tests pass.
+The GitHub Actions workflow generates platform scaffolding for CI. The Flutter Web output is not wired to the production Cloudflare Pages deployment.

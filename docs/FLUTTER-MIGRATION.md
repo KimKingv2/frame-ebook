@@ -1,129 +1,67 @@
-# FRAME Ebook: Flutter three-platform migration
+# FRAME Ebook Flutter migration
 
-Status: shared transport and WebDAV connection foundation implemented; reader UI and catalog migration remain in progress.
+Status: Flutter project and transport proof-of-concept exist. Full feature migration has not started. The feature source of truth is the repository main branch at migration start, commit 650d4fac99dded2e2c75fad9921a7ae7597cf90c.
 
-## Product decision
+## Non-negotiable parity rule
 
-The final client target is one Flutter codebase for Web, macOS and Android.
+Reproduce the complete main-branch application across one Flutter codebase targeting Web, macOS and Android. Do not simplify or redesign established user flows, remove controls, replace data models, or add features taken only from the frozen Tauri development branch. When a behaviour is unclear, inspect the main-branch source and preserve it.
 
-The existing Web application remains online during the transition and is the feature and UI reference. It must not be deleted or replaced until the Flutter Web release has passed parity checks. The existing Tauri macOS implementation is frozen as a reference and is not the long-term native client.
+The existing main-branch Web application remains deployed and unchanged during migration. The Pages output stays in pages/. Do not point production Pages at Flutter build output until all three targets pass the same feature acceptance checklist and the user explicitly approves cutover.
 
-The Flutter project lives in /flutter; the Cloudflare Pages output remains /pages for now. Do not point the production Pages deployment at flutter/build/web until a separate preview deployment has passed the acceptance checklist.
+The detailed feature inventory and acceptance checklist are in docs/MAIN-PARITY-INVENTORY.md.
 
-## Existing services to preserve
+## Existing main-branch backend to preserve
 
-The rewrite is client-side. Keep these server resources and contracts unless a documented migration is required:
+Reuse the existing Cloudflare Pages Functions, D1 database, R2 cover storage, Cloudflare Access boundary and current API contracts. Do not add Tauri-only pairing/sync endpoints or new database tables as part of a UI port.
 
-- Cloudflare Pages Functions in /functions
-- D1 schema and migrations in /migrations
-- Private R2 cover storage
-- Shared MEDIA_AUTH_TOKEN_CACHE KV binding
-- Cloudflare Access identity boundary
-- Existing per-user bookshelf, reading state, reading preferences, annotations, reading events and statistics APIs
-- Device pairing and Bearer-token device sync APIs
+Existing API groups:
 
-The current device pairing and sync API is separate from the Access identity used to approve a pairing. Native clients create a pairing request, the user approves it in the Access-protected Web flow, and the client redeems the approved pairing to obtain a device token. Device sync requests then use the device Bearer token. Never put the device token, WebDAV password or provider JWT into source control or diagnostic logs.
+- Authentication/session readiness: /api/auth/session
+- Cloud library source and files: /api/cloud/books, /api/cloud/file, /api/cloud/covers, /api/cloud/scan-list
+- Incremental cloud index: /api/cloud/index/state, /api/cloud/index/entries, /api/cloud/index/metadata, /api/cloud/index/complete
+- Bangumi comic metadata: /api/comics/bangumi/search, /api/comics/bangumi/link
+- User bookshelf and reading data: /api/reading/bookshelf, /api/reading/preferences, /api/reading/state, /api/reading/annotations, /api/reading/events, /api/reading/stats, /api/reading/link
 
-## File source model
+Do not recreate or reset D1, change the migrations, or move original archives to Cloudflare storage. Preserve Cloudflare Access user isolation and the existing stable cloud book identifiers.
 
-Use one WebDAV connection profile with two independent library roots:
+## Reader engine
 
-1. Books root: EPUB.
-2. Comics root: CBZ and fixed-layout EPUB.
+The existing Reading Room uses the vendored Foliate.js engine for EPUB and fixed-layout/CBZ content, with JSZip/ZIP readers and custom reading controls. The first Flutter implementation should retain this engine through a carefully designed platform bridge unless parity tests demonstrate an equivalent implementation. The Web target, macOS and Android must preserve EPUB CFI progress and fixed-layout page-index progress.
 
-The profile is shared by both roots. Do not create separate book and comic connections.
-
-### Credential handling
-
-- macOS stores the WebDAV password in Keychain.
-- Android stores it through the platform secure-storage implementation backed by Android Keystore encryption.
-- Flutter Web keeps the password in memory for the current page session. The user must reconnect after a reload; it is not written to browser storage by this app.
-- The base URL, username and two root paths are non-secret preferences. They do not include a password, token or authorization header.
-- Never send WebDAV credentials to D1 or KV.
-
-### macOS and Android
-
-Native clients connect directly to WebDAV. The shared client supports PROPFIND directory listings, HEAD metadata, bounded Range reads and an in-memory EPUB read path. It follows 301, 302, 303, 307 and 308 for file requests, resolves relative Location values, sends credentials only on the configured origin's initial request, rejects redirect loops and HTTPS downgrade, validates 206 and Content-Range, and limits each comic Range request to 1 MiB.
-
-Original EPUB / CBZ archives are never written to a temporary file. EPUB bytes are retained in memory for the active reading session. CBZ pages must be read through bounded Range requests and a bounded RAM page cache.
-
-### Web
-
-Flutter Web uses the browser Fetch API. The browser manages redirects and the final destination must pass browser CORS checks. A remote HTTPS Flutter Web page cannot assume it can connect to an arbitrary HTTP LAN WebDAV server: mixed-content, CORS and local-network access restrictions still apply.
-
-## Existing Pages services to preserve
-
-- Cloudflare Pages Functions in /functions
-- D1 frame-reader-db
-- Private R2 cover storage
-- Shared MEDIA_AUTH_TOKEN_CACHE KV binding
-- Cloudflare Access identity boundary
-- Existing reading APIs under /api/reading/*
-- Existing device pairing and Bearer-token device sync APIs
-
-The existing /api/cloud/file route is for the three server-configured Alist/OpenList providers. It does not handle the direct WebDAV profile.
-
-## Memory and storage rules
-
-- Original EPUB / CBZ bytes stay in memory only while needed.
-- CBZ pages use bounded RAM LRU caching; evicted pages are released.
-- Do not persist full archives, expanded ZIP directories or page images to the internal SSD.
-- A small local preference store may hold non-secret connection settings. It must not hold an original archive or extracted page images.
-- D1 remains authoritative for the existing Cloudflare-backed Web reading data.
-- WebDAV credentials remain device-local and are never synced through D1.
-
-## Reader strategy
-
-- Keep Foliate.js as the EPUB rendering engine in a Flutter WebView during the first migration phase if it provides the closest compatibility with the established Web reader.
-- Keep CBZ page presentation native in Flutter where practical; ZIP reads should be range-backed and bounded.
-- Preserve the current EPUB CFI and comic page progress format so Web and native clients can continue to sync where the source identity is compatible.
-- Reproduce the current bookshelf grouping, cover aspect ratios, folder navigation, reading controls, appearance settings, bookmarks, annotations, reading statistics and daily goal before retiring the reference Web UI.
+Original EPUB/CBZ archives are read-only source files. Do not create full-archive temporary files or persist archive contents/page images to the internal SSD. Keep active archive bytes in memory and use bounded range/page caching where the source and engine permit it. A transport success is not proof that memory-only behaviour has been achieved; inspect and test actual filesystem writes.
 
 ## Milestones
 
-### F0 — Transport proof of concept
+### F0 — Flutter engineering baseline
+- [x] Isolated Flutter project and three-target CI.
+- [x] Native HTTP 302 / Range proof-of-concept.
+- [x] Browser-managed HTTP redirect / Range proof-of-concept.
+- [ ] Add regression tests for all existing main-branch API and data contracts.
 
-- [x] Create an isolated Flutter project directory.
-- [x] Implement native redirect-aware HTTP range probe.
-- [x] Implement browser-managed redirect and range probe.
-- [x] Generate platform scaffolding with Flutter SDK in CI.
-- [ ] Run a real 302 to signed URL to 206 test on macOS.
-- [ ] Run the same test on Android.
-- [ ] Run the browser CORS and exposed-header test.
-- [ ] Verify no archive is written to disk.
+### F1 — Exact application shell
+- [ ] Reproduce the main bookshelf layout, theme, typography, responsive breakpoints and navigation.
+- [ ] Reproduce recent reading, folder grouping, search, sorting, grid/list modes and book detail dialog.
+- [ ] Reproduce the OpenList connection and library manager flows without changing backend contracts.
 
-### F1 — Shared app foundation and WebDAV
+### F2 — Library and metadata parity
+- [ ] Reproduce provider selection, local OpenList login and separate books/comics roots.
+- [ ] Reproduce browsing, path navigation, filtering, pagination, scan progress, pause/resume, logs and cover retry.
+- [ ] Preserve EPUB OPF metadata, cover extraction, ComicInfo/Bangumi metadata, folder/volume grouping and metadata editing.
 
-- [x] Add one WebDAV profile model with separate books and comics roots.
-- [x] Add native secure-secret storage and Web session-only secret storage.
-- [x] Add shared PROPFIND, HEAD, Range and in-memory EPUB transport.
-- [ ] Add connection/profile UI and folder browser.
-- [ ] Verify with the user's actual OpenList WebDAV server.
+### F3 — Reader parity
+- [ ] Integrate the existing Foliate.js EPUB and fixed-layout/CBZ engine.
+- [ ] Reproduce the full TOC, footnote, page navigation, bookmark, highlight, underline and note flows.
+- [ ] Reproduce all text appearance, layout, comic layout, theme, backdrop and fullscreen controls.
+- [ ] Preserve progress restoration and save lifecycle.
 
-### F2 — Library and metadata
-
-- [ ] Folder-first bookshelf matching the existing Web UI.
-- [ ] Recursive source scanning and resumable progress.
-- [ ] EPUB OPF and CBZ ComicInfo.xml metadata extraction.
-- [ ] Cover extraction and bounded thumbnail cache.
-
-### F3 — Reading engines
-
-- [ ] EPUB rendering bridge and CFI navigation.
-- [ ] Native CBZ reader with page-level Range access and RAM LRU.
-- [ ] Appearance controls and reading-session lifecycle.
-
-### F4 — Data parity
-
-- [ ] Reading progress and preferences.
-- [ ] Bookmarks, highlights and notes.
-- [ ] Reading history, statistics and daily goal.
-- [ ] Cloud device pairing, incremental sync and revoke handling.
+### F4 — Personal reading data parity
+- [ ] Preserve reading preferences, bookmarks, annotations and metadata through existing APIs.
+- [ ] Preserve foreground/idle reading-time tracking, daily goals, history, streaks and statistics.
+- [ ] Preserve JSON and CSV export.
 
 ### F5 — Three-platform release
-
-- [ ] Flutter Web preview on a separate Pages target.
-- [ ] macOS arm64 build and install test.
-- [ ] Android APK install test on target devices.
-- [ ] Full feature parity review against the old Web app.
-- [ ] Cut over Web only after explicit acceptance.
+- [ ] Flutter Web preview separate from the existing production Pages app.
+- [ ] macOS arm64 build, install and full reading tests.
+- [ ] Android APK install and full reading tests on the target devices.
+- [ ] Run the complete main-parity acceptance checklist on each platform.
+- [ ] Only cut over Web after explicit user acceptance.
