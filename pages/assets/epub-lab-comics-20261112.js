@@ -1740,7 +1740,7 @@
           turnReaderPage(1);
           break;
         case 'toggle-fullscreen':
-          toggleReaderFullscreen();
+          toggleReaderImmersive();
           break;
         case 'show-toc':
         case 'show-notes':
@@ -1813,12 +1813,73 @@
     button.setAttribute('aria-label', active ? '退出沉浸式閱讀' : '進入沉浸式閱讀');
     button.title = active ? '退出沉浸式閱讀' : '進入沉浸式閱讀';
   }
+  var readerEmbedFrameStyleSnapshot = null;
+  var readerEmbedParentStylesSnapshot = null;
+
+  function setReaderEmbedFrameImmersive(active) {
+    if (!flutterReaderEmbed || window.parent === window) return;
+    var frame = window.frameElement;
+    if (!frame || !frame.style) return;
+
+    if (active) {
+      if (!readerEmbedFrameStyleSnapshot) {
+        readerEmbedFrameStyleSnapshot = frame.getAttribute('style');
+        readerEmbedParentStylesSnapshot = {
+          html: window.parent.document.documentElement.getAttribute('style'),
+          body: window.parent.document.body
+            ? window.parent.document.body.getAttribute('style')
+            : null
+        };
+      }
+
+      var frameStyle = frame.style;
+      frameStyle.setProperty('position', 'fixed', 'important');
+      frameStyle.setProperty('inset', '0', 'important');
+      frameStyle.setProperty('top', '0', 'important');
+      frameStyle.setProperty('right', '0', 'important');
+      frameStyle.setProperty('bottom', '0', 'important');
+      frameStyle.setProperty('left', '0', 'important');
+      frameStyle.setProperty('width', '100vw', 'important');
+      frameStyle.setProperty('height', '100vh', 'important');
+      frameStyle.setProperty('height', '100dvh', 'important');
+      frameStyle.setProperty('max-width', 'none', 'important');
+      frameStyle.setProperty('max-height', 'none', 'important');
+      frameStyle.setProperty('margin', '0', 'important');
+      frameStyle.setProperty('z-index', '2147483647', 'important');
+      frameStyle.setProperty('background', '#12101a', 'important');
+      frameStyle.setProperty('transform', 'none', 'important');
+      window.parent.document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+      if (window.parent.document.body) {
+        window.parent.document.body.style.setProperty('overflow', 'hidden', 'important');
+      }
+      return;
+    }
+
+    if (readerEmbedFrameStyleSnapshot === null) return;
+    if (readerEmbedFrameStyleSnapshot === null) frame.removeAttribute('style');
+    else frame.setAttribute('style', readerEmbedFrameStyleSnapshot);
+
+    if (readerEmbedParentStylesSnapshot) {
+      var parentHtml = window.parent.document.documentElement;
+      var parentBody = window.parent.document.body;
+      if (readerEmbedParentStylesSnapshot.html === null) parentHtml.removeAttribute('style');
+      else parentHtml.setAttribute('style', readerEmbedParentStylesSnapshot.html);
+      if (parentBody) {
+        if (readerEmbedParentStylesSnapshot.body === null) parentBody.removeAttribute('style');
+        else parentBody.setAttribute('style', readerEmbedParentStylesSnapshot.body);
+      }
+    }
+    readerEmbedFrameStyleSnapshot = null;
+    readerEmbedParentStylesSnapshot = null;
+  }
+
   function toggleReaderImmersive() {
     var workspace = el('reading-workspace');
     if (!workspace) return;
     var active = !workspace.classList.contains('reader-immersive-mode');
     workspace.classList.toggle('reader-immersive-mode', active);
     document.body.classList.toggle('reader-immersive-open', active);
+    setReaderEmbedFrameImmersive(active);
     updateReaderFullscreenButton();
     scheduleReaderLayoutRefresh();
   }
