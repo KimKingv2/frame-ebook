@@ -152,8 +152,8 @@ class FrameShelfEntry {
 
   bool get isFolder => members.isNotEmpty && first.folderPath.isNotEmpty;
   bool get isComic => first.isComic;
-  int get lastOpenedAt =>
-      members.fold<int>(0, (value, item) => item.lastOpenedAt > value ? item.lastOpenedAt : value);
+  int get lastOpenedAt => members.fold<int>(
+      0, (value, item) => item.lastOpenedAt > value ? item.lastOpenedAt : value);
   int get volumeCount => members.length;
   int get totalSize => members.fold<int>(0, (sum, item) => sum + item.size);
   int get progressPercent => first.progressPercent;
@@ -168,8 +168,8 @@ class FrameShelfEntry {
 
   String get title {
     if (!isFolder) return first.title.isNotEmpty ? first.title : first.fileName;
-    final bangumiTitle = first.comicMetadata['nameCn'] ??
-        first.comicMetadata['name'];
+    final bangumiTitle =
+        first.comicMetadata['nameCn'] ?? first.comicMetadata['name'];
     if (bangumiTitle != null && bangumiTitle.toString().isNotEmpty) {
       return bangumiTitle.toString();
     }
@@ -191,8 +191,9 @@ class FrameShelfEntry {
             return tag.toString();
           }).join(' ')
         : '';
-    final membersText =
-        members.map((item) => '${item.fileName} ${item.title} ${item.format}').join(' ');
+    final membersText = members
+        .map((item) => '${item.fileName} ${item.title} ${item.format}')
+        .join(' ');
     return [
       title,
       author,
@@ -211,7 +212,7 @@ class FrameShelfEntry {
   List<FrameBook> sortedMembers() {
     final result = [...members];
     result.sort((a, b) {
-      final byName = a.fileName.toLowerCase().compareTo(b.fileName.toLowerCase());
+      final byName = compareFrameFileNames(a.fileName, b.fileName);
       if (byName != 0) return byName;
       return a.path.compareTo(b.path);
     });
@@ -228,6 +229,32 @@ class FrameShelfEntry {
       .toList();
 }
 
+int compareFrameFileNames(String left, String right) {
+  final leftTokens = RegExp(r'\d+|\D+')
+      .allMatches(left.toLowerCase())
+      .map((match) => match.group(0)!)
+      .toList();
+  final rightTokens = RegExp(r'\d+|\D+')
+      .allMatches(right.toLowerCase())
+      .map((match) => match.group(0)!)
+      .toList();
+  final count = leftTokens.length < rightTokens.length
+      ? leftTokens.length
+      : rightTokens.length;
+  for (var index = 0; index < count; index++) {
+    final a = leftTokens[index];
+    final b = rightTokens[index];
+    final aNumber = int.tryParse(a);
+    final bNumber = int.tryParse(b);
+    final compared = aNumber != null && bNumber != null
+        ? aNumber.compareTo(bNumber)
+        : a.compareTo(b);
+    if (compared != 0) return compared;
+  }
+  final byTokenCount = leftTokens.length.compareTo(rightTokens.length);
+  return byTokenCount != 0 ? byTokenCount : left.compareTo(right);
+}
+
 List<FrameShelfEntry> groupFrameBooks(List<FrameBook> books) {
   final groups = <String, FrameShelfEntry>{};
   final output = <FrameShelfEntry>[];
@@ -236,7 +263,12 @@ List<FrameShelfEntry> groupFrameBooks(List<FrameBook> books) {
       output.add(FrameShelfEntry(book));
       continue;
     }
-    final key = [book.provider, book.library, book.rootPath, book.folderPath].join('\n');
+    final key = [
+      book.provider,
+      book.library,
+      book.rootPath,
+      book.folderPath
+    ].join('\n');
     final group = groups[key];
     if (group == null) {
       final created = FrameShelfEntry(book);
