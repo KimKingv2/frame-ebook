@@ -681,3 +681,68 @@
     font-size:10px;
   }
 }
+
+/* Full project data reset, deliberately separated from ordinary connection controls. */
+.cloud-danger-zone {
+  display:grid;
+  gap:12px;
+  margin-top:20px;
+  padding:16px;
+  border:1px solid rgba(210,95,112,.38);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(74,24,38,.24),rgba(28,18,31,.72));
+}
+.cloud-danger-zone h3 {
+  margin:4px 0 8px;
+  color:#f0d8df;
+  font-size:15px;
+  font-weight:650;
+}
+.cloud-danger-zone p {
+  margin:7px 0 0;
+  color:#b9a9b2;
+  font-size:11px;
+  line-height:1.75;
+}
+.cloud-danger-zone .cloud-danger-scope {
+  color:#f0b7bf;
+  font-weight:600;
+}
+.cloud-danger-zone label {
+  color:#e2ccd3;
+  font-size:10px;
+}
+.cloud-danger-zone input {
+  width:100%;
+  min-height:38px;
+  padding:8px 10px;
+  border:1px solid rgba(210,145,158,.3);
+  border-radius:7px;
+  color:#f3eaf0;
+  background:rgba(10,8,14,.72);
+  font:11px ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+.cloud-danger-zone input:focus {
+  outline:2px solid rgba(222,143,158,.38);
+  outline-offset:1px;
+}
+.cloud-reset-button {
+  justify-self:start;
+  min-height:36px;
+  padding:0 14px;
+  border:1px solid rgba(232,113,132,.45);
+  border-radius:7px;
+  color:#ffe9ed;
+  background:rgba(133,42,61,.48);
+  font-size:10px;
+  font-weight:650;
+}
+.cloud-reset-button:hover:not(:disabled) { background:rgba(155,47,69,.66); }
+.cloud-reset-button:disabled { opacity:.35; cursor:not-allowed; }
+.cloud-danger-zone .cloud-reset-status { min-height:18px; margin:0; }
+.cloud-danger-zone .cloud-reset-status.is-error { color:#f0a5b0; }
+.cloud-danger-zone .cloud-reset-status.is-success { color:#a9d9b6; }
+#cloud-settings-dialog .cloud-danger-zone h3 { color:#f2dbe1; }
+@media(max-width:560px) {
+  .cloud-reset-button { width:100%; }
+}
