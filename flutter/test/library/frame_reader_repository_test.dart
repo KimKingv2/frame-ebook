@@ -83,6 +83,22 @@ void main() {
       expect(saved.progress['percent'], 55);
     });
 
+    test('supplies required progress defaults for a first save', () async {
+      api.getResponse = {'ok': true, 'state': <String, dynamic>{}};
+
+      await repository.saveState(
+        book,
+        progress: {'cfi': 'first-cfi', 'percent': 3},
+      );
+
+      final state = api.lastPostBody!['state'] as Map<String, dynamic>;
+      final progress = state['progress'] as Map<String, dynamic>;
+      expect(progress['percent'], 3);
+      expect(progress['label'], '尚未閱讀');
+      expect(progress['cfi'], 'first-cfi');
+      expect(progress['index'], isNull);
+    });
+
     test('loads, saves and deletes annotations through compatible endpoints', () async {
       api.getResponse = {
         'annotations': [
