@@ -101,7 +101,7 @@
           <div class="cloud-index-copy">
             <p class="section-kicker">PERSISTENT CLOUD INDEX</p>
             <h3>書庫掃描與索引</h3>
-            <p>電子書與漫畫均以根目錄下一層資料夾作為一本作品；資料夾內的 EPUB／CBZ 會合併成同一張書架卡，封面以多冊堆疊呈現。索引會逐批加入書架，支援完整重掃、暫停與 D1 游標續掃；原始書檔不會被下載或修改。</p>
+            <p>電子書與漫畫均以根目錄下一層資料夾作為一本作品；資料夾內的 EPUB／CBZ 會合併成同一張書架卡，封面以多冊堆疊呈現。索引會逐批加入書架，支援完整重掃與 D1 游標續掃。暫停只停止新的目錄遍歷，已寫入 D1 的書籍仍會繼續處理封面；關閉管理視窗則會停止後續工作。原始書檔不會被下載或修改。</p>
           </div>
           <div class="cloud-index-actions">
             <span id="cloud-index-status" class="cloud-index-status">尚未建立索引</span>
@@ -113,7 +113,7 @@
           <button id="cloud-scan-comics" class="primary-link" type="button">掃描／續掃漫畫 <span>↗</span></button>
           <button id="cloud-scan-comics-full" class="quiet-button" type="button">完整重掃漫畫</button>
           <button id="cloud-scan-all" class="quiet-button" type="button">依序掃描電子書＋漫畫</button>
-          <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停目前掃描</button>
+          <button id="cloud-scan-pause" class="quiet-button" type="button" disabled>暫停目錄掃描</button>
           <button id="cloud-retry-covers" class="quiet-button" type="button">重試本分類失敗封面</button>
         </div>
         <div class="cloud-index-summary-grid">
@@ -199,6 +199,6 @@
     <footer class="footer"><a class="footer-brand" href="/">FRAME READER</a><span>OPENLIST · CLOUDFLARE FUNCTIONS</span><span>PRIVATE BY DESIGN</span></footer>
   </main>
   <script src="/assets/legacy-cleanup.js?v=20261116-cleanup-r1"></script>
-  <script type="module" src="/assets/cloud-library.js?v=20261118-cloud-reset-r1"></script>
+  <script type="module" src="/assets/cloud-library.js?v=20261118-cover-pause-fix-r1"></script>
 </body>
 </html>
