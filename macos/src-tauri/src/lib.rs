@@ -1,4 +1,5 @@
 use futures_util::StreamExt;
+use keyring::Entry;
 use percent_encoding::percent_decode_str;
 use reqwest::{header, redirect::Policy, Client, Method, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use std::{
     fs,
     net::IpAddr,
     path::PathBuf,
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Manager, State};
@@ -57,7 +58,7 @@ struct TransferDiagnostic {
 
 #[derive(Default)]
 struct AppState {
-    // WebDAV passwords exist only for the lifetime of this app process.
+    // RAM cache for WebDAV passwords; persistent secrets live in macOS Keychain.
     passwords: Mutex<HashMap<String, String>>,
     // Transfer diagnostics are RAM-only and drained by the Mac UI when it returns from the reader.
     transfer_diagnostics: Mutex<VecDeque<TransferDiagnostic>>,
@@ -103,6 +104,13 @@ fn write_profiles(app: &AppHandle, profiles: &[WebDavProfile]) -> Result<(), Str
     fs::write(path, bytes).map_err(|e| format!("寫入 WebDAV 設定失敗：{e}"))
 }
 
+const WEBDAV_KEYRING_SERVICE: &str = "com.kimkingv2.frameebook.webdav";
+
+fn webdav_keyring_entry(profile_id: &str) -> Result<Entry, String> {
+    Entry::new(WEBDAV_KEYRING_SERVICE, profile_id)
+        .map_err(|error| format!("建立 macOS 密碼管理項目失敗：{error}"))
+}
+
 fn get_profile_and_password(
     app: &AppHandle,
     state: &AppState,
@@ -111,10 +119,21 @@ fn get_profile_and_password(
     let profiles = read_profiles(app)?;
     let profile = profiles.into_iter().find(|item| item.id == profile_id)
         .ok_or_else(|| "找不到這個 WebDAV 來源設定。".to_string())?;
-    let passwords = state.passwords.lock()
-        .map_err(|_| "WebDAV 記憶體密碼鎖定失敗。".to_string())?;
-    let password = passwords.get(profile_id).cloned()
-        .ok_or_else(|| "這個 WebDAV 來源尚未解鎖。請重新輸入密碼；密碼只保留在 FRAME Ebook 執行期間，完全退出 App 後就會清除。".to_string())?;
+    let cached = state.passwords.lock()
+        .map_err(|_| "WebDAV 記憶體密碼鎖定失敗。".to_string())?
+        .get(profile_id).cloned();
+    let password = match cached {
+        Some(value) => value,
+        None => {
+            let value = webdav_keyring_entry(profile_id)?
+                .get_password()
+                .map_err(|error| format!("無法從這台 Mac 的密碼管理工具讀取 WebDAV 密碼：{error}。請在「修改／重新連接 WebDAV」中重新儲存一次密碼。"))?;
+            state.passwords.lock()
+                .map_err(|_| "WebDAV 記憶體密碼鎖定失敗。".to_string())?
+                .insert(profile_id.to_string(), value.clone());
+            value
+        }
+    };
     Ok((profile, password))
 }
 
@@ -184,13 +203,73 @@ fn resource_url(profile: &WebDavProfile, path: &str, collection: bool) -> Result
 }
 
 fn make_client() -> Result<Client, String> {
-    Client::builder()
-        .redirect(Policy::none())
-        .connect_timeout(Duration::from_secs(20))
-        .timeout(Duration::from_secs(300))
-        .user_agent("FRAME-Ebook-macOS/0.2.6")
-        .build()
-        .map_err(|e| format!("建立 WebDAV 連線失敗：{e}"))
+    static WEBDAV_CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+    WEBDAV_CLIENT.get_or_init(|| {
+        Client::builder()
+            .redirect(Policy::none())
+            .connect_timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(300))
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Some(Duration::from_secs(30)))
+            .user_agent("FRAME-Ebook-macOS/0.3.4")
+            .build()
+            .map_err(|e| format!("建立 WebDAV 連線失敗：{e}"))
+    }).clone()
+}
+
+fn make_sync_client() -> Result<Client, String> {
+    static SYNC_CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+    SYNC_CLIENT.get_or_init(|| {
+        Client::builder()
+            .redirect(Policy::none())
+            .connect_timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(90))
+            .user_agent("FRAME-Ebook-macOS/0.3.4")
+            .build()
+            .map_err(|e| format!("建立 Cloudflare 同步連線失敗：{e}"))
+    }).clone()
+}
+
+async fn send_with_retry(
+    request: reqwest::RequestBuilder,
+    operation: &str,
+) -> Result<reqwest::Response, String> {
+    let mut next_request = Some(request);
+    for attempt in 0..3 {
+        let builder = next_request.take()
+            .ok_or_else(|| format!("{operation} 無法重新建立請求。"))?;
+        let retry_builder = builder.try_clone();
+        match builder.send().await {
+            Ok(response) => {
+                let status = response.status();
+                let retryable = status.is_server_error()
+                    || status == StatusCode::TOO_MANY_REQUESTS
+                    || status == StatusCode::REQUEST_TIMEOUT;
+                if retryable && attempt < 2 {
+                    let _ = response.bytes().await;
+                    next_request = retry_builder;
+                    if next_request.is_none() {
+                        return Err(format!("{operation} 暫時失敗（HTTP {status}），請求無法安全重試。"));
+                    }
+                    tokio::time::sleep(Duration::from_millis(300 * (attempt + 1) as u64)).await;
+                    continue;
+                }
+                return Ok(response);
+            }
+            Err(error) => {
+                if attempt >= 2 {
+                    return Err(format!("{operation} 連線失敗，已自動重試 2 次：{error}"));
+                }
+                next_request = retry_builder;
+                if next_request.is_none() {
+                    return Err(format!("{operation} 連線失敗，無法重建請求：{error}"));
+                }
+                tokio::time::sleep(Duration::from_millis(300 * (attempt + 1) as u64)).await;
+            }
+        }
+    }
+    Err(format!("{operation} 在自動重試後仍失敗。"))
 }
 
 fn node_text<'a>(node: roxmltree::Node<'a, 'a>, name: &str) -> Option<String> {
@@ -261,9 +340,14 @@ fn list_webdav_profiles(app: AppHandle) -> Result<Vec<WebDavProfile>, String> {
 
 #[tauri::command(rename_all = "camelCase")]
 fn webdav_has_password(state: State<'_, AppState>, profile_id: String) -> bool {
-    state.passwords.lock()
+    if state.passwords.lock()
         .map(|passwords| passwords.contains_key(&profile_id))
-        .unwrap_or(false)
+        .unwrap_or(false) {
+        return true;
+    }
+    webdav_keyring_entry(&profile_id)
+        .and_then(|entry| entry.get_password().map_err(|error| error.to_string()))
+        .is_ok()
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -301,6 +385,10 @@ fn save_webdav_profile(
     } else {
         profiles.push(profile.clone());
     }
+    // Save the secret in the local macOS Keychain, never in the profile JSON file.
+    webdav_keyring_entry(&profile.id)?
+        .set_password(&password)
+        .map_err(|error| format!("無法安全保存 WebDAV 密碼到 macOS 密碼管理工具：{error}"))?;
     write_profiles(&app, &profiles)?;
     state.passwords.lock()
         .map_err(|_| "WebDAV 記憶體密碼鎖定失敗。".to_string())?
@@ -320,6 +408,9 @@ fn delete_webdav_profile(
     state.passwords.lock()
         .map_err(|_| "WebDAV 記憶體密碼鎖定失敗。".to_string())?
         .remove(&profile_id);
+    if let Ok(entry) = webdav_keyring_entry(&profile_id) {
+        let _ = entry.delete_credential();
+    }
     Ok(())
 }
 
@@ -335,12 +426,12 @@ async fn webdav_list_directory(
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:"><d:prop><d:displayname/><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getcontenttype/></d:prop></d:propfind>"#;
     let method = Method::from_bytes(b"PROPFIND").map_err(|e| e.to_string())?;
-    let response = make_client()?.request(method, target.clone())
+    let request = make_client()?.request(method, target.clone())
         .basic_auth(&profile.username, Some(password))
         .header("Depth", "1")
         .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-        .body(body)
-        .send().await.map_err(|e| format!("WebDAV 連線失敗：{e}"))?;
+        .body(body);
+    let response = send_with_retry(request, "WebDAV PROPFIND").await?;
     if response.status() == StatusCode::UNAUTHORIZED {
         return Err("WebDAV 驗證失敗，請檢查帳號與密碼。".into());
     }
@@ -415,8 +506,7 @@ async fn request_webdav_range(
         if hop == 0 {
             request = request.basic_auth(&profile.username, Some(password));
         }
-        let response = request.send().await
-            .map_err(|e| format!("WebDAV Range 讀取失敗：{e}"))?;
+        let response = send_with_retry(request, "WebDAV Range 讀取").await?;
 
         if response.status().is_redirection() {
             let location = response.headers().get(header::LOCATION)
@@ -433,6 +523,9 @@ async fn request_webdav_range(
             return Err("WebDAV 驗證失敗，請檢查帳號與密碼。".into());
         }
         if response.status() != StatusCode::PARTIAL_CONTENT {
+            if response.status().is_server_error() || response.status() == StatusCode::TOO_MANY_REQUESTS {
+                return Err(format!("WebDAV Range 暫時性故障（HTTP {}），自動重試後仍失敗。", response.status()));
+            }
             return Err(format!(
                 "這個 WebDAV 來源或 302 目的位置不支援 HTTP Range（收到 HTTP {}，預期 206）。為避免把整部漫畫下載到 SSD，已停止讀取。",
                 response.status()
@@ -473,8 +566,7 @@ async fn webdav_get_file_size(
         if hop == 0 {
             request = request.basic_auth(&profile.username, Some(password.clone()));
         }
-        let response = request.send().await
-            .map_err(|e| format!("WebDAV 檔案資訊讀取失敗：{e}"))?;
+        let response = send_with_retry(request, "WebDAV HEAD 檔案資訊").await?;
         if response.status().is_redirection() {
             let location = response.headers().get(header::LOCATION)
                 .and_then(|value| value.to_str().ok())
@@ -539,8 +631,7 @@ async fn webdav_download_file(
         if hop == 0 {
             request = request.basic_auth(&profile.username, Some(password.clone()));
         }
-        let result = request.send().await
-            .map_err(|e| format!("WebDAV 檔案請求失敗：{e}"))?;
+        let result = send_with_retry(request, "WebDAV 檔案下載").await?;
         if result.status().is_redirection() {
             let location = result.headers().get(header::LOCATION)
                 .and_then(|value| value.to_str().ok())
@@ -617,8 +708,7 @@ async fn webdav_download_file_memory(
         if hop == 0 {
             request = request.basic_auth(&profile.username, Some(password.clone()));
         }
-        let result = request.send().await
-            .map_err(|e| format!("WebDAV EPUB 記憶體讀取失敗：{e}"))?;
+        let result = send_with_retry(request, "WebDAV EPUB 記憶體讀取").await?;
         if result.status().is_redirection() {
             redirect_statuses.push(result.status().as_u16());
             let location = result.headers().get(header::LOCATION)
