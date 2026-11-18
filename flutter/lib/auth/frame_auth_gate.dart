@@ -52,11 +52,27 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
 
     final controller = WebViewController();
     _webController = controller;
-    _api = FrameWebViewApiClient(baseUri: _baseUri, controller: controller);
-    controller
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF12101A))
-      ..setNavigationDelegate(
+    final api = FrameWebViewApiClient(baseUri: _baseUri, controller: controller);
+    _api = api;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initializeNativeEntry(controller, api));
+    });
+  }
+
+  @override
+  void dispose() {
+    _api?.close();
+    super.dispose();
+  }
+
+  Future<void> _initializeNativeEntry(
+    WebViewController controller,
+    FrameWebViewApiClient api,
+  ) async {
+    try {
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.setBackgroundColor(const Color(0xFF12101A));
+      await controller.setNavigationDelegate(
         NavigationDelegate(
           onProgress: (value) {
             if (mounted) setState(() => _progress = value);
@@ -91,22 +107,9 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
           },
         ),
       );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadNativeEntry());
-    });
-  }
-
-  @override
-  void dispose() {
-    _api?.close();
-    super.dispose();
-  }
-
-  Future<void> _loadNativeEntry() async {
-    try {
-      final api = _api;
-      if (api is FrameWebViewApiClient) await api.ready;
-      await _webController?.loadRequest(_baseUri);
+      await api.ready;
+      if (!mounted) return;
+      await controller.loadRequest(_baseUri);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -223,6 +226,28 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
       if (_checking) return const _AuthLoadingScreen();
       if (_authenticated) return FrameApiScope(api: _api!, child: widget.child);
       return _AccessWebNotice(error: _error, onRetry: _checkSession);
+    }
+
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
+    if (_authenticated && isMacOS) {
+      return FrameApiScope(api: _api!, child: widget.child);
+    }
+    if (!_authenticated && isMacOS) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF12101A),
+        body: _NativeAccessOverlay(
+          progress: _progress,
+          checking: _checking,
+          pageReady: _pageReady,
+          error: _error,
+          webError: _webError,
+          browser: _webController == null
+              ? const Center(child: CircularProgressIndicator())
+              : WebViewWidget(controller: _webController!),
+          onRetryLogin: _retryLogin,
+          onConfirm: _checkSession,
+        ),
+      );
     }
 
     return Stack(
@@ -387,6 +412,7 @@ class _NativeAccessOverlay extends StatelessWidget {
     required this.pageReady,
     required this.error,
     required this.webError,
+    this.browser,
     required this.onRetryLogin,
     required this.onConfirm,
   });
@@ -396,6 +422,7 @@ class _NativeAccessOverlay extends StatelessWidget {
   final bool pageReady;
   final String? error;
   final String? webError;
+  final Widget? browser;
   final Future<void> Function() onRetryLogin;
   final Future<bool> Function() onConfirm;
 
@@ -439,7 +466,7 @@ class _NativeAccessOverlay extends StatelessWidget {
               color: const Color(0xFF9875EC),
               backgroundColor: const Color(0xFF262131),
             ),
-          const Expanded(child: SizedBox.expand()),
+          Expanded(child: browser ?? const SizedBox.expand()),
           if (checking || !pageReady)
             Container(
               width: double.infinity,
