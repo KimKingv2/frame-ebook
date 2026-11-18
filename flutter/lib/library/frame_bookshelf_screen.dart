@@ -1363,32 +1363,6 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
     );
   }
 
-  Widget _metadataRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(label, style: const TextStyle(color: _faint, fontSize: 10)),
-          ),
-          Expanded(
-            child: Text(value, style: const TextStyle(color: _muted, fontSize: 10)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dialogLabel(String value) => Padding(
-        padding: const EdgeInsets.only(bottom: 7),
-        child: Text(
-          value,
-          style: const TextStyle(color: Color(0xFFD4CDE1), fontSize: 11),
-        ),
-      );
-
   String _formatBytes(int bytes) {
     if (bytes < 1024 * 1024) {
       return '${(bytes / 1024).round()} KB';
