@@ -3277,6 +3277,9 @@ html.flutter-reader-embed .reader-layout {
   height:100%;
   min-height:0;
 }
+html.flutter-reader-embed .reading-workspace.reader-sidebar-collapsed .reader-layout {
+  grid-template-columns:minmax(0,1fr);
+}
 html.flutter-reader-embed .reader-sidebar {
   position:relative;
   top:auto;
