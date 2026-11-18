@@ -3,6 +3,8 @@
  * The browser keeps only short-lived in-memory objects needed by the active page.
  */
 const bookCache = new Map();
+let preferenceCache = null;
+let preferencePromise = null;
 
 
 const LOCAL_DB_NAME = "frame-ebook-macos";
