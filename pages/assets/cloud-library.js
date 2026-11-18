@@ -1792,4 +1792,68 @@ $("cloud-test-source").addEventListener("click", async () => {
     if (button) button.disabled = false;
   }
 });
+
+const cloudResetConfirmation = "DELETE ALL FRAME EBOOK DATA";
+const cloudResetInput = $("cloud-reset-confirmation");
+const cloudResetButton = $("cloud-reset-all");
+const cloudResetStatus = $("cloud-reset-status");
+function updateCloudResetButton() {
+  if (!cloudResetButton || !cloudResetInput) return;
+  cloudResetButton.disabled = cloudResetInput.value.trim() !== cloudResetConfirmation ||
+    state.scanRunning || state.scanAllRunning;
+}
+cloudResetInput?.addEventListener("input", updateCloudResetButton);
+cloudResetButton?.addEventListener("click", async () => {
+  if (!cloudResetInput || cloudResetInput.value.trim() !== cloudResetConfirmation) return;
+  if (state.scanRunning || state.scanAllRunning) {
+    if (cloudResetStatus) cloudResetStatus.textContent = "目前這個頁面仍有掃描工作，請先暫停並等待掃描停止。";
+    return;
+  }
+  const accepted = window.confirm(
+    "最後確認：這會清空整個 FRAME Ebook 專案的共用 D1 資料與 R2 封面快取，包含所有帳戶的閱讀進度、筆記、閱讀時光及裝置配對。\n\n" +
+    "原始 Alist／OpenList 書檔不會刪除，但已清除的閱讀資料無法復原。確定永久清除？"
+  );
+  if (!accepted) return;
+
+  cloudResetButton.disabled = true;
+  cloudResetInput.disabled = true;
+  if (cloudResetStatus) {
+    cloudResetStatus.className = "cloud-reset-status";
+    cloudResetStatus.textContent = "正在清除共用 D1 資料與 R2 封面快取，請勿關閉此頁……";
+  }
+  try {
+    const response = await fetch("/api/reading/reset", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: cloudResetConfirmation })
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok || !data.ok) {
+      const message = data.error || ("HTTP " + response.status);
+      if (data.d1Cleared) {
+        throw new Error(message + "。D1 已清除；R2 封面可能仍有殘留，可再次執行清除。");
+      }
+      throw new Error(message);
+    }
+    const deletedRows = Object.values(data.deletedTables || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    if (cloudResetStatus) {
+      cloudResetStatus.className = "cloud-reset-status is-success";
+      cloudResetStatus.textContent = "已完成清除：D1 " + deletedRows + " 筆資料、R2 " +
+        Number(data.deletedCoverObjects || 0) + " 個封面物件。即將重新載入管理頁面。";
+    }
+    cloudResetInput.value = "";
+    window.setTimeout(() => window.location.reload(), 1800);
+  } catch (error) {
+    if (cloudResetStatus) {
+      cloudResetStatus.className = "cloud-reset-status is-error";
+      cloudResetStatus.textContent = "清除未完全完成：" + (error.message || String(error));
+    }
+    cloudResetInput.disabled = false;
+    updateCloudResetButton();
+  }
+});
+
 checkSession();
