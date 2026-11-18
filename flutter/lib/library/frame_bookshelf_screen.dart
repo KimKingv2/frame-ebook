@@ -258,13 +258,13 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                   _metadataRow(
                     '內容',
                     book.pageCount > 0
-                        ? '\${book.pageCount}\${book.format == 'CBZ' ? ' 頁' : ' 個內容項目'}'
+                        ? '${book.pageCount}${book.format == 'CBZ' ? ' 頁' : ' 個內容項目'}'
                         : '未提供',
                   ),
                   _metadataRow('檔案', book.fileName),
                   _metadataRow('大小', _formatBytes(book.size)),
                   _metadataRow('閱讀進度', book.progressPercent > 0
-                      ? '\${book.progressPercent}% · \${book.progressLabel}'
+                      ? '${book.progressPercent}% · ${book.progressLabel}'
                       : '尚未開始'),
                   if (book.language.isNotEmpty)
                     _metadataRow('語言', book.language),
@@ -735,7 +735,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '\${all.length.toString().padLeft(2, '0')} ITEMS',
+                    '${all.length.toString().padLeft(2, '0')} ITEMS',
                     style: const TextStyle(
                       color: Color(0xFFD3C2F5),
                       fontFamily: 'Georgia',
@@ -776,7 +776,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
         ),
         const SizedBox(height: 16),
         Text(
-          '目前顯示 \${visibleBooks.length} 本電子書 · \${visibleComics.length} 部漫畫',
+          '目前顯示 ${visibleBooks.length} 本電子書 · ${visibleComics.length} 部漫畫',
           style: const TextStyle(color: _faint, fontSize: 10),
         ),
         const SizedBox(height: 10),
@@ -1040,7 +1040,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        Expanded(child: Text(folder ? '\${entry.volumeCount} 冊' : entry.format,
+                        Expanded(child: Text(folder ? '${entry.volumeCount} 冊' : entry.format,
                             style: const TextStyle(color: Color(0xFFC5B2E8), fontSize: 9))),
                         if (!folder && percent > 0)
                           Text('$percent%', style: const TextStyle(color: _accent, fontSize: 9)),
@@ -1226,9 +1226,9 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
         const SizedBox(height: 5),
         Text(
           folder
-              ? '\${entry.volumeCount} 本作品，點擊查看資料夾'
+              ? '${entry.volumeCount} 本作品，點擊查看資料夾'
               : percent > 0
-                  ? '$percent% · \${entry.progressLabel}'
+                  ? '$percent% · ${entry.progressLabel}'
                   : '尚未開始',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -1252,7 +1252,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
               style: TextButton.styleFrom(foregroundColor: _accent),
             ),
             const Spacer(),
-            Text('\${volumes.length} 冊 · \${_formatBytes(folder.totalSize)}',
+            Text('${volumes.length} 冊 · ${_formatBytes(folder.totalSize)}',
                 style: const TextStyle(color: _muted, fontSize: 10)),
           ],
         ),
@@ -1266,7 +1266,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
         Text(folder.folderPath, style: const TextStyle(color: _faint, fontSize: 10)),
         const SizedBox(height: 8),
         Text(
-          '這個資料夾共有 \${volumes.length} 個可閱讀檔案。選擇下方任一本作品即可進入閱讀室。',
+          '這個資料夾共有 ${volumes.length} 個可閱讀檔案。選擇下方任一本作品即可進入閱讀室。',
           style: const TextStyle(color: _muted, fontSize: 11),
         ),
         const SizedBox(height: 24),
@@ -1520,9 +1520,9 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
       );
 
   String _formatBytes(int bytes) {
-    if (bytes < 1024 * 1024) return '\${(bytes / 1024).round()} KB';
-    if (bytes < 1024 * 1024 * 1024) return '\${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '\${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }
 
