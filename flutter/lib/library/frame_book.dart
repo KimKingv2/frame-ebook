@@ -115,13 +115,26 @@ class FrameBook {
     );
   }
 
-  Map<String, dynamic> descriptor() => {
-        'id': id,
-        'provider': provider,
-        'library': library,
-        'rootPath': rootPath,
-        'path': path,
-      };
+  Map<String, dynamic> descriptor() {
+    final result = <String, dynamic>{
+      'id': id,
+      'provider': provider,
+      'library': library,
+      'rootPath': rootPath,
+      'path': path,
+    };
+    final source = raw['cloudSource'];
+    if (source is Map) {
+      final profileId = (source['profileId'] ?? source['profile_id'])
+              ?.toString() ??
+          '';
+      final sourceId =
+          (source['sourceId'] ?? source['source_id'])?.toString() ?? '';
+      if (profileId.isNotEmpty) result['profileId'] = profileId;
+      if (sourceId.isNotEmpty) result['sourceId'] = sourceId;
+    }
+    return result;
+  }
 
   static Map<String, dynamic> _map(dynamic value) =>
       value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
