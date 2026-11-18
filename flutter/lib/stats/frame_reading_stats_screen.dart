@@ -104,7 +104,7 @@ class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
       final stats = await fetchStats(r.$1, r.$2);
       if (!mounted) return;
       setState(() {
-        goalMinutes = goal.clamp(5, 240);
+        goalMinutes = goal.clamp(5, 240).toInt();
         data = stats;
         days = dayMap(stats['days']);
         allDays = dayMap(stats['allDays']);
