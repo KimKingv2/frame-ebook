@@ -18,7 +18,7 @@
   var editingAnnotation = null;
   var Overlayer = null;
   var annotationBusy = false;
-  var libraryStorePromise = import('/assets/library-store.js?v=20261117-filename-id-r2');
+  var libraryStorePromise = import('/assets/library-store.js?v=20261118-preference-metadata-fix-r1');
   var readingTrackerPromise = import('/assets/reading-tracker.js?v=20261116-cloud-only-r2');
   var cloudBookSourcePromise = import('/assets/cloud-book-source.js?v=20261117-webdav-ram-r1');
   var overlayerModulePromise = import('/vendor/foliate-js/overlayer.js');
