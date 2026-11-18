@@ -1528,7 +1528,831 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
   String _volumeTitle(FrameBook book) {
     if (book.manualTitle && book.title.isNotEmpty) return book.title;
     final fileStem = book.fileName.replaceFirst(
-      RegExp(r'\\.(epub|cbz)$', caseSensitive: false),
+      RegExp(r'\.(epub|cbz)
+      '',
+    );
+    if (book.isComic) return fileStem.isEmpty ? book.title : fileStem;
+    final embeddedTitle = book.raw['bookTitle']?.toString() ?? '';
+    if (embeddedTitle.isNotEmpty) return embeddedTitle;
+    return book.title.isNotEmpty ? book.title : fileStem;
+  }
+
+  String _volumeAuthor(FrameBook book) {
+    if (book.manualAuthor) return book.author;
+    final embeddedAuthor = book.raw['bookCreator']?.toString() ?? '';
+    return embeddedAuthor.isNotEmpty ? embeddedAuthor : book.author;
+  }
+
+  Widget _sectionHeading({
+    required String kicker,
+    required String title,
+    String? subtitle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(kicker,
+            style: const TextStyle(color: Color(0xFF8F7BB7), fontSize: 8, letterSpacing: 2.3)),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFFF1EDF8),
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 5),
+          Text(subtitle, style: const TextStyle(color: Color(0xFF8D859A), fontSize: 10)),
+        ],
+      ],
+    );
+  }
+
+  Widget _emptyShelf({
+    required String title,
+    required String detail,
+    bool comic = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 18),
+      decoration: BoxDecoration(
+        color: const Color(0x331B1825),
+        border: Border.all(color: _line.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        children: [
+          Icon(comic ? Icons.auto_stories_outlined : Icons.menu_book_outlined,
+              color: const Color(0xFFBBA5E8), size: 27),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(color: Color(0xFFDCD3E8), fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(detail, textAlign: TextAlign.center,
+              style: const TextStyle(color: _faint, fontSize: 9, height: 1.6)),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchEmpty(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Text('沒有符合條件的$title。',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: _muted, fontSize: 11)),
+    );
+  }
+
+  Widget _statusLine() {
+    String message;
+    Color color;
+    if (_loading) {
+      message = '正在讀取雲端書架索引……';
+      color = _muted;
+    } else if (_error != null) {
+      message = '雲端書架載入失敗：$_error';
+      color = const Color(0xFFFFA5A5);
+    } else {
+      final books = _shelves.where((entry) => !entry.isComic).length;
+      final comics = _shelves.where((entry) => entry.isComic).length;
+      message = '雲端書架已載入：電子書 $books 本、漫畫 $comics 部。書目及閱讀記憶由 D1 同步保存。';
+      color = const Color(0xFF9E95AE);
+    }
+    return Row(
+      children: [
+        if (_refreshing)
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: _accent),
+            ),
+          ),
+        Expanded(child: Text(message, style: TextStyle(color: color, fontSize: 9, height: 1.5))),
+        IconButton(
+          tooltip: '重新整理書架',
+          onPressed: _refreshing ? null : () => _refresh(),
+          icon: const Icon(Icons.refresh, color: _faint, size: 17),
+        ),
+      ],
+    );
+  }
+
+  Widget _privacyNote() {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: const Color(0x551F1B28),
+        border: Border.all(color: const Color(0x33C4ADEF)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.home_work_outlined, color: _accent, size: 21),
+              SizedBox(width: 13),
+              Expanded(
+                child: Text(
+                  '雲端保存書檔，Cloudflare 保存你的閱讀資料。',
+                  style: TextStyle(color: Color(0xFFD8CFE7), fontSize: 10, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            '原始 EPUB／CBZ 留在 Alist／OpenList；D1 保存索引、閱讀位置、閱讀統計、分類與外觀偏好，R2 保存索引封面。書籤、螢光標記與筆記也保存在 D1，依 Cloudflare Access 使用者身分隔離。瀏覽器只在閱讀時暫時載入書檔，不會建立本機書庫或持久化副本。',
+            style: TextStyle(color: Color(0xFF898096), fontSize: 8, height: 1.8),
+          ),
+          SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'PRIVATE BY DESIGN',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomBanner(bool narrow) {
+    const copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ONE BOOK · YOUR OWN RHYTHM', style: _tinyLabel),
+        SizedBox(height: 9),
+        Text(
+          '翻到下一頁，繼續自己的故事。',
+          style: TextStyle(color: _text, fontSize: 19, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+    final button = FilledButton.icon(
+      onPressed: () => _openLegacy('/epub-lab/', '閱讀室'),
+      icon: const Icon(Icons.arrow_outward, size: 16),
+      label: const Text('進入閱讀空間'),
+      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF7253B6)),
+    );
+    return Container(
+      padding: EdgeInsets.all(narrow ? 18 : 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF302641), Color(0xFF1A1724)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0x40BAA0EE)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: narrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [copy, const SizedBox(height: 16), button],
+            )
+          : Row(
+              children: [const Expanded(child: copy), button],
+            ),
+    );
+  }
+
+  Widget _footer() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 15),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        runSpacing: 8,
+        spacing: 16,
+        children: [
+          Text('FRAME READER',
+              style: TextStyle(color: _accent, fontSize: 9, letterSpacing: 1.8)),
+          Text('MADE FOR THE LOVE OF READING',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.4)),
+          Text('CLOUD CATALOG · CLOUD READING DATA',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.1)),
+        ],
+      ),
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).round()} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+}
+
+const _tinyLabel = TextStyle(
+  color: Color(0xFF8D829D),
+  fontSize: 8,
+  letterSpacing: 1.8,
+  fontWeight: FontWeight.w600,
+);
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.caption,
+    required this.width,
+  });
+
+  final String label;
+  final int value;
+  final String caption;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width < 120 ? 120 : width,
+      constraints: const BoxConstraints(minHeight: 92),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _panel,
+        border: Border.all(color: _line.withValues(alpha: 0.75)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.6)),
+          const SizedBox(height: 11),
+          Text(
+            value.toString().padLeft(2, '0'),
+            style: const TextStyle(
+              color: Color(0xFFE9E1F4),
+              fontFamily: 'NotoSansTC',
+              fontSize: 27,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(caption, style: const TextStyle(color: _faint, fontSize: 8)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroArtwork extends StatelessWidget {
+  const _HeroArtwork();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 380,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFF8F6BDA).withValues(alpha: 0.22),
+                  const Color(0xFF5B408F).withValues(alpha: 0.04),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: 320,
+            height: 245,
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0x1AC4B0F2)),
+              borderRadius: BorderRadius.circular(160),
+            ),
+          ),
+          Transform.rotate(
+            angle: -0.12,
+            child: Container(
+              width: 190,
+              height: 275,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF9C7AD0), Color(0xFF393050), Color(0xFF171420)],
+                ),
+                border: Border.all(color: const Color(0x66E7DBFF)),
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x99000000), blurRadius: 55, offset: Offset(22, 27)),
+                  BoxShadow(color: Color(0x339F7EE2), blurRadius: 45),
+                ],
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('F R A M E', style: TextStyle(color: Color(0xFFEADFFF), fontSize: 11, letterSpacing: 2)),
+                  Spacer(),
+                  Icon(Icons.menu_book_rounded, size: 54, color: Color(0xFFE9DDFB)),
+                  SizedBox(height: 15),
+                  Text('YOUR OWN\nLIBRARY', style: TextStyle(color: Colors.white, fontSize: 20, height: 1.25, fontWeight: FontWeight.w600)),
+                  Spacer(),
+                  Text('READER EDITION · 2026', style: TextStyle(color: Color(0xFFD0BDEA), fontSize: 7, letterSpacing: 1.4)),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 42,
+            right: 4,
+            child: _FloatingNote(icon: Icons.auto_awesome, title: 'YOUR OWN', subtitle: 'LIBRARY'),
+          ),
+          const Positioned(
+            bottom: 42,
+            left: 2,
+            child: _FloatingNote(icon: Icons.circle, title: '一座書架', subtitle: '隨時續讀'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingNote extends StatelessWidget {
+  const _FloatingNote({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xD91F1A2B),
+        border: Border.all(color: const Color(0x33D3C2F4)),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 22)],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFFD4C1FF), size: 16),
+          const SizedBox(width: 9),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: _muted, fontSize: 8)),
+              Text(subtitle, style: const TextStyle(color: Color(0xFFEEE6FF), fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+, caseSensitive: false), '');
+    if (book.isComic) return fileStem.isEmpty ? book.title : fileStem;
+    final embeddedTitle = book.raw['bookTitle']?.toString() ?? '';
+    if (embeddedTitle.isNotEmpty) return embeddedTitle;
+    return book.title.isNotEmpty ? book.title : fileStem;
+  }
+
+  String _volumeAuthor(FrameBook book) {
+    if (book.manualAuthor) return book.author;
+    final embeddedAuthor = book.raw['bookCreator']?.toString() ?? '';
+    return embeddedAuthor.isNotEmpty ? embeddedAuthor : book.author;
+  }
+
+  Widget _sectionHeading({
+    required String kicker,
+    required String title,
+    String? subtitle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(kicker,
+            style: const TextStyle(color: Color(0xFF8F7BB7), fontSize: 8, letterSpacing: 2.3)),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFFF1EDF8),
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.5,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 5),
+          Text(subtitle, style: const TextStyle(color: Color(0xFF8D859A), fontSize: 10)),
+        ],
+      ],
+    );
+  }
+
+  Widget _emptyShelf({
+    required String title,
+    required String detail,
+    bool comic = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 18),
+      decoration: BoxDecoration(
+        color: const Color(0x331B1825),
+        border: Border.all(color: _line.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        children: [
+          Icon(comic ? Icons.auto_stories_outlined : Icons.menu_book_outlined,
+              color: const Color(0xFFBBA5E8), size: 27),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(color: Color(0xFFDCD3E8), fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(detail, textAlign: TextAlign.center,
+              style: const TextStyle(color: _faint, fontSize: 9, height: 1.6)),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchEmpty(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Text('沒有符合條件的$title。',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: _muted, fontSize: 11)),
+    );
+  }
+
+  Widget _statusLine() {
+    String message;
+    Color color;
+    if (_loading) {
+      message = '正在讀取雲端書架索引……';
+      color = _muted;
+    } else if (_error != null) {
+      message = '雲端書架載入失敗：$_error';
+      color = const Color(0xFFFFA5A5);
+    } else {
+      final books = _shelves.where((entry) => !entry.isComic).length;
+      final comics = _shelves.where((entry) => entry.isComic).length;
+      message = '雲端書架已載入：電子書 $books 本、漫畫 $comics 部。書目及閱讀記憶由 D1 同步保存。';
+      color = const Color(0xFF9E95AE);
+    }
+    return Row(
+      children: [
+        if (_refreshing)
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: _accent),
+            ),
+          ),
+        Expanded(child: Text(message, style: TextStyle(color: color, fontSize: 9, height: 1.5))),
+        IconButton(
+          tooltip: '重新整理書架',
+          onPressed: _refreshing ? null : () => _refresh(),
+          icon: const Icon(Icons.refresh, color: _faint, size: 17),
+        ),
+      ],
+    );
+  }
+
+  Widget _privacyNote() {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: const Color(0x551F1B28),
+        border: Border.all(color: const Color(0x33C4ADEF)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.home_work_outlined, color: _accent, size: 21),
+              SizedBox(width: 13),
+              Expanded(
+                child: Text(
+                  '雲端保存書檔，Cloudflare 保存你的閱讀資料。',
+                  style: TextStyle(color: Color(0xFFD8CFE7), fontSize: 10, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            '原始 EPUB／CBZ 留在 Alist／OpenList；D1 保存索引、閱讀位置、閱讀統計、分類與外觀偏好，R2 保存索引封面。書籤、螢光標記與筆記也保存在 D1，依 Cloudflare Access 使用者身分隔離。瀏覽器只在閱讀時暫時載入書檔，不會建立本機書庫或持久化副本。',
+            style: TextStyle(color: Color(0xFF898096), fontSize: 8, height: 1.8),
+          ),
+          SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'PRIVATE BY DESIGN',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomBanner(bool narrow) {
+    const copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ONE BOOK · YOUR OWN RHYTHM', style: _tinyLabel),
+        SizedBox(height: 9),
+        Text(
+          '翻到下一頁，繼續自己的故事。',
+          style: TextStyle(color: _text, fontSize: 19, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+    final button = FilledButton.icon(
+      onPressed: () => _openLegacy('/epub-lab/', '閱讀室'),
+      icon: const Icon(Icons.arrow_outward, size: 16),
+      label: const Text('進入閱讀空間'),
+      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF7253B6)),
+    );
+    return Container(
+      padding: EdgeInsets.all(narrow ? 18 : 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF302641), Color(0xFF1A1724)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0x40BAA0EE)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: narrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [copy, const SizedBox(height: 16), button],
+            )
+          : Row(
+              children: [const Expanded(child: copy), button],
+            ),
+    );
+  }
+
+  Widget _footer() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 15),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        runSpacing: 8,
+        spacing: 16,
+        children: [
+          Text('FRAME READER',
+              style: TextStyle(color: _accent, fontSize: 9, letterSpacing: 1.8)),
+          Text('MADE FOR THE LOVE OF READING',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.4)),
+          Text('CLOUD CATALOG · CLOUD READING DATA',
+              style: TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.1)),
+        ],
+      ),
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).round()} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+}
+
+const _tinyLabel = TextStyle(
+  color: Color(0xFF8D829D),
+  fontSize: 8,
+  letterSpacing: 1.8,
+  fontWeight: FontWeight.w600,
+);
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.caption,
+    required this.width,
+  });
+
+  final String label;
+  final int value;
+  final String caption;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width < 120 ? 120 : width,
+      constraints: const BoxConstraints(minHeight: 92),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _panel,
+        border: Border.all(color: _line.withValues(alpha: 0.75)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(color: _faint, fontSize: 7, letterSpacing: 1.6)),
+          const SizedBox(height: 11),
+          Text(
+            value.toString().padLeft(2, '0'),
+            style: const TextStyle(
+              color: Color(0xFFE9E1F4),
+              fontFamily: 'NotoSansTC',
+              fontSize: 27,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(caption, style: const TextStyle(color: _faint, fontSize: 8)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroArtwork extends StatelessWidget {
+  const _HeroArtwork();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 380,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFF8F6BDA).withValues(alpha: 0.22),
+                  const Color(0xFF5B408F).withValues(alpha: 0.04),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: 320,
+            height: 245,
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0x1AC4B0F2)),
+              borderRadius: BorderRadius.circular(160),
+            ),
+          ),
+          Transform.rotate(
+            angle: -0.12,
+            child: Container(
+              width: 190,
+              height: 275,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF9C7AD0), Color(0xFF393050), Color(0xFF171420)],
+                ),
+                border: Border.all(color: const Color(0x66E7DBFF)),
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x99000000), blurRadius: 55, offset: Offset(22, 27)),
+                  BoxShadow(color: Color(0x339F7EE2), blurRadius: 45),
+                ],
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('F R A M E', style: TextStyle(color: Color(0xFFEADFFF), fontSize: 11, letterSpacing: 2)),
+                  Spacer(),
+                  Icon(Icons.menu_book_rounded, size: 54, color: Color(0xFFE9DDFB)),
+                  SizedBox(height: 15),
+                  Text('YOUR OWN\nLIBRARY', style: TextStyle(color: Colors.white, fontSize: 20, height: 1.25, fontWeight: FontWeight.w600)),
+                  Spacer(),
+                  Text('READER EDITION · 2026', style: TextStyle(color: Color(0xFFD0BDEA), fontSize: 7, letterSpacing: 1.4)),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 42,
+            right: 4,
+            child: _FloatingNote(icon: Icons.auto_awesome, title: 'YOUR OWN', subtitle: 'LIBRARY'),
+          ),
+          const Positioned(
+            bottom: 42,
+            left: 2,
+            child: _FloatingNote(icon: Icons.circle, title: '一座書架', subtitle: '隨時續讀'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingNote extends StatelessWidget {
+  const _FloatingNote({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xD91F1A2B),
+        border: Border.all(color: const Color(0x33D3C2F4)),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 22)],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFFD4C1FF), size: 16),
+          const SizedBox(width: 9),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: _muted, fontSize: 8)),
+              Text(subtitle, style: const TextStyle(color: Color(0xFFEEE6FF), fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _FolderEmptyCoverPainter extends CustomPainter {
+  const _FolderEmptyCoverPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFD9D1C4),
+    );
+    final upper = Path()
+      ..moveTo(size.width * 0.58, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.61)
+      ..close();
+    canvas.drawPath(upper, Paint()..color = const Color(0xFF355047));
+
+    final lower = Path()
+      ..moveTo(0, size.height * 0.74)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width * 0.34, size.height)
+      ..close();
+    canvas.drawPath(lower, Paint()..color = const Color(0xFFC58C70));
+  }
+
+  @override
+  bool shouldRepaint(covariant _FolderEmptyCoverPainter oldDelegate) => false;
+}
+
+, caseSensitive: false),
       '',
     );
     if (book.isComic) return fileStem.isEmpty ? book.title : fileStem;
