@@ -42,6 +42,8 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
   late final web.HTMLIFrameElement _iframe;
   bool _frameLoaded = false;
   final List<String> _pendingCommands = <String>[];
+  late final JSFunction _fullscreenChangeListener;
+  late final JSFunction _fullscreenErrorListener;
 
   @override
   void initState() {
@@ -52,6 +54,19 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
       ..allow = 'fullscreen; clipboard-read; clipboard-write'
       ..allowFullscreen = true
       ..referrerPolicy = 'same-origin';
+    _fullscreenChangeListener = ((web.Event event) {
+      if (!_frameLoaded) return;
+      final isFullscreen = web.window.document.fullscreenElement == _iframe;
+      _postCommand(isFullscreen ? 'enter-immersive' : 'exit-immersive');
+    }).toJS;
+    _fullscreenErrorListener = ((web.Event event) {
+      if (_frameLoaded) _postCommand('fullscreen-denied');
+    }).toJS;
+    web.window.document.addEventListener(
+      'fullscreenchange',
+      _fullscreenChangeListener,
+    );
+    _iframe.addEventListener('fullscreenerror', _fullscreenErrorListener);
     _iframe.style
       ..border = '0'
       ..width = '100%'
@@ -68,6 +83,9 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
         for (final command in pending) {
           _postCommand(command);
         }
+        if (web.window.document.fullscreenElement == _iframe) {
+          _postCommand('enter-immersive');
+        }
       }).toJS,
     );
     widget.handle.attach(_sendCommand);
@@ -79,6 +97,20 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
   }
 
   void _sendCommand(String command) {
+    if (command == 'toggle-fullscreen') {
+      final document = web.window.document;
+      if (document.fullscreenElement == _iframe) {
+        document.exitFullscreen();
+      } else {
+        try {
+          // Invoke fullscreen inside Flutter's original onPressed gesture.
+          _iframe.requestFullscreen();
+        } catch (_) {
+          if (_frameLoaded) _postCommand('fullscreen-denied');
+        }
+      }
+      return;
+    }
     if (command == 'reload') {
       _frameLoaded = false;
       _pendingCommands.clear();
@@ -121,6 +153,11 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
 
   @override
   void dispose() {
+    web.window.document.removeEventListener(
+      'fullscreenchange',
+      _fullscreenChangeListener,
+    );
+    _iframe.removeEventListener('fullscreenerror', _fullscreenErrorListener);
     widget.handle.attach(null);
     _readerFrames.remove(_viewType);
     _iframe.src = 'about:blank';
