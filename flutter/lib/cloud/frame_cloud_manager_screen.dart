@@ -65,10 +65,6 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
   int get _perPage=>_isLocal?100:(_directory?.perPage??80);
   int get _pages=>_total==0?1:(_total+_perPage-1)~/_perPage;
   List<FrameCloudEntry> get _items=>_isLocal?_localEntries:(_directory?.items??const []);
-  List<FrameCloudEntry> get _visible{
-    final q=_search.text.trim().toLowerCase();
-    return q.isEmpty?_items:_items.where((x)=>x.name.toLowerCase().contains(q)).toList();
-  }
 
   Future<void> _init() async {
     try{
@@ -97,7 +93,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
     await _loadDirectory();
   }
   Future<void> _selectLibrary(FrameCloudLibrary v) async {
-    setState(()=>{_libraryType=v,_path=v==FrameCloudLibrary.books?_books.text:_comics.text,_page=1});
+    setState(() { _libraryType = v; _path = v == FrameCloudLibrary.books ? _books.text : _comics.text; _page = 1; });
     try{await _cloud.saveActiveLibrary(v);}catch(_){}
     await _loadDirectory();
   }
