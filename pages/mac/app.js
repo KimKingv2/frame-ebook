@@ -706,6 +706,7 @@ async function cloudPairRequest(path, body) {
       data.httpStatus?"HTTP "+data.httpStatus:"",
       data.contentType?"Content-Type："+data.contentType:"",
       data.redirectTarget?"重新導向："+data.redirectTarget:"",
+      data.finalPath?"實際路徑："+data.finalPath:"",
       data.cfRay?"CF-Ray："+data.cfRay:"",
       data.bodyPreview?"回應摘要："+data.bodyPreview:""
     ].filter(Boolean);

@@ -510,7 +510,6 @@ export function createMacShelf({ store, invoke, appendLog, setStatus, openBook, 
         const entries=await zip.getEntries();
         const metadata=format==="epub"?await readEpubMetadata(entries):await readComicInfoMetadata(entries);
         const extracted=Object.keys(metadata).length>0;
-        if(extracted)appendLog("INFO","書籍 metadata 已從檔案擷取",path+"\n書名："+(metadata.title||"未提供")+"\n作者："+(metadata.author||"未提供")+"\n欄位："+Object.keys(metadata).join("、")+"\nRange："+reader.rangeCount+" 次／"+sizeLabel(reader.bytesRead));
         return {metadata,extracted,rangeCount:reader.rangeCount,bytesRead:reader.bytesRead};
       }finally{try{await zip?.close?.();}catch(_){}}
     }catch(error){
