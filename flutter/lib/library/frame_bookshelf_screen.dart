@@ -7,6 +7,7 @@ import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
+import '../cloud/frame_cloud_manager_screen.dart';
 import 'frame_book_details_dialog.dart';
 import 'frame_library_repository.dart';
 
@@ -157,6 +158,14 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
     return _coverRequests.putIfAbsent(
       hash,
       () => _repository!.loadCover(hash),
+    );
+  }
+
+  void _openCloudManager() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const FrameCloudManagerScreen(),
+      ),
     );
   }
 
@@ -379,11 +388,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
               _navText('閱讀時光', false, () => _openLegacy('/reading-stats/', '閱讀時光')),
               _navText('閱讀室', false, () => _openLegacy('/epub-lab/', '閱讀室')),
               OutlinedButton(
-                onPressed: () => _openLegacy(
-                  '/cloud/',
-                  '連接與掃描',
-                  const {'manager': '1'},
-                ),
+                onPressed: () => _openCloudManager(),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _accent,
                   side: const BorderSide(color: Color(0x668F7BB7)),
@@ -477,11 +482,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilledButton.icon(
-              onPressed: () => _openLegacy(
-                '/cloud/',
-                '連接與掃描',
-                const {'manager': '1'},
-              ),
+              onPressed: () => _openCloudManager(),
               icon: const Icon(Icons.add_link_rounded, size: 17),
               label: const Text('連接與掃描'),
               style: FilledButton.styleFrom(
