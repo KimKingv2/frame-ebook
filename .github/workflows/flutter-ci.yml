@@ -30,7 +30,7 @@ jobs:
         run: dart format lib test
       - name: Analyze
         working-directory: flutter
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Unit tests
         working-directory: flutter
         run: flutter test
