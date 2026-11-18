@@ -479,7 +479,7 @@ export class Paginator extends HTMLElement {
             grid-template-columns:
                 var(--_outer-margin)
                 var(--_half-gap)
-                minmax(0, calc(100% - 2 * var(--_outer-margin) - var(--_gap)))
+                minmax(0, calc(100% - var(--_outer-margin) - var(--_outer-margin) - var(--_gap)))
                 var(--_half-gap)
                 var(--_outer-margin);
             grid-template-rows:
