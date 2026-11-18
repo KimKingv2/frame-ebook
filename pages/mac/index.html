@@ -119,10 +119,13 @@
                 </div>
               </div>
               <div class="manager-profile-row">
-                <label for="profile-select">目前使用的 WebDAV 來源</label>
-                <select id="profile-select" aria-label="選擇 WebDAV 來源"><option value="">尚未設定來源</option></select>
-                <button id="add-profile" class="quiet-button" type="button">新增來源</button>
-                <button id="edit-profile" class="quiet-button" type="button">編輯來源</button>
+                <div class="manager-profile-summary">
+                  <strong id="active-webdav-source">尚未設定 WebDAV 來源</strong>
+                  <small>本 App 使用單一 WebDAV 來源；電子書與漫畫只透過下方兩條目錄分開掃描。</small>
+                </div>
+                <select id="profile-select" aria-label="目前 WebDAV 來源" hidden><option value="">尚未設定來源</option></select>
+                <button id="add-profile" class="quiet-button" type="button" hidden>新增來源</button>
+                <button id="edit-profile" class="quiet-button" type="button">新增 WebDAV 來源</button>
               </div>
               <div class="cloud-root-settings">
                 <div class="cloud-root-settings-heading"><strong>書庫目錄設定</strong><span>BOOKS &amp; COMICS</span></div>
