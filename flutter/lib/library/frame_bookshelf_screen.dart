@@ -1023,7 +1023,8 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
             ? 3
             : ((availableWidth + columnGap) / (minimumCardWidth + columnGap))
                 .floor()
-                .clamp(1, 12);
+                .clamp(1, 12)
+                .toInt();
     final rowCount = (itemCount + columns - 1) ~/ columns;
 
     return SliverPadding(
