@@ -350,8 +350,6 @@
     var appearancePanel = el('reader-appearance-panel');
     var appearanceToggle = el('reader-appearance-toggle');
     var settingsBackdrop = el('reader-settings-backdrop');
-    var quickActions = el('reader-quick-actions');
-    var quickActionsHome = quickActions ? quickActions.parentNode : null;
     var tocSelect = el('toc-select');
     var paneButtons = Array.prototype.slice.call(document.querySelectorAll('[data-reader-pane]'));
 
@@ -361,23 +359,6 @@
       if (settingsBackdrop) workspace.appendChild(settingsBackdrop);
       if (appearancePanel) workspace.appendChild(appearancePanel);
     }
-
-    // Keep the three primary actions independent of the heading and reading
-    // surface while native fullscreen is active. Restore their original home
-    // when fullscreen closes.
-    function syncFullscreenActionDock() {
-      if (!workspace || !quickActions || !quickActionsHome) return;
-      var active = document.fullscreenElement === workspace ||
-        document.webkitFullscreenElement === workspace;
-      if (active) {
-        if (quickActions.parentNode !== workspace) workspace.appendChild(quickActions);
-      } else if (quickActions.parentNode !== quickActionsHome) {
-        quickActionsHome.appendChild(quickActions);
-      }
-    }
-    document.addEventListener('fullscreenchange', syncFullscreenActionDock);
-    document.addEventListener('webkitfullscreenchange', syncFullscreenActionDock);
-    syncFullscreenActionDock();
 
     function isMobile() {
       return !!(window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
@@ -1824,20 +1805,13 @@
     if (view && event.target.value) view.goTo(event.target.value).catch(function (error) { console.error(error); });
   });
 
-  var immersiveExitTimer = 0;
   function updateReaderFullscreenButton() {
     var workspace = el('reading-workspace');
     var button = el('reader-fullscreen');
     if (!workspace || !button) return;
     var active = document.fullscreenElement === workspace ||
       document.webkitFullscreenElement === workspace;
-    if (!active) {
-      workspace.classList.remove('reader-immersive-mode', 'reader-immersive-exiting');
-      if (immersiveExitTimer) {
-        window.clearTimeout(immersiveExitTimer);
-        immersiveExitTimer = 0;
-      }
-    }
+    if (!active) workspace.classList.remove('reader-immersive-mode', 'reader-immersive-exiting');
     button.textContent = active ? '↙ 退出全螢幕' : '⛶ 全螢幕';
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
     button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
@@ -1846,24 +1820,12 @@
     var workspace = el('reading-workspace');
     if (!workspace || !isReaderFullscreen()) return;
 
-    if (immersiveExitTimer) {
-      window.clearTimeout(immersiveExitTimer);
-      immersiveExitTimer = 0;
-    }
+    // Switch the reader chrome in one layout pass. Animating the heading,
+    // controls, or viewport dimensions makes Foliate repaginate repeatedly
+    // and produces a flash when leaving immersive fullscreen.
     var wasImmersive = workspace.classList.contains('reader-immersive-mode');
-    if (wasImmersive) {
-      workspace.classList.remove('reader-immersive-mode');
-      workspace.classList.add('reader-immersive-exiting');
-      immersiveExitTimer = window.setTimeout(function () {
-        workspace.classList.remove('reader-immersive-exiting');
-        immersiveExitTimer = 0;
-      }, 420);
-    } else {
-      workspace.classList.remove('reader-immersive-exiting');
-      workspace.classList.add('reader-immersive-mode');
-    }
-    // Let the animated workspace finish changing size, then explicitly
-    // remeasure Foliate before another page turn can use the new viewport.
+    workspace.classList.toggle('reader-immersive-mode', !wasImmersive);
+    workspace.classList.remove('reader-immersive-exiting');
     scheduleReaderLayoutRefresh();
   }
   async function toggleReaderFullscreen() {
