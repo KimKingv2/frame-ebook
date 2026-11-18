@@ -10,14 +10,20 @@ int _nextLegacyFrameId = 0;
 Widget buildFrameLegacyPage({
   required Uri uri,
   required String title,
+  bool showToolbar = true,
 }) =>
-    _WebLegacyPage(uri: uri, title: title);
+    _WebLegacyPage(uri: uri, title: title, showToolbar: showToolbar);
 
 class _WebLegacyPage extends StatefulWidget {
-  const _WebLegacyPage({required this.uri, required this.title});
+  const _WebLegacyPage({
+    required this.uri,
+    required this.title,
+    required this.showToolbar,
+  });
 
   final Uri uri;
   final String title;
+  final bool showToolbar;
 
   @override
   State<_WebLegacyPage> createState() => _WebLegacyPageState();
@@ -75,17 +81,19 @@ class _WebLegacyPageState extends State<_WebLegacyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF12101A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1B1825),
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            tooltip: '重新載入',
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+      appBar: widget.showToolbar
+          ? AppBar(
+              backgroundColor: const Color(0xFF1B1825),
+              title: Text(widget.title),
+              actions: [
+                IconButton(
+                  tooltip: '重新載入',
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            )
+          : null,
       body: HtmlElementView(viewType: _viewType),
     );
   }
