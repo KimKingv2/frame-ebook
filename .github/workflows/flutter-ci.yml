@@ -49,8 +49,8 @@ jobs:
           from pathlib import Path
 
           web = Path("build/web")
-          index = web / "index.html"
-          html = index.read_text(encoding="utf-8")
+          bootstrap = web / "flutter_bootstrap.js"
+          html = bootstrap.read_text(encoding="utf-8")
           pattern = re.compile(
               r"_flutter\.loader\.load\(\{\s*serviceWorkerSettings:\s*\{.*?\}\s*\}\);",
               re.DOTALL,
@@ -59,7 +59,7 @@ jobs:
           html, count = pattern.subn(replacement, html, count=1)
           if count != 1:
               raise SystemExit("Could not disable Flutter's generated service worker safely.")
-          index.write_text(html, encoding="utf-8")
+          bootstrap.write_text(html, encoding="utf-8")
 
           service_worker = web / "flutter_service_worker.js"
           if service_worker.exists():
