@@ -88,10 +88,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
       _setStatus('讀取雲端設定失敗：'+e.toString(),error:true);
     }
   }
-  void _setStatus(String v,{bool error=false}){if(!mounted)return;setState(()=>{_status=v,_error=error?v:null});}
+  void _setStatus(String v,{bool error=false}){if(!mounted)return;setState(() { _status = v; _error = error ? v : null; });}
 
   Future<void> _selectProvider(FrameCloudProvider p) async {
-    setState(()=>{_provider=p,_path=_root,_page=1});
+    setState(() { _provider = p; _path = _root; _page = 1; });
     if(p.isServerSide){try{await _cloud.saveActiveProvider(p);}catch(e){_setStatus('保存來源失敗：'+e.toString(),error:true);}}
     await _loadDirectory();
   }
@@ -157,7 +157,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
         _cloud.loadScanState(provider:p,library:FrameCloudLibrary.books,rootPath:_books.text),
         _cloud.loadScanState(provider:p,library:FrameCloudLibrary.comics,rootPath:_comics.text),
       ]);
-      if(mounted)setState(()=>{_booksScan=r[0],_comicsScan=r[1]});
+      if (mounted) setState(() { _booksScan = r[0]; _comicsScan = r[1]; });
     }catch(_){}
   }
   Future<void> _loadDirectory() async {
@@ -186,7 +186,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
   Future<void> _navigate(String p) async {
     final n=normalizeFrameCloudPath(p);
     if(n==null||!frameCloudPathIsWithinRoot(n,_root))return;
-    setState(()=>{_path=n,_page=1,_search.clear()});
+    setState(() { _path = n; _page = 1; _search.clear(); });
     await _loadDirectory();
   }
   Future<void> _up() async {
