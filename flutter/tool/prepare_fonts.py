@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and verify the pinned Noto Sans TC font used by all FRAME Ebook targets."""
+"""Fetch and verify the pinned Traditional and Simplified CJK fallback fonts."""
 
 from __future__ import annotations
 
@@ -9,6 +9,13 @@ from pathlib import Path
 
 SOURCE_REVISION = "f8d157532fbfaeda587e826d4cd5b21a49186f7c"
 BASE_URL = f"https://raw.githubusercontent.com/notofonts/noto-cjk/{SOURCE_REVISION}"
+FONT_FALLBACK = {
+    "path": "Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf",
+    "name": "NotoSansSC-VF.ttf",
+    "size": 17_773_132,
+    "git_blob_sha1": "5371a543be5fc670c7cdee9760c03554ee3e9b8e",
+}
+
 FONT = {
     "path": "Sans/Variable/TTF/Subset/NotoSansTC-VF.ttf",
     "name": "NotoSansTC-VF.ttf",
@@ -65,6 +72,7 @@ def main() -> None:
     project = Path(__file__).resolve().parents[1]
     font_dir = project / "assets" / "fonts"
     fetch_verified(FONT, font_dir / FONT["name"])
+    fetch_verified(FONT_FALLBACK, font_dir / FONT_FALLBACK["name"])
     fetch_verified(LICENSE, font_dir / LICENSE["name"])
 
 

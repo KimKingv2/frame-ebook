@@ -29,5 +29,9 @@ flutter:
       fonts:
         - asset: assets/fonts/NotoSansTC-VF.ttf
           weight: 400
+    - family: NotoSansSCFallback
+      fonts:
+        - asset: assets/fonts/NotoSansSC-VF.ttf
+          weight: 400
   assets:
     - assets/fonts/OFL.txt

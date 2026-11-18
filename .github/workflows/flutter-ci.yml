@@ -46,7 +46,9 @@ jobs:
             case "$path" in
               flutter/lib/library/frame_reader_engine_web.dart|\
               flutter/lib/library/frame_bookshelf_screen.dart|\
-              flutter/lib/main.dart)
+              flutter/lib/main.dart|\
+              flutter/pubspec.yaml|\
+              flutter/tool/prepare_fonts.py)
                 continue
                 ;;
             esac
@@ -147,7 +149,9 @@ jobs:
         working-directory: flutter
         run: |
           test -s build/web/assets/assets/fonts/NotoSansTC-VF.ttf
+          test -s build/web/assets/assets/fonts/NotoSansSC-VF.ttf
           grep -q '"family":"NotoSansTC"' build/web/assets/FontManifest.json
+          grep -q '"family":"NotoSansSCFallback"' build/web/assets/FontManifest.json
       - name: Upload Web preview artifact
         uses: actions/upload-artifact@v4
         with:
