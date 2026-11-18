@@ -275,7 +275,9 @@ class FrameReaderRepository {
       'events': [event.toJson()],
     });
     final accepted = response['accepted'];
-    return accepted is num ? accepted > 0 : int.tryParse('$accepted')! > 0;
+    return accepted is num
+        ? accepted > 0
+        : (int.tryParse(accepted?.toString() ?? '') ?? 0) > 0;
   }
 
   void clearStateCache() => _stateCache.clear();
