@@ -195,6 +195,13 @@ class FrameWebViewApiClient implements FrameApiClient {
       _decodeJson(await _request(method: 'POST', path: path, body: body));
 
   @override
+  Future<Map<String, dynamic>> deleteJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async =>
+      _decodeJson(await _request(method: 'DELETE', path: path, body: body));
+
+  @override
   Future<Uint8List> getBytes(String path) async {
     final response = await _request(method: 'GET', path: path, asBytes: true);
     final status = response['status'] as int? ?? 0;
