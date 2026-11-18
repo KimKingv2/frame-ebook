@@ -406,6 +406,53 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     );
   }
 
+  Widget _cardActionButton({
+    required String label,
+    required VoidCallback onPressed,
+    required bool primary,
+  }) {
+    final foreground = primary ? const Color(0xFFE4D6FF) : const Color(0xFFC7BBD9);
+    final background = primary ? const Color(0xFF403252) : const Color(0xFF211D2B);
+    final border = primary ? const Color(0xFF6C568E) : const Color(0xFF665A78);
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(7),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(7),
+          child: Container(
+            height: 36,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 7),
+            decoration: BoxDecoration(
+              border: Border.all(color: border, width: 1),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'NotoSansTC',
+                fontFamilyFallback: ['NotoSansSCFallback'],
+                color: Color(0xFFE4D6FF),
+                fontSize: 10,
+                height: 1.15,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.none,
+              ).copyWith(color: foreground),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _gridCard(
     FrameShelfEntry entry,
     FrameBook book,
@@ -493,52 +540,24 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: SizedBox(
-            height: 34,
+            height: 36,
             child: Row(
               children: [
                 Expanded(
-                  child: FilledButton(
+                  flex: 3,
+                  child: _cardActionButton(
+                    label: actionText,
+                    primary: true,
                     onPressed: () => folder ? _openFolder(entry) : _openReader(book),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF392F4D),
-                      foregroundColor: _accent,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 34),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      textStyle: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    child: Text(
-                      actionText,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                OutlinedButton(
-                  onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _muted,
-                    side: const BorderSide(color: Color(0x66564C68)),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 34),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  child: Text(
-                    folder ? '查看卷冊' : '作品資訊',
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 7),
+                Expanded(
+                  flex: 2,
+                  child: _cardActionButton(
+                    label: folder ? '查看卷冊' : '作品資訊',
+                    primary: false,
+                    onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
                   ),
                 ),
               ],
