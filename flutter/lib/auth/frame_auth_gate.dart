@@ -72,8 +72,8 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
           onPageFinished: _onPageFinished,
           onWebResourceError: (error) {
             if (error.isForMainFrame == false || !mounted) return;
-            final failedUri = Uri.tryParse(error.url);
-            final failedLocation = failedUri == null
+            final failedUri = Uri.tryParse(error.url ?? '');
+            final failedLocation = failedUri == null || failedUri.host.isEmpty
                 ? ''
                 : ' · ${failedUri.host}${failedUri.path}';
             setState(() {

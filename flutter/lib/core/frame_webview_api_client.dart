@@ -98,7 +98,7 @@ class FrameWebViewApiClient implements FrameApiClient {
         deliver({id:requestId,ok:false,error:'已阻止跨網域 API 請求。'});
         return;
       }
-      const body = ${bodyLiteral};
+      const body = $bodyLiteral;
       const headers = {Accept: ${asBytes ? "'*/*'" : "'application/json'"}};
       if (body !== null) headers['Content-Type'] = 'application/json';
       const response = await fetch(url.href, {
@@ -114,7 +114,7 @@ class FrameWebViewApiClient implements FrameApiClient {
         return;
       }
       let responseBody;
-      if (${asBytes}) {
+      if ($asBytes) {
         const bytes = new Uint8Array(await response.arrayBuffer());
         let binary = '';
         for (let i = 0; i < bytes.length; i += 0x8000) {

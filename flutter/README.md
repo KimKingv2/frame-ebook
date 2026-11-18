@@ -43,4 +43,4 @@ Native self-use defaults to `https://frame-ebook.pages.dev`; this can also be ov
 - `flutter build macos`
 - `flutter build apk`
 
-GitHub Actions generates platform scaffolding in each CI job. Flutter Web output is not connected to the production Cloudflare Pages deployment. Do not change the production Pages build output from `pages/` until full feature parity passes and the user explicitly approves cutover.
+GitHub Actions generates platform scaffolding in each CI job and applies the Android release INTERNET permission plus the macOS App Sandbox outgoing-network entitlement. Flutter Web output is not connected to the production Cloudflare Pages deployment. Do not open the Web artifact's `index.html` directly with `file://`: the Web app must be served over HTTPS from the same protected hostname as the existing Pages Functions, so Cloudflare Access cookies and same-origin `/api/*` calls work. The startup screen now explains this instead of leaving a blank page. Do not change the production Pages build output from `pages/` until full feature parity passes and the user explicitly approves cutover.
