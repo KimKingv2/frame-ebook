@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/frame_api_client.dart';
 import '../core/frame_api_factory.dart';
+import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 
 class FrameAuthGate extends StatefulWidget {
@@ -79,13 +80,11 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
   @override
   Widget build(BuildContext context) {
     if (_checking) return const _AuthLoadingScreen();
-    if (_authenticated) return widget.child;
-
+    if (_authenticated) {
+      return FrameApiScope(api: _api, child: widget.child);
+    }
     if (kIsWeb) {
-      return _AccessWebNotice(
-        error: _error,
-        onRetry: _checkSession,
-      );
+      return _AccessWebNotice(error: _error, onRetry: _checkSession);
     }
     return _NativeAccessLoginScreen(
       baseUri: _baseUri,
@@ -205,7 +204,7 @@ class _NativeAccessLoginScreenState extends State<_NativeAccessLoginScreen> {
           },
           onPageFinished: _onPageFinished,
           onWebResourceError: (error) {
-            if (!error.isForMainFrame || !mounted) return;
+            if (error.isForMainFrame != true || !mounted) return;
             setState(() => _webError = error.description);
           },
           onNavigationRequest: (request) {

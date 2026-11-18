@@ -8,7 +8,17 @@ class FrameAppConfig {
 
   static Uri get apiBaseUri {
     if (kIsWeb) {
-      final current = Uri.base;
+      final configured = _configuredBaseUrl.trim();
+      final current = configured.isEmpty ? Uri.base : Uri.tryParse(configured);
+      if (current == null ||
+          !current.hasAuthority ||
+          current.host.isEmpty ||
+          (current.scheme != 'https' && current.scheme != 'http') ||
+          current.userInfo.isNotEmpty ||
+          current.query.isNotEmpty ||
+          current.fragment.isNotEmpty) {
+        throw const FormatException('FRAME_EBOOK_API_BASE_URL 格式不正確。');
+      }
       return Uri(
         scheme: current.scheme,
         host: current.host,

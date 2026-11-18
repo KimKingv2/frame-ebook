@@ -1,32 +1,46 @@
 # FRAME Ebook Flutter
 
-This is the Flutter client being built to reproduce the existing application in the repository's main branch across Web, macOS and Android.
+The Flutter client is being rebuilt against the exact product behaviour in the repository's main branch. Main is the sole feature and visual reference. The three targets are Web, macOS and Android. The existing Pages app and its backend remain online and unchanged throughout the migration.
 
-The source of truth for product behaviour and visual parity is the current main branch:
+## Main-branch source map
 
-- Home bookshelf: pages/index.html and pages/assets/library.js
-- OpenList connection, browsing and scanning: pages/cloud/index.html and pages/assets/cloud-library.js
-- Book metadata and bookshelf data: pages/assets/library-store.js and functions/api/reading/*
-- EPUB / CBZ Reading Room: pages/epub-lab/index.html and pages/assets/epub-lab-comics-20261112.js
-- Reading-time tracking and statistics: pages/assets/reading-tracker.js and pages/assets/reading-stats.js
+- Home bookshelf: `pages/index.html`, `pages/assets/library.js`, `pages/assets/library-store.js`
+- Cloud connection, directory browser and scanner: `pages/cloud/index.html`, `pages/assets/cloud-library.js`, `pages/assets/local-openlist.js`
+- EPUB / CBZ Reading Room: `pages/epub-lab/index.html`, `pages/assets/epub-lab-comics-20261112.js`
+- Reading statistics: `pages/reading-stats/index.html`, `pages/assets/reading-stats.js`, `pages/assets/reading-tracker.js`
+- Existing backend contracts: `functions/api/**`, `functions/_lib/**`, `migrations/**`
 
-The current Flutter screen is still a transport proof-of-concept. It is not the finished product and does not yet have feature parity. Do not remove or change the existing Pages application while porting the interface and features.
+The required feature-by-feature acceptance list is `docs/MAIN-PARITY-INVENTORY.md`.
+
+## Current implementation stage
+
+The Flutter shell now checks the existing Cloudflare Access session, retrieves the real D1 bookshelf, groups folder volumes using the main-branch key, renders separate EPUB and Comics shelves, recent reading, search, sort, grid/list modes, folder navigation, cover thumbnails from the private R2 endpoint and basic metadata editing.
+
+Until a feature is ported and parity-tested, the existing same-origin main page remains available as a compatibility bridge for the original Cloud Manager, Reading Room and Reading Statistics. These bridges do not change the backend or create a second data model. They are transitional, not a claim that the feature has already been rewritten in Flutter.
+
+The home shelf reads only existing APIs. The original EPUB/CBZ files remain in Alist/OpenList. Cover responses are retained only in a bounded in-memory cache. Do not add persistent archive, expanded ZIP or page-image caches.
 
 ## Run
 
 From this directory:
 
-- flutter pub get
-- flutter run -d macos
-- flutter run -d chrome
-- flutter run -d <Android device ID>
+- `flutter pub get`
+- `flutter run -d macos`
+- `flutter run -d chrome`
+- `flutter run -d <Android device ID>`
+
+For a non-production Pages preview, pass its API origin only when that origin serves the existing Pages Functions:
+
+`--dart-define=FRAME_EBOOK_API_BASE_URL=https://your-preview-host.example`
+
+Native self-use defaults to `https://frame-ebook.pages.dev`; this can also be overridden with the same dart-define.
 
 ## Build
 
-- flutter analyze
-- flutter test
-- flutter build web
-- flutter build macos
-- flutter build apk
+- `flutter analyze`
+- `flutter test`
+- `flutter build web`
+- `flutter build macos`
+- `flutter build apk`
 
-The GitHub Actions workflow generates platform scaffolding for CI. The Flutter Web output is not wired to the production Cloudflare Pages deployment.
+GitHub Actions generates platform scaffolding in each CI job. Flutter Web output is not connected to the production Cloudflare Pages deployment. Do not change the production Pages build output from `pages/` until full feature parity passes and the user explicitly approves cutover.
