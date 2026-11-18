@@ -9,7 +9,12 @@ class FrameAppConfig {
   static Uri get apiBaseUri {
     if (kIsWeb) {
       final configured = _configuredBaseUrl.trim();
-      final current = configured.isEmpty ? Uri.base : Uri.tryParse(configured);
+      // Uri.base includes the page's query string and fragment. Those belong
+      // to the browser URL (for example a cache-busting ?v=... parameter),
+      // not the API origin, so normalize the implicit value to origin first.
+      final current = configured.isEmpty
+          ? Uri.parse(Uri.base.origin)
+          : Uri.tryParse(configured);
       if (current == null ||
           !current.hasAuthority ||
           current.host.isEmpty ||
