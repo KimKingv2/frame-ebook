@@ -48,9 +48,12 @@
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
   var pageTapBoundDocuments = new WeakSet();
 
-  function isReaderImmersive() {
+  function isReaderFullscreen() {
     var workspace = el('reading-workspace');
-    return !!workspace && workspace.classList.contains('reader-immersive-mode');
+    return !!workspace && (
+      document.fullscreenElement === workspace ||
+      document.webkitFullscreenElement === workspace
+    );
   }
 
   function isControlOrLinkTarget(target) {
@@ -97,10 +100,10 @@
     var point = getReaderWindowPoint(event, sourceDoc);
     if (!point) return false;
 
-    // Top 0–20% toggles the in-page immersive reading layout.
-    // The remaining 20–100% is split into left/right page-turn zones.
+    // The top 0–20% switches between the normal and immersive layouts
+    // only after native browser fullscreen has been entered.
     if (point.relativeY < point.rect.height * 0.2) {
-      toggleReaderImmersive();
+      if (isReaderFullscreen()) toggleImmersiveFullscreen();
     } else {
       turnReaderPage(point.x < point.rect.left + point.rect.width / 2 ? -1 : 1);
     }
@@ -1740,7 +1743,7 @@
           turnReaderPage(1);
           break;
         case 'toggle-fullscreen':
-          toggleReaderImmersive();
+          toggleReaderFullscreen();
           break;
         case 'show-toc':
         case 'show-notes':
@@ -1807,122 +1810,59 @@
     var workspace = el('reading-workspace');
     var button = el('reader-fullscreen');
     if (!workspace || !button) return;
-    var active = isReaderImmersive();
+    var active = isReaderFullscreen();
+    if (!active) {
+      workspace.classList.remove('reader-immersive-mode', 'reader-immersive-exiting');
+      document.body.classList.remove('reader-immersive-open');
+    }
     button.classList.toggle('is-fullscreen-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    button.setAttribute('aria-label', active ? '退出沉浸式閱讀' : '進入沉浸式閱讀');
-    button.title = active ? '退出沉浸式閱讀' : '進入沉浸式閱讀';
-  }
-  var readerEmbedStyleSnapshot = null;
-
-  function restoreReaderEmbedAttribute(element, value) {
-    if (!element) return;
-    if (value === null) element.removeAttribute('style');
-    else element.setAttribute('style', value);
+    button.setAttribute('aria-label', active ? '退出全螢幕閱讀' : '進入全螢幕閱讀');
+    button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
   }
 
-  function setReaderEmbedFrameImmersive(active) {
-    if (!flutterReaderEmbed || window.parent === window) return;
-    var parentWindow = window.parent;
-    var parentDocument = parentWindow.document;
-    var frame = window.frameElement;
-    if (!frame || !frame.style) return;
-
-    if (active) {
-      if (!readerEmbedStyleSnapshot) {
-        var parentBody = parentDocument.body;
-        var ancestors = [];
-        var ancestor = frame.parentElement;
-        while (ancestor) {
-          ancestors.push({
-            element: ancestor,
-            style: ancestor.getAttribute('style')
-          });
-          if (ancestor === parentBody) break;
-          ancestor = ancestor.parentElement;
-        }
-        readerEmbedStyleSnapshot = {
-          frame: frame.getAttribute('style'),
-          html: parentDocument.documentElement.getAttribute('style'),
-          body: parentBody ? parentBody.getAttribute('style') : null,
-          ancestors: ancestors
-        };
-      }
-
-      // Flutter Web places HtmlElementView inside compositor wrappers. A fixed
-      // iframe can still be clipped or trapped by transforms/stacking contexts
-      // on those ancestors. Neutralize those constraints temporarily while
-      // preserving every original inline style for an exact exit restoration.
-      readerEmbedStyleSnapshot.ancestors.forEach(function (entry) {
-        var element = entry.element;
-        var style = element.style;
-        var computed = parentWindow.getComputedStyle(element);
-        if (computed.position === 'static') {
-          style.setProperty('position', 'relative', 'important');
-        }
-        style.setProperty('z-index', '2147483647', 'important');
-        style.setProperty('transform', 'none', 'important');
-        style.setProperty('filter', 'none', 'important');
-        style.setProperty('backdrop-filter', 'none', 'important');
-        style.setProperty('perspective', 'none', 'important');
-        style.setProperty('contain', 'none', 'important');
-        style.setProperty('content-visibility', 'visible', 'important');
-        style.setProperty('will-change', 'auto', 'important');
-        style.setProperty('overflow', 'visible', 'important');
-        style.setProperty('overflow-x', 'visible', 'important');
-        style.setProperty('overflow-y', 'visible', 'important');
-        style.setProperty('clip-path', 'none', 'important');
-        style.setProperty('mask', 'none', 'important');
-        style.setProperty('isolation', 'auto', 'important');
-        style.setProperty('opacity', '1', 'important');
-        style.setProperty('mix-blend-mode', 'normal', 'important');
-      });
-
-      var frameStyle = frame.style;
-      frameStyle.setProperty('position', 'fixed', 'important');
-      frameStyle.setProperty('inset', '0', 'important');
-      frameStyle.setProperty('top', '0', 'important');
-      frameStyle.setProperty('right', '0', 'important');
-      frameStyle.setProperty('bottom', '0', 'important');
-      frameStyle.setProperty('left', '0', 'important');
-      frameStyle.setProperty('width', '100vw', 'important');
-      frameStyle.setProperty('height', '100vh', 'important');
-      frameStyle.setProperty('height', '100dvh', 'important');
-      frameStyle.setProperty('max-width', 'none', 'important');
-      frameStyle.setProperty('max-height', 'none', 'important');
-      frameStyle.setProperty('margin', '0', 'important');
-      frameStyle.setProperty('z-index', '2147483647', 'important');
-      frameStyle.setProperty('background', '#12101a', 'important');
-      frameStyle.setProperty('transform', 'none', 'important');
-      parentDocument.documentElement.style.setProperty('overflow', 'hidden', 'important');
-      if (parentDocument.body) {
-        parentDocument.body.style.setProperty('overflow', 'hidden', 'important');
-      }
-      return;
-    }
-
-    if (!readerEmbedStyleSnapshot) return;
-    var snapshot = readerEmbedStyleSnapshot;
-    restoreReaderEmbedAttribute(frame, snapshot.frame);
-    snapshot.ancestors.slice().reverse().forEach(function (entry) {
-      restoreReaderEmbedAttribute(entry.element, entry.style);
-    });
-    restoreReaderEmbedAttribute(parentDocument.documentElement, snapshot.html);
-    restoreReaderEmbedAttribute(parentDocument.body, snapshot.body);
-    readerEmbedStyleSnapshot = null;
-  }
-
-  function toggleReaderImmersive() {
+  function toggleImmersiveFullscreen() {
     var workspace = el('reading-workspace');
-    if (!workspace) return;
+    if (!workspace || !isReaderFullscreen()) return;
     var active = !workspace.classList.contains('reader-immersive-mode');
     workspace.classList.toggle('reader-immersive-mode', active);
     document.body.classList.toggle('reader-immersive-open', active);
-    setReaderEmbedFrameImmersive(active);
     updateReaderFullscreenButton();
     scheduleReaderLayoutRefresh();
   }
-  el('reader-fullscreen').addEventListener('click', toggleReaderImmersive);
+
+  async function toggleReaderFullscreen() {
+    var workspace = el('reading-workspace');
+    if (!workspace) return;
+    var active = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (active) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        var request = workspace.requestFullscreen || workspace.webkitRequestFullscreen;
+        if (!request) {
+          setText('reader-status', '目前瀏覽器不支援頁面全螢幕，請使用瀏覽器的全螢幕功能。');
+          return;
+        }
+        var result = request.call(workspace);
+        if (result && typeof result.then === 'function') await result;
+      }
+    } catch (error) {
+      setText('reader-status', '無法切換全螢幕：' + (error && error.message ? error.message : String(error)));
+      console.warn('FRAME Reader fullscreen request failed:', error);
+    }
+    updateReaderFullscreenButton();
+  }
+
+  function handleReaderFullscreenChange() {
+    updateReaderFullscreenButton();
+    scheduleReaderLayoutRefresh();
+  }
+
+  el('reader-fullscreen').addEventListener('click', toggleReaderFullscreen);
+  document.addEventListener('fullscreenchange', handleReaderFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleReaderFullscreenChange);
   updateReaderFullscreenButton();
 
   window.addEventListener('pagehide', function () {
