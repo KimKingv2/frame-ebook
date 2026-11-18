@@ -1,4 +1,4 @@
-import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261117-filename-id-r2";
+import { listBooks, getBook, updateBook } from "/assets/library-store.js?v=20261118-preference-metadata-fix-r1";
 
 const $ = id => document.getElementById(id);
 const state = { books: [], query: "", sort: "recent", view: "grid", dialogBookId: null, linkTargetBookId: null, activeFolderKey: null };
@@ -263,9 +263,9 @@ function folderVolumeTitle(volume) {
   const fileStem = fileName.replace(/\.(epub|cbz)$/i, "");
   if (getBookShelf(volume) === "comics") {
     const comicMetadata = volume.comicMetadata || {};
-    return comicMetadata.nameCn || comicMetadata.name || volume.bookTitle || fileStem;
+    return comicMetadata.nameCn || comicMetadata.name || volume.bookTitle || volume.title || fileStem;
   }
-  return volume.bookTitle || fileStem;
+  return volume.bookTitle || volume.title || fileStem;
 }
 function folderVolumeAuthor(volume) {
   if (volume.manualAuthor) return volume.author || "";
