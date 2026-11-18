@@ -3865,8 +3865,15 @@ html.flutter-reader-embed .reading-session-indicator {
 
 
 /* Immersive reading is an in-page overlay, not browser-native fullscreen.
-   It covers the Reading Room/embedded frame while keeping the browser chrome. */
-.reading-workspace.reader-immersive-mode:not(:fullscreen) {
+   Remove the page's animated transform so position:fixed anchors to the viewport. */
+body.reader-immersive-open {
+  overflow:hidden !important;
+}
+body.reader-immersive-open main {
+  animation:none !important;
+  transform:none !important;
+}
+.reading-workspace.reader-immersive-mode {
   position:fixed !important;
   inset:0 !important;
   z-index:2147482000 !important;
@@ -3888,7 +3895,7 @@ html.flutter-reader-embed .reading-session-indicator {
   background:#12101a !important;
   color:#f2edf9 !important;
 }
-.reading-workspace.reader-immersive-mode:not(:fullscreen) .reader-layout {
+.reading-workspace.reader-immersive-mode .reader-layout {
   display:flex !important;
   flex:1 1 auto !important;
   width:100% !important;
@@ -3900,9 +3907,9 @@ html.flutter-reader-embed .reading-session-indicator {
   padding:0 !important;
   overflow:hidden !important;
 }
-.reading-workspace.reader-immersive-mode:not(:fullscreen) .reader-main-column,
-.reading-workspace.reader-immersive-mode:not(:fullscreen) .reader-frame,
-.reading-workspace.reader-immersive-mode:not(:fullscreen) .reader-viewport {
+.reading-workspace.reader-immersive-mode .reader-main-column,
+.reading-workspace.reader-immersive-mode .reader-frame,
+.reading-workspace.reader-immersive-mode .reader-viewport {
   display:flex !important;
   flex:1 1 auto !important;
   width:100% !important;
@@ -3916,14 +3923,14 @@ html.flutter-reader-embed .reading-session-indicator {
   border:0 !important;
   border-radius:0 !important;
 }
-.reading-workspace.reader-immersive-mode:not(:fullscreen) .reader-viewport foliate-view {
+.reading-workspace.reader-immersive-mode .reader-viewport foliate-view {
   display:block !important;
   flex:1 1 auto !important;
   width:100% !important;
   height:100% !important;
   min-height:0 !important;
 }
-html.flutter-reader-embed .reading-workspace.reader-immersive-mode:not(:fullscreen) {
+html.flutter-reader-embed .reading-workspace.reader-immersive-mode {
   position:fixed !important;
   inset:0 !important;
 }
