@@ -151,8 +151,8 @@ void main() {
     });
 
     test('rejects malformed reading events before sending them', () async {
-      expect(
-        () => repository.recordReadingEvent(
+      await expectLater(
+        repository.recordReadingEvent(
           FrameReadingEvent(
             id: 'event-0001',
             bookId: book.id,
