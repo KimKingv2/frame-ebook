@@ -1286,9 +1286,24 @@
     }
 
     var chapterPercent = chapterProgressFromTOC(detail);
+    var isReflowableEpub = !!(book && view && !view.isFixedLayout &&
+      Array.isArray(book.sections) && book.sections.length);
     var chapterLabel = tocItem && tocItem.href ? '本章進度' : '本節進度';
-    if (chapterPercent == null && typeof detail.sectionFraction === 'number' && isFinite(detail.sectionFraction)) {
+    if (chapterPercent == null && isReflowableEpub &&
+        typeof detail.sectionFraction === 'number' && isFinite(detail.sectionFraction)) {
       chapterPercent = Math.max(0, Math.min(100, detail.sectionFraction * 100));
+    }
+    // Very short spine sections can produce NaN from the paginated renderer's
+    // page-count denominator. Fall back to the visible text position so an
+    // EPUB still has a useful section meter rather than silently hiding it.
+    if (chapterPercent == null && isReflowableEpub && detail.range && detail.range.startContainer) {
+      var chapterDoc = detail.range.startContainer.ownerDocument;
+      var chapterRoot = chapterDoc && (chapterDoc.body || chapterDoc.documentElement);
+      var chapterLength = chapterRoot && chapterRoot.textContent ? chapterRoot.textContent.length : 0;
+      var chapterOffset = textOffsetAtRange(chapterDoc, detail.range);
+      if (chapterLength > 0 && chapterOffset != null) {
+        chapterPercent = Math.max(0, Math.min(100, chapterOffset / chapterLength * 100));
+      }
     }
     var chapterRow = el('reader-chapter-progress-row');
     if (chapterPercent != null) {
