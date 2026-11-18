@@ -62,11 +62,13 @@ jobs:
               r"_flutter\.loader\.load\(\{\s*serviceWorkerSettings:\s*\{.*?\}\s*\}\);",
               re.DOTALL,
           )
-          replacement = "_flutter.loader.load({config: {canvasKitVariant: 'full'}});"
+          replacement = "_flutter.loader.load({config: {canvasKitVariant: 'full', canvasKitBaseUrl: 'canvaskit/'}});"
           html, count = pattern.subn(replacement, html, count=1)
           if count != 1:
               raise SystemExit("Could not disable Flutter's generated service worker safely.")
           bootstrap.write_text(html, encoding="utf-8")
+          if "canvasKitBaseUrl: 'canvaskit/'" not in html:
+              raise SystemExit("Flutter Web must use the locally bundled CanvasKit runtime.")
 
           service_worker = web / "flutter_service_worker.js"
           if service_worker.exists():
