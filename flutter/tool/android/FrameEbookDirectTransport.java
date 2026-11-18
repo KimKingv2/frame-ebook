@@ -167,9 +167,17 @@ final class FrameEbookDirectTransport {
                 reason = status >= 400 ? "Upstream Error" : "OK";
             }
 
-            publish(status == 206
-                    ? "雲端直連成功 · 網盤回傳 206 Range"
-                    : "雲端直連成功 · 正在串流書檔正文");
+            if (status >= 400) {
+                publish(firstRequest
+                        ? "雲端 API 拒絕請求 · HTTP " + status + "（尚未取得 302）"
+                        : "已取得 302，但網盤回應 HTTP " + status);
+            } else if (firstRequest) {
+                publish("雲端 API 回應 HTTP " + status + "，未取得預期的 302。");
+            } else {
+                publish(status == 206
+                        ? "雲端直連成功 · 網盤回傳 206 Range"
+                        : "雲端直連成功 · 正在串流書檔正文");
+            }
             return new WebResourceResponse(
                     mimeType,
                     encoding,
