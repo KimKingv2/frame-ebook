@@ -99,7 +99,7 @@ class _WebFrameReaderEngineState extends State<_WebFrameReaderEngine> {
       'channel': 'frame-ebook-reader',
       'command': command,
     });
-    target.postMessage(message.toJS, web.window.location.origin);
+    target.postMessage(message.toJS, web.window.location.origin.toJS);
   }
 
   @override
