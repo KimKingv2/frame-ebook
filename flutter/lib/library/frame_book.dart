@@ -145,6 +145,11 @@ class FrameBook {
 }
 
 
+bool _isNaturalNumberPart(String value) {
+  return value.isNotEmpty &&
+      value.codeUnits.every((unit) => unit >= 48 && unit <= 57);
+}
+
 int _compareNaturalFileNames(String first, String second) {
   final firstParts = RegExp(r'\d+|\D+')
       .allMatches(first.toLowerCase())
@@ -160,7 +165,24 @@ int _compareNaturalFileNames(String first, String second) {
   for (var index = 0; index < length; index += 1) {
     final left = firstParts[index];
     final right = secondParts[index];
-    final leftIsNumeric = RegExp(r'^\d+
+    var comparison = 0;
+    if (_isNaturalNumberPart(left) && _isNaturalNumberPart(right)) {
+      var normalizedLeft = left;
+      var normalizedRight = right;
+      while (normalizedLeft.length > 1 && normalizedLeft.codeUnitAt(0) == 48) {
+        normalizedLeft = normalizedLeft.substring(1);
+      }
+      while (normalizedRight.length > 1 && normalizedRight.codeUnitAt(0) == 48) {
+        normalizedRight = normalizedRight.substring(1);
+      }
+      comparison = normalizedLeft.length.compareTo(normalizedRight.length);
+      if (comparison == 0) {
+        comparison = normalizedLeft.compareTo(normalizedRight);
+      }
+    } else {
+      comparison = left.compareTo(right);
+    }
+    if (comparison != 0) return comparison;
   }
   return firstParts.length.compareTo(secondParts.length);
 }
