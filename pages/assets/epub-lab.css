@@ -3934,3 +3934,27 @@ html.flutter-reader-embed .reading-workspace.reader-immersive-mode {
   position:fixed !important;
   inset:0 !important;
 }
+
+
+/* Immersive mode inside Flutter must fill the complete iframe viewport.
+   The reader script also promotes the host iframe over Flutter's AppBar. */
+html.flutter-reader-embed body.reader-immersive-open,
+html.flutter-reader-embed body.reader-immersive-open .app-shell,
+html.flutter-reader-embed body.reader-immersive-open main {
+  width:100vw !important;
+  height:100vh !important;
+  height:100dvh !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:hidden !important;
+}
+html.flutter-reader-embed body.reader-immersive-open .reading-workspace {
+  position:fixed !important;
+  inset:0 !important;
+  width:100vw !important;
+  height:100vh !important;
+  height:100dvh !important;
+  max-width:none !important;
+  max-height:none !important;
+  z-index:2147483647 !important;
+}
