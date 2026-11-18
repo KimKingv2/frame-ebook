@@ -1813,8 +1813,7 @@
     button.setAttribute('aria-label', active ? '退出沉浸式閱讀' : '進入沉浸式閱讀');
     button.title = active ? '退出沉浸式閱讀' : '進入沉浸式閱讀';
   }
-  var readerEmbedFrameStyleSnapshot = null;
-  var readerEmbedParentStylesSnapshot = null;
+  var readerEmbedStyleSnapshot = null;
 
   function setReaderEmbedFrameImmersive(active) {
     if (!flutterReaderEmbed || window.parent === window) return;
@@ -1822,9 +1821,9 @@
     if (!frame || !frame.style) return;
 
     if (active) {
-      if (!readerEmbedFrameStyleSnapshot) {
-        readerEmbedFrameStyleSnapshot = frame.getAttribute('style');
-        readerEmbedParentStylesSnapshot = {
+      if (!readerEmbedStyleSnapshot) {
+        readerEmbedStyleSnapshot = {
+          frame: frame.getAttribute('style'),
           html: window.parent.document.documentElement.getAttribute('style'),
           body: window.parent.document.body
             ? window.parent.document.body.getAttribute('style')
@@ -1855,22 +1854,20 @@
       return;
     }
 
-    if (readerEmbedFrameStyleSnapshot === null) return;
-    if (readerEmbedFrameStyleSnapshot === null) frame.removeAttribute('style');
-    else frame.setAttribute('style', readerEmbedFrameStyleSnapshot);
+    if (!readerEmbedStyleSnapshot) return;
+    var snapshot = readerEmbedStyleSnapshot;
+    if (snapshot.frame === null) frame.removeAttribute('style');
+    else frame.setAttribute('style', snapshot.frame);
 
-    if (readerEmbedParentStylesSnapshot) {
-      var parentHtml = window.parent.document.documentElement;
-      var parentBody = window.parent.document.body;
-      if (readerEmbedParentStylesSnapshot.html === null) parentHtml.removeAttribute('style');
-      else parentHtml.setAttribute('style', readerEmbedParentStylesSnapshot.html);
-      if (parentBody) {
-        if (readerEmbedParentStylesSnapshot.body === null) parentBody.removeAttribute('style');
-        else parentBody.setAttribute('style', readerEmbedParentStylesSnapshot.body);
-      }
+    var parentHtml = window.parent.document.documentElement;
+    var parentBody = window.parent.document.body;
+    if (snapshot.html === null) parentHtml.removeAttribute('style');
+    else parentHtml.setAttribute('style', snapshot.html);
+    if (parentBody) {
+      if (snapshot.body === null) parentBody.removeAttribute('style');
+      else parentBody.setAttribute('style', snapshot.body);
     }
-    readerEmbedFrameStyleSnapshot = null;
-    readerEmbedParentStylesSnapshot = null;
+    readerEmbedStyleSnapshot = null;
   }
 
   function toggleReaderImmersive() {
