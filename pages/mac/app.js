@@ -1,5 +1,5 @@
-import * as store from "/assets/library-store.js?v=20261117-main-ui-scan-r2";
-import { createMacShelf } from "/mac/shelf.js?v=20261117-main-ui-scan-r3";
+import * as store from "/assets/library-store.js?v=20261118-root-scope-fix-r1";
+import { createMacShelf } from "/mac/shelf.js?v=20261118-root-scope-fix-r1";
 import { startMacSync } from "/mac/sync.js?v=20261117-sync-r2";
 const $ = id => document.getElementById(id);
 const LOG_LIMIT = 500;
@@ -292,7 +292,7 @@ async function addBook(entry, openAfter = false, refresh = true, profileOverride
 const SKIP_SCAN_FOLDERS = new Set(["@eadir","#recycle","__macosx",".appledouble",".trash","lost+found"]);
 function shouldSkipScanFolder(entry) {
   const name = String(entry?.name || "").trim().toLowerCase();
-  return !name || SKIP_SCAN_FOLDERS.has(name) || name.startsWith(".");
+  return !name || SKIP_SCAN_FOLDERS.has(name);
 }
 function makeScannedBookRecord(entry, profile, sourceId, library, rootPath) {
   const ext = extension(entry.path);
@@ -365,9 +365,10 @@ async function scanWebDavProfile(profile, library, { forceRescan = false } = {})
   } else {
     progress.seenFilePaths=Array.isArray(progress.seenFilePaths)?progress.seenFilePaths:[];
     progress.failedPaths=Array.isArray(progress.failedPaths)?progress.failedPaths:[];
+    progress.paused=false;
+    progress.scanMode="續掃";
   }
   await store.setLocalSyncMeta(progressKey,progress);
-  } else { progress.paused=false; progress.scanMode="續掃"; }
 
   const visited = new Set(progress.visitedDirectories);
   const maxDirs = 500, maxFiles = 50000;
