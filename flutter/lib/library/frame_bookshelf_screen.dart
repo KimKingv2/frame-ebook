@@ -1104,27 +1104,6 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
               else
                 _bookArtwork(entry.first, compact: compact, fit: BoxFit.cover),
               if (!isFolderCard)
-                Positioned(
-                  top: 9,
-                  right: 9,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xB8171321),
-                      border: Border.all(color: const Color(0x3BE7D9FF)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      entry.first.format,
-                      style: const TextStyle(
-                        color: Color(0xFFE9E0F8),
-                        fontSize: 7,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              if (!isFolderCard)
                 Positioned.fill(
                   child: IgnorePointer(
                     child: DecoratedBox(
@@ -1143,6 +1122,27 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                           ],
                           stops: const [0, 0.24, 0.80, 1],
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (!isFolderCard)
+                Positioned(
+                  top: 9,
+                  right: 9,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xB8171321),
+                      border: Border.all(color: const Color(0x3BE7D9FF)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      entry.first.format,
+                      style: const TextStyle(
+                        color: Color(0xFFE9E0F8),
+                        fontSize: 7,
+                        letterSpacing: 1,
                       ),
                     ),
                   ),
@@ -1338,7 +1338,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
                   style: TextStyle(
                     color: const Color(0xFFF5EFFB),
                     fontFamily: 'serif',
-                    fontSize: compact ? 15 : 16,
+                    fontSize: 16,
                     fontWeight: FontWeight.w500,
                     height: 1.45,
                   ),
