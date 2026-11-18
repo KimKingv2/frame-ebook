@@ -3211,3 +3211,143 @@ body.reader-settings-open .reader-quick-actions {
     transform:translateY(0) !important;
   }
 }
+
+
+/* Flutter Web Reading Room host mode. The Flutter app owns the top bar while
+   this same-origin document keeps Foliate's existing EPUB/CBZ workspace. */
+html.flutter-reader-embed,
+html.flutter-reader-embed body {
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+}
+html.flutter-reader-embed body {
+  background:#12101a;
+}
+html.flutter-reader-embed .app-shell {
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  min-height:0;
+  margin:0;
+  overflow:hidden;
+}
+html.flutter-reader-embed .topbar,
+html.flutter-reader-embed .intro,
+html.flutter-reader-embed .notice,
+html.flutter-reader-embed .footer {
+  display:none !important;
+}
+html.flutter-reader-embed main {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;
+  animation:none;
+}
+html.flutter-reader-embed .reading-workspace {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  min-height:0;
+  margin:0;
+  padding:0 12px;
+  overflow:hidden;
+}
+html.flutter-reader-embed .book-heading {
+  display:none !important;
+}
+html.flutter-reader-embed .appearance-panel[open] {
+  top:12px;
+  right:12px;
+  left:auto;
+  z-index:2400;
+}
+html.flutter-reader-embed .reader-layout {
+  display:grid;
+  flex:1;
+  grid-template-columns:250px minmax(0,1fr);
+  align-items:stretch;
+  gap:12px;
+  height:100%;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-sidebar {
+  position:relative;
+  top:auto;
+  align-self:stretch;
+  height:100%;
+  max-height:none;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-main-column {
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-frame {
+  display:flex;
+  flex:1;
+  height:100%;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-viewport {
+  flex:1;
+  height:100%;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-viewport foliate-view {
+  height:100%;
+  min-height:0;
+}
+html.flutter-reader-embed .reader-controls {
+  flex:none;
+  padding-top:8px;
+}
+html.flutter-reader-embed .reader-status {
+  flex:none;
+  min-height:20px;
+  margin:0;
+}
+html.flutter-reader-embed .reading-session-indicator {
+  flex:none;
+  margin:0;
+}
+@media(max-width:720px) {
+  html.flutter-reader-embed .reading-workspace {
+    padding:0 6px;
+  }
+  html.flutter-reader-embed .reader-layout {
+    display:block;
+    height:100%;
+  }
+  html.flutter-reader-embed .reader-main-column {
+    height:100%;
+  }
+  html.flutter-reader-embed .reader-frame {
+    height:100%;
+  }
+  html.flutter-reader-embed .reader-viewport {
+    height:100%;
+  }
+}
+
+@media(max-width:820px) {
+  html.flutter-reader-embed .reader-sidebar {
+    position:fixed !important;
+    top:calc(env(safe-area-inset-top, 0px) + 8px) !important;
+    right:auto !important;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+    left:0 !important;
+    width:min(390px, 91vw);
+    height:auto;
+    max-height:none !important;
+    z-index:2300;
+  }
+}
