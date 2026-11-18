@@ -50,10 +50,23 @@
 
   function isReaderFullscreen() {
     var workspace = el('reading-workspace');
-    return !!workspace && (
-      document.fullscreenElement === workspace ||
-      document.webkitFullscreenElement === workspace
-    );
+    if (!workspace) return false;
+    if (document.fullscreenElement === workspace ||
+        document.webkitFullscreenElement === workspace) return true;
+
+    // In Flutter Web the host may fullscreen the iframe itself so the browser
+    // chrome disappears. Treat that as the reader's fullscreen state too.
+    if (flutterReaderEmbed && window.parent !== window) {
+      try {
+        var frame = window.frameElement;
+        var parentDocument = window.parent.document;
+        return !!frame && (
+          parentDocument.fullscreenElement === frame ||
+          parentDocument.webkitFullscreenElement === frame
+        );
+      } catch (error) {}
+    }
+    return false;
   }
 
   function isControlOrLinkTarget(target) {
@@ -100,10 +113,10 @@
     var point = getReaderWindowPoint(event, sourceDoc);
     if (!point) return false;
 
-    // The top 0–20% switches between the normal and immersive layouts
-    // only after native browser fullscreen has been entered.
+    // One tap at the top edge enters immersive browser fullscreen;
+    // the same gesture exits back to the normal reader.
     if (point.relativeY < point.rect.height * 0.2) {
-      if (isReaderFullscreen()) toggleImmersiveFullscreen();
+      toggleReaderFullscreen();
     } else {
       turnReaderPage(point.x < point.rect.left + point.rect.width / 2 ? -1 : 1);
     }
@@ -1745,6 +1758,16 @@
         case 'toggle-fullscreen':
           toggleReaderFullscreen();
           break;
+        case 'enter-immersive':
+          setReaderImmersiveMode(true);
+          break;
+        case 'exit-immersive':
+          setReaderImmersiveMode(false);
+          break;
+        case 'fullscreen-denied':
+          setReaderImmersiveMode(false);
+          setText('reader-status', '瀏覽器未允許全螢幕，請再點一次全螢幕按鈕。');
+          break;
         case 'show-toc':
         case 'show-notes':
         case 'show-bookmarks':
@@ -1817,38 +1840,60 @@
     }
     button.classList.toggle('is-fullscreen-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    button.setAttribute('aria-label', active ? '退出全螢幕閱讀' : '進入全螢幕閱讀');
-    button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
+    button.setAttribute('aria-label', active ? '退出沉浸式閱讀' : '進入沉浸式閱讀');
+    button.title = active ? '退出沉浸式閱讀' : '進入沉浸式閱讀';
   }
 
-  function toggleImmersiveFullscreen() {
+  function setReaderImmersiveMode(active) {
     var workspace = el('reading-workspace');
-    if (!workspace || !isReaderFullscreen()) return;
-    var active = !workspace.classList.contains('reader-immersive-mode');
-    workspace.classList.toggle('reader-immersive-mode', active);
-    document.body.classList.toggle('reader-immersive-open', active);
+    if (!workspace) return;
+    workspace.classList.toggle('reader-immersive-mode', !!active);
+    document.body.classList.toggle('reader-immersive-open', !!active);
     updateReaderFullscreenButton();
     scheduleReaderLayoutRefresh();
+  }
+
+  function getReaderFullscreenDocument() {
+    if (flutterReaderEmbed && window.parent !== window) {
+      try {
+        var frame = window.frameElement;
+        var parentDocument = window.parent.document;
+        if (frame && (
+            parentDocument.fullscreenElement === frame ||
+            parentDocument.webkitFullscreenElement === frame
+        )) return parentDocument;
+      } catch (error) {}
+    }
+    return document;
   }
 
   async function toggleReaderFullscreen() {
     var workspace = el('reading-workspace');
     if (!workspace) return;
-    var active = document.fullscreenElement || document.webkitFullscreenElement;
+    var active = isReaderFullscreen();
     try {
       if (active) {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        // Leave immersive layout first, then exit whichever document owns
+        // fullscreen (the reader document or Flutter's host document).
+        setReaderImmersiveMode(false);
+        var fullscreenDocument = getReaderFullscreenDocument();
+        if (fullscreenDocument.exitFullscreen) {
+          await fullscreenDocument.exitFullscreen();
+        } else if (fullscreenDocument.webkitExitFullscreen) {
+          fullscreenDocument.webkitExitFullscreen();
+        }
       } else {
         var request = workspace.requestFullscreen || workspace.webkitRequestFullscreen;
         if (!request) {
-          setText('reader-status', '目前瀏覽器不支援頁面全螢幕，請使用瀏覽器的全螢幕功能。');
+          setText('reader-status', '目前瀏覽器不支援真正的全螢幕閱讀。');
           return;
         }
         var result = request.call(workspace);
         if (result && typeof result.then === 'function') await result;
+        setReaderImmersiveMode(true);
       }
     } catch (error) {
+      setReaderImmersiveMode(false);
       setText('reader-status', '無法切換全螢幕：' + (error && error.message ? error.message : String(error)));
       console.warn('FRAME Reader fullscreen request failed:', error);
     }
