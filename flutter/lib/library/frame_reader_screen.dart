@@ -95,36 +95,15 @@ class _FrameReaderScreenState extends State<FrameReaderScreen> {
             onPressed: () => _engine.send('toggle-bookmark'),
             icon: const Icon(Icons.bookmark_add_outlined),
           ),
-          PopupMenuButton<String>(
-            tooltip: '更多閱讀功能',
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (value) {
-              if (value == 'fullscreen') {
-                _engine.send('toggle-fullscreen');
-              } else if (value == 'reload') {
-                _engine.send('reload');
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'fullscreen',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.fullscreen_rounded),
-                  title: Text('全螢幕閱讀'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'reload',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.refresh_rounded),
-                  title: Text('重新載入閱讀室'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+          IconButton(
+            tooltip: '切換全螢幕閱讀',
+            onPressed: () => _engine.send('toggle-fullscreen'),
+            icon: const Icon(Icons.fullscreen_rounded),
+          ),
+          IconButton(
+            tooltip: '重新載入閱讀室',
+            onPressed: () => _engine.send('reload'),
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),

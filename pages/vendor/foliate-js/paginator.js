@@ -697,7 +697,11 @@ export class Paginator extends HTMLElement {
 
         const style = getComputedStyle(this.#top)
         const maxInlineSize = parseFloat(style.getPropertyValue('--_max-inline-size'))
-        const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread'))
+        const configuredColumnCount = Number.parseInt(
+            style.getPropertyValue('--_max-column-count-spread'), 10)
+        // Reflowable books must never expand beyond the user's one/two-page setting.
+        const maxColumnCount = Number.isFinite(configuredColumnCount)
+            ? Math.max(1, Math.min(2, configuredColumnCount)) : 1
         const margin = parseFloat(style.getPropertyValue('--_margin'))
         this.#margin = margin
 
@@ -736,7 +740,8 @@ export class Paginator extends HTMLElement {
             return { flow, margin, gap, columnWidth }
         }
 
-        const divisor = Math.min(maxColumnCount, Math.ceil(size / maxInlineSize))
+        const divisor = Math.max(1, Math.min(
+            maxColumnCount, Math.ceil(size / maxInlineSize)))
         const columnWidth = (size / divisor) - gap
         this.setAttribute('dir', rtl ? 'rtl' : 'ltr')
 

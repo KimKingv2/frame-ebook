@@ -114,9 +114,58 @@
     return true;
   }
 
-  function turnReaderPage(direction) {
+  var readerLayoutRefreshTimer = 0;
+  var readerLayoutRefreshPromise = null;
+  var readerLayoutRefreshResolve = null;
+
+  function scheduleReaderLayoutRefresh() {
+    if (!view || !view.renderer || typeof view.renderer.render !== 'function') {
+      return Promise.resolve();
+    }
+    if (readerLayoutRefreshTimer) window.clearTimeout(readerLayoutRefreshTimer);
+    if (!readerLayoutRefreshPromise) {
+      readerLayoutRefreshPromise = new Promise(function (resolve) {
+        readerLayoutRefreshResolve = resolve;
+      });
+    }
+
+    var reducedMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    readerLayoutRefreshTimer = window.setTimeout(function () {
+      readerLayoutRefreshTimer = 0;
+      var refresh = function () {
+        try {
+          if (view && view.renderer && typeof view.renderer.render === 'function') {
+            // Recalculate the actual spread width only after fullscreen/immersive
+            // CSS transitions have settled, so the next page uses the same width.
+            view.renderer.render();
+          }
+        } catch (error) {
+          console.warn('FRAME Reader layout refresh failed:', error);
+        } finally {
+          var resolve = readerLayoutRefreshResolve;
+          readerLayoutRefreshResolve = null;
+          readerLayoutRefreshPromise = null;
+          if (resolve) resolve();
+        }
+      };
+      if (document.hidden) refresh();
+      else window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(refresh);
+      });
+    }, reducedMotion ? 0 : 560);
+
+    return readerLayoutRefreshPromise;
+  }
+
+  async function turnReaderPage(direction) {
     if (!view) return;
+    var activeView = view;
     try {
+      // If the user pages during a fullscreen transition, wait for the
+      // final paginator measurement instead of advancing by a stale width.
+      if (readerLayoutRefreshPromise) await readerLayoutRefreshPromise;
+      if (!view || view !== activeView) return;
       var result = direction < 0 ? view.prev() : view.next();
       if (result && typeof result.catch === 'function') {
         result.catch(function (error) { console.error('FRAME Reader page tap failed:', error); });
@@ -1491,7 +1540,7 @@
     var isCbz = /\.cbz$/i.test(String(source && source.name || name || ''));
     var parsedBook;
     if (isCbz) {
-      await import('/vendor/foliate-js/view.js?v=20261118-layout-r1');
+      await import('/vendor/foliate-js/view.js?v=20261118-layout-r2');
     } else {
       var archiveData = source && source.frameMemoryBytes instanceof Uint8Array
         ? source.frameMemoryBytes
@@ -1765,10 +1814,10 @@
     button.addEventListener('click', function () { setAppearance('backdrop', button.getAttribute('data-backdrop')); });
   });
   el('prev-page').addEventListener('click', function () {
-    if (view) view.prev().catch(function (error) { console.error(error); });
+    turnReaderPage(-1);
   });
   el('next-page').addEventListener('click', function () {
-    if (view) view.next().catch(function (error) { console.error(error); });
+    turnReaderPage(1);
   });
   var readerViewport = el('reader-viewport');
   if (readerViewport) {
@@ -1819,8 +1868,9 @@
       workspace.classList.remove('reader-immersive-exiting');
       workspace.classList.add('reader-immersive-mode');
     }
-    // Foliate's paginator and fixed-layout renderer already observe their
-    // container size. Avoid forcing a second render while the layout changes.
+    // Let the animated workspace finish changing size, then explicitly
+    // remeasure Foliate before another page turn can use the new viewport.
+    scheduleReaderLayoutRefresh();
   }
   async function toggleReaderFullscreen() {
     var workspace = el('reading-workspace');
@@ -1845,9 +1895,13 @@
     }
     updateReaderFullscreenButton();
   }
+  function handleReaderFullscreenChange() {
+    updateReaderFullscreenButton();
+    scheduleReaderLayoutRefresh();
+  }
   el('reader-fullscreen').addEventListener('click', toggleReaderFullscreen);
-  document.addEventListener('fullscreenchange', updateReaderFullscreenButton);
-  document.addEventListener('webkitfullscreenchange', updateReaderFullscreenButton);
+  document.addEventListener('fullscreenchange', handleReaderFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleReaderFullscreenChange);
   updateReaderFullscreenButton();
 
 
@@ -1895,7 +1949,7 @@
   }
 
   setText('engine-status', featureSummary());
-  import('/vendor/foliate-js/view.js?v=20261118-layout-r1').then(async function () {
+  import('/vendor/foliate-js/view.js?v=20261118-layout-r2').then(async function () {
     setText('engine-status', featureSummary() + ' · Foliate ready');
     var params = new URLSearchParams(window.location.search);
     var bookId = params.get('book');
