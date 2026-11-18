@@ -106,7 +106,7 @@ def patch_android_reader_view(root: Path) -> None:
     if "FrameEbookNativeReaderFactory" not in content:
         content = content.replace(
             "import io.flutter.embedding.android.FlutterActivity",
-            "import io.flutter.embedding.android.FlutterActivity\\n"
+            "import io.flutter.embedding.android.FlutterActivity\n"
             "import io.flutter.embedding.engine.FlutterEngine",
         )
         content = content.replace(
