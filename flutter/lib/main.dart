@@ -23,6 +23,9 @@ class FrameEbookApp extends StatelessWidget {
         // The bundled Noto subset keeps the Web payload manageable. Use
         // installed Traditional Chinese fonts for glyphs outside that subset.
         fontFamilyFallback: const [
+          // Both fallback families are bundled. Flutter Web's CanvasKit
+          // renderer cannot rely on arbitrary host OS fonts for missing CJK glyphs.
+          'NotoSansSCFallback',
           'PingFang TC',
           'Heiti TC',
           'Microsoft JhengHei',
