@@ -659,7 +659,8 @@
     });
     button.disabled = !cfi || !currentBookId;
     button.setAttribute('aria-pressed', bookmarked ? 'true' : 'false');
-    button.textContent = bookmarked ? '★ 書籤' : '☆ 書籤';
+    button.classList.toggle('is-bookmarked', bookmarked);
+    button.setAttribute('aria-label', bookmarked ? '移除目前頁面的書籤' : '將目前閱讀位置加入書籤');
     button.title = bookmarked ? '移除此頁書籤' : '將目前閱讀位置加入書籤';
   }
 
@@ -1812,8 +1813,9 @@
     var active = document.fullscreenElement === workspace ||
       document.webkitFullscreenElement === workspace;
     if (!active) workspace.classList.remove('reader-immersive-mode', 'reader-immersive-exiting');
-    button.textContent = active ? '↙ 退出全螢幕' : '⛶ 全螢幕';
+    button.classList.toggle('is-fullscreen-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-label', active ? '退出全螢幕閱讀' : '進入全螢幕閱讀');
     button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
   }
   function toggleImmersiveFullscreen() {
