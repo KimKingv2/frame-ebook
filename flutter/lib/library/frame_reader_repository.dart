@@ -51,6 +51,9 @@ class FrameReaderState {
     return FrameReaderState(next);
   }
 
+  factory FrameReaderState.fromJson(Map<String, dynamic> json) =>
+      FrameReaderState(json);
+
   factory FrameReaderState.empty() => FrameReaderState(const {});
 }
 
