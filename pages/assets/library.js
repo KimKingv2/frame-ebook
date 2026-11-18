@@ -261,11 +261,15 @@ function folderVolumeTitle(volume) {
   if (volume.manualTitle && volume.title) return volume.title;
   const fileName = String(volume.fileName || volume.title || "未命名檔案");
   const fileStem = fileName.replace(/\.(epub|cbz)$/i, "");
+  const ownTitle = volume.bookTitle ||
+    (volume.title && volume.title !== volume.folderTitle ? volume.title : "");
   if (getBookShelf(volume) === "comics") {
     const comicMetadata = volume.comicMetadata || {};
-    return comicMetadata.nameCn || comicMetadata.name || volume.bookTitle || volume.title || fileStem;
+    return ownTitle || comicMetadata.nameCn || comicMetadata.name || fileStem;
   }
-  return volume.bookTitle || volume.title || fileStem;
+  // API title used to fall back to the parent folder name for every item
+  // without indexed OPF metadata. Do not repeat that folder name as a volume.
+  return ownTitle || fileStem;
 }
 function folderVolumeAuthor(volume) {
   if (volume.manualAuthor) return volume.author || "";
