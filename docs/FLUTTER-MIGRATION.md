@@ -42,6 +42,7 @@ Original EPUB/CBZ archives are read-only source files. Do not create full-archiv
 - Cloudflare Access session gate and native WebView login bridge.
 - Shared existing Pages API client for Web and native targets.
 - D1-backed home bookshelf and main's folder-volume grouping.
+- Flutter-native reading statistics backed by the existing D1 stats/preferences APIs, including period summaries, daily goal, reading streaks, calendar, trends, top books, time bands, recent sessions and JSON/CSV data export.
 - Recent reading, four sort modes, search, grid/list, books/comics categories and folder detail navigation.
 - R2 cover retrieval with bounded in-memory cache.
 - Basic title, author and shelf metadata editing.
@@ -85,8 +86,9 @@ These items must still pass CI and device verification before being treated as c
 
 ### F4 — Personal reading data parity
 - [ ] Preserve reading preferences, annotations, reading-time events, history and statistics.
-- [ ] Preserve foreground/idle tracking, goal, streaks, calendar and charts.
-- [ ] Preserve JSON and CSV export.
+- [x] Flutter statistics screen reads the existing D1 stats/preferences APIs and renders period summaries, goal, streaks, calendar, trends, top books, time-of-day and recent sessions.
+- [ ] Validate foreground/idle event aggregation against the original tracker on all three targets.
+- [ ] Preserve native file-based JSON and CSV export on Web, macOS and Android. Current Flutter statistics screen copies JSON/CSV text to the clipboard.
 
 ### F5 — Three-platform release
 - [ ] Separate Flutter Web preview and browser Access validation.
