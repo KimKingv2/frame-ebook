@@ -160,11 +160,237 @@ int _compareNaturalFileNames(String first, String second) {
   for (var index = 0; index < length; index += 1) {
     final left = firstParts[index];
     final right = secondParts[index];
-    final leftNumber = BigInt.tryParse(left);
-    final rightNumber = BigInt.tryParse(right);
-    final comparison = leftNumber != null && rightNumber != null
-        ? leftNumber.compareTo(rightNumber)
-        : left.compareTo(right);
+    final leftIsNumeric = RegExp(r'^\d+
+  }
+  return firstParts.length.compareTo(secondParts.length);
+}
+
+class FrameShelfEntry {
+  FrameShelfEntry(this.first) : members = [first];
+
+  final FrameBook first;
+  final List<FrameBook> members;
+
+  bool get isFolder => members.isNotEmpty && first.folderPath.isNotEmpty;
+  bool get isComic => first.isComic;
+  int get lastOpenedAt =>
+      members.fold<int>(0, (value, item) => item.lastOpenedAt > value ? item.lastOpenedAt : value);
+  int get volumeCount => members.length;
+  int get totalSize => members.fold<int>(0, (sum, item) => sum + item.size);
+  int get progressPercent => first.progressPercent;
+  String get progressLabel => first.progressLabel;
+  String get provider => first.provider;
+  String get library => first.library;
+  String get rootPath => first.rootPath;
+  String get folderPath => first.folderPath;
+  String get key => first.folderPath.isEmpty
+      ? first.bookKey
+      : [first.provider, first.library, first.rootPath, first.folderPath].join('\n');
+
+  String get title {
+    if (!isFolder) return first.title.isNotEmpty ? first.title : first.fileName;
+    final bangumiTitle = first.comicMetadata['nameCn'] ??
+        first.comicMetadata['name'];
+    if (bangumiTitle != null && bangumiTitle.toString().isNotEmpty) {
+      return bangumiTitle.toString();
+    }
+    if (first.folderTitle.isNotEmpty) return first.folderTitle;
+    final parts = first.folderPath.split('/').where((part) => part.isNotEmpty);
+    return parts.isNotEmpty ? parts.last : first.title;
+  }
+
+  String get author => first.author;
+  String get format => first.format;
+  String get coverHash => first.coverHash;
+  String get coverStatus => first.coverStatus;
+
+  List<String> get searchText {
+    final metadata = first.comicMetadata;
+    final tags = (metadata['tags'] is List)
+        ? (metadata['tags'] as List).map((tag) {
+            if (tag is Map) return tag['name']?.toString() ?? '';
+            return tag.toString();
+          }).join(' ')
+        : '';
+    final membersText =
+        members.map((item) => '${item.fileName} ${item.title} ${item.format}').join(' ');
+    return [
+      title,
+      author,
+      first.fileName,
+      first.format,
+      membersText,
+      metadata['name']?.toString() ?? '',
+      metadata['nameCn']?.toString() ?? '',
+      metadata['author']?.toString() ?? '',
+      tags,
+    ];
+  }
+
+  void add(FrameBook book) => members.add(book);
+
+  List<FrameBook> sortedMembers() {
+    final result = [...members];
+    result.sort((a, b) {
+      final byName = _compareNaturalFileNames(a.fileName, b.fileName);
+      if (byName != 0) return byName;
+      return a.path.compareTo(b.path);
+    });
+    return result;
+  }
+
+  List<String> get coverHashes => members
+      .where((item) =>
+          item.coverStatus == 'ready' &&
+          RegExp(r'^[a-f0-9]{64}$').hasMatch(item.coverHash))
+      .map((item) => item.coverHash)
+      .toSet()
+      .take(8)
+      .toList();
+}
+
+List<FrameShelfEntry> groupFrameBooks(List<FrameBook> books) {
+  final groups = <String, FrameShelfEntry>{};
+  final output = <FrameShelfEntry>[];
+  for (final book in books) {
+    if (book.folderPath.isEmpty) {
+      output.add(FrameShelfEntry(book));
+      continue;
+    }
+    final key = [book.provider, book.library, book.rootPath, book.folderPath].join('\n');
+    final group = groups[key];
+    if (group == null) {
+      final created = FrameShelfEntry(book);
+      groups[key] = created;
+      output.add(created);
+    } else {
+      group.add(book);
+    }
+  }
+  return output;
+}
+).hasMatch(left);
+    final rightIsNumeric = RegExp(r'^\d+
+  }
+  return firstParts.length.compareTo(secondParts.length);
+}
+
+class FrameShelfEntry {
+  FrameShelfEntry(this.first) : members = [first];
+
+  final FrameBook first;
+  final List<FrameBook> members;
+
+  bool get isFolder => members.isNotEmpty && first.folderPath.isNotEmpty;
+  bool get isComic => first.isComic;
+  int get lastOpenedAt =>
+      members.fold<int>(0, (value, item) => item.lastOpenedAt > value ? item.lastOpenedAt : value);
+  int get volumeCount => members.length;
+  int get totalSize => members.fold<int>(0, (sum, item) => sum + item.size);
+  int get progressPercent => first.progressPercent;
+  String get progressLabel => first.progressLabel;
+  String get provider => first.provider;
+  String get library => first.library;
+  String get rootPath => first.rootPath;
+  String get folderPath => first.folderPath;
+  String get key => first.folderPath.isEmpty
+      ? first.bookKey
+      : [first.provider, first.library, first.rootPath, first.folderPath].join('\n');
+
+  String get title {
+    if (!isFolder) return first.title.isNotEmpty ? first.title : first.fileName;
+    final bangumiTitle = first.comicMetadata['nameCn'] ??
+        first.comicMetadata['name'];
+    if (bangumiTitle != null && bangumiTitle.toString().isNotEmpty) {
+      return bangumiTitle.toString();
+    }
+    if (first.folderTitle.isNotEmpty) return first.folderTitle;
+    final parts = first.folderPath.split('/').where((part) => part.isNotEmpty);
+    return parts.isNotEmpty ? parts.last : first.title;
+  }
+
+  String get author => first.author;
+  String get format => first.format;
+  String get coverHash => first.coverHash;
+  String get coverStatus => first.coverStatus;
+
+  List<String> get searchText {
+    final metadata = first.comicMetadata;
+    final tags = (metadata['tags'] is List)
+        ? (metadata['tags'] as List).map((tag) {
+            if (tag is Map) return tag['name']?.toString() ?? '';
+            return tag.toString();
+          }).join(' ')
+        : '';
+    final membersText =
+        members.map((item) => '${item.fileName} ${item.title} ${item.format}').join(' ');
+    return [
+      title,
+      author,
+      first.fileName,
+      first.format,
+      membersText,
+      metadata['name']?.toString() ?? '',
+      metadata['nameCn']?.toString() ?? '',
+      metadata['author']?.toString() ?? '',
+      tags,
+    ];
+  }
+
+  void add(FrameBook book) => members.add(book);
+
+  List<FrameBook> sortedMembers() {
+    final result = [...members];
+    result.sort((a, b) {
+      final byName = _compareNaturalFileNames(a.fileName, b.fileName);
+      if (byName != 0) return byName;
+      return a.path.compareTo(b.path);
+    });
+    return result;
+  }
+
+  List<String> get coverHashes => members
+      .where((item) =>
+          item.coverStatus == 'ready' &&
+          RegExp(r'^[a-f0-9]{64}$').hasMatch(item.coverHash))
+      .map((item) => item.coverHash)
+      .toSet()
+      .take(8)
+      .toList();
+}
+
+List<FrameShelfEntry> groupFrameBooks(List<FrameBook> books) {
+  final groups = <String, FrameShelfEntry>{};
+  final output = <FrameShelfEntry>[];
+  for (final book in books) {
+    if (book.folderPath.isEmpty) {
+      output.add(FrameShelfEntry(book));
+      continue;
+    }
+    final key = [book.provider, book.library, book.rootPath, book.folderPath].join('\n');
+    final group = groups[key];
+    if (group == null) {
+      final created = FrameShelfEntry(book);
+      groups[key] = created;
+      output.add(created);
+    } else {
+      group.add(book);
+    }
+  }
+  return output;
+}
+).hasMatch(right);
+    var comparison = 0;
+    if (leftIsNumeric && rightIsNumeric) {
+      final normalizedLeft = left.replaceFirst(RegExp(r'^0+'), '');
+      final normalizedRight = right.replaceFirst(RegExp(r'^0+'), '');
+      comparison = normalizedLeft.length.compareTo(normalizedRight.length);
+      if (comparison == 0) {
+        comparison = normalizedLeft.compareTo(normalizedRight);
+      }
+    } else {
+      comparison = left.compareTo(right);
+    }
     if (comparison != 0) return comparison;
   }
   return firstParts.length.compareTo(secondParts.length);
