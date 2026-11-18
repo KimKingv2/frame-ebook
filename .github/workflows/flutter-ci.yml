@@ -29,6 +29,19 @@ jobs:
       - name: Configure release network permissions
         working-directory: flutter
         run: python3 tool/prepare_platforms.py
+      - name: Verify synchronous Flutter first-frame listener
+        working-directory: flutter
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path("web/index.html").read_text(encoding="utf-8")
+          expected = '<script src="frame-boot.js"></script>'
+          if expected not in html:
+              raise SystemExit("The Flutter first-frame listener must load synchronously before Flutter bootstrap.")
+          if '<script src="frame-boot.js" defer></script>' in html:
+              raise SystemExit("A deferred first-frame listener can miss Flutter's first-frame event.")
+          print("Verified synchronous first-frame listener.")
+          PY
       - name: Prepare bundled Traditional Chinese font
         working-directory: flutter
         run: python3 tool/prepare_fonts.py
