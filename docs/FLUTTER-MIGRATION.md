@@ -1,6 +1,6 @@
 # FRAME Ebook Flutter migration
 
-Status: Flutter Web/macOS/Android shell and the first D1-backed bookshelf are implemented. The full legacy Reading Room, Cloud Manager and Statistics are now being brought into Flutter navigation through same-origin embedded compatibility views while their Flutter-native replacements are built.
+Status: Flutter Web/macOS/Android shell, D1-backed bookshelf and Flutter-native reading statistics are implemented. The full legacy Reading Room and Cloud Manager remain available through embedded compatibility views while their Flutter-native replacements are built.
 
 ## Non-negotiable parity rule
 
@@ -33,7 +33,7 @@ Do not recreate or reset D1, change migrations, or move original archives to Clo
 
 ## Reader and compatibility bridge
 
-The main Reading Room currently uses the vendored Foliate.js engine for EPUB and fixed-layout/CBZ content, with JSZip/ZIP readers and custom controls. During the UI port, native targets may open the original same-origin Pages Reader in a WebView and Web may open the original route in a separate tab. This bridge deliberately preserves all existing Reader controls while the Flutter reader shell is built; it is a transition mechanism, not a completed Flutter-native reader implementation.
+The main Reading Room currently uses the vendored Foliate.js engine for EPUB and fixed-layout/CBZ content, with JSZip/ZIP readers and custom controls. The current Flutter integration embeds the original same-origin Pages Reader inside Flutter navigation: Web uses a same-origin iframe and native targets use the app's WebView. This bridge preserves all existing Reader controls while the Flutter reader is built; it is a transition mechanism, not a completed Flutter-native reader implementation.
 
 Original EPUB/CBZ archives are read-only source files. Do not create full-archive temporary files or persist archive contents/page images to the internal SSD. Keep active archive bytes in memory and use bounded memory/page caching where the source and engine permit it. A transport success is not proof that memory-only behaviour has been achieved; inspect and test actual filesystem writes.
 
