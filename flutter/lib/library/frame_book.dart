@@ -144,45 +144,6 @@ class FrameBook {
   }
 }
 
-int _compareNaturalFileNames(String first, String second) {
-  final firstParts = RegExp(r'\d+|\D+')
-      .allMatches(first.toLowerCase())
-      .map((match) => match.group(0)!)
-      .toList();
-  final secondParts = RegExp(r'\d+|\D+')
-      .allMatches(second.toLowerCase())
-      .map((match) => match.group(0)!)
-      .toList();
-  final length = firstParts.length < secondParts.length
-      ? firstParts.length
-      : secondParts.length;
-  for (var index = 0; index < length; index += 1) {
-    final left = firstParts[index];
-    final right = secondParts[index];
-    var comparison = 0;
-    final leftDigits = left.codeUnits.every((unit) => unit >= 48 && unit <= 57);
-    final rightDigits = right.codeUnits.every((unit) => unit >= 48 && unit <= 57);
-    if (leftDigits && rightDigits) {
-      var normalizedLeft = left;
-      var normalizedRight = right;
-      while (normalizedLeft.length > 1 && normalizedLeft.codeUnitAt(0) == 48) {
-        normalizedLeft = normalizedLeft.substring(1);
-      }
-      while (normalizedRight.length > 1 && normalizedRight.codeUnitAt(0) == 48) {
-        normalizedRight = normalizedRight.substring(1);
-      }
-      comparison = normalizedLeft.length.compareTo(normalizedRight.length);
-      if (comparison == 0) {
-        comparison = normalizedLeft.compareTo(normalizedRight);
-      }
-    } else {
-      comparison = left.compareTo(right);
-    }
-    if (comparison != 0) return comparison;
-  }
-  return firstParts.length.compareTo(secondParts.length);
-}
-
 class FrameShelfEntry {
   FrameShelfEntry(this.first) : members = [first];
 
@@ -250,7 +211,7 @@ class FrameShelfEntry {
   List<FrameBook> sortedMembers() {
     final result = [...members];
     result.sort((a, b) {
-      final byName = _compareNaturalFileNames(a.fileName, b.fileName);
+      final byName = a.fileName.toLowerCase().compareTo(b.fileName.toLowerCase());
       if (byName != 0) return byName;
       return a.path.compareTo(b.path);
     });
