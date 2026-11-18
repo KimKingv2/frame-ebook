@@ -1528,7 +1528,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
   String _volumeTitle(FrameBook book) {
     if (book.manualTitle && book.title.isNotEmpty) return book.title;
     final fileStem = book.fileName.replaceFirst(
-      RegExp(r'\\.(epub|cbz)', caseSensitive: false),
+      RegExp(r'\(epub|cbz)', caseSensitive: false),
       '',
     );
     if (book.isComic) return fileStem.isEmpty ? book.title : fileStem;
