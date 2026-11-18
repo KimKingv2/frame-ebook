@@ -91,6 +91,13 @@ class _BrowserFrameApiClient implements FrameApiClient {
       _decodeJson(await _send(method: 'POST', path: path, body: body));
 
   @override
+  Future<Map<String, dynamic>> deleteJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async =>
+      _decodeJson(await _send(method: 'DELETE', path: path, body: body));
+
+  @override
   Future<Uint8List> getBytes(String path) async {
     final response = await _send(method: 'GET', path: path);
     if (response.statusCode < 200 || response.statusCode >= 300) {
