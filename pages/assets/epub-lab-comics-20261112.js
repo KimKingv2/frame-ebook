@@ -117,12 +117,12 @@
   var readerLayoutRefreshTimer = 0;
   var readerLayoutRefreshPromise = null;
   var readerLayoutRefreshResolve = null;
+  var readerLayoutRefreshGeneration = 0;
 
   function scheduleReaderLayoutRefresh() {
-    if (!view || !view.renderer || typeof view.renderer.render !== 'function') {
-      return Promise.resolve();
-    }
+    if (!view || !view.renderer) return Promise.resolve();
     if (readerLayoutRefreshTimer) window.clearTimeout(readerLayoutRefreshTimer);
+    var generation = ++readerLayoutRefreshGeneration;
     if (!readerLayoutRefreshPromise) {
       readerLayoutRefreshPromise = new Promise(function (resolve) {
         readerLayoutRefreshResolve = resolve;
@@ -133,27 +133,21 @@
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     readerLayoutRefreshTimer = window.setTimeout(function () {
       readerLayoutRefreshTimer = 0;
-      var refresh = function () {
-        try {
-          if (view && view.renderer && typeof view.renderer.render === 'function') {
-            // Recalculate the actual spread width only after fullscreen/immersive
-            // CSS transitions have settled, so the next page uses the same width.
-            view.renderer.render();
-          }
-        } catch (error) {
-          console.warn('FRAME Reader layout refresh failed:', error);
-        } finally {
-          var resolve = readerLayoutRefreshResolve;
-          readerLayoutRefreshResolve = null;
-          readerLayoutRefreshPromise = null;
-          if (resolve) resolve();
-        }
+      var settle = function () {
+        if (generation !== readerLayoutRefreshGeneration) return;
+        // Foliate's ResizeObserver already reflows the paginator to the new
+        // viewport. Do not call renderer.render() here: rebuilding columns
+        // after the transition causes a visible flash of the reading text.
+        var resolve = readerLayoutRefreshResolve;
+        readerLayoutRefreshResolve = null;
+        readerLayoutRefreshPromise = null;
+        if (resolve) resolve();
       };
-      if (document.hidden) refresh();
+      if (document.hidden) settle();
       else window.requestAnimationFrame(function () {
-        window.requestAnimationFrame(refresh);
+        window.requestAnimationFrame(settle);
       });
-    }, reducedMotion ? 0 : 560);
+    }, reducedMotion ? 0 : 90);
 
     return readerLayoutRefreshPromise;
   }
