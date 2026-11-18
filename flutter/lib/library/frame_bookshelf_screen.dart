@@ -491,33 +491,58 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 7),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () => folder ? _openFolder(entry) : _openReader(book),
-                  style: TextButton.styleFrom(
-                    foregroundColor: _accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    minimumSize: const Size(0, 28),
-                    textStyle: const TextStyle(fontSize: 8),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          child: SizedBox(
+            height: 34,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => folder ? _openFolder(entry) : _openReader(book),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF392F4D),
+                      foregroundColor: _accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 34),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      textStyle: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: Text(
+                      actionText,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  child: Text(actionText),
                 ),
-              ),
-              OutlinedButton(
-                onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _muted,
-                  side: const BorderSide(color: Color(0x33205A50)),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  minimumSize: const Size(0, 28),
-                  textStyle: const TextStyle(fontSize: 8),
+                const SizedBox(width: 6),
+                OutlinedButton(
+                  onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _muted,
+                    side: const BorderSide(color: Color(0x66564C68)),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 34),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  child: Text(
+                    folder ? '查看卷冊' : '作品資訊',
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                child: Text(folder ? '查看卷冊' : '作品資訊'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -1055,17 +1080,14 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (var column = 0; column < columns; column++)
+                  for (var column = 0; column < columns; column++) ...[
                     Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: column == columns - 1 ? 0 : columnGap,
-                        ),
-                        child: firstIndex + column < itemCount
-                            ? itemBuilder(firstIndex + column)
-                            : const SizedBox.shrink(),
-                      ),
+                      child: firstIndex + column < itemCount
+                          ? itemBuilder(firstIndex + column)
+                          : const SizedBox.shrink(),
                     ),
+                    if (column != columns - 1) SizedBox(width: columnGap),
+                  ],
                 ],
               ),
             );
