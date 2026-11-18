@@ -71,13 +71,14 @@ html, body { margin: 0; min-height: 100%; background: #12101a; }
             raise ValueError("Generated Flutter Web index has an unexpected structure.")
         html = html.replace("</head>", style + "\n</head>", 1)
         body_start = html.index(">", html.index("<body")) + 1
-        boot = """<div id="frame-boot-message">FRAME Ebook 正在啟動……</div>
-<script>
-window.addEventListener('flutter-first-frame', function () {
+        boot_script = """window.addEventListener('flutter-first-frame', function () {
   var message = document.getElementById('frame-boot-message');
   if (message) message.remove();
 }, { once: true });
-</script>"""
+"""
+        (path.parent / "frame-boot.js").write_text(boot_script, encoding="utf-8")
+        boot = """<div id="frame-boot-message">FRAME Ebook 正在啟動……</div>
+<script src="frame-boot.js" defer></script>"""
         html = html[:body_start] + "\n" + boot + html[body_start:]
         path.write_text(html, encoding="utf-8")
 
