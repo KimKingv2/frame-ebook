@@ -1,0 +1,27 @@
+import 'dart:typed_data';
+
+abstract interface class FrameApiClient {
+  Future<Map<String, dynamic>> getJson(String path);
+
+  Future<Map<String, dynamic>> postJson(
+    String path,
+    Map<String, dynamic> body,
+  );
+
+  Future<Uint8List> getBytes(String path);
+
+  void close();
+}
+
+class FrameApiException implements Exception {
+  const FrameApiException({
+    required this.message,
+    this.statusCode,
+  });
+
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() => message;
+}
