@@ -7,6 +7,7 @@ import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
+import 'frame_book_details_dialog.dart';
 import 'frame_library_repository.dart';
 
 const _bg = Color(0xFF12101A);
@@ -200,172 +201,41 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen>
   }
 
   Future<void> _showBookDetails(FrameBook book) async {
-    final title = TextEditingController(text: book.title);
-    final author = TextEditingController(text: book.author);
-    var shelf = book.isComic ? 'comics' : 'books';
-    var saving = false;
     final action = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _panel,
-          surfaceTintColor: Colors.transparent,
-          title: Text(book.isComic ? '漫畫資訊' : '電子書資訊'),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _dialogLabel('書名'),
-                  TextField(
-                    controller: title,
-                    maxLength: 240,
-                    decoration: const InputDecoration(
-                      hintText: '輸入作品名稱',
-                      counterText: '',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _dialogLabel('作者'),
-                  TextField(
-                    controller: author,
-                    maxLength: 240,
-                    decoration: const InputDecoration(
-                      hintText: '作者未提供',
-                      counterText: '',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _dialogLabel('收藏分類'),
-                  DropdownButtonFormField<String>(
-                    value: shelf,
-                    items: const [
-                      DropdownMenuItem(value: 'books', child: Text('電子書')),
-                      DropdownMenuItem(value: 'comics', child: Text('漫畫')),
-                    ],
-                    onChanged: book.format == 'CBZ'
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => shelf = value);
-                            }
-                          },
-                  ),
-                  const SizedBox(height: 18),
-                  _metadataRow('格式', book.format),
-                  _metadataRow(
-                    '內容',
-                    book.pageCount > 0
-                        ? '${book.pageCount}${book.format == 'CBZ' ? ' 頁' : ' 個內容項目'}'
-                        : '未提供',
-                  ),
-                  _metadataRow('檔案', book.fileName),
-                  _metadataRow('大小', _formatBytes(book.size)),
-                  _metadataRow('閱讀進度', book.progressPercent > 0
-                      ? '${book.progressPercent}% · ${book.progressLabel}'
-                      : '尚未開始'),
-                  if (book.language.isNotEmpty)
-                    _metadataRow('語言', book.language),
-                  if (book.publisher.isNotEmpty)
-                    _metadataRow('出版社', book.publisher),
-                  if (book.publishedAt.isNotEmpty)
-                    _metadataRow('出版日期', book.publishedAt),
-                  if (book.identifier.isNotEmpty)
-                    _metadataRow('識別碼', book.identifier),
-                  if (book.subjects.isNotEmpty)
-                    _metadataRow('主題', book.subjects.join('、')),
-                  if (book.description.isNotEmpty)
-                    _metadataRow('簡介', book.description),
-                  if (book.comicMetadata.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const Divider(color: _line),
-                    const Text(
-                      'BANGUMI',
-                      style: TextStyle(
-                        color: _accent,
-                        fontSize: 10,
-                        letterSpacing: 1.8,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      (book.comicMetadata['nameCn'] ??
-                              book.comicMetadata['name'] ??
-                              '')
-                          .toString(),
-                      style: const TextStyle(color: _text),
-                    ),
-                  ],
-                  if (saving)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 14),
-                      child: LinearProgressIndicator(
-                        color: _accentStrong,
-                        backgroundColor: _line,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            if (book.manualTitle || book.manualAuthor)
-              TextButton(
-                onPressed: saving ? null : () => Navigator.pop(dialogContext, 'reset'),
-                child: const Text('恢復 EPUB 內部資訊'),
-              ),
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () {
-                      setDialogState(() => saving = true);
-                      Navigator.pop(dialogContext, 'save');
-                    },
-              child: const Text('保存資訊'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => FrameBookDetailsDialog(book: book, books: _books),
     );
-    final savedTitle = title.text.trim();
-    final savedAuthor = author.text.trim();
-    title.dispose();
-    author.dispose();
     if (!mounted || action == null) return;
-    try {
-      if (action == 'reset') {
-        await _repository!.resetOpfMetadata(book);
-      } else {
-        if (title.text.trim().isEmpty) {
-          throw const FormatException('書名不可為空。');
-        }
-        await _repository!.updateMetadata(
-          book: book,
-          title: savedTitle,
-          author: savedAuthor,
-          shelf: shelf,
-        );
-      }
-      await _refresh(silent: true);
-      if (mounted) {
+    await _refresh(silent: true);
+    if (!mounted) return;
+
+    switch (action) {
+      case 'saved':
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(action == 'reset' ? '已恢復 EPUB 內部資訊。' : '作品資訊已保存至雲端。'),
-          ),
+          const SnackBar(content: Text('作品資訊已保存至雲端。')),
         );
-      }
-    } catch (error) {
-      if (mounted) {
+        break;
+      case 'reset':
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失敗：$error')),
+          const SnackBar(content: Text('已恢復 EPUB 內部書名與作者。')),
         );
-      }
+        break;
+      case 'linked':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('舊書籍閱讀資料已完成關聯。')),
+        );
+        final updated = _books.where((item) => item.id == book.id);
+        if (updated.isNotEmpty) await _showBookDetails(updated.first);
+        break;
+      case 'bangumi':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bangumi 資料已套用至同資料夾卷冊。')),
+        );
+        final updated = _books.where((item) => item.id == book.id);
+        if (updated.isNotEmpty) await _showBookDetails(updated.first);
+        break;
+      default:
+        break;
     }
   }
 
