@@ -69,7 +69,7 @@ html, body { margin: 0; min-height: 100%; background: #12101a; }
     if 'id="frame-boot-message"' not in html:
         if "</head>" not in html or "<body" not in html:
             raise ValueError("Generated Flutter Web index has an unexpected structure.")
-        html = html.replace("</head>", style + "\\n</head>", 1)
+        html = html.replace("</head>", style + "\n</head>", 1)
         body_start = html.index(">", html.index("<body")) + 1
         boot = """<div id="frame-boot-message">FRAME Ebook 正在啟動……</div>
 <script>
@@ -78,7 +78,7 @@ window.addEventListener('flutter-first-frame', function () {
   if (message) message.remove();
 }, { once: true });
 </script>"""
-        html = html[:body_start] + "\\n" + boot + html[body_start:]
+        html = html[:body_start] + "\n" + boot + html[body_start:]
         path.write_text(html, encoding="utf-8")
 
 
