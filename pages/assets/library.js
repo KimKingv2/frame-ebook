@@ -195,8 +195,9 @@ function groupedShelfBooks() {
       group = {
         ...book,
         _folderKey: key,
-        title: book.comicMetadata?.nameCn || book.comicMetadata?.name ||
-          book.folderTitle || folderPath.split("/").pop() || book.title || book.bookTitle,
+        title: book.manualTitle && book.title ? book.title :
+          (book.comicMetadata?.nameCn || book.comicMetadata?.name ||
+            book.folderTitle || folderPath.split("/").pop() || book.title || book.bookTitle),
         folderTitle: book.folderTitle || folderPath.split("/").pop() || "",
         cloudCoverHashes: [],
         cloudSource: { ...source, files: [] },
@@ -216,6 +217,20 @@ function groupedShelfBooks() {
   }
   for (const group of groups.values()) {
     group._groupMembers.sort(compareFolderFiles);
+    if (getBookShelf(group) === "books" && group._groupMembers.length === 1) {
+      const onlyVolume = group._groupMembers[0];
+      group.title = folderVolumeTitle(onlyVolume);
+      group.author = folderVolumeAuthor(onlyVolume);
+    } else if (getBookShelf(group) === "comics") {
+      const seriesMetadata = group._groupMembers.find(member =>
+        member.comicMetadata?.nameCn || member.comicMetadata?.name
+      )?.comicMetadata;
+      if (seriesMetadata) {
+        group.comicMetadata = seriesMetadata;
+        if (!group.manualTitle) group.title = seriesMetadata.nameCn || seriesMetadata.name || group.title;
+        if (!group.manualAuthor) group.author = seriesMetadata.author || group.author || "";
+      }
+    }
     group.cloudCoverHashes = [...new Set(group._groupMembers
       .filter(member => member.cloudCoverStatus === "ready" && /^[a-f0-9]{64}$/i.test(String(member.cloudCoverHash || "")))
       .map(member => member.cloudCoverHash))].slice(0, 8);
@@ -246,11 +261,17 @@ function folderVolumeTitle(volume) {
   if (volume.manualTitle && volume.title) return volume.title;
   const fileName = String(volume.fileName || volume.title || "未命名檔案");
   const fileStem = fileName.replace(/\.(epub|cbz)$/i, "");
-  if (getBookShelf(volume) === "comics") return fileStem;
+  if (getBookShelf(volume) === "comics") {
+    const comicMetadata = volume.comicMetadata || {};
+    return comicMetadata.nameCn || comicMetadata.name || volume.bookTitle || fileStem;
+  }
   return volume.bookTitle || fileStem;
 }
 function folderVolumeAuthor(volume) {
   if (volume.manualAuthor) return volume.author || "";
+  if (getBookShelf(volume) === "comics") {
+    return volume.comicMetadata?.author || volume.author || volume.bookCreator || "";
+  }
   return volume.bookCreator || volume.author || "";
 }
 function openFolderDetails(book) {
