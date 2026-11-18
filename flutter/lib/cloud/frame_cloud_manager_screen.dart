@@ -10,7 +10,7 @@ import 'frame_cloud_repository.dart';
 import 'local_openlist_client.dart';
 import 'local_openlist_settings_store.dart';
 
-const _bg=Color(0xFF12101A), _panel=Color(0xFF1B1825), _soft=Color(0xFF211C2B);
+const _bg=Color(0xFF12101A), _panelColor=Color(0xFF1B1825), _soft=Color(0xFF211C2B);
 const _line=Color(0xFF393247), _text=Color(0xFFF4F0FA), _muted=Color(0xFFAAA2B8);
 const _faint=Color(0xFF827A91), _accent=Color(0xFFC5ADFF);
 
@@ -319,7 +319,6 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
     ]);
   }
 
-  List<FrameCloudEntry> get _items=>_isLocal?_localEntries:(_directory?.items??const []);
   Widget _entryTile(FrameCloudEntry x){
     final dir=x.isDirectory, icon=dir?Icons.folder_outlined:x.format=='CBZ'?Icons.auto_stories_outlined:Icons.menu_book_outlined;
     return Container(margin:const EdgeInsets.only(top:6),decoration:BoxDecoration(color:_soft,border:Border.all(color:_line),borderRadius:BorderRadius.circular(8)),
@@ -337,7 +336,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen> with 
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(title,style:const TextStyle(color:_text,fontSize:11))),Text(state,style:const TextStyle(color:_accent,fontSize:9))]),const SizedBox(height:5),Text(detail,style:const TextStyle(color:_muted,fontSize:10,height:1.5))]);
   }
   Widget _heading(String kicker,String title,String desc)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(kicker,style:const TextStyle(color:Color(0xFF8F7BB7),fontSize:8,letterSpacing:2)),const SizedBox(height:7),Text(title,style:const TextStyle(color:_text,fontSize:23,fontWeight:FontWeight.w600)),const SizedBox(height:5),Text(desc,style:const TextStyle(color:_muted,fontSize:10,height:1.5))]);
-  Widget _panel(Widget child)=>Container(padding:const EdgeInsets.all(15),decoration:BoxDecoration(color:_panel,border:Border.all(color:_line),borderRadius:BorderRadius.circular(12)),child:child);
+  Widget _panel(Widget child)=>Container(padding:const EdgeInsets.all(15),decoration:BoxDecoration(color:_panelColor,border:Border.all(color:_line),borderRadius:BorderRadius.circular(12)),child:child);
   Widget _statusBox(String text,{bool error=false})=>Container(margin:const EdgeInsets.only(top:9),padding:const EdgeInsets.all(10),decoration:BoxDecoration(color:error?const Color(0x332D191E):const Color(0x33291F3A),border:Border.all(color:error?const Color(0x77A75C68):const Color(0x667A64AC)),borderRadius:BorderRadius.circular(8)),child:Text(text,style:TextStyle(color:error?const Color(0xFFFFA5A5):_muted,fontSize:10,height:1.5)));
   String _bytes(int b)=>b<1048576?(b/1024).round().toString()+' KB':b<1073741824?(b/1048576).toStringAsFixed(1)+' MB':(b/1073741824).toStringAsFixed(2)+' GB';
 }

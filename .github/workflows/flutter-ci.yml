@@ -37,6 +37,13 @@ jobs:
       - name: Build Web
         working-directory: flutter
         run: flutter build web
+      - name: Upload Web preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-ebook-flutter-web
+          path: flutter/build/web/
+          if-no-files-found: error
+          retention-days: 14
 
   macos:
     name: Build macOS
@@ -56,6 +63,13 @@ jobs:
       - name: Build macOS
         working-directory: flutter
         run: flutter build macos
+      - name: Upload macOS app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-ebook-flutter-macos
+          path: flutter/build/macos/Build/Products/Release/*.app
+          if-no-files-found: error
+          retention-days: 14
 
   android:
     name: Build Android APK
@@ -75,3 +89,10 @@ jobs:
       - name: Build Android APK
         working-directory: flutter
         run: flutter build apk
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-ebook-flutter-android-apk
+          path: flutter/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
