@@ -3600,3 +3600,77 @@ html.flutter-reader-embed .reading-session-indicator {
 #reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle[aria-pressed="true"]:hover:not(:disabled) {
   background:linear-gradient(135deg,rgba(100,76,148,.96),rgba(55,42,79,.96)) !important;
 }
+
+
+/* Use the exact same button metrics in native fullscreen as in the regular
+   reader header. The parent row can move, but the controls themselves should
+   not change width, height, padding, radius, or typography. */
+#reading-workspace:fullscreen .reader-quick-actions > #reader-sidebar-toggle,
+#reading-workspace:fullscreen .reader-quick-actions > #reader-appearance-toggle,
+#reading-workspace:fullscreen .reader-quick-actions > #reader-fullscreen {
+  display:inline-flex !important;
+  flex:0 1 auto !important;
+  box-sizing:border-box !important;
+  width:104px !important;
+  min-width:104px !important;
+  max-width:104px !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 8px !important;
+  border-radius:8px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+  font-weight:500 !important;
+  white-space:nowrap !important;
+}
+#reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle {
+  display:inline-flex !important;
+  flex:0 0 72px !important;
+  box-sizing:border-box !important;
+  width:72px !important;
+  min-width:72px !important;
+  max-width:72px !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:0 6px !important;
+  border-radius:8px !important;
+  font-size:10px !important;
+  line-height:1 !important;
+  white-space:nowrap !important;
+}
+@media(max-width:820px) {
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-sidebar-toggle,
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-appearance-toggle,
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-fullscreen {
+    width:92px !important;
+    min-width:92px !important;
+    max-width:92px !important;
+    height:33px !important;
+    min-height:33px !important;
+    padding:0 5px !important;
+    font-size:9px !important;
+  }
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-bookmark-toggle {
+    flex:1 1 0 !important;
+    width:0 !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:34px !important;
+    min-height:34px !important;
+    padding:0 3px !important;
+    font-size:clamp(7px,2.5vw,9px) !important;
+  }
+}
+@media(max-width:380px) {
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-sidebar-toggle,
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-appearance-toggle,
+  #reading-workspace:fullscreen .reader-quick-actions > #reader-fullscreen {
+    width:86px !important;
+    min-width:86px !important;
+    max-width:86px !important;
+    padding:0 3px !important;
+    font-size:8px !important;
+  }
+}
