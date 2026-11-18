@@ -48,12 +48,9 @@
   var setText = function (id, value) { var node = el(id); if (node) node.textContent = value; };
   var pageTapBoundDocuments = new WeakSet();
 
-  function isReaderFullscreen() {
+  function isReaderImmersive() {
     var workspace = el('reading-workspace');
-    return !!workspace && (
-      document.fullscreenElement === workspace ||
-      document.webkitFullscreenElement === workspace
-    );
+    return !!workspace && workspace.classList.contains('reader-immersive-mode');
   }
 
   function isControlOrLinkTarget(target) {
@@ -100,10 +97,10 @@
     var point = getReaderWindowPoint(event, sourceDoc);
     if (!point) return false;
 
-    // Top 0–20% toggles native browser fullscreen directly.
+    // Top 0–20% toggles the in-page immersive reading layout.
     // The remaining 20–100% is split into left/right page-turn zones.
     if (point.relativeY < point.rect.height * 0.2) {
-      toggleReaderFullscreen();
+      toggleReaderImmersive();
     } else {
       turnReaderPage(point.x < point.rect.left + point.rect.width / 2 ? -1 : 1);
     }
@@ -1810,45 +1807,23 @@
     var workspace = el('reading-workspace');
     var button = el('reader-fullscreen');
     if (!workspace || !button) return;
-    var active = document.fullscreenElement === workspace ||
-      document.webkitFullscreenElement === workspace;
+    var active = isReaderImmersive();
     button.classList.toggle('is-fullscreen-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    button.setAttribute('aria-label', active ? '退出全螢幕閱讀' : '進入全螢幕閱讀');
-    button.title = active ? '退出全螢幕閱讀' : '進入全螢幕閱讀';
+    button.setAttribute('aria-label', active ? '退出沉浸式閱讀' : '進入沉浸式閱讀');
+    button.title = active ? '退出沉浸式閱讀' : '進入沉浸式閱讀';
   }
-  async function toggleReaderFullscreen() {
+  function toggleReaderImmersive() {
     var workspace = el('reading-workspace');
     if (!workspace) return;
-    var active = isReaderFullscreen();
-    try {
-      if (active) {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-      } else {
-        var request = workspace.requestFullscreen || workspace.webkitRequestFullscreen;
-        if (!request) {
-          setText('reader-status', '目前瀏覽器不支援頁面全螢幕，請使用瀏覽器的全螢幕功能。');
-          return;
-        }
-        var result = request.call(workspace);
-        if (result && typeof result.then === 'function') await result;
-      }
-    } catch (error) {
-      setText('reader-status', '無法切換全螢幕：' + (error && error.message ? error.message : String(error)));
-      console.warn('FRAME Reader fullscreen request failed:', error);
-    }
-    updateReaderFullscreenButton();
-  }
-  function handleReaderFullscreenChange() {
+    var active = !workspace.classList.contains('reader-immersive-mode');
+    workspace.classList.toggle('reader-immersive-mode', active);
+    document.body.classList.toggle('reader-immersive-open', active);
     updateReaderFullscreenButton();
     scheduleReaderLayoutRefresh();
   }
-  el('reader-fullscreen').addEventListener('click', toggleReaderFullscreen);
-  document.addEventListener('fullscreenchange', handleReaderFullscreenChange);
-  document.addEventListener('webkitfullscreenchange', handleReaderFullscreenChange);
+  el('reader-fullscreen').addEventListener('click', toggleReaderImmersive);
   updateReaderFullscreenButton();
-
 
   window.addEventListener('pagehide', function () {
     flushLibraryProgress();
