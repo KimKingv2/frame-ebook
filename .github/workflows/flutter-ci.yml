@@ -43,7 +43,13 @@ jobs:
           NATIVE=false
           while IFS= read -r path; do
             [[ "$path" == flutter/* ]] || continue
-            [[ "$path" == "flutter/lib/library/frame_reader_engine_web.dart" ]] && continue
+            case "$path" in
+              flutter/lib/library/frame_reader_engine_web.dart|\
+              flutter/lib/library/frame_bookshelf_screen.dart|\
+              flutter/lib/main.dart)
+                continue
+                ;;
+            esac
             NATIVE=true
           done <<< "$CHANGED_FILES"
 
