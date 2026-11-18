@@ -93,6 +93,14 @@ class _FakeApi implements FrameApiClient {
   }
 
   @override
+  Future<Map<String, dynamic>> deleteJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    return {'ok': true};
+  }
+
+  @override
   Future<Uint8List> getBytes(String path) async => Uint8List(0);
 
   @override
