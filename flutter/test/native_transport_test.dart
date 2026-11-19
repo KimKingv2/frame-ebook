@@ -138,7 +138,7 @@ void main() {
         () async {
       final response = await transport.openStream(
         uri: Uri.parse(
-          'http://127.0.0.1:\${firstServer.port}/stream-cross-origin',
+          'http://127.0.0.1:${firstServer.port}/stream-cross-origin',
         ),
         headers: const {
           'Cookie': 'CF_Authorization=opaque-session',
@@ -164,17 +164,14 @@ void main() {
     test('cancels an in-flight native stream', () async {
       final cancellation = FrameFileCancellation();
       final response = await transport.openStream(
-        uri: Uri.parse('http://127.0.0.1:\${firstServer.port}/range'),
+        uri: Uri.parse('http://127.0.0.1:${firstServer.port}/range'),
         range: FrameByteRange.from(start: 0, end: 1023),
         cancellation: cancellation,
       );
 
       expect(response.statusCode, HttpStatus.partialContent);
-      final received = <int>[];
-      final subscription = response.stream.listen(received.add);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
       cancellation.cancel();
-      await subscription.cancel();
+      await expectLater(response.stream, emitsDone);
       await response.close();
       expect(response.isClosed, isTrue);
     });
