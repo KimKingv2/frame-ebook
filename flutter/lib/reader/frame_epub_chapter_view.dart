@@ -1,8 +1,10 @@
+import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
+import 'frame_epub_cfi.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 
@@ -25,6 +27,11 @@ class FrameEpubChapterView extends StatefulWidget {
     this.contentMaxWidth = 760,
     this.horizontalPadding = 26,
     this.maxImageBytes = 16 * 1024 * 1024,
+    this.spineIndex = 0,
+    this.initialAnchor,
+    this.initialScrollFraction,
+    this.scrollController,
+    this.onReadingPosition,
     this.onInternalLink,
     this.onExternalLink,
     super.key,
@@ -44,6 +51,11 @@ class FrameEpubChapterView extends StatefulWidget {
   final double contentMaxWidth;
   final double horizontalPadding;
   final int maxImageBytes;
+  final int spineIndex;
+  final XmlElement? initialAnchor;
+  final double? initialScrollFraction;
+  final ScrollController? scrollController;
+  final void Function(String cfi, double chapterFraction)? onReadingPosition;
   final ValueChanged<String>? onInternalLink;
   final ValueChanged<Uri>? onExternalLink;
 
@@ -59,6 +71,9 @@ class _EpubStylesheetBundle {
 
 class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   late Future<_EpubStylesheetBundle> _stylesFuture;
+  final GlobalKey _viewportKey = GlobalKey();
+  final Map<XmlElement, GlobalKey> _elementKeys = HashMap.identity();
+  bool _restoreScheduled = false;
 
   @override
   void initState() {
@@ -72,6 +87,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (!identical(oldWidget.chapter, widget.chapter) ||
         !identical(oldWidget.resourceLoader, widget.resourceLoader)) {
       _stylesFuture = _loadStylesheets();
+      _elementKeys.clear();
+      _restoreScheduled = false;
+    } else if (oldWidget.initialAnchor != widget.initialAnchor ||
+        oldWidget.initialScrollFraction != widget.initialScrollFraction) {
+      _restoreScheduled = false;
     }
   }
 
@@ -173,6 +193,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         final bodyStyle =
             _computedStyle(body, snapshot.data!.cascade, baseStyle);
 
+        if (!widget.fixedLayout) _scheduleInitialRestore();
+
         if (widget.fixedLayout) {
           return ColoredBox(
             color: widget.backgroundColor,
@@ -208,15 +230,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           child: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
-              child: ListView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: widget.horizontalPadding,
-                  vertical: 30,
-                ),
-                children: _flowChildren(
-                  body,
-                  bodyStyle,
-                  snapshot.data!.cascade,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollUpdateNotification ||
+                      notification is ScrollEndNotification) {
+                    _scheduleVisiblePosition();
+                  }
+                  return false;
+                },
+                child: ListView(
+                  key: _viewportKey,
+                  controller: widget.scrollController,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.horizontalPadding,
+                    vertical: 30,
+                  ),
+                  children: _flowChildren(
+                    body,
+                    bodyStyle,
+                    snapshot.data!.cascade,
+                  ),
                 ),
               ),
             ),
@@ -224,6 +257,104 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         );
       },
     );
+  }
+
+
+  GlobalKey _elementKey(XmlElement element) =>
+      _elementKeys.putIfAbsent(element, GlobalKey.new);
+
+  void _scheduleInitialRestore() {
+    if (_restoreScheduled ||
+        (widget.initialAnchor == null &&
+            widget.initialScrollFraction == null)) {
+      return;
+    }
+    _restoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final controller = widget.scrollController;
+      if (controller != null &&
+          controller.hasClients &&
+          widget.initialScrollFraction != null &&
+          controller.position.maxScrollExtent > 0) {
+        final fraction = widget.initialScrollFraction!.clamp(0.0, 1.0);
+        controller.jumpTo(
+          controller.position.maxScrollExtent * fraction,
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((__) {
+        if (!mounted || widget.initialAnchor == null) return;
+        final targetContext = _elementKeys[widget.initialAnchor]?.currentContext;
+        if (targetContext == null) return;
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.04,
+          duration: Duration.zero,
+        );
+      });
+    });
+  }
+
+  void _scheduleVisiblePosition() {
+    if (widget.fixedLayout || widget.onReadingPosition == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.onReadingPosition == null) return;
+      final viewportObject = _viewportKey.currentContext?.findRenderObject();
+      if (viewportObject is! RenderBox || !viewportObject.hasSize) return;
+      final viewportTop = viewportObject.localToGlobal(Offset.zero).dy;
+      final viewportBottom = viewportTop + viewportObject.size.height;
+      final crossing = <({XmlElement element, double top, int depth})>[];
+      final below = <({XmlElement element, double top, int depth})>[];
+
+      for (final entry in _elementKeys.entries) {
+        final object = entry.value.currentContext?.findRenderObject();
+        if (object is! RenderBox || !object.hasSize) continue;
+        final top = object.localToGlobal(Offset.zero).dy;
+        final bottom = top + object.size.height;
+        if (bottom <= viewportTop + 8 || top >= viewportBottom) continue;
+        var depth = 0;
+        XmlNode? parent = entry.key.parent;
+        while (parent != null) {
+          if (parent is XmlElement) depth++;
+          parent = parent.parent;
+        }
+        final candidate = (element: entry.key, top: top, depth: depth);
+        if (top <= viewportTop + 8) {
+          crossing.add(candidate);
+        } else {
+          below.add(candidate);
+        }
+      }
+
+      if (crossing.isNotEmpty) {
+        crossing.sort((a, b) => b.depth.compareTo(a.depth));
+      } else {
+        below.sort((a, b) {
+          final byTop = a.top.compareTo(b.top);
+          return byTop != 0 ? byTop : b.depth.compareTo(a.depth);
+        });
+      }
+      final candidates = crossing.isNotEmpty ? crossing : below;
+      if (candidates.isEmpty) return;
+      final point = FrameEpubCfi.firstTextPoint(candidates.first.element);
+      if (point == null) return;
+      final cfi = FrameEpubCfi.create(
+        book: widget.resourceLoader.book,
+        spineIndex: widget.spineIndex,
+        textNode: point.node,
+        offset: point.offset,
+      );
+      if (cfi == null) return;
+      final controller = widget.scrollController;
+      final fraction = controller != null &&
+              controller.hasClients &&
+              controller.position.maxScrollExtent > 0
+          ? (controller.position.pixels /
+                  controller.position.maxScrollExtent)
+              .clamp(0.0, 1.0)
+          : 0.0;
+      widget.onReadingPosition!(cfi, fraction);
+    });
   }
 
   Widget _message(String message) => Center(
@@ -367,7 +498,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (margin != EdgeInsets.zero) {
       child = Padding(padding: margin, child: child);
     }
-    return child;
+    return KeyedSubtree(key: _elementKey(element), child: child);
   }
 
   Widget _buildList(
