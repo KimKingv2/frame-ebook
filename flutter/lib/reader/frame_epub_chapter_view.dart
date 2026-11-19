@@ -1398,18 +1398,44 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         flushInline();
         if (flattenBlockContainers &&
             _canFlattenFlowContainer(child, childStyle)) {
-          // Keep a zero-size anchor for fragment links and CFI restoration,
-          // while allowing the contained paragraphs to flow onto separate pages.
+          // Keep a zero-size anchor for fragment links and CFI restoration.
+          // Container margins are applied only to the first/last child so the
+          // inner paragraphs can still occupy separate pages.
           widgets.add(SizedBox(key: _elementKey(child), width: 0, height: 0));
-          widgets.addAll(_flowChildren(
+          final margin = _boxInsets(childStyle, 'margin', widget.fontSize);
+          final childWidth = paginationWidth == null
+              ? null
+              : (paginationWidth - margin.horizontal)
+                  .clamp(1.0, paginationWidth)
+                  .toDouble();
+          final flowWidgets = _flowChildren(
             child,
             childStyle,
             cascade,
             flattenBlockContainers: true,
-            paginationWidth: paginationWidth,
+            paginationWidth: childWidth,
             paginationMaxHeight: paginationMaxHeight,
             paginationTextScaler: paginationTextScaler,
-          ));
+          );
+          if (flowWidgets.isEmpty) {
+            if (margin.vertical > 0) {
+              widgets.add(SizedBox(height: margin.vertical));
+            }
+          } else {
+            flowWidgets[0] = Padding(
+              padding: EdgeInsets.only(
+                top: margin.top,
+                left: margin.left,
+                right: margin.right,
+              ),
+              child: flowWidgets.first,
+            );
+            flowWidgets[flowWidgets.length - 1] = Padding(
+              padding: EdgeInsets.only(bottom: margin.bottom),
+              child: flowWidgets.last,
+            );
+            widgets.addAll(flowWidgets);
+          }
         } else {
           widgets.add(_buildBlock(
             child,
@@ -1513,7 +1539,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return false;
     }
     if (_boxInsets(style, 'padding', widget.fontSize) != EdgeInsets.zero ||
-        _boxInsets(style, 'margin', widget.fontSize) != EdgeInsets.zero ||
         _cssColor(style['background-color']) != null ||
         _backgroundFromShorthand(style['background']) != null) {
       return false;
