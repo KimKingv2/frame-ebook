@@ -4,7 +4,46 @@ from __future__ import annotations
 
 import unittest
 
-from native_build_policy import native_targets
+from native_build_policy import (
+    lockfile_change_is_dart_only,
+    native_targets,
+    pubspec_change_is_dart_only,
+)
+
+
+BASE_PUBSPEC = """name: frame_ebook
+version: 0.4.0+1
+dependencies:
+  flutter:
+    sdk: flutter
+  web: ^1.1.1
+  webview_flutter: ^4.14.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/OFL.txt
+"""
+
+BASE_LOCK = """packages:
+  flutter:
+    dependency: direct main
+    source: sdk
+    version: "0.0.0"
+  web:
+    dependency: direct main
+    source: hosted
+    version: "1.1.1"
+  webview_flutter:
+    dependency: direct main
+    source: hosted
+    version: "4.14.1"
+sdks:
+  dart: ">=3.13.0 <4.0.0"
+"""
 
 
 class NativeBuildPolicyTests(unittest.TestCase):
@@ -42,6 +81,61 @@ class NativeBuildPolicyTests(unittest.TestCase):
             "flutter/assets/fonts/NotoSansTC-VF.ttf",
         ]
         self.assertEqual(native_targets(paths), (True, True))
+
+    def test_pure_dart_dependency_additions_do_not_rebuild_apps(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "  web: ^1.1.1\n",
+            "  web: ^1.1.1\n"
+            "  koni_archive_core: ^0.9.0\n"
+            "  koni_zip: ^0.9.0\n",
+        )
+        self.assertTrue(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+        self.assertEqual(
+            native_targets(
+                ["flutter/pubspec.yaml"],
+                dart_only_dependency_manifests=True,
+            ),
+            (False, False),
+        )
+
+    def test_native_plugin_dependency_addition_still_rebuilds_apps(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "  web: ^1.1.1\n",
+            "  web: ^1.1.1\n  new_native_plugin: ^1.0.0\n",
+        )
+        self.assertFalse(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+
+    def test_packaged_resource_changes_still_rebuild_apps(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "    - assets/fonts/OFL.txt\n",
+            "    - assets/fonts/OFL.txt\n    - assets/reader/\n",
+        )
+        self.assertFalse(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+
+    def test_lockfile_allows_only_reviewed_dart_packages(self) -> None:
+        after = BASE_LOCK.replace(
+            "  webview_flutter:\n",
+            "  koni_archive_core:\n"
+            "    dependency: transitive\n"
+            "    source: hosted\n"
+            "    version: \"0.9.0\"\n"
+            "  koni_zip:\n"
+            "    dependency: direct main\n"
+            "    source: hosted\n"
+            "    version: \"0.9.0\"\n"
+            "  webview_flutter:\n",
+        )
+        self.assertTrue(lockfile_change_is_dart_only(BASE_LOCK, after))
+
+        native_after = after.replace(
+            "  webview_flutter:\n",
+            "  unreviewed_plugin:\n"
+            "    dependency: transitive\n"
+            "    source: hosted\n"
+            "    version: \"1.0.0\"\n"
+            "  webview_flutter:\n",
+        )
+        self.assertFalse(lockfile_change_is_dart_only(BASE_LOCK, native_after))
 
     def test_mixed_platform_changes_rebuild_only_affected_platforms(self) -> None:
         paths = [
