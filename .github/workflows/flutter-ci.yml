@@ -24,6 +24,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Test native app rebuild policy
+        run: python3 flutter/tool/test_native_build_policy.py
       - id: detect
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -41,34 +43,9 @@ jobs:
             CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")"
           fi
 
-          ANDROID=false
-          MACOS=false
-          while IFS= read -r path; do
-            case "$path" in
-              flutter/android/*|flutter/tool/android/*)
-                ANDROID=true
-                ;;
-              flutter/macos/*|flutter/tool/macos/*)
-                MACOS=true
-                ;;
-              flutter/pubspec.yaml|flutter/pubspec.lock|flutter/tool/prepare_platforms.py)
-                # Plugin dependencies and generated platform permissions/bridges
-                # are packaged into both native applications.
-                ANDROID=true
-                MACOS=true
-                ;;
-            esac
-            # App-bundled fonts and other assets are not Dart-only OTA patches.
-            if [[ "$path" == flutter/assets/* ]]; then
-              ANDROID=true
-              MACOS=true
-            fi
-          done <<< "$CHANGED_FILES"
-
-          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
-          echo "macos=$MACOS" >> "$GITHUB_OUTPUT"
-          echo "Native Android package rebuild required: $ANDROID"
-          echo "Native macOS package rebuild required: $MACOS"
+          TARGETS="$(printf '%s\\n' "$CHANGED_FILES" | python3 flutter/tool/native_build_policy.py)"
+          printf '%s\\n' "$TARGETS" >> "$GITHUB_OUTPUT"
+          printf '%s\\n' "$TARGETS"
 
   web:
     name: Analyze, test and build Web
