@@ -185,6 +185,28 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     );
   }
 
+  List<FrameBook> _relatedBooks(FrameBook selected) {
+    if (selected.folderPath.isEmpty) return [selected];
+    final related = _books.where((book) =>
+      book.provider == selected.provider &&
+      book.library == selected.library &&
+      book.rootPath == selected.rootPath &&
+      book.folderPath == selected.folderPath
+    ).toList();
+    return related.isEmpty ? [selected] : related;
+  }
+
+  Future<void> _reloadDetails(String bookId) async {
+    await _load(showLoading: false);
+    if (!mounted) return;
+    for (final book in _books) {
+      if (book.id == bookId) {
+        setState(() => _detailsBook = book);
+        return;
+      }
+    }
+  }
+
   void _showDetails(FrameBook book) {
     setState(() => _detailsBook = book);
   }
@@ -1379,7 +1401,11 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       return FrameBookDetailsScreen(
         book: detailsBook,
         cover: _cover(detailsBook, contain: true),
+        relatedBooks: _relatedBooks(detailsBook),
+        repository: _repository,
         onBack: () => setState(() => _detailsBook = null),
+        onRead: () => unawaited(_openReader(detailsBook)),
+        onBookChanged: _reloadDetails,
       );
     }
 
