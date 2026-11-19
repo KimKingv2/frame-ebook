@@ -18,11 +18,14 @@ jobs:
     name: Detect native platform source changes
     runs-on: ubuntu-latest
     outputs:
-      native: ${{ steps.detect.outputs.native }}
+      android: ${{ steps.detect.outputs.android }}
+      macos: ${{ steps.detect.outputs.macos }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Test native app rebuild policy
+        run: python3 flutter/tool/test_native_build_policy.py
       - id: detect
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -40,26 +43,9 @@ jobs:
             CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")"
           fi
 
-          NATIVE=false
-          while IFS= read -r path; do
-            [[ "$path" == flutter/* ]] || continue
-            case "$path" in
-              flutter/lib/library/frame_reader_engine_web.dart|\
-              flutter/lib/library/frame_bookshelf_screen.dart|\
-              flutter/lib/library/frame_book_details_dialog.dart|\
-              flutter/lib/library/frame_book_details_screen.dart|\
-              flutter/lib/library/frame_library_repository.dart|\
-              flutter/lib/main.dart|\
-              flutter/pubspec.yaml|\
-              flutter/tool/prepare_fonts.py)
-                continue
-                ;;
-            esac
-            NATIVE=true
-          done <<< "$CHANGED_FILES"
-
-          echo "native=$NATIVE" >> "$GITHUB_OUTPUT"
-          echo "Native platform sources changed: $NATIVE"
+          TARGETS="$(printf '%s\n' "$CHANGED_FILES" | python3 flutter/tool/native_build_policy.py)"
+          printf '%s\n' "$TARGETS" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$TARGETS"
 
   web:
     name: Analyze, test and build Web
@@ -166,7 +152,7 @@ jobs:
   macos:
     name: Build macOS
     needs: detect-native-changes
-    if: needs.detect-native-changes.outputs.native == 'true'
+    if: needs.detect-native-changes.outputs.macos == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +186,7 @@ jobs:
   android:
     name: Build Android APK
     needs: detect-native-changes
-    if: needs.detect-native-changes.outputs.native == 'true'
+    if: needs.detect-native-changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
