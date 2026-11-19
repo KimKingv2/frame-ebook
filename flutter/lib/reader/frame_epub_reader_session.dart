@@ -96,7 +96,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
     final index = _currentSpineIndex;
     final count = _epub?.spine.length ?? 0;
     if (index == null || count <= 0) return 0;
-    return ((index * 100) ~/ count).clamp(0, 99);
+    return ((index * 100) ~/ count).clamp(0, 99).toInt();
   }
 
   String get currentChapterLabel {
@@ -164,6 +164,10 @@ class FrameEpubReaderSession extends ChangeNotifier {
       _status = FrameEpubReaderStatus.ready;
       notifyListeners();
     } on Object catch (error) {
+      final archive = _archive;
+      _archive = null;
+      _loader = null;
+      if (archive != null) await archive.close();
       if (_closed) return;
       _status = FrameEpubReaderStatus.error;
       _error = error.toString();
@@ -255,22 +259,9 @@ class FrameEpubReaderSession extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    late final FrameEpubChapterDocument chapter;
     try {
-      final chapter = await loader.loadChapter(epub.spine[index]);
-      if (_closed || revision != _navigationRevision) return false;
-      _currentSpineIndex = index;
-      _currentFragment = fragment;
-      _chapter = chapter;
-      _chapterLoading = false;
-      notifyListeners();
-
-      if (saveProgress) {
-        await _saveProgress(
-          percent: chapterProgressPercent,
-          cfi: '',
-        );
-      }
-      return true;
+      chapter = await loader.loadChapter(epub.spine[index]);
     } on Object catch (error) {
       if (!_closed && revision == _navigationRevision) {
         _chapterLoading = false;
@@ -279,6 +270,26 @@ class FrameEpubReaderSession extends ChangeNotifier {
       }
       return false;
     }
+
+    if (_closed || revision != _navigationRevision) return false;
+    _currentSpineIndex = index;
+    _currentFragment = fragment;
+    _chapter = chapter;
+    _chapterLoading = false;
+    notifyListeners();
+
+    if (saveProgress) {
+      try {
+        await _saveProgress(
+          percent: chapterProgressPercent,
+          cfi: '',
+        );
+      } on Object {
+        // The new chapter remains available offline in memory for this
+        // session. The warning already exposes the failed cloud sync.
+      }
+    }
+    return true;
   }
 
   /// Saves a real renderer position without changing the existing D1 schema.
@@ -294,7 +305,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
       throw StateError('EPUB 閱讀工作階段尚未就緒。');
     }
     await _saveProgress(
-      percent: percent.clamp(0, 100),
+      percent: percent.clamp(0, 100).toInt(),
       cfi: cfi,
     );
   }
