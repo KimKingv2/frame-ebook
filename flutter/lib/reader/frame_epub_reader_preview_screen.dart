@@ -391,6 +391,7 @@ class _FrameEpubReaderPreviewScreenState
                   chapter: chapter,
                   resourceLoader: session.resourceLoader!,
                   fixedLayout: session.isFixedLayout,
+                  annotations: session.annotations,
                   spineIndex: chapterIndex,
                   initialAnchor: _initialAnchorFor(session),
                   initialScrollFraction: _initialScrollFractionFor(session),

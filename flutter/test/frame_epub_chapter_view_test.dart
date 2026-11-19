@@ -3,7 +3,9 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
+import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
+import 'package:frame_ebook/reader/frame_epub_cfi.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
 import 'package:frame_ebook/reader/frame_zip_archive.dart';
@@ -269,6 +271,17 @@ void main() {
       final epub = await const FrameEpubParser().parse(archive);
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
+      final selectedNode = chapter.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == 'EPUB');
+      final annotationCfi = FrameEpubCfi.createRange(
+        book: epub,
+        spineIndex: 0,
+        startNode: selectedNode,
+        startOffset: 0,
+        endNode: selectedNode,
+        endOffset: selectedNode.value.length,
+      )!;
       String? followedHref;
 
       await tester.pumpWidget(MaterialApp(
@@ -277,6 +290,27 @@ void main() {
             child: FrameEpubChapterView(
               chapter: chapter,
               resourceLoader: loader,
+              annotations: [
+                FrameReaderAnnotation(
+                  id: 'test-yellow-highlight',
+                  bookId: book.id,
+                  type: 'highlight',
+                  cfi: annotationCfi,
+                  quote: 'EPUB',
+                  color: 'yellow',
+                  createdAt: 1,
+                ),
+                FrameReaderAnnotation(
+                  id: 'test-note',
+                  bookId: book.id,
+                  type: 'note',
+                  cfi: annotationCfi,
+                  quote: 'EPUB',
+                  text: '測試筆記',
+                  color: 'violet',
+                  createdAt: 2,
+                ),
+              ],
               onInternalLink: (href) => followedHref = href,
             ),
           ),
@@ -288,6 +322,34 @@ void main() {
       expect(find.textContaining('EPUB'), findsOneWidget);
       expect(find.text('章節目標'), findsOneWidget);
       expect(find.byType(SelectableText), findsWidgets);
+      final paragraph = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .firstWhere(
+            (widget) =>
+                widget.textSpan?.toPlainText().contains('EPUB') ?? false,
+          );
+      final paragraphSpan = paragraph.textSpan!;
+      final markedSpan = <TextSpan>[];
+      void collectMarkedSpans(InlineSpan span) {
+        if (span is! TextSpan) return;
+        if (span.style?.backgroundColor != null ||
+            span.style?.decoration != null) {
+          markedSpan.add(span);
+        }
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          collectMarkedSpans(child);
+        }
+      }
+      collectMarkedSpans(paragraphSpan);
+      expect(
+        markedSpan.any(
+          (span) =>
+              span.text == 'EPUB' &&
+              span.style?.backgroundColor != null &&
+              span.style?.decorationStyle == TextDecorationStyle.wavy,
+        ),
+        isTrue,
+      );
 
       await tester.tap(find.text('章內連結'));
       expect(followedHref, 'chapter.xhtml#inside');
