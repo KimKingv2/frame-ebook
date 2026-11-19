@@ -191,6 +191,7 @@ void main() {
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
       String? followedHref;
+      FrameEpubTextSelection? selectedText;
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -199,6 +200,9 @@ void main() {
               chapter: chapter,
               resourceLoader: loader,
               onInternalLink: (href) => followedHref = href,
+              onTextSelection: (selection) {
+                if (selection != null) selectedText = selection;
+              },
             ),
           ),
         ),
@@ -208,6 +212,13 @@ void main() {
       expect(find.text('閱讀畫面測試'), findsOneWidget);
       expect(find.textContaining('EPUB'), findsOneWidget);
       expect(find.text('章節目標'), findsOneWidget);
+      expect(find.byType(SelectableText), findsWidgets);
+
+      await tester.longPress(find.textContaining('EPUB'));
+      await tester.pumpAndSettle();
+      expect(selectedText, isNotNull);
+      expect(selectedText!.quote, contains('EPUB'));
+      expect(selectedText!.startNode.value, contains('EPUB'));
 
       await tester.tap(find.text('章內連結'));
       expect(followedHref, 'chapter.xhtml#inside');

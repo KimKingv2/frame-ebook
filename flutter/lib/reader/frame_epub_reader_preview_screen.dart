@@ -58,6 +58,7 @@ class _FrameEpubReaderPreviewScreenState
   String? _pendingCfi;
   int? _pendingPercent;
   String? _lastSavedCfi;
+  _SelectedEpubText? _selectedText;
 
   double _fontSize = 18;
   double _lineHeight = 1.75;
@@ -104,6 +105,7 @@ class _FrameEpubReaderPreviewScreenState
     if (chapterPath != null && chapterPath != _activeChapterPath) {
       _activeChapterPath = chapterPath;
       _lastSavedCfi = null;
+      _selectedText = null;
       final previousController = _chapterScrollController;
       _chapterScrollController = ScrollController();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -394,6 +396,7 @@ class _FrameEpubReaderPreviewScreenState
                   initialScrollFraction: _initialScrollFractionFor(session),
                   scrollController: _chapterScrollController,
                   onReadingPosition: _queueReadingPosition,
+                  onTextSelection: _handleTextSelection,
                   backgroundColor: _pageBackground,
                   textColor: _pageText,
                   linkColor: _pageLink,
@@ -404,6 +407,16 @@ class _FrameEpubReaderPreviewScreenState
                   },
                 ),
               ),
+              if (_selectedText != null && !session.isFixedLayout)
+                Positioned(
+                  top: 10,
+                  left: 8,
+                  right: 8,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: _selectionToolbar(),
+                  ),
+                ),
               if (session.isChapterLoading)
                 const Positioned(
                   top: 0,
@@ -723,6 +736,244 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  void _handleTextSelection(FrameEpubTextSelection? selection) {
+    if (!mounted || selection == null) return;
+    final session = _session;
+    final chapter = session?.currentChapter;
+    final spineIndex = session?.currentSpineIndex;
+    final book = session?.epub;
+    if (session == null ||
+        chapter == null ||
+        book == null ||
+        spineIndex == null ||
+        session.isFixedLayout) {
+      return;
+    }
+
+    final cfi = FrameEpubCfi.createRange(
+      book: book,
+      spineIndex: spineIndex,
+      startNode: selection.startNode,
+      startOffset: selection.startOffset,
+      endNode: selection.endNode,
+      endOffset: selection.endOffset,
+    );
+    if (cfi == null) return;
+    if (_selectedText?.cfi == cfi && _selectedText?.quote == selection.quote) {
+      return;
+    }
+    setState(() {
+      _selectedText = _SelectedEpubText(cfi: cfi, quote: selection.quote);
+    });
+  }
+
+  Widget _selectionToolbar() => Material(
+        color: _readerPanel,
+        elevation: 10,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 2,
+            children: [
+              IconButton(
+                tooltip: '黃色高亮',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _saveSelectedHighlight('yellow'),
+                icon: const Icon(Icons.circle, color: Color(0xFFF2C94C), size: 19),
+              ),
+              IconButton(
+                tooltip: '紫色高亮',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _saveSelectedHighlight('violet'),
+                icon: const Icon(Icons.circle, color: Color(0xFFA78BFA), size: 19),
+              ),
+              IconButton(
+                tooltip: '綠色高亮',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _saveSelectedHighlight('mint'),
+                icon: const Icon(Icons.circle, color: Color(0xFF65C9A5), size: 19),
+              ),
+              IconButton(
+                tooltip: '粉色高亮',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _saveSelectedHighlight('rose'),
+                icon: const Icon(Icons.circle, color: Color(0xFFE88EAF), size: 19),
+              ),
+              TextButton.icon(
+                onPressed: () => _saveSelectedHighlight('underline'),
+                icon: const Icon(Icons.format_underline_rounded, size: 17),
+                label: const Text('下劃線'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _readerText,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _showSelectionNoteEditor,
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text('筆記'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _readerText,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              IconButton(
+                tooltip: '關閉選取工具列',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => _selectedText = null),
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Future<void> _saveSelectedHighlight(String color) async {
+    final selected = _selectedText;
+    if (selected == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final annotation = FrameReaderAnnotation(
+      id: 'flutter-highlight-${DateTime.now().microsecondsSinceEpoch}',
+      bookId: widget.book.id,
+      type: 'highlight',
+      cfi: selected.cfi,
+      quote: selected.quote,
+      text: '',
+      color: color,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _saveAnnotation(annotation);
+  }
+
+  Future<void> _showSelectionNoteEditor() => _editNote();
+
+  Future<void> _editNote({FrameReaderAnnotation? annotation}) async {
+    final selected = _selectedText;
+    final session = _session;
+    if (session == null || (annotation == null && selected == null)) return;
+
+    final quote = annotation?.quote ?? selected?.quote ?? '';
+    final controller = TextEditingController(text: annotation?.text ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _readerPanel,
+        title: Text(
+          annotation == null ? '新增閱讀筆記' : '編輯閱讀筆記',
+          style: const TextStyle(color: _readerText, fontSize: 17),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (quote.isNotEmpty)
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0x332B2635),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      quote,
+                      style: const TextStyle(
+                        color: _readerMuted,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                minLines: 4,
+                maxLines: 9,
+                maxLength: 20000,
+                style: const TextStyle(color: _readerText, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: '記下你的想法、解讀或補充資料……',
+                  hintStyle: const TextStyle(color: _readerMuted),
+                  filled: true,
+                  fillColor: const Color(0x332B2635),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('保存筆記'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || value == null) return;
+    final text = value.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('筆記內容不可為空白。')),
+      );
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final saved = FrameReaderAnnotation(
+      id: annotation?.id ??
+          'flutter-note-${DateTime.now().microsecondsSinceEpoch}',
+      bookId: widget.book.id,
+      type: 'note',
+      cfi: annotation?.cfi ?? selected!.cfi,
+      quote: annotation?.quote ?? selected!.quote,
+      text: text,
+      color: annotation?.color ?? 'violet',
+      createdAt: annotation?.createdAt ?? now,
+      updatedAt: now,
+    );
+    await _saveAnnotation(saved);
+  }
+
+  Future<void> _saveAnnotation(FrameReaderAnnotation annotation) async {
+    final session = _session;
+    if (session == null) return;
+    try {
+      await session.saveAnnotation(annotation);
+      if (!mounted) return;
+      setState(() => _selectedText = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            annotation.type == 'highlight'
+                ? (annotation.color == 'underline' ? '已新增下劃線。' : '已新增高亮。')
+                : '筆記已保存。',
+          ),
+        ),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('標註保存失敗：$error')),
+      );
+    }
+  }
+
   Future<void> _createBookmark() async {
     final session = _session;
     if (session == null ||
@@ -869,30 +1120,48 @@ class _FrameEpubReaderPreviewScreenState
                                 height: 1.5,
                               ),
                             ),
-                            trailing: IconButton(
-                              tooltip: '刪除$title',
-                              onPressed: () async {
-                                try {
-                                  await session.deleteAnnotation(annotation.id);
-                                  if (!mounted) return;
-                                  setSheetState(() {
-                                    annotations = session.annotations;
-                                  });
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('已刪除$title。')),
-                                  );
-                                } on Object catch (error) {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('刪除$title失敗：$error')),
-                                  );
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Color(0xFFBBAFCB),
-                                size: 19,
-                              ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (annotation.type == 'note')
+                                  IconButton(
+                                    tooltip: '編輯筆記',
+                                    onPressed: () {
+                                      Navigator.of(sheetContext).pop();
+                                      unawaited(_editNote(annotation: annotation));
+                                    },
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      color: _readerAccent,
+                                      size: 18,
+                                    ),
+                                  ),
+                                IconButton(
+                                  tooltip: '刪除$title',
+                                  onPressed: () async {
+                                    try {
+                                      await session.deleteAnnotation(annotation.id);
+                                      if (!mounted) return;
+                                      setSheetState(() {
+                                        annotations = session.annotations;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('已刪除$title。')),
+                                      );
+                                    } on Object catch (error) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('刪除$title失敗：$error')),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Color(0xFFBBAFCB),
+                                    size: 19,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         },
@@ -1043,6 +1312,13 @@ class _FrameEpubReaderPreviewScreenState
       ),
     );
   }
+}
+
+class _SelectedEpubText {
+  const _SelectedEpubText({required this.cfi, required this.quote});
+
+  final String cfi;
+  final String quote;
 }
 
 class _FlattenedTocEntry {
