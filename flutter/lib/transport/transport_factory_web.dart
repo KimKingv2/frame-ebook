@@ -129,7 +129,9 @@ class _BrowserFrameTransport implements FrameTransport {
       }
     }
 
-    cancellation?.whenCancelled.then((_) => abortRequest());
+    if (cancellation != null) {
+      unawaited(cancellation.whenCancelled.then((_) => abortRequest()));
+    }
 
     final requestHeaders = web.Headers();
     requestHeaders.set('Accept', '*/*');
@@ -151,7 +153,7 @@ class _BrowserFrameTransport implements FrameTransport {
 
     late final web.Response response;
     try {
-      response = await web.window.fetch(uri.toString().toJS, init).toDart;
+      response = await web.window.fetch(uri.toString().toJS, init).toDart.timeout(timeout);
     } catch (_) {
       _activeStreams.remove(abortController);
       if (cancelled || cancellation?.isCancelled == true) {
@@ -187,7 +189,8 @@ class _BrowserFrameTransport implements FrameTransport {
           if (cancelled) break;
           final result = await currentReader
               .callMethod<JSPromise<web.ReadableStreamReadResult>>('read'.toJS)
-              .toDart;
+              .toDart
+              .timeout(timeout);
           final done = result.getProperty<JSBoolean>('done'.toJS).toDart;
           if (done) break;
           final chunk = result.getProperty<JSUint8Array?>('value'.toJS);
