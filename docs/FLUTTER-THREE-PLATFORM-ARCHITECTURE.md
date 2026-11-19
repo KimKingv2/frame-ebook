@@ -105,7 +105,8 @@ The app is not yet at the final architecture:
 - The Flutter bookshelf and work-details UI are already using shared Dart feature code and the existing APIs.
 - The shared EPUB reader session now coordinates Range-backed archive access, package parsing, chapter/resource loading, TOC navigation, chapter-index progress restoration, and the existing D1 state/annotation APIs.
 - The reader session deliberately does not synthesize EPUB CFI values. Fine-grained CFI persistence must come from the eventual renderer, and the existing CFI is not treated as a chapter index.
-- The Flutter Reader shell still remains on the legacy iframe/WebView route. The session is not wired into the live screen until XHTML/CSS rendering and fixed-layout presentation are ready.
+- The Flutter Reader shell still remains on the legacy iframe/WebView route. A first shared CSS cascade and Flutter XHTML chapter renderer now exist as isolated components; they are not wired into the live screen until broader EPUB layout parity is verified.
+- The initial renderer supports common text blocks, headings, inline emphasis, lists, basic links, raster images, CSS selector/cascade rules, and an interactive fixed-layout viewport. It is not a browser-complete CSS engine: SVG rendering, embedded EPUB fonts, complex positioning, background-image painting, tables, and standards-based CFI generation remain follow-up work.
 
 Keep those bridges until the shared Dart transport and Flutter reader have passed the acceptance checks below. Do not remove a working legacy route merely to make the architecture look complete.
 
@@ -117,7 +118,7 @@ Keep those bridges until the shared Dart transport and Flutter reader have passe
 4. **Web adapter:** implement a Fetch-based same-origin streaming adapter with Range support and no native imports.
 5. **EPUB package parser:** parse container.xml, OPF metadata, manifest, spine, EPUB 3 navigation and EPUB 2 NCX on top of the generic Range-backed ZIP reader.
 6. **EPUB resource loader:** resolve chapter-relative XHTML, CSS, SVG, image, font and internal-link references with bounded per-entry reads and no persistent content cache.
-7. **Flutter reader core:** the shared session layer is in place. Next implement EPUB CSS cascade and the shared XHTML/fixed-layout Flutter renderer, then connect real CFI positions, annotations, appearance and reading events.
+7. **Flutter reader core:** the shared session, initial CSS cascade and XHTML/fixed-layout Flutter chapter renderer are in place as isolated components. Next expand EPUB layout coverage, add real CFI generation/restoration, and connect annotations, appearance and reading events.
 8. **Parity and retirement:** verify the complete main-branch parity inventory on Web, Android and macOS. Only then retire the legacy iframe/WebView reader bridges.
 9. **OTA release automation:** connect Shorebird app configuration and protected CI credentials, then verify a Dart-only patch on both native targets before relying on it as the normal update route.
 
