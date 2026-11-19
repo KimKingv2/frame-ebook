@@ -34,7 +34,6 @@ class _FrameEpubFixedLayoutLongStripState
     extends State<FrameEpubFixedLayoutLongStrip> {
   late final ScrollController _scrollController;
   int? _lastReportedIndex;
-  int _lastExternalIndex = -1;
   bool _initialPositionApplied = false;
   double _pageExtent = 0;
 
@@ -43,7 +42,6 @@ class _FrameEpubFixedLayoutLongStripState
     super.initState();
     _scrollController = ScrollController()
       ..addListener(_handleScrollChanged);
-    _lastExternalIndex = widget.currentPageIndex;
   }
 
   @override
@@ -53,7 +51,6 @@ class _FrameEpubFixedLayoutLongStripState
       _lastReportedIndex = null;
     }
     if (oldWidget.currentPageIndex != widget.currentPageIndex) {
-      _lastExternalIndex = widget.currentPageIndex;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients || _pageExtent <= 0) {
           return;
@@ -67,7 +64,7 @@ class _FrameEpubFixedLayoutLongStripState
             target.clamp(
               position.minScrollExtent,
               position.maxScrollExtent,
-            ),
+            ).toDouble(),
           );
         }
       });
