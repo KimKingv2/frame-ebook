@@ -37,6 +37,9 @@ DART_ONLY_DEPENDENCIES = {
     "koni_archive_core",
     "koni_codecs",
     "koni_zip",
+    "args",
+    "petitparser",
+    "xml",
     "web",
 }
 PUBSPEC_SECTIONS = {"dependencies", "dev_dependencies", "dependency_overrides"}
