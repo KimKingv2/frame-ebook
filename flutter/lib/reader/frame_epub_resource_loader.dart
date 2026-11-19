@@ -315,6 +315,13 @@ class FrameEpubResourceLoader {
           continue;
         }
 
+        if (name == 'link' && attributeName == 'href') {
+          final rel = element.attributes
+              .where((item) => item.name.local.toLowerCase() == 'rel')
+              .map((item) => item.value)
+              .firstOrNull ?? '';
+          if (!_tokens(rel).contains('stylesheet')) continue;
+        }
         final role = _documentAttributeRole(name, attributeName);
         if (role == null) continue;
         final target = resolve(attribute.value, fromPath: chapter.path);
@@ -426,8 +433,12 @@ class FrameEpubResourceLoader {
         if (reference.kind == FrameEpubCssReferenceKind.import &&
             resolved.resource?.kind == FrameEpubResourceKind.stylesheet &&
             !scheduled.contains(resolved.path)) {
-          scheduled.add(resolved.path!);
-          queue.add((resolved.path!, depth + 1));
+          if (scheduled.length >= maxStylesheets) {
+            warnings.add('CSS 文件數量超過上限，略過匯入：' + resolved.path!);
+          } else {
+            scheduled.add(resolved.path!);
+            queue.add((resolved.path!, depth + 1));
+          }
         }
       }
 
@@ -512,7 +523,6 @@ class FrameEpubResourceLoader {
         FrameEpubResourceKind.document => maxXhtmlBytes,
         FrameEpubResourceKind.stylesheet => maxStylesheetBytes,
         FrameEpubResourceKind.image => maxImageBytes,
-        FrameEpubResourceKind.svg => maxSvgBytes,
         FrameEpubResourceKind.svg => maxSvgBytes,
         FrameEpubResourceKind.font => maxFontBytes,
         _ => maxOtherResourceBytes,
