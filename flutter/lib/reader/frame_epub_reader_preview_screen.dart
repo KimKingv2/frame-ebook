@@ -760,7 +760,6 @@ class _FrameEpubReaderPreviewScreenState
             key: ValueKey(epub.spine[index].item.path),
             resourceLoader: loader,
             spineItem: epub.spine[index],
-            spineIndex: index,
             imageFit: 'fit-page',
             allowZoom: false,
             backgroundColor: _pageBackground,
@@ -775,7 +774,6 @@ class _FrameEpubReaderPreviewScreenState
         key: ValueKey(epub.spine[spineIndex].item.path),
         resourceLoader: loader,
         spineItem: epub.spine[spineIndex],
-        spineIndex: spineIndex,
         chapter: chapter,
         imageFit: _comicImageFit,
         allowZoom: true,
@@ -796,7 +794,6 @@ class _FrameEpubReaderPreviewScreenState
               key: ValueKey(epub.spine[nextIndex].item.path),
               resourceLoader: loader,
               spineItem: epub.spine[nextIndex],
-              spineIndex: nextIndex,
               imageFit: _comicImageFit,
               allowZoom: true,
               backgroundColor: _pageBackground,
@@ -1963,7 +1960,6 @@ class _FixedLayoutComicPage extends StatefulWidget {
   const _FixedLayoutComicPage({
     required this.resourceLoader,
     required this.spineItem,
-    required this.spineIndex,
     required this.imageFit,
     required this.allowZoom,
     required this.backgroundColor,
@@ -1977,7 +1973,6 @@ class _FixedLayoutComicPage extends StatefulWidget {
 
   final FrameEpubResourceLoader resourceLoader;
   final FrameEpubSpineItem spineItem;
-  final int spineIndex;
   final FrameEpubChapterDocument? chapter;
   final String imageFit;
   final bool allowZoom;
@@ -2042,7 +2037,7 @@ class _FixedLayoutComicPageState extends State<_FixedLayoutComicPage> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                '漫畫頁載入失敗：\${snapshot.error}',
+                '漫畫頁載入失敗：${snapshot.error}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFFFFC1C1), fontSize: 12),
               ),
