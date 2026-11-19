@@ -436,6 +436,7 @@ class _FrameEpubReaderPreviewScreenState
       session.isFixedLayout &&
       _comicReadingMode == 'paginated' &&
       _comicPageLayout == '2' &&
+      session.epub?.spread.toLowerCase() != 'none' &&
       MediaQuery.sizeOf(context).width >= 760;
 
   int _comicPageStep(BuildContext context, FrameEpubReaderSession session) =>
@@ -861,6 +862,8 @@ class _FrameEpubReaderPreviewScreenState
   }) {
     final label = session.currentChapterLabel.trim();
     final pageStep = _comicPageStep(context, session);
+    final previousLabel = session.isFixedLayout ? '上一頁' : '上一章';
+    final nextLabel = session.isFixedLayout ? '下一頁' : '下一章';
     final canGoPrevious = chapterIndex > 0;
     final canGoNext = chapterIndex + pageStep < spineCount;
     return Material(
@@ -875,7 +878,7 @@ class _FrameEpubReaderPreviewScreenState
               Row(
                 children: [
                   IconButton(
-                    tooltip: '上一章',
+                    tooltip: previousLabel,
                     onPressed: canGoPrevious
                         ? () => unawaited(
                               session.isFixedLayout
@@ -910,7 +913,7 @@ class _FrameEpubReaderPreviewScreenState
                     ),
                   ),
                   IconButton(
-                    tooltip: '下一章',
+                    tooltip: nextLabel,
                     onPressed: canGoNext
                         ? () => unawaited(
                               session.isFixedLayout
