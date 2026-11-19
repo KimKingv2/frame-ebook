@@ -15,11 +15,13 @@ const _line = Color(0x55393247);
 class FrameBookDetailsScreen extends StatelessWidget {
   const FrameBookDetailsScreen({
     required this.book,
+    required this.cover,
     required this.onBack,
     super.key,
   });
 
   final FrameBook book;
+  final Widget cover;
   final VoidCallback onBack;
 
   @override
@@ -66,7 +68,13 @@ class FrameBookDetailsScreen extends StatelessWidget {
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text('作品元資料'),
+        title: const Text(
+          '作品資訊',
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: _bg,
         foregroundColor: _ink,
         elevation: 0,
@@ -86,32 +94,58 @@ class FrameBookDetailsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _line),
                   ),
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        comic ? 'COMIC METADATA' : 'EBOOK METADATA',
-                        style: const TextStyle(
-                          color: _accent,
-                          fontSize: 9,
-                          letterSpacing: 1.8,
-                          fontWeight: FontWeight.w600,
+                      SizedBox(
+                        width: 112,
+                        child: AspectRatio(
+                          aspectRatio: comic ? 2 / 3 : 3 / 4,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: ColoredBox(
+                              color: _raised,
+                              child: cover,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      SelectableText(
-                        title,
-                        style: const TextStyle(
-                          color: _ink,
-                          fontSize: 22,
-                          height: 1.4,
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              comic ? 'COMIC METADATA' : 'EBOOK METADATA',
+                              style: const TextStyle(
+                                color: _accent,
+                                fontSize: 9,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SelectableText(
+                              title,
+                              style: const TextStyle(
+                                color: _ink,
+                                fontSize: 22,
+                                height: 1.4,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              book.author.isEmpty ? '作者未提供' : book.author,
+                              style: const TextStyle(color: _muted, fontSize: 12),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              book.format.isEmpty ? '格式未提供' : book.format,
+                              style: const TextStyle(color: _faint, fontSize: 10),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        book.author.isEmpty ? '作者未提供' : book.author,
-                        style: const TextStyle(color: _muted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -206,9 +240,13 @@ class FrameBookDetailsScreen extends StatelessWidget {
         children: [
           Text(
             title,
+            maxLines: 2,
+            softWrap: true,
+            overflow: TextOverflow.visible,
             style: const TextStyle(
               color: _accent,
-              fontSize: 11,
+              fontSize: 12,
+              height: 1.4,
               fontWeight: FontWeight.w600,
             ),
           ),
