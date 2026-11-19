@@ -5,8 +5,8 @@ import 'package:frame_ebook/reader/frame_epub_text_paginator.dart';
 
 void main() {
   test('splits long rich text only at rendered line boundaries', () {
-    const text = TextSpan(
-      style: TextStyle(fontSize: 18, height: 1.6),
+    final text = TextSpan(
+      style: const TextStyle(fontSize: 18, height: 1.6),
       children: [
         TextSpan(text: '這是一段很長的中文內容，'),
         TextSpan(
@@ -40,8 +40,8 @@ void main() {
   });
 
   test('keeps inline widget placeholders in one intact fragment', () {
-    const text = TextSpan(
-      style: TextStyle(fontSize: 18),
+    final text = TextSpan(
+      style: const TextStyle(fontSize: 18),
       children: [
         TextSpan(text: 'Before image '),
         WidgetSpan(child: SizedBox(width: 24, height: 24)),
