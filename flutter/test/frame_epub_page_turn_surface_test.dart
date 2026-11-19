@@ -349,4 +349,38 @@ void main() {
   });
 
 
+  testWidgets('paginated horizontal swipe is handled by PageView once', (tester) async {
+    final scrollController = ScrollController();
+    final pageController = PageController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: scrollController,
+            pageController: pageController,
+            paginated: true,
+            child: PageView(
+              controller: pageController,
+              children: const [
+                ColoredBox(color: Colors.red),
+                ColoredBox(color: Colors.green),
+                ColoredBox(color: Colors.blue),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(PageView), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(pageController.page, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    pageController.dispose();
+    scrollController.dispose();
+  });
+
 }
