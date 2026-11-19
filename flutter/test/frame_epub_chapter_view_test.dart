@@ -49,7 +49,7 @@ class _MemoryFileSource implements FrameFileSource {
   }
 }
 
-Uint8List _fixture() {
+Uint8List _fixture({String additionalIntroText = ''}) {
   const container = '''
 <container><rootfiles>
   <rootfile full-path="OPS/book.opf"
@@ -74,13 +74,13 @@ Uint8List _fixture() {
   <spine><itemref idref="chapter"/></spine>
 </package>
 ''';
-  const chapter = '''
+  final chapter = '''
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:epub="http://www.idpf.org/2007/ops">
   <head><title>Widget fixture</title></head>
   <body>
     <h1>閱讀畫面測試</h1>
-    <p class="intro">這是一段 <strong>EPUB</strong> 文字。</p>
+    <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
     <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
@@ -459,5 +459,64 @@ void main() {
     }
   });
 
+
+  testWidgets('long paragraphs are split into separate paginated text fragments', (tester) async {
+    final longText = List.filled(
+      900,
+      '這是一段用來測試長篇 EPUB 文字自動分頁的內容，粗體、註記與原始文字位置都必須保持正確。',
+    ).join();
+    final bytes = _fixture(additionalIntroText: longText);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-long-pagination-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/long-pagination.epub',
+      'fileName': 'long-pagination.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsOneWidget);
+      expect(pageController.hasClients, isTrue);
+      final pageCount =
+          (pageController.position.maxScrollExtent /
+                  pageController.position.viewportDimension)
+              .round() +
+          1;
+      expect(pageCount, greaterThan(5));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
 
 }
