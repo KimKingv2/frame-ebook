@@ -84,6 +84,8 @@ Uint8List _fixture() {
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
     <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
+    <p>舊版註腳 <a class="noteref" href="#legacy-note">[3]</a></p>
+    <div id="legacy-note" class="footnote"><p>這是 EPUB 2 註腳。</p></div>
     <aside id="footnote-1" epub:type="footnote">
       <p>這是註腳的內文。</p>
       <a role="doc-backlink" href="#note-ref-1">返回正文</a>
@@ -385,6 +387,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '尾註');
       expect(openedFootnote?.content, '這是跨文件尾註。');
+      expect(followedHref, isNull);
+
+      await tester.tap(find.text('[3]'));
+      await tester.pumpAndSettle();
+      expect(openedFootnote?.title, '註腳');
+      expect(openedFootnote?.content, '這是 EPUB 2 註腳。');
       expect(followedHref, isNull);
 
       await tester.tap(find.text('章內連結'));
