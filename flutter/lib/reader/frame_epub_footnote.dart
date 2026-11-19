@@ -25,16 +25,23 @@ class FrameEpubFootnoteResolver {
   static bool isFootnoteReference(XmlElement element) {
     final type = _tokens(element, 'type');
     final role = _tokens(element, 'role');
+    final classes = _tokens(element, 'class');
     return type.contains('noteref') ||
         type.contains('doc-noteref') ||
         role.contains('doc-noteref') ||
-        role.contains('noteref');
+        role.contains('noteref') ||
+        classes.contains('noteref') ||
+        classes.contains('footnote-ref') ||
+        classes.contains('endnote-ref');
   }
 
   static bool isFootnoteTarget(XmlElement element) {
     final type = _tokens(element, 'type');
     final role = _tokens(element, 'role');
-    return _isFootnoteToken(type) || _isFootnoteToken(role);
+    final classes = _tokens(element, 'class');
+    return _isFootnoteToken(type) ||
+        _isFootnoteToken(role) ||
+        _isFootnoteToken(classes);
   }
 
   static Future<FrameEpubFootnote?> resolve({
@@ -117,13 +124,20 @@ class FrameEpubFootnoteResolver {
   static String? _targetType(XmlElement element) {
     final type = _tokens(element, 'type');
     final role = _tokens(element, 'role');
+    final classes = _tokens(element, 'class');
     if (type.contains('endnote') ||
         type.contains('doc-endnote') ||
+        type.contains('endnotes') ||
         role.contains('doc-endnote') ||
-        role.contains('endnote')) {
+        role.contains('endnote') ||
+        classes.contains('endnote') ||
+        classes.contains('endnotes')) {
       return 'endnote';
     }
-    if (_isFootnoteToken(type) || _isFootnoteToken(role)) {
+    if (_isFootnoteToken(type) ||
+        _isFootnoteToken(role) ||
+        classes.contains('footnote') ||
+        classes.contains('footnotes')) {
       return 'footnote';
     }
     return null;
@@ -133,7 +147,9 @@ class FrameEpubFootnoteResolver {
       tokens.contains('footnote') ||
       tokens.contains('doc-footnote') ||
       tokens.contains('endnote') ||
-      tokens.contains('doc-endnote');
+      tokens.contains('doc-endnote') ||
+      tokens.contains('footnotes') ||
+      tokens.contains('endnotes');
 
   static Set<String> _tokens(XmlElement element, String name) {
     final result = <String>{};
