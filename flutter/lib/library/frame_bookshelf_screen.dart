@@ -423,26 +423,28 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
           child: Container(
             height: 36,
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
               border: Border.all(color: border, width: 1),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'NotoSansTC',
-                fontFamilyFallback: ['NotoSansSCFallback'],
-                color: Color(0xFFE4D6FF),
-                fontSize: 10,
-                height: 1.15,
-                fontWeight: FontWeight.w600,
-                decoration: TextDecoration.none,
-              ).copyWith(color: foreground),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                  fontFamily: 'NotoSansTC',
+                  fontFamilyFallback: ['NotoSansSCFallback'],
+                  color: Color(0xFFE4D6FF),
+                  fontSize: 10,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
+                ).copyWith(color: foreground),
+              ),
             ),
           ),
         ),
@@ -547,7 +549,6 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
                 : Row(
                     children: [
                       Expanded(
-                        flex: 3,
                         child: _cardActionButton(
                           label: actionText,
                           primary: true,
@@ -556,7 +557,6 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
                       ),
                       const SizedBox(width: 7),
                       Expanded(
-                        flex: 2,
                         child: _cardActionButton(
                           label: '作品資訊',
                           primary: false,
