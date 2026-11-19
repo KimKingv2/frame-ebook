@@ -97,3 +97,8 @@ These items must still pass CI and device verification before being treated as c
 - [ ] Android install and full Reader tests on target devices.
 - [ ] Run the complete main-parity acceptance checklist on each platform.
 - [ ] Cut over Web only after explicit user acceptance.
+
+
+### Reader appearance parity update
+- Flutter EPUB Preview now reads and writes the existing Legacy D1 appearance keys for font scale, font family, weight, paragraph spacing, text alignment, vertical and horizontal margins, reading mode, page layout and theme.
+- The Flutter preview exposes these typography and margin settings in its appearance panel. Comic image-fit, backdrop and fullscreen parity remain open.
