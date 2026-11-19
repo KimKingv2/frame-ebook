@@ -65,7 +65,7 @@ class FrameLibraryRepository {
         'metadata': {
           'title': book.raw['bookTitle']?.toString() ?? '',
           'author': book.raw['bookCreator']?.toString() ?? '',
-          'shelf': book.library,
+          'shelf': book.shelf == 'comics' ? 'comics' : 'books',
           'manualTitle': false,
           'manualAuthor': false,
           'language': book.language,
@@ -85,6 +85,9 @@ class FrameLibraryRepository {
       '/api/comics/bangumi/search',
       {'keyword': keyword},
     );
+    if (response['error'] != null) {
+      throw FrameApiException(message: response['error'].toString());
+    }
     final rawItems = response['items'];
     if (rawItems is! List) return const [];
     return rawItems
