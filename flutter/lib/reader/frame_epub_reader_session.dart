@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:xml/xml.dart';
 
 import '../library/frame_book.dart';
 import '../library/frame_reader_repository.dart';
 import '../transport/frame_file_source.dart';
+import 'frame_epub_cfi.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_resource_loader.dart';
 import 'frame_zip_archive.dart';
@@ -20,9 +22,9 @@ enum FrameEpubReaderStatus {
 /// A shared, platform-neutral reading session for one cloud EPUB.
 ///
 /// The session owns the Range-backed archive and coordinates the EPUB parser,
-/// resource loader and existing Reading Room repository. It deliberately
-/// does not render XHTML or invent a synthetic CFI: a future renderer can
-/// report a real EPUB CFI through [saveReadingPosition].
+/// resource loader, CFI restoration and existing Reading Room repository.
+/// CFI generation is supplied by the XHTML renderer and validated here before
+/// it is persisted through [saveReadingPosition].
 class FrameEpubReaderSession extends ChangeNotifier {
   FrameEpubReaderSession({
     required this.book,
@@ -63,6 +65,23 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
   String _currentFragment = '';
   String get currentFragment => _currentFragment;
+
+  String? _initialCfi;
+  String? get initialCfi => _initialCfi;
+
+  FrameEpubCfiLocation? _restoredCfiLocation;
+  XmlElement? get initialAnchor => _restoredCfiLocation?.anchorElement;
+
+  double? get initialScrollFraction {
+    final location = _restoredCfiLocation;
+    final chapter = _chapter;
+    if (location == null || chapter == null) return null;
+    return FrameEpubCfi.textFraction(
+      chapter.document,
+      location.node,
+      location.offset,
+    );
+  }
 
   bool _chapterLoading = false;
   bool get isChapterLoading => _chapterLoading;
@@ -159,12 +178,29 @@ class FrameEpubReaderSession extends ChangeNotifier {
       _loader = loader;
 
       final savedIndex = _asInteger(_readerState.progress['index']);
-      final initialIndex = savedIndex == null
-          ? 0
-          : savedIndex.clamp(0, epub.spine.length - 1).toInt();
+      final savedCfi = _readerState.progress['cfi']?.toString().trim() ?? '';
+      final cfiIndex = savedCfi.isEmpty
+          ? null
+          : FrameEpubCfi.spineIndexFromCfi(epub, savedCfi);
+      final initialIndex = cfiIndex ??
+          (savedIndex == null
+              ? 0
+              : savedIndex.clamp(0, epub.spine.length - 1).toInt());
       final chapter = await loader.loadChapter(epub.spine[initialIndex]);
 
       if (_closed) return;
+      if (cfiIndex == initialIndex && savedCfi.isNotEmpty) {
+        _restoredCfiLocation = FrameEpubCfi.resolve(
+          book: epub,
+          document: chapter.document,
+          cfi: savedCfi,
+        );
+        if (_restoredCfiLocation != null) {
+          _initialCfi = savedCfi;
+        } else {
+          _warning = '上次的 EPUB 精確閱讀位置無法解析，已退回章節位置。';
+        }
+      }
       _currentSpineIndex = initialIndex;
       _chapter = chapter;
       _currentFragment = '';
@@ -281,6 +317,8 @@ class FrameEpubReaderSession extends ChangeNotifier {
     if (_closed || revision != _navigationRevision) return false;
     _currentSpineIndex = index;
     _currentFragment = fragment;
+    _initialCfi = null;
+    _restoredCfiLocation = null;
     _chapter = chapter;
     _chapterLoading = false;
     notifyListeners();
@@ -310,6 +348,13 @@ class FrameEpubReaderSession extends ChangeNotifier {
   }) async {
     if (_status != FrameEpubReaderStatus.ready || _currentSpineIndex == null) {
       throw StateError('EPUB 閱讀工作階段尚未就緒。');
+    }
+    final epub = _epub;
+    final index = _currentSpineIndex;
+    if (epub == null ||
+        index == null ||
+        FrameEpubCfi.spineIndexFromCfi(epub, cfi) != index) {
+      throw ArgumentError('閱讀位置 CFI 與目前 EPUB 章節不一致。');
     }
     await _saveProgress(
       percent: percent.clamp(0, 100).toInt(),

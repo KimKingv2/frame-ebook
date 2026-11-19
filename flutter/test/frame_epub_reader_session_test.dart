@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xml/xml.dart';
 import 'package:frame_ebook/core/frame_api_client.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
+import 'package:frame_ebook/reader/frame_epub_cfi.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_reader_session.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
@@ -143,8 +145,8 @@ Uint8List _zipFixture({
       media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
-    <itemref idref="one"/>
-    <itemref idref="two"/>
+    <itemref id="ref-one" idref="one"/>
+    <itemref id="ref-two" idref="two"/>
   </spine>
 </package>
 ''';
@@ -335,6 +337,57 @@ void main() {
       expect(progress['percent'], 50);
       expect(progress['cfi'], '');
       await session.close();
+    });
+
+    test('restores a saved CFI before falling back to the chapter index',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final initialApi = _FakeApi();
+      final initialSession = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(initialApi),
+      );
+
+      await initialSession.open();
+      expect(await initialSession.goToTocEntry(initialSession.toc[1]), isTrue);
+      final heading = initialSession.currentChapter!.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'h1');
+      final textNode = heading.descendants.whereType<XmlText>().first;
+      final cfi = FrameEpubCfi.create(
+        book: initialSession.epub!,
+        spineIndex: 1,
+        textNode: textNode,
+        offset: 2,
+      );
+      expect(cfi, isNotNull);
+      await initialSession.close();
+
+      final restoredApi = _FakeApi(
+        state: {
+          'progress': {
+            'percent': 48,
+            'label': '第二章',
+            'index': 0,
+            'cfi': cfi,
+          },
+        },
+      );
+      final restoredSession = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(restoredApi),
+      );
+
+      await restoredSession.open();
+      expect(restoredSession.currentSpineIndex, 1);
+      expect(restoredSession.initialCfi, cfi);
+      expect(restoredSession.initialAnchor?.name.local, 'h1');
+      expect(restoredSession.initialScrollFraction, isNotNull);
+      expect(restoredSession.initialScrollFraction, greaterThan(0));
+      await restoredSession.close();
     });
 
     test('does not fetch external links or route them into the archive',
