@@ -141,6 +141,32 @@ void main() {
       expect(location.offset, 2);
     });
 
+    test('creates an element CFI for an image-only fixed-layout page', () {
+      final book = _book();
+      final document = XmlDocument.parse(
+        '<html><body><div id="comic-page"><img src="page-1.jpg"/></div></body></html>',
+      );
+      final page = document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'div');
+
+      final cfi = FrameEpubCfi.createElement(
+        book: book,
+        spineIndex: 0,
+        element: page,
+      );
+      expect(cfi, isNotNull);
+
+      final location = FrameEpubCfi.resolve(
+        book: book,
+        document: document,
+        cfi: cfi!,
+      );
+      expect(location, isNotNull);
+      expect(identical(location!.node, page), isTrue);
+      expect(location.anchorElement, same(page));
+    });
+
     test('accepts a legacy Foliate range CFI and restores its start', () {
       final book = _book();
       final document = XmlDocument.parse(

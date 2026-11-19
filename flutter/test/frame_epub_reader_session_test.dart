@@ -390,6 +390,41 @@ void main() {
       await restoredSession.close();
     });
 
+    test('jumps to a saved annotation CFI in another spine item', () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+
+      await session.open();
+      expect(await session.goToSpineIndex(1), isTrue);
+      final chapter = session.currentChapter!;
+      final paragraph = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final textNode = paragraph.descendants.whereType<XmlText>().first;
+      final targetCfi = FrameEpubCfi.create(
+        book: session.epub!,
+        spineIndex: 1,
+        textNode: textNode,
+        offset: 2,
+      )!;
+      expect(await session.goToSpineIndex(0), isTrue);
+
+      expect(await session.goToCfi(targetCfi), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(session.initialCfi, targetCfi);
+      expect(session.initialAnchor?.name.local, 'p');
+      final savedProgress = api.postedState!['progress'] as Map;
+      expect(savedProgress['cfi'], targetCfi);
+      expect(savedProgress['index'], 1);
+
+      await session.close();
+    });
+
     test('does not fetch external links or route them into the archive',
         () async {
       final fixture = _zipFixture();
