@@ -265,4 +265,88 @@ void main() {
     await tester.pump();
     expect(previousChapterCalls, 1);
   });
+  testWidgets('paginated mode advances and reverses one real page', (tester) async {
+    final scrollController = ScrollController();
+    final pageController = PageController();
+    await tester.view.setPhysicalSize(const Size(800, 600));
+    await tester.view.setDevicePixelRatio(1);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: scrollController,
+            pageController: pageController,
+            paginated: true,
+            child: PageView(
+              controller: pageController,
+              children: const [
+                ColoredBox(color: Colors.red),
+                ColoredBox(color: Colors.green),
+                ColoredBox(color: Colors.blue),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(pageController.page, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    expect(pageController.page, 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+    await tester.pumpAndSettle();
+    expect(pageController.page, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.view.resetPhysicalSize();
+    await tester.view.resetDevicePixelRatio();
+    pageController.dispose();
+    scrollController.dispose();
+  });
+
+  testWidgets('paginated mode changes chapter only at the last page', (tester) async {
+    final scrollController = ScrollController();
+    final pageController = PageController();
+    var nextChapterCalls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: scrollController,
+            pageController: pageController,
+            paginated: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: PageView(
+              controller: pageController,
+              children: const [
+                ColoredBox(color: Colors.red),
+                ColoredBox(color: Colors.green),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    expect(pageController.page, 1);
+    expect(nextChapterCalls, 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pump();
+    expect(nextChapterCalls, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    pageController.dispose();
+    scrollController.dispose();
+  });
+
+
 }
