@@ -54,7 +54,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
     _tabController = TabController(
       length: 3,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 2),
+      initialIndex: widget.initialTabIndex.clamp(0, 2).toInt(),
     );
   }
 
