@@ -1,0 +1,218 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:frame_ebook/library/frame_book.dart';
+import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
+import 'package:frame_ebook/reader/frame_epub_parser.dart';
+import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
+import 'package:frame_ebook/reader/frame_zip_archive.dart';
+import 'package:frame_ebook/transport/frame_file_source.dart';
+import 'package:material_ui/material_ui.dart';
+
+class _ZipItem {
+  const _ZipItem(this.name, this.bytes);
+  final String name;
+  final List<int> bytes;
+}
+
+class _MemoryFileSource implements FrameFileSource {
+  _MemoryFileSource(this.bytes);
+  final Uint8List bytes;
+
+  @override
+  Future<FrameFileResponse> open(FrameFileRequest request) async {
+    final range = request.range;
+    if (range == null) throw StateError('An explicit ZIP Range is required.');
+    final start = range.suffixLength == null
+        ? range.start!
+        : bytes.length - range.suffixLength!;
+    final requestedEnd = range.end ?? bytes.length - 1;
+    final end = requestedEnd < bytes.length ? requestedEnd : bytes.length - 1;
+    final body = Uint8List.sublistView(bytes, start, end + 1);
+    return FrameFileResponse(
+      statusCode: 206,
+      headers: {
+        'content-type': 'application/epub+zip',
+        'content-length': body.length.toString(),
+        'content-range': 'bytes $start-$end/' + bytes.length.toString(),
+        'accept-ranges': 'bytes',
+      },
+      stream: Stream<List<int>>.value(body),
+      onClose: () {},
+      requestedRange: range,
+    );
+  }
+}
+
+Uint8List _fixture() {
+  const container = '''
+<container><rootfiles>
+  <rootfile full-path="OPS/book.opf"
+    media-type="application/oebps-package+xml"/>
+</rootfiles></container>
+''';
+  const package = '''
+<package xmlns="http://www.idpf.org/2007/opf"
+         xmlns:dc="http://purl.org/dc/elements/1.1/"
+         version="3.0" unique-identifier="uid">
+  <metadata>
+    <dc:identifier id="uid">urn:uuid:widget-test</dc:identifier>
+    <dc:title>Widget test</dc:title>
+    <dc:language>zh-TW</dc:language>
+  </metadata>
+  <manifest>
+    <item id="chapter" href="Text/chapter.xhtml"
+      media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>
+''';
+  const chapter = '''
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>Widget fixture</title></head>
+  <body>
+    <h1>閱讀畫面測試</h1>
+    <p class="intro">這是一段 <strong>EPUB</strong> 文字。</p>
+    <p><a href="chapter.xhtml#inside">章內連結</a></p>
+    <p id="inside">章節目標</p>
+  </body>
+</html>
+''';
+  return _buildZip([
+    _ZipItem('mimetype', utf8.encode('application/epub+zip')),
+    _ZipItem('META-INF/container.xml', utf8.encode(container)),
+    _ZipItem('OPS/book.opf', utf8.encode(package)),
+    _ZipItem('OPS/Text/chapter.xhtml', utf8.encode(chapter)),
+  ]);
+}
+
+Uint8List _buildZip(List<_ZipItem> items) {
+  final output = <int>[];
+  final central = <int>[];
+  for (final item in items) {
+    final name = utf8.encode(item.name);
+    final bytes = Uint8List.fromList(item.bytes);
+    final crc = _crc32(bytes);
+    final offset = output.length;
+
+    _write32(output, 0x04034b50);
+    _write16(output, 20);
+    _write16(output, 0x0800);
+    _write16(output, 0);
+    _write16(output, 0);
+    _write16(output, 0);
+    _write32(output, crc);
+    _write32(output, bytes.length);
+    _write32(output, bytes.length);
+    _write16(output, name.length);
+    _write16(output, 0);
+    output
+      ..addAll(name)
+      ..addAll(bytes);
+
+    _write32(central, 0x02014b50);
+    _write16(central, 0x0314);
+    _write16(central, 20);
+    _write16(central, 0x0800);
+    _write16(central, 0);
+    _write16(central, 0);
+    _write16(central, 0);
+    _write32(central, crc);
+    _write32(central, bytes.length);
+    _write32(central, bytes.length);
+    _write16(central, name.length);
+    _write16(central, 0);
+    _write16(central, 0);
+    _write16(central, 0);
+    _write16(central, 0);
+    _write32(central, 0);
+    _write32(central, offset);
+    central.addAll(name);
+  }
+  final centralOffset = output.length;
+  output.addAll(central);
+  _write32(output, 0x06054b50);
+  _write16(output, 0);
+  _write16(output, 0);
+  _write16(output, items.length);
+  _write16(output, items.length);
+  _write32(output, central.length);
+  _write32(output, centralOffset);
+  _write16(output, 0);
+  return Uint8List.fromList(output);
+}
+
+int _crc32(List<int> bytes) {
+  var crc = 0xffffffff;
+  for (final byte in bytes) {
+    crc ^= byte;
+    for (var bit = 0; bit < 8; bit++) {
+      crc = (crc & 1) == 1 ? (crc >> 1) ^ 0xedb88320 : crc >> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) & 0xffffffff;
+}
+
+void _write16(List<int> output, int value) {
+  output
+    ..add(value & 0xff)
+    ..add((value >> 8) & 0xff);
+}
+
+void _write32(List<int> output, int value) {
+  output
+    ..add(value & 0xff)
+    ..add((value >> 8) & 0xff)
+    ..add((value >> 16) & 0xff)
+    ..add((value >> 24) & 0xff);
+}
+
+void main() {
+  testWidgets('renders XHTML text and forwards internal links', (tester) async {
+    final bytes = _fixture();
+    final book = FrameBook.fromJson({
+      'id': 'chapter-widget-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/widget.epub',
+      'fileName': 'widget.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      String? followedHref;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              onInternalLink: (href) => followedHref = href,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('閱讀畫面測試'), findsOneWidget);
+      expect(find.textContaining('EPUB'), findsOneWidget);
+      expect(find.text('章節目標'), findsOneWidget);
+
+      await tester.tap(find.text('章內連結'));
+      expect(followedHref, 'chapter.xhtml#inside');
+    } finally {
+      await archive.close();
+    }
+  });
+}
