@@ -197,6 +197,8 @@ class FrameEpubChapterView extends StatefulWidget {
     this.maxImageBytes = 16 * 1024 * 1024,
     this.spineIndex = 0,
     this.initialAnchor,
+    this.initialTextNode,
+    this.initialTextOffset,
     this.initialScrollFraction,
     this.scrollController,
     this.onReadingPosition,
@@ -228,6 +230,8 @@ class FrameEpubChapterView extends StatefulWidget {
   final int maxImageBytes;
   final int spineIndex;
   final XmlElement? initialAnchor;
+  final XmlText? initialTextNode;
+  final int? initialTextOffset;
   final double? initialScrollFraction;
   final ScrollController? scrollController;
   final void Function(String cfi, double chapterFraction)? onReadingPosition;
@@ -782,9 +786,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   int? _measureInitialAnchorPage(List<FrameEpubPage> pages) {
     final anchor = widget.initialAnchor;
-    if (anchor != null) {
-      final point = FrameEpubCfi.firstTextPoint(anchor);
-      if (point != null) {
+    final point = widget.initialTextNode != null &&
+            widget.initialTextOffset != null
+        ? FrameEpubCfiPoint(
+            node: widget.initialTextNode!,
+            offset: widget.initialTextOffset!,
+          )
+        : anchor == null
+            ? null
+            : FrameEpubCfi.firstTextPoint(anchor);
+    if (point != null) {
         _PaginatedTextPosition? best;
         GlobalKey? bestKey;
         var bestDistance = 1 << 30;
@@ -814,7 +825,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             }
           }
         }
-      }
     }
 
     RenderBox? anchorBox;
