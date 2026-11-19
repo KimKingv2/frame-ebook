@@ -1090,15 +1090,10 @@ class _FrameEpubReaderPreviewScreenState
         ),
         content: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * .86,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               if (quote.isNotEmpty)
                 Container(
                   constraints: const BoxConstraints(maxHeight: 120),
@@ -1463,10 +1458,15 @@ class _FrameEpubReaderPreviewScreenState
             20,
             18 + MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * .86,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               const Text(
                 '閱讀外觀',
                 style: TextStyle(
@@ -1695,13 +1695,13 @@ class _FrameEpubReaderPreviewScreenState
                         setSheetState(() => theme = 'dark'),
                   ),
                   ChoiceChip(
-                    label: const Text('紙本'),
+                    label: const Text('暖紙'),
                     selected: theme == 'sepia',
                     onSelected: (_) =>
                         setSheetState(() => theme = 'sepia'),
                   ),
                   ChoiceChip(
-                    label: const Text('明亮'),
+                    label: const Text('紙白'),
                     selected: theme == 'light',
                     onSelected: (_) =>
                         setSheetState(() => theme = 'light'),
