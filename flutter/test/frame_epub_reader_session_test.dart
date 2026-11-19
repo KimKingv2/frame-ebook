@@ -179,6 +179,9 @@ Uint8List _zipFixture({
     _ZipItem('OPS/nav.xhtml', utf8.encode(navigation)),
     _ZipItem('OPS/Text/chapter-one.xhtml', utf8.encode(chapterOne)),
     _ZipItem('OPS/Text/chapter-two.xhtml', utf8.encode(chapterTwo)),
+    // Keep the archive larger than its ZIP tail metadata window so the test
+    // can prove that opening never requests the complete small fixture.
+    _ZipItem('OPS/unused-padding.bin', List<int>.filled(100000, 0x5a)),
   ];
   return _buildZip(items);
 }
