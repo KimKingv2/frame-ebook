@@ -12,6 +12,8 @@ The Flutter client is being rebuilt against the exact product behaviour in the r
 
 The required feature-by-feature acceptance list is `docs/MAIN-PARITY-INVENTORY.md`.
 
+The agreed three-platform target architecture and migration sequence are documented in `docs/FLUTTER-THREE-PLATFORM-ARCHITECTURE.md`.
+
 ## Font assets
 
 All three Flutter targets bundle **Noto Sans TC** so Traditional Chinese, Latin text and UI labels render consistently without runtime font requests to Google Fonts. The font is fetched by `tool/prepare_fonts.py` from a pinned revision of the official `notofonts/noto-cjk` repository and checked against its Git blob SHA before use. Its SIL Open Font License is included as `assets/fonts/OFL.txt`.
