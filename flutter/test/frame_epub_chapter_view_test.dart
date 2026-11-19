@@ -49,14 +49,17 @@ class _MemoryFileSource implements FrameFileSource {
   }
 }
 
-Uint8List _fixture({String additionalIntroText = ''}) {
+Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) {
   const container = '''
 <container><rootfiles>
   <rootfile full-path="OPS/book.opf"
     media-type="application/oebps-package+xml"/>
 </rootfiles></container>
 ''';
-  const package = '''
+  final layoutMeta = fixedLayout
+      ? '<meta property="rendition:layout">pre-paginated</meta>'
+      : '';
+  final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
          version="3.0" unique-identifier="uid">
@@ -64,6 +67,7 @@ Uint8List _fixture({String additionalIntroText = ''}) {
     <dc:identifier id="uid">urn:uuid:widget-test</dc:identifier>
     <dc:title>Widget test</dc:title>
     <dc:language>zh-TW</dc:language>
+    $layoutMeta
   </metadata>
   <manifest>
     <item id="chapter" href="Text/chapter.xhtml"
@@ -401,6 +405,80 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('fixed-layout renderer supports fit-width and fit-page modes',
+      (tester) async {
+    final bytes = _fixture(fixedLayout: true);
+    final book = FrameBook.fromJson({
+      'id': 'fixed-layout-comic-fit-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/comic.epub',
+      'fileName': 'comic.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      expect(epub.isFixedLayout, isTrue);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(420, 620);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              fixedLayout: true,
+              fixedLayoutImageFit: 'fit-width',
+              fixedLayoutAllowZoom: false,
+              fixedLayoutBackdropDecoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF76543A), Color(0xFF30241E)],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('閱讀畫面測試'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              fixedLayout: true,
+              fixedLayoutImageFit: 'fit-page',
+              fixedLayoutAllowZoom: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('閱讀畫面測試'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('paginated renderer lays out XHTML as horizontal pages', (tester) async {
     final bytes = _fixture();
     final book = FrameBook.fromJson({
