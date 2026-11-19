@@ -56,9 +56,8 @@ class FrameEpubFootnoteResolver {
       href,
       fromPath: chapter.resource.path,
     );
-    if (!reference.isInternal ||
-        reference.fragment == null ||
-        reference.fragment!.isEmpty) {
+    final fragmentValue = reference.fragment;
+    if (!reference.isInternal || fragmentValue.isEmpty) {
       return null;
     }
 
@@ -83,9 +82,9 @@ class FrameEpubFootnoteResolver {
 
     String fragment;
     try {
-      fragment = Uri.decodeComponent(reference.fragment!);
+      fragment = Uri.decodeComponent(fragmentValue);
     } on FormatException {
-      fragment = reference.fragment!;
+      fragment = fragmentValue;
     }
 
     XmlElement? target;
