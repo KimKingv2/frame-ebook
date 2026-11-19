@@ -271,6 +271,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   int _paginationRevision = 0;
   Size? _paginationViewportSize;
   int? _initialPageForRestore;
+  XmlText? _lastVisibleTextNode;
+  int? _lastVisibleTextOffset;
 
   @override
   void initState() {
@@ -792,15 +794,21 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   int? _measureInitialAnchorPage(List<FrameEpubPage> pages) {
     final anchor = widget.initialAnchor;
-    final point = widget.initialTextNode != null &&
-            widget.initialTextOffset != null
+    final point = _lastVisibleTextNode != null &&
+            _lastVisibleTextOffset != null
         ? FrameEpubCfiPoint(
-            node: widget.initialTextNode!,
-            offset: widget.initialTextOffset!,
+            node: _lastVisibleTextNode!,
+            offset: _lastVisibleTextOffset!,
           )
-        : anchor == null
-            ? null
-            : FrameEpubCfi.firstTextPoint(anchor);
+        : widget.initialTextNode != null &&
+                widget.initialTextOffset != null
+            ? FrameEpubCfiPoint(
+                node: widget.initialTextNode!,
+                offset: widget.initialTextOffset!,
+              )
+            : anchor == null
+                ? null
+                : FrameEpubCfi.firstTextPoint(anchor);
     if (point != null) {
         _PaginatedTextPosition? best;
         GlobalKey? bestKey;
@@ -957,6 +965,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         if (visible.isEmpty) return;
         visible.sort((a, b) => a.top.compareTo(b.top));
         final first = visible.first;
+        _lastVisibleTextNode = first.node;
+        _lastVisibleTextOffset = first.offset;
         final cfi = FrameEpubCfi.create(
           book: widget.resourceLoader.book,
           spineIndex: widget.spineIndex,
