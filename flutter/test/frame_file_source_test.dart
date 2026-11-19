@@ -58,11 +58,29 @@ void main() {
         'format': 'EPUB',
       });
       final range = FrameByteRange.from(start: 0, end: 31);
-      final request = FrameFileRequest(book: book, range: range);
+      final cancellation = FrameFileCancellation();
+      final request = FrameFileRequest(
+        book: book,
+        range: range,
+        cancellation: cancellation,
+      );
 
       expect(request.book.id, 'book-1');
       expect(request.book.descriptor()['provider'], 'vps');
       expect(request.range?.headerValue, 'bytes=0-31');
+      expect(request.cancellation, same(cancellation));
+    });
+
+    test('cancels an in-flight request exactly once', () async {
+      final cancellation = FrameFileCancellation();
+      expect(cancellation.isCancelled, isFalse);
+
+      final signal = cancellation.whenCancelled;
+      cancellation.cancel();
+      await signal;
+      cancellation.cancel();
+
+      expect(cancellation.isCancelled, isTrue);
     });
   });
 
