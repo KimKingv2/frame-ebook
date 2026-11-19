@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:xml/xml.dart';
 
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
@@ -9,6 +10,7 @@ import '../library/frame_reader_repository.dart';
 import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
+import 'frame_epub_cfi.dart';
 import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_reader_session.dart';
@@ -50,10 +52,22 @@ class _FrameEpubReaderPreviewScreenState
   String? _setupError;
   FrameFileSource? _fileSource;
   FrameEpubReaderSession? _session;
+  late ScrollController _chapterScrollController;
+  String? _activeChapterPath;
+  Timer? _progressSaveTimer;
+  String? _pendingCfi;
+  int? _pendingPercent;
+  String? _lastSavedCfi;
 
   double _fontSize = 18;
   double _lineHeight = 1.75;
   String _theme = 'dark';
+
+  @override
+  void initState() {
+    super.initState();
+    _chapterScrollController = ScrollController();
+  }
 
   @override
   void didChangeDependencies() {
@@ -86,6 +100,16 @@ class _FrameEpubReaderPreviewScreenState
 
   void _handleSessionChanged() {
     final session = _session;
+    final chapterPath = session?.currentChapter?.resource.path;
+    if (chapterPath != null && chapterPath != _activeChapterPath) {
+      _activeChapterPath = chapterPath;
+      _lastSavedCfi = null;
+      final previousController = _chapterScrollController;
+      _chapterScrollController = ScrollController();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        previousController.dispose();
+      });
+    }
     if (session?.status == FrameEpubReaderStatus.ready &&
         !_appearanceInitialized) {
       _restoreAppearance(session!.readerState.appearance);
@@ -119,6 +143,8 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   Future<void> _releaseResources() async {
+    await _flushReadingPosition();
+    _progressSaveTimer?.cancel();
     final session = _session;
     if (session != null) {
       session.removeListener(_handleSessionChanged);
@@ -127,6 +153,83 @@ class _FrameEpubReaderPreviewScreenState
     }
     final source = _fileSource;
     if (source is FrameCloudFileSource) source.close();
+    _chapterScrollController.dispose();
+  }
+
+  XmlElement? _initialAnchorFor(FrameEpubReaderSession session) {
+    final chapter = session.currentChapter;
+    if (chapter == null) return null;
+    return session.initialAnchor ??
+        FrameEpubCfi.anchorForFragment(
+          chapter.document,
+          session.currentFragment,
+        );
+  }
+
+  double? _initialScrollFractionFor(FrameEpubReaderSession session) {
+    final chapter = session.currentChapter;
+    if (chapter == null) return null;
+    final restored = session.initialScrollFraction;
+    if (session.initialCfi != null && restored != null) return restored;
+    final anchor = FrameEpubCfi.anchorForFragment(
+      chapter.document,
+      session.currentFragment,
+    );
+    if (anchor == null) return null;
+    final point = FrameEpubCfi.firstTextPoint(anchor);
+    if (point == null) return null;
+    return FrameEpubCfi.textFraction(
+      chapter.document,
+      point.node,
+      point.offset,
+    );
+  }
+
+  void _queueReadingPosition(String cfi, double chapterFraction) {
+    final session = _session;
+    final index = session?.currentSpineIndex;
+    final count = session?.epub?.spine.length ?? 0;
+    if (session == null || index == null || count <= 0 ||
+        cfi == _lastSavedCfi || cfi == _pendingCfi) {
+      return;
+    }
+    final fraction = chapterFraction.clamp(0.0, 1.0);
+    final percent = (((index + fraction) / count) * 100)
+        .round()
+        .clamp(0, 100)
+        .toInt();
+    _pendingCfi = cfi;
+    _pendingPercent = percent;
+    _progressSaveTimer?.cancel();
+    _progressSaveTimer = Timer(
+      const Duration(milliseconds: 1400),
+      () => unawaited(_flushReadingPosition()),
+    );
+  }
+
+  Future<void> _flushReadingPosition() async {
+    _progressSaveTimer?.cancel();
+    _progressSaveTimer = null;
+    final cfi = _pendingCfi;
+    final percent = _pendingPercent;
+    _pendingCfi = null;
+    _pendingPercent = null;
+    final session = _session;
+    if (cfi == null || percent == null || session == null) return;
+    try {
+      await session.saveReadingPosition(percent: percent, cfi: cfi);
+      _lastSavedCfi = cfi;
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('閱讀位置尚未同步：$error')),
+      );
+    }
+  }
+
+  Future<void> _runNavigation(Future<bool> Function() navigate) async {
+    await _flushReadingPosition();
+    await navigate();
   }
 
   String get _bookTitle => widget.book.title.trim().isNotEmpty
@@ -278,13 +381,18 @@ class _FrameEpubReaderPreviewScreenState
                   chapter: chapter,
                   resourceLoader: session.resourceLoader!,
                   fixedLayout: session.isFixedLayout,
+                  spineIndex: chapterIndex,
+                  initialAnchor: _initialAnchorFor(session),
+                  initialScrollFraction: _initialScrollFractionFor(session),
+                  scrollController: _chapterScrollController,
+                  onReadingPosition: _queueReadingPosition,
                   backgroundColor: _pageBackground,
                   textColor: _pageText,
                   linkColor: _pageLink,
                   fontSize: _fontSize,
                   lineHeight: _lineHeight,
                   onInternalLink: (href) {
-                    unawaited(session.goToHref(href));
+                    unawaited(_runNavigation(() => session.goToHref(href)));
                   },
                 ),
               ),
@@ -386,7 +494,9 @@ class _FrameEpubReaderPreviewScreenState
                   IconButton(
                     tooltip: '上一章',
                     onPressed: session.canGoPrevious
-                        ? () => unawaited(session.goToPreviousChapter())
+                        ? () => unawaited(
+                              _runNavigation(session.goToPreviousChapter),
+                            )
                         : null,
                     icon: const Icon(Icons.chevron_left_rounded),
                   ),
@@ -417,7 +527,9 @@ class _FrameEpubReaderPreviewScreenState
                   IconButton(
                     tooltip: '下一章',
                     onPressed: session.canGoNext
-                        ? () => unawaited(session.goToNextChapter())
+                        ? () => unawaited(
+                              _runNavigation(session.goToNextChapter),
+                            )
                         : null,
                     icon: const Icon(Icons.chevron_right_rounded),
                   ),
@@ -524,7 +636,11 @@ class _FrameEpubReaderPreviewScreenState
                             onTap: available
                                 ? () {
                                     Navigator.of(sheetContext).pop();
-                                    unawaited(session.goToTocEntry(entry));
+                                    unawaited(
+                                      _runNavigation(
+                                        () => session.goToTocEntry(entry),
+                                      ),
+                                    );
                                   }
                                 : null,
                           ),
