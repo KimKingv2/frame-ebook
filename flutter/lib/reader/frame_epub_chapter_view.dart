@@ -507,7 +507,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         root,
         textAlign: _textAlign(parentStyle['text-align']),
         textDirection: _textDirection(parentStyle['direction']),
-        softWrap: true,
         onSelectionChanged: (selection, cause) {
           final callback = widget.onTextSelection;
           if (callback == null) return;
@@ -571,8 +570,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
     while (index < source.length) {
       final start = index;
-      final rune = source.runeAt(index);
-      final codeUnits = rune > 0xFFFF ? 2 : 1;
+      final firstCodeUnit = source.codeUnitAt(index);
+      final hasSurrogatePair = firstCodeUnit >= 0xD800 &&
+          firstCodeUnit <= 0xDBFF &&
+          index + 1 < source.length &&
+          source.codeUnitAt(index + 1) >= 0xDC00 &&
+          source.codeUnitAt(index + 1) <= 0xDFFF;
+      final rune = hasSurrogatePair
+          ? 0x10000 +
+              ((firstCodeUnit - 0xD800) << 10) +
+              (source.codeUnitAt(index + 1) - 0xDC00)
+          : firstCodeUnit;
+      final codeUnits = hasSurrogatePair ? 2 : 1;
       var end = index + codeUnits;
       String rendered;
       if (collapseWhitespace && isCollapsibleWhitespace(rune)) {
