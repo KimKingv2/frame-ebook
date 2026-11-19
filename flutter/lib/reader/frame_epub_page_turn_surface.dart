@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -49,7 +50,7 @@ class _TouchStart {
 
 class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   static const _tapDuration = Duration(milliseconds: 300);
-  static const _swipeDuration = Duration(milliseconds: 650);
+  static const _swipeDuration = Duration(milliseconds: 500);
   static const _tapSlop = 18.0;
   static const _swipeDistance = 64.0;
   static const _edgeFraction = 0.22;
