@@ -13,6 +13,8 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   const FrameEpubPageTurnSurface({
     required this.controller,
     required this.child,
+    this.pageController,
+    this.paginated = false,
     this.onPreviousChapter,
     this.onNextChapter,
     this.fixedLayout = false,
@@ -23,6 +25,8 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   });
 
   final ScrollController controller;
+  final PageController? pageController;
+  final bool paginated;
   final Widget child;
   final Future<void> Function()? onPreviousChapter;
   final Future<void> Function()? onNextChapter;
@@ -154,11 +158,36 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     if (_isTurning || !mounted) return;
     _isTurning = true;
     try {
-      final controller = widget.controller;
       if (widget.fixedLayout) {
         await _turnAdjacentChapter(forward: forward);
         return;
       }
+      if (widget.paginated) {
+        final pageController = widget.pageController;
+        if (pageController == null || !pageController.hasClients) return;
+        final position = pageController.position;
+        if (!position.hasContentDimensions ||
+            !position.viewportDimension.isFinite ||
+            position.viewportDimension <= 0) {
+          return;
+        }
+        final current = (pageController.page ?? 0).round();
+        final lastPage =
+            (position.maxScrollExtent / position.viewportDimension).round();
+        final boundary = forward ? current >= lastPage : current <= 0;
+        if (boundary) {
+          await _turnAdjacentChapter(forward: forward);
+          return;
+        }
+        await pageController.animateToPage(
+          current + (forward ? 1 : -1),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+
+      final controller = widget.controller;
       if (!controller.hasClients) return;
 
       final position = controller.position;
