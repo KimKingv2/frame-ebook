@@ -73,7 +73,7 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve EPUB CFI progress restoration and CBZ/fixed-layout page-index restoration.
 - [ ] Preserve debounced progress saving and final flush when changing books or leaving the reader.
 - [ ] Preserve reading-session start/stop and live reading duration indicator.
-- [ ] Preserve sidebar show/hide, mobile TOC/notes/bookmarks tabs, drawer/backdrop and responsive controls.
+- [ ] Preserve sidebar show/hide, mobile TOC/notes/bookmarks tabs, drawer/backdrop and responsive controls. Flutter Preview now has one adaptive navigation drawer with TOC, bookmark and note tabs (bottom sheet on compact widths, right-side drawer on wide layouts); Web/macOS/Android interaction and sizing still require device acceptance.
 - [ ] Preserve appearance panel and its open/close interactions.
 - [ ] Preserve font size options: 0.9, 1.0, 1.1, 1.2 and 1.3.
 - [ ] Preserve line-height options: 1.45, 1.65, 1.85 and 2.0.
