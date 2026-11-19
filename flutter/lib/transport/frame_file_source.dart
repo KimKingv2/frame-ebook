@@ -53,14 +53,33 @@ class FrameByteRange {
 /// Delivery policy is deliberately absent: the Web adapter may use the
 /// same-origin Pages Functions stream while native adapters may follow a
 /// credential-safe 302 chain. Reader UI code must not select either path.
+/// Cancellation signal for an in-flight file request, including the period
+/// before response headers have arrived.
+class FrameFileCancellation {
+  final Completer<void> _signal = Completer<void>();
+
+  bool get isCancelled => _signal.isCompleted;
+
+  Future<void> get whenCancelled => _signal.future;
+
+  void cancel() {
+    if (!_signal.isCompleted) _signal.complete();
+  }
+}
+
 class FrameFileRequest {
   const FrameFileRequest({
     required this.book,
     this.range,
+    this.cancellation,
   });
 
   final FrameBook book;
   final FrameByteRange? range;
+
+  /// Adapters must abort connection setup and any active response when this
+  /// signal fires.
+  final FrameFileCancellation? cancellation;
 }
 
 /// A one-shot streaming response from a [FrameFileSource].
