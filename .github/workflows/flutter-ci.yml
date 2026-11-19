@@ -43,7 +43,7 @@ jobs:
             CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")"
           fi
 
-          TARGETS="$(printf '%s\n' "$CHANGED_FILES" | python3 flutter/tool/native_build_policy.py)"
+          TARGETS="$(printf '%s\n' "$CHANGED_FILES" | BASE_SHA="$BASE_SHA" HEAD_SHA="$HEAD_SHA" python3 flutter/tool/native_build_policy.py)"
           printf '%s\n' "$TARGETS" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$TARGETS"
 
