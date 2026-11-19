@@ -52,7 +52,9 @@ class FrameLibraryRepository {
       },
     });
     if (result['ok'] != true) {
-      throw const FrameApiException(message: '作品資訊保存失敗。');
+      throw FrameApiException(
+        message: result['error']?.toString() ?? '作品資訊保存失敗。',
+      );
     }
   }
 
@@ -63,7 +65,7 @@ class FrameLibraryRepository {
         'metadata': {
           'title': book.raw['bookTitle']?.toString() ?? '',
           'author': book.raw['bookCreator']?.toString() ?? '',
-          'shelf': book.library,
+          'shelf': book.shelf == 'comics' ? 'comics' : 'books',
           'manualTitle': false,
           'manualAuthor': false,
           'language': book.language,
@@ -72,7 +74,82 @@ class FrameLibraryRepository {
       },
     });
     if (result['ok'] != true) {
-      throw const FrameApiException(message: '恢復書籍內部資訊失敗。');
+      throw FrameApiException(
+        message: result['error']?.toString() ?? '恢復書籍內部資訊失敗。',
+      );
     }
+  }
+
+  Future<List<Map<String, dynamic>>> searchBangumi(String keyword) async {
+    final response = await api.postJson(
+      '/api/comics/bangumi/search',
+      {'keyword': keyword},
+    );
+    if (response['error'] != null) {
+      throw FrameApiException(message: response['error'].toString());
+    }
+    final rawItems = response['items'];
+    if (rawItems is! List) return const [];
+    return rawItems
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> linkBangumi(
+    FrameBook book,
+    int subjectId,
+  ) async {
+    final response = await api.postJson('/api/comics/bangumi/link', {
+      'book': book.descriptor(),
+      'subjectId': subjectId,
+    });
+    if (response['ok'] != true) {
+      throw FrameApiException(
+        message: response['error']?.toString() ?? '保存 Bangumi 作品資料失敗。',
+      );
+    }
+    return response;
+  }
+
+  Future<List<Map<String, dynamic>>> loadLegacyLinkCandidates(
+    FrameBook book,
+  ) async {
+    final query = Uri(
+      path: '/api/reading/link',
+      queryParameters: {
+        'book_id': book.id,
+        'provider': book.provider,
+        'library': book.library,
+        'root_path': book.rootPath,
+        'path': book.path,
+      },
+    );
+    final response = await api.getJson(query.toString());
+    if (response['error'] != null) {
+      throw FrameApiException(message: response['error'].toString());
+    }
+    final rawCandidates = response['candidates'];
+    if (rawCandidates is! List) return const [];
+    return rawCandidates
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> linkLegacyBook(
+    FrameBook target,
+    String oldBookId,
+  ) async {
+    final response = await api.postJson('/api/reading/link', {
+      'book': target.descriptor(),
+      'oldBookId': oldBookId,
+    });
+    if (response['ok'] != true) {
+      throw FrameApiException(
+        message: response['error']?.toString() ?? '關聯舊書籍資料失敗。',
+      );
+    }
+    return response;
   }
 }
