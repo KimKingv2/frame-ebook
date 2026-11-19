@@ -30,7 +30,7 @@ class FrameEpubCfi {
   FrameEpubCfi._();
 
   static const _blockTags = <String>{
-    'address', 'article', 'aside', 'blockquote', 'dd', 'div', 'dl', 'dt',
+    'address', 'article', 'aside', 'blockquote', 'body', 'dd', 'div', 'dl', 'dt',
     'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'header', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul',
   };
@@ -48,6 +48,35 @@ class FrameEpubCfi {
     final root = _documentRoot(textNode);
     if (root == null) return null;
     final localPath = _pathForNode(root, textNode, offset);
+    if (localPath == null || localPath.isEmpty) return null;
+
+    final packageStep = StringBuffer('/6/')
+      ..write((spineIndex + 1) * 2);
+    final itemrefId = book.spine[spineIndex].itemrefId.trim();
+    if (itemrefId.isNotEmpty) {
+      packageStep
+        ..write('[')
+        ..write(_escape(itemrefId))
+        ..write(']');
+    }
+    return 'epubcfi(' + packageStep.toString() + '!' + localPath + ')';
+  }
+
+  /// Creates a page-level CFI for fixed-layout content that has no text node,
+  /// such as a comic page represented by a single image.
+  static String? createElement({
+    required FrameEpubBook book,
+    required int spineIndex,
+    required XmlElement element,
+  }) {
+    if (spineIndex < 0 ||
+        spineIndex >= book.spine.length ||
+        element.parent == null) {
+      return null;
+    }
+    final root = _documentRoot(element);
+    if (root == null) return null;
+    final localPath = _pathForNode(root, element, 0);
     if (localPath == null || localPath.isEmpty) return null;
 
     final packageStep = StringBuffer('/6/')

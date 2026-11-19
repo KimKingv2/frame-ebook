@@ -304,6 +304,14 @@ class _FrameEpubReaderPreviewScreenState
             icon: const Icon(Icons.menu_book_outlined),
           ),
           IconButton(
+            tooltip: '加入書籤',
+            onPressed: session == null ||
+                    session.status != FrameEpubReaderStatus.ready
+                ? null
+                : _createBookmark,
+            icon: const Icon(Icons.bookmark_add_outlined),
+          ),
+          IconButton(
             tooltip: '筆記與書籤',
             onPressed: session == null ? null : _showAnnotations,
             icon: const Icon(Icons.bookmarks_outlined),
@@ -654,82 +662,244 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  String? _bookmarkCfi(
+    FrameEpubReaderSession session, {
+    String? preferred,
+  }) {
+    final chapter = session.currentChapter;
+    final epub = session.epub;
+    final index = session.currentSpineIndex;
+    if (chapter == null || epub == null || index == null) return null;
+
+    for (final candidate in <String?>[
+      preferred,
+      _lastSavedCfi,
+      session.initialCfi,
+    ]) {
+      final value = candidate?.trim() ?? '';
+      if (value.isEmpty ||
+          FrameEpubCfi.spineIndexFromCfi(epub, value) != index) {
+        continue;
+      }
+      if (FrameEpubCfi.resolve(
+            book: epub,
+            document: chapter.document,
+            cfi: value,
+          ) !=
+          null) {
+        return value;
+      }
+    }
+
+    XmlElement? anchor = session.initialAnchor ??
+        FrameEpubCfi.anchorForFragment(
+          chapter.document,
+          session.currentFragment,
+        );
+    if (anchor == null) {
+      for (final element
+          in chapter.document.descendants.whereType<XmlElement>()) {
+        if (element.name.local.toLowerCase() == 'body') {
+          anchor = element;
+          break;
+        }
+      }
+    }
+    anchor ??= chapter.document.rootElement;
+
+    final point = FrameEpubCfi.firstTextPoint(anchor);
+    if (point != null) {
+      return FrameEpubCfi.create(
+        book: epub,
+        spineIndex: index,
+        textNode: point.node,
+        offset: point.offset,
+      );
+    }
+    return FrameEpubCfi.createElement(
+      book: epub,
+      spineIndex: index,
+      element: anchor,
+    );
+  }
+
+  Future<void> _createBookmark() async {
+    final session = _session;
+    if (session == null ||
+        session.status != FrameEpubReaderStatus.ready) {
+      return;
+    }
+
+    final pendingCfi = _pendingCfi;
+    await _flushReadingPosition();
+    if (!mounted) return;
+
+    final cfi = _bookmarkCfi(session, preferred: pendingCfi);
+    if (cfi == null || cfi.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前 EPUB 頁面無法建立書籤。')),
+      );
+      return;
+    }
+    if (session.annotations.any(
+      (item) => item.type == 'bookmark' && item.cfi == cfi,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('這個位置已經有書籤。')),
+      );
+      return;
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final annotation = FrameReaderAnnotation(
+      id: 'flutter-bookmark-${DateTime.now().microsecondsSinceEpoch}',
+      bookId: widget.book.id,
+      type: 'bookmark',
+      cfi: cfi,
+      color: 'violet',
+      createdAt: now,
+    );
+    try {
+      await session.saveAnnotation(annotation);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已加入書籤。')),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('書籤儲存失敗：$error')),
+      );
+    }
+  }
+
+  Future<void> _goToAnnotation(FrameReaderAnnotation annotation) async {
+    final session = _session;
+    if (session == null) return;
+    await _flushReadingPosition();
+    try {
+      final moved = await session.goToCfi(annotation.cfi);
+      if (!mounted || moved) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('這筆標註的位置無法在目前 EPUB 中定位。')),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法跳轉至標註位置：$error')),
+      );
+    }
+  }
+
   Future<void> _showAnnotations() async {
     final session = _session;
     if (session == null) return;
-    final annotations = session.annotations;
+    var annotations = session.annotations;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: _readerPanel,
-      builder: (sheetContext) => SizedBox(
-        height: MediaQuery.of(sheetContext).size.height * 0.68,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.bookmarks_outlined, color: _readerAccent),
-                  const SizedBox(width: 10),
-                  Text(
-                    '筆記與書籤（${annotations.length}）',
-                    style: const TextStyle(
-                      color: _readerText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Color(0x55393247)),
-            Expanded(
-              child: annotations.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '目前沒有已保存的筆記或書籤。',
-                        style: TextStyle(color: _readerMuted),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.68,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.bookmarks_outlined, color: _readerAccent),
+                    const SizedBox(width: 10),
+                    Text(
+                      '筆記與書籤（${annotations.length}）',
+                      style: const TextStyle(
+                        color: _readerText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: annotations.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1, color: Color(0x33393247)),
-                      itemBuilder: (context, index) {
-                        final annotation = annotations[index];
-                        final title = switch (annotation.type) {
-                          'bookmark' => '書籤',
-                          'highlight' => '劃線',
-                          _ => '筆記',
-                        };
-                        final detail = annotation.text.trim().isNotEmpty
-                            ? annotation.text.trim()
-                            : annotation.quote.trim();
-                        return ListTile(
-                          title: Text(
-                            title,
-                            style: const TextStyle(
-                              color: _readerText,
-                              fontSize: 13,
-                            ),
-                          ),
-                          subtitle: Text(
-                            detail.isEmpty ? '尚無文字內容' : detail,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: _readerMuted,
-                              fontSize: 12,
-                              height: 1.5,
-                            ),
-                          ),
-                        );
-                      },
                     ),
-            ),
-          ],
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0x55393247)),
+              Expanded(
+                child: annotations.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '目前沒有已保存的筆記或書籤。',
+                          style: TextStyle(color: _readerMuted),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: annotations.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: Color(0x33393247)),
+                        itemBuilder: (context, index) {
+                          final annotation = annotations[index];
+                          final title = switch (annotation.type) {
+                            'bookmark' => '書籤',
+                            'highlight' => '劃線',
+                            _ => '筆記',
+                          };
+                          final detail = annotation.text.trim().isNotEmpty
+                              ? annotation.text.trim()
+                              : annotation.quote.trim();
+                          return ListTile(
+                            onTap: annotation.cfi.trim().isEmpty
+                                ? null
+                                : () {
+                                    Navigator.of(sheetContext).pop();
+                                    unawaited(_goToAnnotation(annotation));
+                                  },
+                            title: Text(
+                              title,
+                              style: const TextStyle(
+                                color: _readerText,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              detail.isEmpty ? '尚無文字內容' : detail,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _readerMuted,
+                                fontSize: 12,
+                                height: 1.5,
+                              ),
+                            ),
+                            trailing: IconButton(
+                              tooltip: '刪除$title',
+                              onPressed: () async {
+                                try {
+                                  await session.deleteAnnotation(annotation.id);
+                                  if (!mounted) return;
+                                  setSheetState(() {
+                                    annotations = session.annotations;
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('已刪除$title。')),
+                                  );
+                                } on Object catch (error) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('刪除$title失敗：$error')),
+                                  );
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Color(0xFFBBAFCB),
+                                size: 19,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

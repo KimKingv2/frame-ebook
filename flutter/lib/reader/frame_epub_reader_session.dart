@@ -222,6 +222,54 @@ class FrameEpubReaderSession extends ChangeNotifier {
   Future<bool> goToSpineIndex(int index) =>
       _loadSpineIndex(index, fragment: '', saveProgress: true);
 
+  /// Navigates to an existing EPUB CFI, including a legacy range CFI.
+  /// The same Range-backed loader is used when the annotation belongs to a
+  /// different spine item; no archive is extracted or written to disk.
+  Future<bool> goToCfi(String cfi) async {
+    final epub = _epub;
+    if (_status != FrameEpubReaderStatus.ready || epub == null || _closed) {
+      return false;
+    }
+    final spineIndex = FrameEpubCfi.spineIndexFromCfi(epub, cfi);
+    if (spineIndex == null) return false;
+
+    if (_currentSpineIndex != spineIndex) {
+      final loaded = await _loadSpineIndex(
+        spineIndex,
+        fragment: '',
+        saveProgress: false,
+      );
+      if (!loaded) return false;
+    }
+
+    final chapter = _chapter;
+    if (chapter == null) return false;
+    final location = FrameEpubCfi.resolve(
+      book: epub,
+      document: chapter.document,
+      cfi: cfi,
+    );
+    if (location == null || location.spineIndex != spineIndex) return false;
+
+    _currentFragment = '';
+    _initialCfi = cfi;
+    _restoredCfiLocation = location;
+    notifyListeners();
+
+    final count = epub.spine.length;
+    final fraction = FrameEpubCfi.textFraction(
+      chapter.document,
+      location.node,
+      location.offset,
+    );
+    final percent = (((spineIndex + fraction) / count) * 100)
+        .round()
+        .clamp(0, 100)
+        .toInt();
+    await _saveProgress(percent: percent, cfi: cfi);
+    return true;
+  }
+
   Future<bool> goToPreviousChapter() {
     final index = _currentSpineIndex;
     if (index == null || index <= 0) return Future.value(false);
