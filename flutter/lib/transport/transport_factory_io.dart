@@ -183,7 +183,10 @@ class _NativeFrameTransport implements FrameTransport {
           );
         }
 
-        final sameOrigin = _origin(current) == originalOrigin;
+        // Credentials are valid only for the initial Pages request. Do not
+        // restore them if a redirect chain later returns to the Pages origin.
+        final sameOrigin =
+            redirectCount == 0 && _origin(current) == originalOrigin;
         for (final entry in headers.entries) {
           final name = entry.key.toLowerCase();
           if (_blockedRequestHeaders.contains(name)) continue;

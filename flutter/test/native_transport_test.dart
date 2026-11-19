@@ -15,7 +15,13 @@ void main() {
       secondServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       secondServer.listen((request) async {
         final response = request.response;
-        if (request.uri.path == '/auth-check') {
+        if (request.uri.path == '/stream-return-origin') {
+          response.statusCode = HttpStatus.found;
+          response.headers.set(
+            HttpHeaders.locationHeader,
+            'http://127.0.0.1:${firstServer.port}/stream-return-check',
+          );
+        } else if (request.uri.path == '/auth-check') {
           response.statusCode = request.headers.value('range') == 'bytes=0-1023'
               ? HttpStatus.partialContent
               : HttpStatus.badRequest;
@@ -27,7 +33,8 @@ void main() {
                 : '"leaked"',
           );
           response.add(List<int>.filled(1024, 65));
-        } else if (request.uri.path == '/stream-auth-check') {
+        } else if (request.uri.path == '/stream-auth-check' ||
+            request.uri.path == '/stream-return-check') {
           final safe =
               request.headers.value(HttpHeaders.authorizationHeader) == null &&
                   request.headers.value(HttpHeaders.cookieHeader) == null;
@@ -67,6 +74,25 @@ void main() {
               HttpHeaders.locationHeader,
               'http://127.0.0.1:${secondServer.port}/stream-auth-check',
             );
+            break;
+          case '/stream-return-start':
+            response.statusCode = HttpStatus.found;
+            response.headers.set(
+              HttpHeaders.locationHeader,
+              'http://127.0.0.1:${secondServer.port}/stream-return-origin',
+            );
+            break;
+          case '/stream-return-check':
+            final safe =
+                request.headers.value(HttpHeaders.authorizationHeader) == null &&
+                    request.headers.value(HttpHeaders.cookieHeader) == null;
+            response.statusCode =
+                request.headers.value(HttpHeaders.rangeHeader) == 'bytes=4-7'
+                    ? HttpStatus.partialContent
+                    : HttpStatus.badRequest;
+            response.headers.set(HttpHeaders.contentRangeHeader, 'bytes 4-7/16');
+            response.headers.set(HttpHeaders.etagHeader, safe ? '"stripped"' : '"leaked"');
+            response.add([4, 5, 6, 7]);
             break;
           case '/loop':
             response.statusCode = HttpStatus.found;
@@ -158,6 +184,26 @@ void main() {
       final bytes = await response.stream.expand((chunk) => chunk).toList();
       expect(bytes, [4, 5, 6, 7]);
       await response.close();
+      await response.close();
+    });
+
+    test('never restores Access credentials when a redirect chain returns to Pages',
+        () async {
+      final response = await transport.openStream(
+        uri: Uri.parse(
+          'http://127.0.0.1:${firstServer.port}/stream-return-start',
+        ),
+        headers: const {
+          'Cookie': 'CF_Authorization=opaque-session',
+          'Authorization': 'Bearer not-a-real-secret',
+        },
+        range: FrameByteRange.from(start: 4, end: 7),
+      );
+
+      expect(response.statusCode, HttpStatus.partialContent);
+      expect(response.headers['etag'], '"stripped"');
+      expect(response.contentRange, 'bytes 4-7/16');
+      expect(await response.stream.expand((chunk) => chunk).toList(), [4, 5, 6, 7]);
       await response.close();
     });
 
