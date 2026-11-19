@@ -6,6 +6,7 @@ import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
 import 'package:frame_ebook/reader/frame_epub_cfi.dart';
+import 'package:frame_ebook/reader/frame_epub_footnote.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
 import 'package:frame_ebook/reader/frame_zip_archive.dart';
@@ -67,18 +68,39 @@ Uint8List _fixture() {
   <manifest>
     <item id="chapter" href="Text/chapter.xhtml"
       media-type="application/xhtml+xml"/>
+    <item id="notes" href="Text/notes.xhtml"
+      media-type="application/xhtml+xml"/>
   </manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
 ''';
   const chapter = '''
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:epub="http://www.idpf.org/2007/ops">
   <head><title>Widget fixture</title></head>
   <body>
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。</p>
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
+    <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
+    <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
+    <p>舊版註腳 <a class="noteref" href="#legacy-note">[3]</a></p>
+    <div id="legacy-note" class="footnote"><p>這是 EPUB 2 註腳。</p></div>
+    <aside id="footnote-1" epub:type="footnote">
+      <p>這是註腳的內文。</p>
+      <a role="doc-backlink" href="#note-ref-1">返回正文</a>
+    </aside>
     <p id="inside">章節目標</p>
+  </body>
+</html>
+''';
+  const notes = '''
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <ol epub:type="endnotes">
+      <li id="endnote-2" epub:type="endnote"><p>這是跨文件尾註。</p></li>
+    </ol>
   </body>
 </html>
 ''';
@@ -87,6 +109,7 @@ Uint8List _fixture() {
     _ZipItem('META-INF/container.xml', utf8.encode(container)),
     _ZipItem('OPS/book.opf', utf8.encode(package)),
     _ZipItem('OPS/Text/chapter.xhtml', utf8.encode(chapter)),
+    _ZipItem('OPS/Text/notes.xhtml', utf8.encode(notes)),
   ]);
 }
 
@@ -283,6 +306,7 @@ void main() {
         endOffset: selectedNode.value.length,
       )!;
       String? followedHref;
+      FrameEpubFootnote? openedFootnote;
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -312,6 +336,7 @@ void main() {
                 ),
               ],
               onInternalLink: (href) => followedHref = href,
+              onFootnote: (footnote) => openedFootnote = footnote,
             ),
           ),
         ),
@@ -350,6 +375,25 @@ void main() {
         ),
         isTrue,
       );
+
+      await tester.tap(find.text('[1]'));
+      await tester.pumpAndSettle();
+      expect(openedFootnote?.title, '註腳');
+      expect(openedFootnote?.content, '這是註腳的內文。');
+      expect(followedHref, isNull);
+      expect(find.text('這是註腳的內文。'), findsNothing);
+
+      await tester.tap(find.text('[2]'));
+      await tester.pumpAndSettle();
+      expect(openedFootnote?.title, '尾註');
+      expect(openedFootnote?.content, '這是跨文件尾註。');
+      expect(followedHref, isNull);
+
+      await tester.tap(find.text('[3]'));
+      await tester.pumpAndSettle();
+      expect(openedFootnote?.title, '註腳');
+      expect(openedFootnote?.content, '這是 EPUB 2 註腳。');
+      expect(followedHref, isNull);
 
       await tester.tap(find.text('章內連結'));
       expect(followedHref, 'chapter.xhtml#inside');
