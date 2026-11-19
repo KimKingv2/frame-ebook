@@ -33,6 +33,7 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
           BASE_REF: ${{ github.base_ref }}
         run: |
+          BASE_SHA=""
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             git fetch origin "$BASE_REF"
             BASE_SHA="$(git merge-base FETCH_HEAD "$HEAD_SHA")"
@@ -40,6 +41,7 @@ jobs:
           elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
             CHANGED_FILES="$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")"
           else
+            BASE_SHA="$BEFORE_SHA"
             CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")"
           fi
 
