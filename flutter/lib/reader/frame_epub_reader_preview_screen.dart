@@ -67,8 +67,15 @@ class _FrameEpubReaderPreviewScreenState
   bool _isFixedPageZoomed = false;
 
   double _fontSize = 18;
-  double _lineHeight = 1.75;
-  String _theme = 'dark';
+  double _lineHeight = 1.65;
+  double _fontScale = 1;
+  String _fontFamilyPreference = 'original';
+  String _fontWeightPreference = 'original';
+  String _paragraphSpacingPreference = 'original';
+  String _textAlignPreference = 'original';
+  double _verticalMargin = 16;
+  double _horizontalMarginPercent = 7;
+  String _theme = 'light';
 
   @override
   void initState() {
@@ -143,13 +150,56 @@ class _FrameEpubReaderPreviewScreenState
     _fontSize = value(appearance['frameFlutterFontSize'], 18)
         .clamp(14, 30)
         .toDouble();
-    _lineHeight = value(appearance['frameFlutterLineHeight'], 1.75)
-        .clamp(1.2, 2.4)
+    _fontScale = value(appearance['fontScale'], 1)
+        .clamp(.9, 1.3)
         .toDouble();
-    final theme = appearance['frameFlutterTheme']?.toString() ?? 'dark';
-    _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme : 'dark';
-    final layoutMode =
-        appearance['frameFlutterLayoutMode']?.toString() ?? 'continuous';
+    _lineHeight = value(
+      appearance['frameFlutterLineHeight'] ?? appearance['lineHeight'],
+      1.65,
+    ).clamp(1.2, 2.4).toDouble();
+    _fontFamilyPreference =
+        const {'original', 'serif', 'sans'}.contains(appearance['fontFamily'])
+            ? appearance['fontFamily'].toString()
+            : 'original';
+    _fontWeightPreference =
+        const {'original', 'normal', 'medium'}.contains(appearance['fontWeight'])
+            ? appearance['fontWeight'].toString()
+            : 'original';
+    _paragraphSpacingPreference =
+        const {'original', 'compact', 'standard', 'loose'}
+                .contains(appearance['paragraphSpacing'])
+            ? appearance['paragraphSpacing'].toString()
+            : 'original';
+    _textAlignPreference =
+        const {'original', 'left', 'justify'}.contains(appearance['textAlign'])
+            ? appearance['textAlign'].toString()
+            : 'original';
+    _verticalMargin = value(appearance['verticalMargin'], 16)
+        .clamp(8, 64)
+        .toDouble();
+    _horizontalMarginPercent = value(appearance['horizontalMargin'], 7)
+        .clamp(0, 20)
+        .toDouble();
+
+    final savedTheme = appearance['frameFlutterTheme']?.toString();
+    final legacyTheme = appearance['theme']?.toString();
+    final theme = savedTheme ??
+        (legacyTheme == 'paper'
+            ? 'light'
+            : legacyTheme == 'night'
+                ? 'dark'
+                : legacyTheme);
+    _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme! : 'light';
+
+    final savedLayout = appearance['frameFlutterLayoutMode']?.toString();
+    final legacyReadingMode = appearance['readingMode']?.toString();
+    final legacyPageLayout = appearance['pageLayout']?.toString();
+    final layoutMode = savedLayout ??
+        (legacyReadingMode == 'scrolled'
+            ? 'continuous'
+            : legacyPageLayout == '2'
+                ? 'doublePage'
+                : 'paginated');
     _layoutMode = const {'continuous', 'paginated', 'doublePage'}
             .contains(layoutMode)
         ? layoutMode
@@ -497,6 +547,13 @@ class _FrameEpubReaderPreviewScreenState
                     linkColor: _pageLink,
                     fontSize: _fontSize,
                     lineHeight: _lineHeight,
+                    fontScale: _fontScale,
+                    fontFamilyPreference: _fontFamilyPreference,
+                    fontWeightPreference: _fontWeightPreference,
+                    paragraphSpacingPreference: _paragraphSpacingPreference,
+                    textAlignPreference: _textAlignPreference,
+                    verticalMargin: _verticalMargin,
+                    horizontalMarginPercent: _horizontalMarginPercent,
                     onInternalLink: (href) {
                       unawaited(
                         _runNavigation(() => session.goToHref(href)),
@@ -1033,10 +1090,15 @@ class _FrameEpubReaderPreviewScreenState
         ),
         content: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * .86,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               if (quote.isNotEmpty)
                 Container(
                   constraints: const BoxConstraints(maxHeight: 120),
@@ -1338,11 +1400,53 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  Widget _appearanceDropdown({
+    required String label,
+    required String value,
+    required List<({String value, String label})> options,
+    required ValueChanged<String> onChanged,
+  }) {
+    return SizedBox(
+      width: 148,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: _readerMuted, fontSize: 11)),
+          DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            dropdownColor: _readerPanel,
+            style: const TextStyle(color: _readerText, fontSize: 12),
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final option in options)
+                DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (next) {
+              if (next != null) onChanged(next);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showAppearance() async {
     final session = _session;
     if (session == null) return;
     var fontSize = _fontSize;
     var lineHeight = _lineHeight;
+    var fontScale = _fontScale;
+    var fontFamilyPreference = _fontFamilyPreference;
+    var fontWeightPreference = _fontWeightPreference;
+    var paragraphSpacingPreference = _paragraphSpacingPreference;
+    var textAlignPreference = _textAlignPreference;
+    var verticalMargin = _verticalMargin;
+    var horizontalMarginPercent = _horizontalMarginPercent;
     var theme = _theme;
     var layoutMode = _layoutMode;
 
@@ -1417,6 +1521,109 @@ class _FrameEpubReaderPreviewScreenState
                 activeColor: _readerAccent,
                 onChanged: (value) =>
                     setSheetState(() => lineHeight = value),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '文字排版',
+                style: TextStyle(color: _readerMuted),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 2,
+                children: [
+                  _appearanceDropdown(
+                    label: '字級比例',
+                    value: fontScale.toStringAsFixed(1),
+                    options: const [
+                      (value: '0.9', label: '偏小 90%'),
+                      (value: '1.0', label: '標準 100%'),
+                      (value: '1.1', label: '稍大 110%'),
+                      (value: '1.2', label: '大字 120%'),
+                      (value: '1.3', label: '特大 130%'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontScale = double.parse(v)),
+                  ),
+                  _appearanceDropdown(
+                    label: '字體',
+                    value: fontFamilyPreference,
+                    options: const [
+                      (value: 'original', label: '原書字體'),
+                      (value: 'serif', label: '明體'),
+                      (value: 'sans', label: '黑體'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontFamilyPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '字重',
+                    value: fontWeightPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'normal', label: '標準 400'),
+                      (value: 'medium', label: '稍厚 500'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontWeightPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '段落間距',
+                    value: paragraphSpacingPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'compact', label: '緊湊'),
+                      (value: 'standard', label: '舒適'),
+                      (value: 'loose', label: '寬鬆'),
+                    ],
+                    onChanged: (v) => setSheetState(() => paragraphSpacingPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '文字對齊',
+                    value: textAlignPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'left', label: '靠左對齊'),
+                      (value: 'justify', label: '左右對齊'),
+                    ],
+                    onChanged: (v) => setSheetState(() => textAlignPreference = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('頁面留白', style: TextStyle(color: _readerMuted)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 2,
+                children: [
+                  _appearanceDropdown(
+                    label: '上下留白',
+                    value: verticalMargin.round().toString(),
+                    options: const [
+                      (value: '8', label: '窄 8 px'),
+                      (value: '16', label: '標準 16 px'),
+                      (value: '24', label: '寬 24 px'),
+                      (value: '32', label: '更寬 32 px'),
+                      (value: '40', label: '寬裕 40 px'),
+                      (value: '48', label: '大留白 48 px'),
+                      (value: '64', label: '極寬 64 px'),
+                    ],
+                    onChanged: (v) => setSheetState(() => verticalMargin = double.parse(v)),
+                  ),
+                  _appearanceDropdown(
+                    label: '左右外側留白',
+                    value: horizontalMarginPercent.round().toString(),
+                    options: const [
+                      (value: '0', label: '0%'),
+                      (value: '2', label: '2%'),
+                      (value: '4', label: '4%'),
+                      (value: '7', label: '7%'),
+                      (value: '10', label: '10%'),
+                      (value: '13', label: '13%'),
+                      (value: '16', label: '16%'),
+                      (value: '20', label: '20%'),
+                    ],
+                    onChanged: (v) => setSheetState(() => horizontalMarginPercent = double.parse(v)),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               const Text(
@@ -1506,7 +1713,14 @@ class _FrameEpubReaderPreviewScreenState
                 onPressed: () async {
                   if (_layoutMode != layoutMode ||
                       _fontSize != fontSize ||
-                      _lineHeight != lineHeight) {
+                      _lineHeight != lineHeight ||
+                      _fontScale != fontScale ||
+                      _fontFamilyPreference != fontFamilyPreference ||
+                      _fontWeightPreference != fontWeightPreference ||
+                      _paragraphSpacingPreference != paragraphSpacingPreference ||
+                      _textAlignPreference != textAlignPreference ||
+                      _verticalMargin != verticalMargin ||
+                      _horizontalMarginPercent != horizontalMarginPercent) {
                     final previousPageController = _chapterPageController;
                     _chapterPageController = PageController();
                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1516,12 +1730,31 @@ class _FrameEpubReaderPreviewScreenState
                   setState(() {
                     _fontSize = fontSize;
                     _lineHeight = lineHeight;
+                    _fontScale = fontScale;
+                    _fontFamilyPreference = fontFamilyPreference;
+                    _fontWeightPreference = fontWeightPreference;
+                    _paragraphSpacingPreference = paragraphSpacingPreference;
+                    _textAlignPreference = textAlignPreference;
+                    _verticalMargin = verticalMargin;
+                    _horizontalMarginPercent = horizontalMarginPercent;
                     _theme = theme;
                     _layoutMode = layoutMode;
                   });
                   Navigator.of(sheetContext).pop();
                   try {
                     await session.saveAppearance({
+                      // Legacy D1 keys keep Flutter and the existing reader in sync.
+                      'fontScale': fontScale.toString(),
+                      'lineHeight': lineHeight.toString(),
+                      'verticalMargin': verticalMargin.round().toString(),
+                      'horizontalMargin': horizontalMarginPercent.round().toString(),
+                      'fontFamily': fontFamilyPreference,
+                      'fontWeight': fontWeightPreference,
+                      'paragraphSpacing': paragraphSpacingPreference,
+                      'textAlign': textAlignPreference,
+                      'readingMode': layoutMode == 'continuous' ? 'scrolled' : 'paginated',
+                      'pageLayout': layoutMode == 'doublePage' ? '2' : '1',
+                      'theme': theme == 'light' ? 'paper' : theme == 'dark' ? 'night' : 'sepia',
                       'frameFlutterFontSize': fontSize,
                       'frameFlutterLineHeight': lineHeight,
                       'frameFlutterTheme': theme,
@@ -1536,7 +1769,9 @@ class _FrameEpubReaderPreviewScreenState
                 },
                 child: const Text('保存設定'),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
