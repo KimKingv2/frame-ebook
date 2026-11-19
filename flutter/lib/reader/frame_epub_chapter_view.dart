@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -60,7 +59,6 @@ class _EpubStylesheetBundle {
 
 class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   late Future<_EpubStylesheetBundle> _stylesFuture;
-  final List<TapGestureRecognizer> _recognizers = [];
 
   @override
   void initState() {
@@ -75,19 +73,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         !identical(oldWidget.resourceLoader, widget.resourceLoader)) {
       _stylesFuture = _loadStylesheets();
     }
-  }
-
-  @override
-  void dispose() {
-    _disposeRecognizers();
-    super.dispose();
-  }
-
-  void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
-    }
-    _recognizers.clear();
   }
 
   Future<_EpubStylesheetBundle> _loadStylesheets() async {
@@ -173,7 +158,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           );
         }
 
-        _disposeRecognizers();
         final body = _bodyElement(widget.chapter.document);
         if (body == null) return _message('EPUB 章節沒有可顯示的 body 內容。');
 
@@ -468,40 +452,40 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
     }
 
-    var linkedChildren = children;
     var textStyle = _textStyle(style);
     if (tag == 'a') {
       final href = _attribute(element, 'href') ?? '';
-      TapGestureRecognizer? tap;
+      VoidCallback? onTap;
       if (href.isNotEmpty) {
         final reference = widget.resourceLoader.resolve(
           href,
           fromPath: widget.chapter.resource.path,
         );
         if (reference.isInternal && widget.onInternalLink != null) {
-          tap = TapGestureRecognizer()
-            ..onTap = () => widget.onInternalLink!(href);
+          onTap = () => widget.onInternalLink!(href);
         } else if (reference.isExternal && widget.onExternalLink != null) {
           final uri = Uri.tryParse(href);
-          if (uri != null) {
-            tap = TapGestureRecognizer()
-              ..onTap = () => widget.onExternalLink!(uri);
-          }
+          if (uri != null) onTap = () => widget.onExternalLink!(uri);
         }
-      }
-      if (tap != null) {
-        _recognizers.add(tap);
-        // TextSpan recognizers only receive hits for the text owned by that
-        // span, not for descendant spans. Attach the same recognizer to the
-        // descendant text leaves so styled inline children remain clickable.
-        linkedChildren = children
-            .map((child) => _attachRecognizer(child, tap!))
-            .toList(growable: false);
       }
       textStyle = textStyle.copyWith(
         color: widget.linkColor,
         decoration: TextDecoration.underline,
       );
+      if (onTap != null) {
+        return WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Text.rich(
+              TextSpan(style: textStyle, children: children),
+              softWrap: false,
+            ),
+          ),
+        );
+      }
     } else if (tag == 'mark') {
       textStyle = textStyle.copyWith(
         backgroundColor: const Color(0x66D8B45B),
@@ -509,22 +493,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
     return TextSpan(
       style: textStyle,
-      children: linkedChildren,
-    );
-  }
-
-  InlineSpan _attachRecognizer(
-    InlineSpan span,
-    TapGestureRecognizer recognizer,
-  ) {
-    if (span is! TextSpan) return span;
-    return TextSpan(
-      text: span.text,
-      style: span.style,
-      recognizer: span.text == null ? span.recognizer : recognizer,
-      children: span.children
-          ?.map((child) => _attachRecognizer(child, recognizer))
-          .toList(growable: false),
+      children: children,
     );
   }
 
