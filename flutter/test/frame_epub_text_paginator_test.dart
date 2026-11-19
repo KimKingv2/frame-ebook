@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/reader/frame_epub_text_paginator.dart';
 
@@ -12,7 +13,7 @@ void main() {
           text: '其中包含粗體文字以及',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        TextSpan(text: '更多一般文字。' * 40),
+        TextSpan(text: List.filled(40, '更多一般文字。').join()),
       ],
     );
     const textScaler = TextScaler.noScaling;
@@ -44,7 +45,7 @@ void main() {
       children: [
         TextSpan(text: 'Before image '),
         WidgetSpan(child: SizedBox(width: 24, height: 24)),
-        TextSpan(text: ' after image ' * 40),
+        TextSpan(text: List.filled(40, ' after image ').join()),
       ],
     );
     final plainText = text.toPlainText(
