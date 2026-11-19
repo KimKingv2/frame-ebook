@@ -85,11 +85,11 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve EPUB page layout: single-page and double-page preferred. Single-page pagination and responsive two-page spreads exist in the reflowable EPUB Flutter Preview; full Legacy parity remains pending.
 - [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px. Flutter Preview now exposes these values.
 - [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent. Flutter Preview now exposes these values for paginated layouts.
-- [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling.
-- [ ] Preserve comic page layouts: single-page and double-page preferred.
-- [ ] Preserve comic image fitting: fit-page and fit-width.
-- [ ] Preserve themes: paper, sepia and night.
-- [ ] Preserve reading backdrops: wood, linen and slate.
+- [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling. Flutter Preview now has a lazy, vertically scrolling fixed-layout EPUB long strip with per-spine progress restoration; device performance and visual parity remain pending.
+- [ ] Preserve comic page layouts: single-page and double-page preferred. Flutter Preview now displays two consecutive fixed-layout EPUB pages side by side on wide layouts, respecting RTL order and falling back to one page on narrow layouts.
+- [ ] Preserve comic image fitting: fit-page and fit-width. Flutter Preview now has both fixed-layout image fitting paths; real-world EPUB image/CSS compatibility still needs book-level acceptance.
+- [ ] Preserve themes: paper, sepia and night. Flutter Preview already exposes these theme choices; verify their interaction with fixed-layout artwork on all targets.
+- [ ] Preserve reading backdrops: wood, linen and slate. Flutter Preview now exposes all three backdrop surfaces for fixed-layout pages.
 - [ ] Preserve fullscreen and immersive fullscreen action states.
 - [ ] Preserve fixed-layout EPUB as well as CBZ comic behaviour.
 
