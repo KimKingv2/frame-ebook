@@ -250,9 +250,9 @@ class _CssCandidate implements Comparable<_CssCandidate> {
 
   @override
   int compareTo(_CssCandidate other) {
-    final byImportance = important.toString().compareTo(
-          other.important.toString(),
-        );
+    final byImportance = (important ? 1 : 0).compareTo(
+      other.important ? 1 : 0,
+    );
     if (byImportance != 0) return byImportance;
     final bySpecificity = specificity.compareTo(other.specificity);
     if (bySpecificity != 0) return bySpecificity;
@@ -398,7 +398,7 @@ bool _matchesCompound(XmlElement element, String compound) {
 
 bool _matchesAttribute(XmlElement element, String expression) {
   final match = RegExp(
-    r'^\s*([\w:|-]+)\s*(?:(~=|\|=|\^=|\$=|\*=|=)\s*(?:"([^"]*)"|''([^'']*)''|([^\s]+))\s*)?$',
+    r"""^\s*([\w:|-]+)\s*(?:(~=|\|=|\^=|\$=|\*=|=)\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))\s*)?$""",
   ).firstMatch(expression);
   if (match == null) return false;
   final name = match.group(1)!.split(RegExp(r'[:|]')).last;
@@ -428,10 +428,14 @@ bool _matchesPseudo(XmlElement element, String pseudo, String argument) {
   final parent = _parentElement(element);
   if (pseudo == 'root') return parent == null;
   if (pseudo == 'first-child') {
-    return parent == null || _elementSiblings(element, parent).firstOrNull == element;
+    if (parent == null) return true;
+    final siblings = _elementSiblings(element, parent);
+    return siblings.isNotEmpty && identical(siblings.first, element);
   }
   if (pseudo == 'last-child') {
-    return parent == null || _elementSiblings(element, parent).lastOrNull == element;
+    if (parent == null) return true;
+    final siblings = _elementSiblings(element, parent);
+    return siblings.isNotEmpty && identical(siblings.last, element);
   }
   if (pseudo == 'only-child') {
     return parent == null || _elementSiblings(element, parent).length == 1;
@@ -663,7 +667,6 @@ List<_CssDeclaration> _parseDeclarations(String css, int startOrder) {
       important: important,
       order: order++,
     ));
-    index++;
   }
   return List.unmodifiable(declarations);
 }
