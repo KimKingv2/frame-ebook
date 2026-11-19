@@ -22,9 +22,9 @@ enum FrameEpubReaderStatus {
 /// A shared, platform-neutral reading session for one cloud EPUB.
 ///
 /// The session owns the Range-backed archive and coordinates the EPUB parser,
-/// resource loader and existing Reading Room repository. It deliberately
-/// does not render XHTML or invent a synthetic CFI: a future renderer can
-/// report a real EPUB CFI through [saveReadingPosition].
+/// resource loader, CFI restoration and existing Reading Room repository.
+/// CFI generation is supplied by the XHTML renderer and validated here before
+/// it is persisted through [saveReadingPosition].
 class FrameEpubReaderSession extends ChangeNotifier {
   FrameEpubReaderSession({
     required this.book,
@@ -71,6 +71,17 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
   FrameEpubCfiLocation? _restoredCfiLocation;
   XmlElement? get initialAnchor => _restoredCfiLocation?.anchorElement;
+
+  double? get initialScrollFraction {
+    final location = _restoredCfiLocation;
+    final chapter = _chapter;
+    if (location == null || chapter == null) return null;
+    return FrameEpubCfi.textFraction(
+      chapter.document,
+      location.node,
+      location.offset,
+    );
+  }
 
   bool _chapterLoading = false;
   bool get isChapterLoading => _chapterLoading;
