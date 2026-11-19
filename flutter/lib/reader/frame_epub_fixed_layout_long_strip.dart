@@ -35,6 +35,7 @@ class _FrameEpubFixedLayoutLongStripState
   late final ScrollController _scrollController;
   int? _lastReportedIndex;
   int _lastExternalIndex = -1;
+  bool _initialPositionApplied = false;
   double _pageExtent = 0;
 
   @override
@@ -99,6 +100,26 @@ class _FrameEpubFixedLayoutLongStripState
           final extent = constraints.maxHeight;
           if (extent.isFinite && extent > 0) {
             _pageExtent = extent;
+          }
+          if (!_initialPositionApplied && _pageExtent > 0) {
+            _initialPositionApplied = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_scrollController.hasClients) return;
+              final initialOffset = widget.currentPageIndex
+                      .clamp(0, widget.pageCount - 1)
+                      .toDouble() *
+                  _pageExtent;
+              if (initialOffset > 0) {
+                _scrollController.jumpTo(
+                  initialOffset.clamp(
+                    _scrollController.position.minScrollExtent,
+                    _scrollController.position.maxScrollExtent,
+                  ).toDouble(),
+                );
+              } else {
+                _handleScrollChanged();
+              }
+            });
           }
           final cacheExtent =
               _pageExtent * widget.cachePages.toDouble();
