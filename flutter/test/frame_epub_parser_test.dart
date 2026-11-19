@@ -262,6 +262,10 @@ List<_ZipItem> _epub3Items() => [
       const _ZipItem('OPS/Text/chapter02.xhtml', '<html/>'),
       const _ZipItem('OPS/Images/cover art.png', 'image-bytes'),
       const _ZipItem('OPS/Styles/book.css', 'body { margin: 0; }'),
+      _ZipItem(
+        'OPS/Media/unopened-large-resource.bin',
+        String.fromCharCodes(List<int>.filled(100000, 0x78)),
+      ),
     ];
 
 void main() {
