@@ -11,9 +11,7 @@ class FrameByteRange {
   FrameByteRange.from({
     required int start,
     int? end,
-  })  : assert(start >= 0),
-        assert(end == null || end >= start),
-        start = start,
+  })  : start = start,
         end = end,
         suffixLength = null {
     if (start < 0) {
@@ -25,8 +23,7 @@ class FrameByteRange {
   }
 
   FrameByteRange.suffix(int length)
-      : assert(length > 0),
-        start = null,
+      : start = null,
         end = null,
         suffixLength = length {
     if (length <= 0) {
