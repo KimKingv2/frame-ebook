@@ -116,13 +116,26 @@ class FrameFileResponse {
     await _onClose();
   }
 
+  static const _safeHeaderNames = {
+    'accept-ranges',
+    'cache-control',
+    'content-disposition',
+    'content-encoding',
+    'content-length',
+    'content-range',
+    'content-type',
+    'etag',
+    'last-modified',
+    'x-content-type-options',
+  };
+
   static Map<String, String> _normalizeHeaders(
     Map<String, String> source,
   ) {
     final normalized = <String, String>{};
     for (final entry in source.entries) {
       final name = entry.key.trim().toLowerCase();
-      if (name.isEmpty) continue;
+      if (!_safeHeaderNames.contains(name)) continue;
       normalized[name] = entry.value.trim();
     }
     return Map<String, String>.unmodifiable(normalized);
