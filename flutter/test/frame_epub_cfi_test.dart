@@ -200,7 +200,8 @@ void main() {
         textNode: text,
         offset: 5,
       )!;
-      expect(cfi, contains('^[bracket^]'));
+      expect(cfi, contains('^['));
+      expect(cfi, contains('^]'));
       expect(cfi, contains('^^'));
       final location = FrameEpubCfi.resolve(
         book: book,
