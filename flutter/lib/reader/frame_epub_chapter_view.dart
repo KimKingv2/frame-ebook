@@ -643,8 +643,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       bodyStyle,
       cascade,
       flattenBlockContainers: true,
-      paginationWidth:
-          (contentWidth - widget.horizontalPadding * 2).clamp(1.0, contentWidth),
+      paginationWidth: (contentWidth - widget.horizontalPadding * 2)
+          .clamp(1.0, contentWidth)
+          .toDouble(),
       paginationMaxHeight: availableHeight > 1 ? availableHeight : 1,
       paginationTextScaler:
           MediaQuery.maybeOf(context)?.textScaler ?? TextScaler.noScaling,
@@ -1544,7 +1545,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final innerWidth = paginationWidth == null
         ? null
         : (paginationWidth - blockPadding.horizontal - blockMargin.horizontal)
-            .clamp(1.0, paginationWidth);
+            .clamp(1.0, paginationWidth)
+            .toDouble();
     Widget child;
     if (tag == 'hr') {
       child = const Divider(color: Color(0x664D455B), height: 24);
@@ -1588,7 +1590,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           style,
           cascade,
           paginationWidth:
-              innerWidth == null ? null : (innerWidth - 19).clamp(1.0, innerWidth),
+              innerWidth == null
+                  ? null
+                  : (innerWidth - 19).clamp(1.0, innerWidth).toDouble(),
           paginationMaxHeight: paginationMaxHeight,
           paginationTextScaler: paginationTextScaler,
         ),
@@ -1663,7 +1667,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                     cascade,
                     paginationWidth: paginationWidth == null
                         ? null
-                        : (paginationWidth - 28).clamp(1.0, paginationWidth),
+                        : (paginationWidth - 28)
+                            .clamp(1.0, paginationWidth)
+                            .toDouble(),
                     paginationMaxHeight: paginationMaxHeight,
                     paginationTextScaler: paginationTextScaler,
                   ),
