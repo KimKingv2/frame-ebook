@@ -206,6 +206,11 @@ class _NativeFrameTransport implements FrameTransport {
           }
           final next = current.resolve(location.trim());
           _validateUri(next);
+          if (_isAccessLogin(next)) {
+            throw const HttpException(
+              'Cloudflare Access 登入已過期，請返回書架重新登入。',
+            );
+          }
           if (current.scheme == 'https' && next.scheme != 'https') {
             throw const HttpException('已阻止 HTTPS 降級到 HTTP 的跳轉。');
           }
@@ -277,6 +282,13 @@ class _NativeFrameTransport implements FrameTransport {
       '${uri.scheme.toLowerCase()}://${uri.host.toLowerCase()}:${uri.port}';
 
   Uri _safeUri(Uri uri) => uri.replace(query: '', fragment: '');
+
+  bool _isAccessLogin(Uri uri) {
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    return host.endsWith('.cloudflareaccess.com') ||
+        path.startsWith('/cdn-cgi/access/login');
+  }
 
   bool _isRedirect(int status) =>
       status == 301 || status == 302 || status == 303 ||
