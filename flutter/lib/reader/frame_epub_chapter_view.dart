@@ -1310,21 +1310,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         children: spans,
       );
       final plainText = StringBuffer();
-      var cursor = 0;
 
       void collect(InlineSpan span) {
         if (span is TextSpan) {
           final value = span.text;
           if (value != null && value.isNotEmpty) {
             plainText.write(value);
-            cursor += value.length;
           }
           for (final child in span.children ?? const <InlineSpan>[]) {
             collect(child);
           }
         } else if (span is WidgetSpan) {
           plainText.write('\uFFFC');
-          cursor++;
         }
       }
 
