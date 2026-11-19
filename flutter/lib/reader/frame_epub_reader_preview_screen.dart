@@ -150,7 +150,8 @@ class _FrameEpubReaderPreviewScreenState
     _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme : 'dark';
     final layoutMode =
         appearance['frameFlutterLayoutMode']?.toString() ?? 'continuous';
-    _layoutMode = const {'continuous', 'paginated'}.contains(layoutMode)
+    _layoutMode = const {'continuous', 'paginated', 'doublePage'}
+            .contains(layoutMode)
         ? layoutMode
         : 'continuous';
   }
@@ -450,7 +451,7 @@ class _FrameEpubReaderPreviewScreenState
                 child: FrameEpubPageTurnSurface(
                   controller: _chapterScrollController,
                   pageController: _chapterPageController,
-                  paginated: _layoutMode == 'paginated' && !session.isFixedLayout,
+                  paginated: _layoutMode != 'continuous' && !session.isFixedLayout,
                   fixedLayout: session.isFixedLayout,
                   isRightToLeft: session.epub?.pageProgressionDirection ==
                       FrameEpubPageProgressionDirection.rightToLeft,
@@ -471,7 +472,9 @@ class _FrameEpubReaderPreviewScreenState
                     chapter: chapter,
                     resourceLoader: session.resourceLoader!,
                     fixedLayout: session.isFixedLayout,
-                    paginated: _layoutMode == 'paginated' && !session.isFixedLayout,
+                    paginated: _layoutMode != 'continuous' && !session.isFixedLayout,
+                    doublePageSpread:
+                        _layoutMode == 'doublePage' && !session.isFixedLayout,
                     isRightToLeft:
                         session.epub?.pageProgressionDirection ==
                             FrameEpubPageProgressionDirection.rightToLeft,
@@ -1442,8 +1445,25 @@ class _FrameEpubReaderPreviewScreenState
                               () => layoutMode = 'paginated',
                             ),
                   ),
+                  ChoiceChip(
+                    label: const Text('雙頁跨頁'),
+                    selected: layoutMode == 'doublePage',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'doublePage',
+                            ),
+                  ),
                 ],
               ),
+              if (!session.isFixedLayout)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    '雙頁模式會在寬螢幕並排顯示；窄螢幕會自動退回單頁。',
+                    style: TextStyle(color: _readerMuted, fontSize: 11),
+                  ),
+                ),
               if (session.isFixedLayout)
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
