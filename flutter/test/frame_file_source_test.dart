@@ -116,7 +116,7 @@ void main() {
         onClose: () {},
       );
 
-      expect(response.stream, emitsInOrder([
+      await expectLater(response.stream, emitsInOrder([
         [1, 2],
         [3, 4],
       ]));
