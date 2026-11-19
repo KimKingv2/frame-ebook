@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/frame_app_config.dart';
 import 'frame_book.dart';
 import 'frame_reader_engine.dart';
+import '../reader/frame_epub_reader_preview_screen.dart';
 
 class FrameReaderScreen extends StatefulWidget {
   const FrameReaderScreen({
@@ -99,6 +100,18 @@ class _FrameReaderScreenState extends State<FrameReaderScreen> {
             tooltip: '切換全螢幕閱讀',
             onPressed: () => _engine.send('toggle-fullscreen'),
             icon: const Icon(Icons.fullscreen_rounded),
+          ),
+          IconButton(
+            tooltip: '開啟 Flutter EPUB 預覽',
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      FrameEpubReaderPreviewScreen(book: widget.book),
+                ),
+              );
+            },
+            icon: const Icon(Icons.auto_stories_outlined),
           ),
           IconButton(
             tooltip: '重新載入閱讀室',
