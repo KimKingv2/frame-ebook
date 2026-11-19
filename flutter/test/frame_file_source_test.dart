@@ -156,7 +156,7 @@ void main() {
       var closeCount = 0;
       final response = FrameFileResponse(
         statusCode: 200,
-        stream: const Stream<List<int>>.empty(),
+        stream: Stream<List<int>>.fromIterable(const <List<int>>[]),
         onClose: () async {
           closeCount++;
         },
@@ -173,7 +173,7 @@ void main() {
     test('keeps failed HTTP status visible to the caller', () {
       final response = FrameFileResponse(
         statusCode: 416,
-        stream: const Stream<List<int>>.empty(),
+        stream: Stream<List<int>>.fromIterable(const <List<int>>[]),
         onClose: () {},
         headers: const {
           'Content-Range': 'bytes */10',
