@@ -75,7 +75,8 @@ Uint8List _fixture() {
 </package>
 ''';
   const chapter = '''
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:epub="http://www.idpf.org/2007/ops">
   <head><title>Widget fixture</title></head>
   <body>
     <h1>閱讀畫面測試</h1>
