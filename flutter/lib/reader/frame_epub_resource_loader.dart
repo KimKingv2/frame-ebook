@@ -323,7 +323,7 @@ class FrameEpubResourceLoader {
               break;
             }
           }
-          if (!rel.split(RegExp(r'\\s+')).contains('stylesheet')) continue;
+          if (!rel.split(RegExp(r'\s+')).contains('stylesheet')) continue;
         }
         final role = _documentAttributeRole(name, attributeName);
         if (role == null) continue;
@@ -833,6 +833,6 @@ bool _isHexDigit(int unit) =>
     (unit >= 0x61 && unit <= 0x66);
 
 Set<String> _tokens(String value) => value
-    .split(RegExp(r'\\s+'))
+    .split(RegExp(r'\s+'))
     .where((token) => token.isNotEmpty)
     .toSet();
