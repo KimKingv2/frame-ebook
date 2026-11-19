@@ -312,7 +312,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
       if (tag == 'br') {
         inlineSpans.add(const TextSpan(text: '\n'));
-      } else if (_isBlockElement(tag, childStyle)) {
+      } else if (_isBlockElement(tag, childStyle) ||
+          (widget.fixedLayout && tag == 'img')) {
         flushInline();
         widgets.add(_buildBlock(child, childStyle, cascade));
       } else {
@@ -1035,23 +1036,28 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
                     ? availableWidth * dpr
                     : 1600)
                 .round()
-                .clamp(96, 2048);
+                .clamp(96, 2048)
+                .toInt();
+            final image = Image.memory(
+              snapshot.data!,
+              fit: widget.fit,
+              cacheWidth: cacheWidth,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined,
+                color: Color(0xFF8F829F),
+              ),
+              semanticLabel: widget.alt,
+            );
+            if (widget.maxWidth.isInfinite && widget.maxHeight.isInfinite) {
+              return SizedBox.expand(child: image);
+            }
             return ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: widget.maxWidth,
                 maxHeight: widget.maxHeight,
               ),
-              child: Image.memory(
-                snapshot.data!,
-                fit: widget.fit,
-                cacheWidth: cacheWidth,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.broken_image_outlined,
-                  color: Color(0xFF8F829F),
-                ),
-                semanticLabel: widget.alt,
-              ),
+              child: image,
             );
           },
         );
