@@ -59,6 +59,9 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
   final layoutMeta = fixedLayout
       ? '<meta property="rendition:layout">pre-paginated</meta>'
       : '';
+  final imageManifest = fixedLayout
+      ? '<item id="page-image" href="Images/page.png" media-type="image/png"/>'
+      : '';
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
@@ -74,15 +77,14 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
       media-type="application/xhtml+xml"/>
     <item id="notes" href="Text/notes.xhtml"
       media-type="application/xhtml+xml"/>
+    $imageManifest
   </manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
 ''';
-  final chapter = '''
-<html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:epub="http://www.idpf.org/2007/ops">
-  <head><title>Widget fixture</title></head>
-  <body>
+  final chapterBody = fixedLayout
+      ? '<img src="../Images/page.png" alt="漫畫頁" style="width:100%;height:100%"/>'
+      : '''
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
@@ -95,7 +97,12 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
       <a role="doc-backlink" href="#note-ref-1">返回正文</a>
     </aside>
     <p id="inside">章節目標</p>
-  </body>
+    ''';
+  final chapter = '''
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:epub="http://www.idpf.org/2007/ops">
+  <head><title>Widget fixture</title></head>
+  <body>$chapterBody</body>
 </html>
 ''';
   const notes = '''
@@ -114,6 +121,13 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
     _ZipItem('OPS/book.opf', utf8.encode(package)),
     _ZipItem('OPS/Text/chapter.xhtml', utf8.encode(chapter)),
     _ZipItem('OPS/Text/notes.xhtml', utf8.encode(notes)),
+    if (fixedLayout)
+      _ZipItem(
+        'OPS/Images/page.png',
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      ),
   ]);
 }
 
@@ -451,7 +465,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('閱讀畫面測試'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(
@@ -469,7 +483,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('閱讀畫面測試'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
