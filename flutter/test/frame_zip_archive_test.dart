@@ -178,8 +178,8 @@ void main() {
 
     setUp(() async {
       fixture = _zipFixture([
-        const _ZipItem('mimetype', 'application/epub+zip'.codeUnits),
-        const _ZipItem(
+        _ZipItem('mimetype', 'application/epub+zip'.codeUnits),
+        _ZipItem(
           'OEBPS/chapter.xhtml',
           '<html><body>FRAME EPUB range reader</body></html>'.codeUnits,
           deflate: true,
