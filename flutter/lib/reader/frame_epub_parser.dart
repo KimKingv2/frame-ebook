@@ -95,8 +95,10 @@ class FrameEpubSpineItem {
     required this.idref,
     required this.item,
     required this.linear,
+    this.itemrefId = '',
   });
 
+  final String itemrefId;
   final String idref;
   final FrameEpubManifestItem item;
   final bool linear;
@@ -538,6 +540,7 @@ List<FrameEpubSpineItem> _parseSpine(
         idref: idref,
         item: item,
         linear: linearValue != 'no',
+        itemrefId: _attribute(itemref, 'id') ?? '',
       ),
     );
   }
