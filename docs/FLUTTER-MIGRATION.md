@@ -47,6 +47,7 @@ Original EPUB/CBZ archives are read-only source files. Do not create full-archiv
 - R2 cover retrieval with bounded in-memory cache.
 - Basic title, author and shelf metadata editing.
 - Opt-in Flutter EPUB Preview reader: continuous scrolling and single-page and responsive two-page spread pagination; long rich-text paragraphs split at rendered line boundaries with original XHTML text offsets retained for CFI selection and annotations. Image loading triggers in-memory remeasurement. Inline widget content and custom padded/background blocks remain intact rather than being force-split; two-page spreads are supported on wide layouts and fall back to single-page pagination on narrow screens.
+- Unified EPUB navigation drawer with nested TOC, separate bookmark and note tabs, annotation deletion/edit actions, CFI jump navigation, a bottom-sheet presentation on compact widths and a right-side drawer on wide layouts. Device-level visual and interaction parity remains pending.
 - Main Reader, Cloud Manager and Statistics routes remain available through a compatibility bridge while each feature is being ported.
 
 These items must still pass CI and device verification before being treated as complete. Other checklist items remain open.
