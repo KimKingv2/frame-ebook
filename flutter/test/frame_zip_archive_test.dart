@@ -69,16 +69,16 @@ class _MemoryFrameFileSource implements FrameFileSource {
 
 FrameBook _book(int size) {
   return FrameBook.fromJson({
-    'id': 'cbz-1',
+    'id': 'epub-zip-1',
     'provider': 'vps',
-    'library': 'comics',
-    'rootPath': '/Comics',
-    'path': '/Comics/Volume01.cbz',
-    'fileName': 'Volume01.cbz',
+    'library': 'books',
+    'rootPath': '/Books',
+    'path': '/Books/Fixture.epub',
+    'fileName': 'Fixture.epub',
     'title': 'Volume 01',
     'author': '',
-    'format': 'CBZ',
-    'shelf': 'comics',
+    'format': 'EPUB',
+    'shelf': 'books',
     'size': size,
   });
 }
@@ -236,7 +236,7 @@ void main() {
       );
     });
 
-    test('reads one CBZ page entry without materializing the archive', () async {
+    test('reads one EPUB image resource without materializing the archive', () async {
       final entry = archive.file('OEBPS/images/page-001.jpg');
       expect(entry, isNotNull);
 
