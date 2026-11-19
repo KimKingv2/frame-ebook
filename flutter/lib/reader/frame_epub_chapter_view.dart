@@ -192,7 +192,14 @@ class FrameEpubChapterView extends StatefulWidget {
     this.linkColor = const Color(0xFFBFA4FF),
     this.fontFamily = 'NotoSansTC',
     this.fontSize = 18,
-    this.lineHeight = 1.75,
+    this.lineHeight = 1.65,
+    this.fontScale = 1,
+    this.fontFamilyPreference = 'original',
+    this.fontWeightPreference = 'original',
+    this.paragraphSpacingPreference = 'original',
+    this.textAlignPreference = 'original',
+    this.verticalMargin = 16,
+    this.horizontalMarginPercent = 7,
     this.contentMaxWidth = 760,
     this.horizontalPadding = 26,
     this.maxImageBytes = 16 * 1024 * 1024,
@@ -227,6 +234,13 @@ class FrameEpubChapterView extends StatefulWidget {
   final String fontFamily;
   final double fontSize;
   final double lineHeight;
+  final double fontScale;
+  final String fontFamilyPreference;
+  final String fontWeightPreference;
+  final String paragraphSpacingPreference;
+  final String textAlignPreference;
+  final double verticalMargin;
+  final double horizontalMarginPercent;
   final double contentMaxWidth;
   final double horizontalPadding;
   final int maxImageBytes;
@@ -316,6 +330,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           oldWidget.pageController != widget.pageController ||
           oldWidget.fontSize != widget.fontSize ||
           oldWidget.lineHeight != widget.lineHeight ||
+          oldWidget.fontScale != widget.fontScale ||
+          oldWidget.fontFamilyPreference != widget.fontFamilyPreference ||
+          oldWidget.fontWeightPreference != widget.fontWeightPreference ||
+          oldWidget.paragraphSpacingPreference != widget.paragraphSpacingPreference ||
+          oldWidget.textAlignPreference != widget.textAlignPreference ||
+          oldWidget.verticalMargin != widget.verticalMargin ||
+          oldWidget.horizontalMarginPercent != widget.horizontalMarginPercent ||
           oldWidget.contentMaxWidth != widget.contentMaxWidth ||
           oldWidget.horizontalPadding != widget.horizontalPadding) {
         _resetPaginationMeasurement();
@@ -417,7 +438,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         final baseStyle = <String, String>{
           'display': 'block',
           'font-family': widget.fontFamily,
-          'font-size': '${widget.fontSize}px',
+          'font-size': '${widget.fontSize * widget.fontScale}px',
           'line-height': '${widget.lineHeight}',
           'color': _colorToCss(widget.textColor),
           'white-space': 'normal',
@@ -492,7 +513,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                   controller: widget.scrollController,
                   padding: EdgeInsets.symmetric(
                     horizontal: widget.horizontalPadding,
-                    vertical: 30,
+                    vertical: widget.verticalMargin.clamp(8, 64),
                   ),
                   children: _flowChildren(
                     body,
@@ -642,7 +663,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         controller: widget.scrollController,
         padding: EdgeInsets.symmetric(
           horizontal: widget.horizontalPadding,
-          vertical: 30,
+          vertical: widget.verticalMargin.clamp(8, 64),
         ),
         children: _flowChildren(body, bodyStyle, cascade),
       );
@@ -654,16 +675,20 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         widget.doublePageSpread && viewportSize.width >= 760;
     _paginationSpreadActive = spreadActive;
 
-    final singlePageWidth = viewportSize.width < widget.contentMaxWidth
-        ? viewportSize.width
+    final outerMargin = viewportSize.width *
+        widget.horizontalMarginPercent.clamp(0, 20) / 100;
+    final pageAreaWidth =
+        (viewportSize.width - outerMargin * 2).clamp(1.0, viewportSize.width);
+    final singlePageWidth = pageAreaWidth < widget.contentMaxWidth
+        ? pageAreaWidth
         : widget.contentMaxWidth;
     final spreadWidthLimit = widget.contentMaxWidth * 2 + spreadGutter;
-    final spreadWidth = viewportSize.width < spreadWidthLimit
-        ? viewportSize.width
-        : spreadWidthLimit;
+    final spreadWidth =
+        pageAreaWidth < spreadWidthLimit ? pageAreaWidth : spreadWidthLimit;
     final pageWidth =
         spreadActive ? (spreadWidth - spreadGutter) / 2 : singlePageWidth;
-    final availableHeight = viewportSize.height - 60;
+    final availableHeight =
+        viewportSize.height - widget.verticalMargin.clamp(8, 64) * 2;
     _paginationTextKeyCursor = 0;
     _paginationTextPositions.clear();
     final items = _flowChildren(
@@ -702,7 +727,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                   child: Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: widget.horizontalPadding,
-                      vertical: 30,
+                      vertical: widget.verticalMargin.clamp(8, 64),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -751,7 +776,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: widget.horizontalPadding,
-            vertical: 30,
+            vertical: widget.verticalMargin.clamp(8, 64),
           ),
           child: content,
         ),
@@ -2003,6 +2028,31 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       widget.fontSize,
     );
     style['font-size'] = '${size}px';
+
+    final tag = element.name.local.toLowerCase();
+    if (widget.fontFamilyPreference != 'original' &&
+        const {'p', 'li', 'blockquote', 'dd', 'dt', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+            .contains(tag)) {
+      style['font-family'] =
+          widget.fontFamilyPreference == 'serif' ? 'serif' : 'NotoSansTC';
+    }
+    if (widget.fontWeightPreference != 'original' &&
+        const {'p', 'li', 'blockquote', 'dd', 'dt'}.contains(tag)) {
+      style['font-weight'] =
+          widget.fontWeightPreference == 'medium' ? '500' : '400';
+    }
+    if (widget.textAlignPreference != 'original' &&
+        const {'p', 'li', 'blockquote', 'dd', 'dt'}.contains(tag)) {
+      style['text-align'] = widget.textAlignPreference;
+    }
+    if (widget.paragraphSpacingPreference != 'original' && tag == 'p') {
+      style['margin-block-end'] = switch (widget.paragraphSpacingPreference) {
+        'compact' => '0.4em',
+        'standard' => '0.8em',
+        'loose' => '1.2em',
+        _ => style['margin-block-end'] ?? '0',
+      };
+    }
     return style;
   }
 
@@ -2180,7 +2230,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         .replaceAll("'", '');
     if (const {'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'}
         .contains(first.toLowerCase())) {
-      return first.toLowerCase() == 'monospace' ? 'monospace' : fallback;
+      return switch (first.toLowerCase()) {
+        'monospace' => 'monospace',
+        'serif' => 'serif',
+        _ => fallback,
+      };
     }
     if (const {'NotoSansTC', 'NotoSansSCFallback'}.contains(first)) {
       return first;
