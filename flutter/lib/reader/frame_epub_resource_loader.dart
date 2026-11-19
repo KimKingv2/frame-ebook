@@ -831,8 +831,3 @@ bool _isHexDigit(int unit) =>
     (unit >= 0x30 && unit <= 0x39) ||
     (unit >= 0x41 && unit <= 0x46) ||
     (unit >= 0x61 && unit <= 0x66);
-
-Set<String> _tokens(String value) => value
-    .split(RegExp(r'\s+'))
-    .where((token) => token.isNotEmpty)
-    .toSet();
