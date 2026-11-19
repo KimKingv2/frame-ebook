@@ -324,6 +324,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   @override
   void didUpdateWidget(covariant FrameEpubChapterView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.fixedLayoutImageFit != widget.fixedLayoutImageFit ||
+        oldWidget.fixedLayoutAllowZoom != widget.fixedLayoutAllowZoom) {
+      _fixedLayoutTransformationController.value = Matrix4.identity();
+    }
     if (!identical(oldWidget.chapter, widget.chapter) ||
         !identical(oldWidget.resourceLoader, widget.resourceLoader)) {
       _stylesFuture = _loadStylesheets();
