@@ -55,7 +55,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
       length: 3,
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 2).toInt(),
-    );
+    )..addListener(_handleTabControllerChanged);
+  }
+
+  void _handleTabControllerChanged() {
+    if (!mounted || _tabController.indexIsChanging) return;
+    setState(() {});
   }
 
   @override
@@ -68,6 +73,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabControllerChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -132,16 +138,15 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
             ),
           ),
           const Divider(height: 1, color: Color(0x55393247)),
-          TabBar(
-            controller: _tabController,
-            indicatorColor: _sidebarAccent,
-            labelColor: _sidebarAccent,
-            unselectedLabelColor: _sidebarMuted,
-            tabs: [
-              const Tab(text: '目錄'),
-              Tab(text: '書籤 $bookmarkCount'),
-              Tab(text: '筆記 $noteCount'),
-            ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              children: [
+                _buildTabButton('目錄', 0),
+                _buildTabButton('書籤 $bookmarkCount', 1),
+                _buildTabButton('筆記 $noteCount', 2),
+              ],
+            ),
           ),
           const Divider(height: 1, color: Color(0x33393247)),
           Expanded(
@@ -155,6 +160,37 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String label, int index) {
+    final selected = _tabController.index == index;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: TextButton(
+          onPressed: () => _tabController.animateTo(index),
+          style: TextButton.styleFrom(
+            foregroundColor: selected ? _sidebarAccent : _sidebarMuted,
+            backgroundColor:
+                selected ? const Color(0x332A213B) : Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ),
       ),
     );
   }
