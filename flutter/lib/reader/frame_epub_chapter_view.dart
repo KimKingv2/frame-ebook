@@ -1299,7 +1299,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         style: _textStyle(parentStyle),
         children: spans,
       );
-      final positionedSources = <FrameEpubTextRangeSource>[];
       final plainText = StringBuffer();
       var cursor = 0;
 
@@ -1307,15 +1306,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         if (span is TextSpan) {
           final value = span.text;
           if (value != null && value.isNotEmpty) {
-            final source = sourceSpans[span];
-            if (source != null) {
-              positionedSources.add(FrameEpubTextRangeSource(
-                start: cursor,
-                end: cursor + value.length,
-                node: source.node,
-                sourceOffsets: source.sourceOffsets,
-              ));
-            }
             plainText.write(value);
             cursor += value.length;
           }
@@ -1329,7 +1319,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
 
       collect(root);
-      sourceSpans.clear();
       final displayedText = plainText.toString();
       final textAlign = _textAlign(parentStyle['text-align']);
       final textDirection = _textDirection(parentStyle['direction']);
@@ -1385,6 +1374,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               : KeyedSubtree(key: fragmentKey, child: selectable),
         );
       }
+      sourceSpans.clear();
     }
 
     for (final child in parent.children) {
