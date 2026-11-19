@@ -149,7 +149,9 @@ class _NativeFrameTransport implements FrameTransport {
       }
     }
 
-    cancellation?.whenCancelled.then((_) => abortRequest());
+    if (cancellation != null) {
+      unawaited(cancellation.whenCancelled.then((_) => abortRequest()));
+    }
 
     try {
       while (true) {
