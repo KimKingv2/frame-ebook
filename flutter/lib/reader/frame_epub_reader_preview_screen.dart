@@ -176,7 +176,9 @@ class _FrameEpubReaderPreviewScreenState
     _chapterPageController.dispose();
   }
 
-  XmlElement? _initialAnchorFor(FrameEpubReaderSession session) {
+  FrameEpubCfiLocation? _initialCfiLocationFor(
+    FrameEpubReaderSession session,
+  ) {
     final chapter = session.currentChapter;
     final epub = session.epub;
     if (chapter == null || epub == null) return null;
@@ -189,13 +191,40 @@ class _FrameEpubReaderPreviewScreenState
         document: chapter.document,
         cfi: visibleCfi,
       );
-      if (location != null) return location.anchorElement;
+      if (location != null) return location;
     }
-    return session.initialAnchor ??
+    final restoredCfi = session.initialCfi;
+    if (restoredCfi == null) return null;
+    return FrameEpubCfi.resolve(
+      book: epub,
+      document: chapter.document,
+      cfi: restoredCfi,
+    );
+  }
+
+  XmlElement? _initialAnchorFor(FrameEpubReaderSession session) {
+    final chapter = session.currentChapter;
+    if (chapter == null) return null;
+    return _initialCfiLocationFor(session)?.anchorElement ??
+        session.initialAnchor ??
         FrameEpubCfi.anchorForFragment(
           chapter.document,
           session.currentFragment,
         );
+  }
+
+  FrameEpubCfiPoint? _initialTextPointFor(
+    FrameEpubReaderSession session,
+  ) {
+    final location = _initialCfiLocationFor(session);
+    if (location?.node is XmlText) {
+      return FrameEpubCfiPoint(
+        node: location!.node as XmlText,
+        offset: location.offset,
+      );
+    }
+    final anchor = _initialAnchorFor(session);
+    return anchor == null ? null : FrameEpubCfi.firstTextPoint(anchor);
   }
 
   double? _initialScrollFractionFor(FrameEpubReaderSession session) {
@@ -384,6 +413,7 @@ class _FrameEpubReaderPreviewScreenState
     final chapter = session.currentChapter!;
     final spineCount = session.epub?.spine.length ?? 0;
     final chapterIndex = session.currentSpineIndex ?? 0;
+    final initialTextPoint = _initialTextPointFor(session);
 
     return Column(
       children: [
@@ -449,6 +479,8 @@ class _FrameEpubReaderPreviewScreenState
                     annotations: session.annotations,
                     spineIndex: chapterIndex,
                     initialAnchor: _initialAnchorFor(session),
+                    initialTextNode: initialTextPoint?.node,
+                    initialTextOffset: initialTextPoint?.offset,
                     initialScrollFraction: _initialScrollFractionFor(session),
                     scrollController: _chapterScrollController,
                     onReadingPosition: _queueReadingPosition,
