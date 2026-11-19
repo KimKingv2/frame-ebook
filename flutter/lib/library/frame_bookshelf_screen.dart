@@ -1378,6 +1378,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     if (detailsBook != null) {
       return FrameBookDetailsScreen(
         book: detailsBook,
+        cover: _cover(detailsBook, contain: true),
         onBack: () => setState(() => _detailsBook = null),
       );
     }
