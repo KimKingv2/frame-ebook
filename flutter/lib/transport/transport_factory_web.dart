@@ -169,24 +169,6 @@ class _BrowserFrameTransport implements FrameTransport {
     late final StreamController<List<int>> controller;
     var paused = false;
     Completer<void>? resumeSignal;
-    controller = StreamController<List<int>>(
-      onListen: () => unawaited(pumpFetchBody()),
-      onPause: () {
-        paused = true;
-        resumeSignal ??= Completer<void>();
-      },
-      onResume: () {
-        paused = false;
-        final signal = resumeSignal;
-        if (signal != null && !signal.isCompleted) signal.complete();
-        resumeSignal = null;
-      },
-      onCancel: () async {
-        abortRequest();
-      },
-    );
-    bodyController = controller;
-    reader = response.body?.getReader();
 
     Future<void> pumpFetchBody() async {
       final currentReader = reader;
@@ -216,6 +198,25 @@ class _BrowserFrameTransport implements FrameTransport {
         }
       }
     }
+
+    controller = StreamController<List<int>>(
+      onListen: () => unawaited(pumpFetchBody()),
+      onPause: () {
+        paused = true;
+        resumeSignal ??= Completer<void>();
+      },
+      onResume: () {
+        paused = false;
+        final signal = resumeSignal;
+        if (signal != null && !signal.isCompleted) signal.complete();
+        resumeSignal = null;
+      },
+      onCancel: () async {
+        abortRequest();
+      },
+    );
+    bodyController = controller;
+    reader = response.body?.getReader();
 
     return FrameFileResponse(
       statusCode: response.status,
