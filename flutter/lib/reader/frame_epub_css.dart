@@ -642,7 +642,6 @@ int _skipWhitespace(String value, int index) {
 
 List<_CssDeclaration> _parseDeclarations(String css, int startOrder) {
   final declarations = <_CssDeclaration>[];
-  var index = 0;
   var order = startOrder;
   for (final raw in _splitCssList(css, separator: ';')) {
     final colon = _findDeclarationColon(raw);
