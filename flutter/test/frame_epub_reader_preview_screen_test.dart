@@ -1,0 +1,104 @@
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:frame_ebook/core/frame_api_client.dart';
+import 'package:frame_ebook/library/frame_book.dart';
+import 'package:frame_ebook/library/frame_reader_repository.dart';
+import 'package:frame_ebook/reader/frame_epub_reader_preview_screen.dart';
+import 'package:frame_ebook/transport/frame_file_source.dart';
+import 'package:material_ui/material_ui.dart';
+
+class _PreviewApi implements FrameApiClient {
+  @override
+  Future<Map<String, dynamic>> getJson(String path) async {
+    switch (Uri.parse(path).path) {
+      case '/api/reading/state':
+        return {'state': <String, dynamic>{}};
+      case '/api/reading/annotations':
+        return {'annotations': <dynamic>[]};
+      default:
+        throw StateError('Unexpected GET $path');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async =>
+      {'ok': true, 'state': body['state']};
+
+  @override
+  Future<Map<String, dynamic>> deleteJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async =>
+      {'ok': true};
+
+  @override
+  Future<Uint8List> getBytes(String path) async => Uint8List(0);
+
+  @override
+  void close() {}
+}
+
+class _FailingFileSource implements FrameFileSource {
+  @override
+  Future<FrameFileResponse> open(FrameFileRequest request) async {
+    throw StateError('test source is offline');
+  }
+}
+
+FrameBook _testBook({String format = 'EPUB'}) => FrameBook.fromJson({
+      'id': 'flutter-reader-preview-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/preview.epub',
+      'fileName': 'preview.epub',
+      'title': 'Preview test book',
+      'author': 'FRAME',
+      'format': format,
+      'shelf': 'books',
+      'size': 1024,
+    });
+
+void main() {
+  testWidgets('shows a recoverable error when the EPUB source fails',
+      (tester) async {
+    final repository = FrameReaderRepository(_PreviewApi());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FrameEpubReaderPreviewScreen(
+          book: _testBook(),
+          fileSource: _FailingFileSource(),
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preview test book'), findsOneWidget);
+    expect(find.text('無法開啟 Flutter EPUB 預覽'), findsOneWidget);
+    expect(find.textContaining('test source is offline'), findsOneWidget);
+    expect(find.text('返回舊版閱讀室'), findsOneWidget);
+  });
+
+  testWidgets('rejects non-EPUB files before opening a cloud source',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FrameEpubReaderPreviewScreen(
+          book: _testBook(format: 'CBZ'),
+          fileSource: _FailingFileSource(),
+          repository: FrameReaderRepository(_PreviewApi()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('無法開啟 Flutter EPUB 預覽'), findsOneWidget);
+    expect(find.textContaining('只接受 EPUB'), findsOneWidget);
+  });
+}
