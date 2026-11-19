@@ -371,7 +371,8 @@ class FrameEpubCfi {
     return output.toString();
   }
 
-  static _ParsedCfi? _parse(String source) {
+  static _ParsedCfi? _parse(String? source) {
+    if (source == null) return null;
     var value = source.trim();
     if (!value.startsWith('epubcfi(') || !value.endsWith(')')) return null;
     value = value.substring(8, value.length - 1);
