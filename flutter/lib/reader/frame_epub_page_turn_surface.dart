@@ -129,7 +129,9 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     final horizontalSwipe = elapsed <= _swipeDuration &&
         dx.abs() >= _swipeDistance &&
         dx.abs() >= dy.abs() * 1.25;
-    if (horizontalSwipe) {
+    // PageView owns horizontal drag gestures in paginated mode. Handling
+    // the same pointer-up here would enqueue a second page turn.
+    if (horizontalSwipe && !widget.paginated) {
       final forward = widget.isRightToLeft ? dx > 0 : dx < 0;
       unawaited(_turnPage(forward: forward));
       return;
