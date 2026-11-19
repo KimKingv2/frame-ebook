@@ -2009,6 +2009,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
+      useViewportBounds: widget.fixedLayout,
       maxWidth: fixedDimension(style['width']) ??
           (widget.fixedLayout
               ? pageSize?.width ?? double.infinity
@@ -2478,6 +2479,7 @@ class _FrameEpubImage extends StatefulWidget {
     required this.fit,
     required this.maxWidth,
     required this.maxHeight,
+    this.useViewportBounds = false,
     required this.alt,
     this.onLayoutChanged,
   });
@@ -2488,6 +2490,7 @@ class _FrameEpubImage extends StatefulWidget {
   final BoxFit fit;
   final double maxWidth;
   final double maxHeight;
+  final bool useViewportBounds;
   final String alt;
   final VoidCallback? onLayoutChanged;
 
@@ -2584,6 +2587,21 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
             final maxHeight = widget.maxHeight.isFinite
                 ? widget.maxHeight
                 : constraints.maxHeight;
+            if (widget.useViewportBounds &&
+                maxWidth.isFinite &&
+                maxHeight.isFinite &&
+                widget.fit == BoxFit.contain) {
+              return SizedBox(
+                width: maxWidth,
+                height: maxHeight,
+                child: image,
+              );
+            }
+            if (widget.useViewportBounds &&
+                maxWidth.isFinite &&
+                widget.fit == BoxFit.fitWidth) {
+              return SizedBox(width: maxWidth, child: image);
+            }
             if (maxWidth.isFinite && maxHeight.isFinite) {
               return ConstrainedBox(
                 constraints: BoxConstraints(
