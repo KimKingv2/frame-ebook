@@ -98,6 +98,38 @@ class NativeBuildPolicyTests(unittest.TestCase):
             (False, False),
         )
 
+    def test_xml_parser_dependency_is_dart_only(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "  web: ^1.1.1\n",
+            "  web: ^1.1.1\n  xml: ^7.1.0\n",
+        )
+        self.assertTrue(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+
+        after_lock = BASE_LOCK.replace(
+            "  webview_flutter:\n",
+            "  args:\n"
+            "    dependency: transitive\n"
+            "    source: hosted\n"
+            '    version: "2.7.0"\n'
+            "  petitparser:\n"
+            "    dependency: transitive\n"
+            "    source: hosted\n"
+            '    version: "7.1.0"\n'
+            "  xml:\n"
+            "    dependency: direct main\n"
+            "    source: hosted\n"
+            '    version: "7.1.0"\n'
+            "  webview_flutter:\n",
+        )
+        self.assertTrue(lockfile_change_is_dart_only(BASE_LOCK, after_lock))
+        self.assertEqual(
+            native_targets(
+                ["flutter/pubspec.yaml", "flutter/pubspec.lock"],
+                dart_only_dependency_manifests=True,
+            ),
+            (False, False),
+        )
+
     def test_native_plugin_dependency_addition_still_rebuilds_apps(self) -> None:
         after = BASE_PUBSPEC.replace(
             "  web: ^1.1.1\n",

@@ -6,7 +6,7 @@ Flutter/Dart is the only feature and product-logic source for Web, Android and m
 
 The shared Flutter core owns:
 
-- EPUB and CBZ reading behaviour and parsing.
+- EPUB reading behaviour and parsing, including reflowable books and fixed-layout comics.
 - Bookshelf, folders, volume grouping and work details.
 - Reader UI, navigation, appearance, fullscreen and reading controls.
 - Bookmarks, highlights, notes, annotations and reading progress.
@@ -27,7 +27,7 @@ A file source should expose a streaming response with the information the reader
 - Content length, content type and content-range when present.
 - Whether the response is a full response or a partial Range response.
 
-The interface must support bounded Range reads for EPUB ZIP metadata/cover extraction and normal streaming for the active reading session.
+The interface must support bounded Range reads for EPUB ZIP metadata and cover extraction and normal streaming for the active reading session.
 
 ### 2. One native transport core for Android and macOS
 
@@ -40,7 +40,7 @@ Required native transport behaviour:
 - Disable automatic redirect following for file delivery. Inspect each redirect and follow it explicitly so credentials are never copied to a signed storage URL.
 - Preserve valid Range headers across the redirect chain.
 - Accept only HTTPS redirect targets, reject invalid targets and cap redirect hops.
-- Stream the response body. Do not buffer an entire EPUB/CBZ archive in a `Uint8List` just to hand it to the reader.
+- Stream the response body. Do not buffer an entire EPUB archive in a `Uint8List` just to hand it to the reader.
 - Cancel the HTTP request and close the response stream when the reader changes books or closes.
 
 Cookie acquisition is a platform boundary. The HTTP protocol and file-stream logic are not.
@@ -67,11 +67,11 @@ Keep platform-specific code limited to capabilities that Dart cannot safely obta
 - Reading the existing authenticated WebView cookie store for native HTTP requests.
 - System file selection or other operating-system capabilities only when a feature genuinely needs them.
 
-Do not put EPUB/CBZ parsing, reading UI, progress rules, annotation logic or general redirect logic in Kotlin, Swift or WebView JavaScript.
+Do not put EPUB parsing, reading UI, progress rules, annotation logic or general redirect logic in Kotlin, Swift or WebView JavaScript.
 
 ## Storage and backend boundaries
 
-- Original EPUB/CBZ archives remain in the configured Alist/OpenList source.
+- Original EPUB archives remain in the configured Alist/OpenList source.
 - Existing Cloudflare Pages Functions remain the authenticated boundary for catalog validation, provider credentials and same-origin Web streaming.
 - D1 remains authoritative for user-specific reading progress, appearance, bookmarks, notes and reading events.
 - Private R2 remains the cover-thumbnail store.
@@ -110,7 +110,7 @@ Keep those bridges until the shared Dart transport and Flutter reader have passe
 2. **File-source contract:** add a platform-neutral streaming file-source interface and tests for response metadata, Range semantics, cancellation and errors.
 3. **Native adapter:** implement one Dart `HttpClient` adapter for Android/macOS, with the minimal cookie-store bridge and explicit credential-safe redirect handling.
 4. **Web adapter:** implement a Fetch-based same-origin streaming adapter with Range support and no native imports.
-5. **Flutter reader core:** move EPUB/CBZ parsing, reader state and reading UI into shared Flutter/Dart modules. The reader consumes only the file-source interface.
+5. **Flutter reader core:** move EPUB parsing, reader state and reading UI into shared Flutter/Dart modules. The reader consumes only the file-source interface.
 6. **Parity and retirement:** verify the complete main-branch parity inventory on Web, Android and macOS. Only then retire the legacy iframe/WebView reader bridges.
 7. **OTA release automation:** connect Shorebird app configuration and protected CI credentials, then verify a Dart-only patch on both native targets before relying on it as the normal update route.
 

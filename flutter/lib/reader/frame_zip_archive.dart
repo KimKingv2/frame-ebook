@@ -34,9 +34,9 @@ class FrameZipArchiveEntry {
   bool get isSafePath => !_entry.pathEscapedRoot;
 }
 
-/// Read-only ZIP/CBZ archive backed by bounded requests to the original file.
+/// Read-only ZIP archive backed by bounded requests to the original file.
 ///
-/// This class never downloads the complete EPUB/CBZ container. ZIP metadata
+/// This class never downloads the complete EPUB container. ZIP metadata
 /// and individual entries are read through the shared FrameFileSource API.
 class FrameZipArchive {
   FrameZipArchive._(this._reader, this._source) {
