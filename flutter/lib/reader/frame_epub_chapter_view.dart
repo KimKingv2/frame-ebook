@@ -182,6 +182,9 @@ class FrameEpubChapterView extends StatefulWidget {
     required this.chapter,
     required this.resourceLoader,
     this.fixedLayout = false,
+    this.fixedLayoutImageFit = 'fit-page',
+    this.fixedLayoutAllowZoom = true,
+    this.fixedLayoutBackdropDecoration,
     this.paginated = false,
     this.doublePageSpread = false,
     this.isRightToLeft = false,
@@ -223,6 +226,9 @@ class FrameEpubChapterView extends StatefulWidget {
   final FrameEpubChapterDocument chapter;
   final FrameEpubResourceLoader resourceLoader;
   final bool fixedLayout;
+  final String fixedLayoutImageFit;
+  final bool fixedLayoutAllowZoom;
+  final BoxDecoration? fixedLayoutBackdropDecoration;
   final bool paginated;
   final bool doublePageSpread;
   final bool isRightToLeft;
@@ -450,15 +456,29 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         if (!widget.fixedLayout) _scheduleInitialRestore();
 
         if (widget.fixedLayout) {
-          return ColoredBox(
-            color: widget.backgroundColor,
+          return DecoratedBox(
+            decoration: widget.fixedLayoutBackdropDecoration ??
+                BoxDecoration(color: widget.backgroundColor),
             child: LayoutBuilder(
-              builder: (context, constraints) => InteractiveViewer(
-                transformationController: _fixedLayoutTransformationController,
-                minScale: 1,
-                maxScale: 4,
-                boundaryMargin: const EdgeInsets.all(24),
-                child: SizedBox(
+              builder: (context, constraints) {
+                final page = _buildFlow(
+                  body,
+                  bodyStyle,
+                  snapshot.data!.cascade,
+                );
+                if (widget.fixedLayoutImageFit == 'fit-width') {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      child: page,
+                    ),
+                  );
+                }
+
+                final canvas = SizedBox(
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
                   child: Center(
@@ -467,15 +487,20 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                         maxWidth: constraints.maxWidth,
                         maxHeight: constraints.maxHeight,
                       ),
-                      child: _buildFlow(
-                        body,
-                        bodyStyle,
-                        snapshot.data!.cascade,
-                      ),
+                      child: page,
                     ),
                   ),
-                ),
-              ),
+                );
+                if (!widget.fixedLayoutAllowZoom) return canvas;
+                return InteractiveViewer(
+                  transformationController:
+                      _fixedLayoutTransformationController,
+                  minScale: 1,
+                  maxScale: 4,
+                  boundaryMargin: const EdgeInsets.all(24),
+                  child: canvas,
+                );
+              },
             ),
           );
         }
@@ -1957,14 +1982,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _imagePlaceholder('$alt（超過圖片讀取上限）');
     }
 
+    final imageFit = widget.fixedLayout
+        ? (widget.fixedLayoutImageFit == 'fit-width'
+            ? BoxFit.fitWidth
+            : BoxFit.contain)
+        : BoxFit.scaleDown;
+    double? fixedDimension(String? value) {
+      if (widget.fixedLayout && value?.trim().endsWith('%') == true) {
+        return null;
+      }
+      return _cssDimension(value, widget.fontSize);
+    }
+
     return _FrameEpubImage(
       loader: widget.resourceLoader,
       resource: resource,
       maxBytes: widget.maxImageBytes,
-      fit: widget.fixedLayout ? BoxFit.contain : BoxFit.scaleDown,
-      maxWidth: _cssDimension(style['width'], widget.fontSize) ??
+      fit: imageFit,
+      maxWidth: fixedDimension(style['width']) ??
           (block ? double.infinity : 320),
-      maxHeight: _cssDimension(style['height'], widget.fontSize) ??
+      maxHeight: fixedDimension(style['height']) ??
           (widget.fixedLayout ? double.infinity : 680),
       alt: alt,
       onLayoutChanged:
@@ -2525,16 +2562,28 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
               ),
               semanticLabel: widget.alt,
             );
-            if (widget.maxWidth.isInfinite && widget.maxHeight.isInfinite) {
-              return SizedBox.expand(child: image);
+            final maxWidth = widget.maxWidth.isFinite
+                ? widget.maxWidth
+                : constraints.maxWidth;
+            final maxHeight = widget.maxHeight.isFinite
+                ? widget.maxHeight
+                : constraints.maxHeight;
+            if (maxWidth.isFinite && maxHeight.isFinite) {
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: maxWidth,
+                  maxHeight: maxHeight,
+                ),
+                child: image,
+              );
             }
-            return ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: widget.maxWidth,
-                maxHeight: widget.maxHeight,
-              ),
-              child: image,
-            );
+            if (maxWidth.isFinite) {
+              return SizedBox(width: maxWidth, child: image);
+            }
+            if (maxHeight.isFinite) {
+              return SizedBox(height: maxHeight, child: image);
+            }
+            return image;
           },
         );
       },
