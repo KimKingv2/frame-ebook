@@ -25,8 +25,8 @@ class FrameEpubResource {
     required this.mediaType,
     required this.size,
     required this.manifestItem,
-    required this._entry,
-  });
+    required FrameZipArchiveEntry entry,
+  }) : _entry = entry;
 
   final String path;
   final String mediaType;
@@ -183,7 +183,7 @@ class FrameEpubResourceLoader {
         mediaType: item?.mediaType ?? _mediaTypeForPath(entry.path),
         size: entry.size,
         manifestItem: item,
-        _entry: entry,
+        entry: entry,
       );
     }
   }
@@ -323,7 +323,7 @@ class FrameEpubResourceLoader {
               break;
             }
           }
-          if (!_tokens(rel).contains('stylesheet')) continue;
+          if (!rel.split(RegExp(r'\\s+')).contains('stylesheet')) continue;
         }
         final role = _documentAttributeRole(name, attributeName);
         if (role == null) continue;
@@ -831,3 +831,8 @@ bool _isHexDigit(int unit) =>
     (unit >= 0x30 && unit <= 0x39) ||
     (unit >= 0x41 && unit <= 0x46) ||
     (unit >= 0x61 && unit <= 0x66);
+
+Set<String> _tokens(String value) => value
+    .split(RegExp(r'\\s+'))
+    .where((token) => token.isNotEmpty)
+    .toSet();
