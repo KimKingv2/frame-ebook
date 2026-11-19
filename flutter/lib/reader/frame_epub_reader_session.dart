@@ -132,18 +132,25 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
     try {
       _readerState = await repository.loadState(book);
+      if (_closed) return;
       try {
         _annotations = await repository.loadAnnotations(book);
       } on Object catch (error) {
         _warning = '筆記與書籤暫時無法載入：$error';
       }
 
+      if (_closed) return;
       final archive = await FrameZipArchive.open(
         source: fileSource,
         book: book,
       );
+      if (_closed) {
+        await archive.close();
+        return;
+      }
       _archive = archive;
       final epub = await parser.parse(archive);
+      if (_closed) return;
       _epub = epub;
       final loader = FrameEpubResourceLoader(
         archive: archive,
