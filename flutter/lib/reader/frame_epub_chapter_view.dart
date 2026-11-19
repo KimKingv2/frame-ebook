@@ -2036,6 +2036,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       style['font-family'] =
           widget.fontFamilyPreference == 'serif' ? 'serif' : 'NotoSansTC';
     }
+    if (const {'p', 'li', 'blockquote', 'dd', 'dt'}.contains(tag)) {
+      // Match the Legacy Reading Room, whose line-height control overrides
+      // author declarations for normal reading text.
+      style['line-height'] = '${widget.lineHeight}';
+    }
     if (widget.fontWeightPreference != 'original' &&
         const {'p', 'li', 'blockquote', 'dd', 'dt'}.contains(tag)) {
       style['font-weight'] =
