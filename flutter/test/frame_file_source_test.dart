@@ -78,6 +78,8 @@ void main() {
           'Content-Length': '3',
           'Content-Range': 'bytes 1-3/10',
           'Accept-Ranges': 'bytes',
+          'Set-Cookie': 'sensitive=secret',
+          'Location': 'https://signed-storage.example/file',
         },
       );
 
@@ -96,6 +98,8 @@ void main() {
           'accept-ranges',
         ]),
       );
+      expect(response.headers.containsKey('set-cookie'), isFalse);
+      expect(response.headers.containsKey('location'), isFalse);
       expect(
         () => response.headers['x-test'] = 'mutable',
         throwsUnsupportedError,
