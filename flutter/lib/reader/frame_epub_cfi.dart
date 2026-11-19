@@ -22,6 +22,12 @@ class FrameEpubCfiPoint {
   final int offset;
 }
 
+class FrameEpubCfiRange {
+  const FrameEpubCfiRange({required this.start, required this.end});
+  final FrameEpubCfiLocation start;
+  final FrameEpubCfiLocation end;
+}
+
 /// Publication-level EPUB CFI support for reading progress.
 ///
 /// Point CFIs and legacy Foliate range CFIs are accepted. Range CFIs restore
@@ -60,6 +66,96 @@ class FrameEpubCfi {
         ..write(']');
     }
     return 'epubcfi(' + packageStep.toString() + '!' + localPath + ')';
+  }
+
+  /// Creates a standards-compatible EPUB CFI range for a text selection.
+  ///
+  /// The generated structure matches Foliate's legacy Reading Room format:
+  /// epubcfi(package!common-path,start-relative-path,end-relative-path).
+  /// A selection must stay inside one XHTML spine item and follow document
+  /// order. The original text nodes remain in memory only for this session.
+  static String? createRange({
+    required FrameEpubBook book,
+    required int spineIndex,
+    required XmlText startNode,
+    required int startOffset,
+    required XmlText endNode,
+    required int endOffset,
+  }) {
+    if (startOffset < 0 ||
+        startOffset > startNode.value.length ||
+        endOffset < 0 ||
+        endOffset > endNode.value.length ||
+        startNode.parent == null ||
+        endNode.parent == null) {
+      return null;
+    }
+
+    final startRoot = _documentRoot(startNode);
+    final endRoot = _documentRoot(endNode);
+    if (startRoot == null || !identical(startRoot, endRoot)) return null;
+
+    final texts = startRoot.descendants.whereType<XmlText>().toList();
+    final startIndex = texts.indexWhere((node) => identical(node, startNode));
+    final endIndex = texts.indexWhere((node) => identical(node, endNode));
+    if (startIndex < 0 ||
+        endIndex < startIndex ||
+        (startIndex == endIndex && startOffset >= endOffset)) {
+      return null;
+    }
+
+    final startCfi = create(
+      book: book,
+      spineIndex: spineIndex,
+      textNode: startNode,
+      offset: startOffset,
+    );
+    final endCfi = create(
+      book: book,
+      spineIndex: spineIndex,
+      textNode: endNode,
+      offset: endOffset,
+    );
+    if (startCfi == null || endCfi == null) return null;
+
+    final start = _parse(startCfi);
+    final end = _parse(endCfi);
+    if (start == null ||
+        end == null ||
+        start.packageSteps.length != end.packageSteps.length ||
+        !_samePath(start.packageSteps, end.packageSteps)) {
+      return null;
+    }
+
+    final startSteps = start.localSteps;
+    final endSteps = end.localSteps;
+    var commonLength = 0;
+    final limit = startSteps.length < endSteps.length
+        ? startSteps.length
+        : endSteps.length;
+    while (commonLength < limit) {
+      final a = startSteps[commonLength];
+      final b = endSteps[commonLength];
+      if (a.index != b.index ||
+          a.offset != null ||
+          b.offset != null ||
+          a.id != b.id) {
+        break;
+      }
+      commonLength++;
+    }
+
+    final parent = startSteps.take(commonLength).toList(growable: false);
+    final relativeStart =
+        startSteps.skip(commonLength).toList(growable: false);
+    final relativeEnd = endSteps.skip(commonLength).toList(growable: false);
+    if (relativeStart.isEmpty || relativeEnd.isEmpty) return null;
+
+    final packagePath = _serializeSteps(start.packageSteps);
+    final parentPath = _serializeSteps(parent);
+    final startPath = _serializeSteps(relativeStart);
+    final endPath = _serializeSteps(relativeEnd);
+    return 'epubcfi($packagePath!$parentPath,$startPath,$endPath)';
   }
 
   /// Creates a page-level CFI for fixed-layout content that has no text node,
@@ -118,10 +214,48 @@ class FrameEpubCfi {
     if (parsed == null) return null;
     final spineIndex = spineIndexFromCfi(book, cfi);
     if (spineIndex == null) return null;
+    return _resolveLocalSteps(
+      document: document,
+      spineIndex: spineIndex,
+      steps: parsed.localSteps,
+    );
+  }
 
+  /// Resolves both endpoints of a range CFI. Point CFIs return null.
+  static FrameEpubCfiRange? resolveRange({
+    required FrameEpubBook book,
+    required XmlDocument document,
+    required String cfi,
+  }) {
+    final parsed = _parse(cfi);
+    final endSteps = parsed?.rangeEndSteps;
+    if (parsed == null || endSteps == null) return null;
+    final spineIndex = spineIndexFromCfi(book, cfi);
+    if (spineIndex == null) return null;
+    final start = _resolveLocalSteps(
+      document: document,
+      spineIndex: spineIndex,
+      steps: parsed.localSteps,
+    );
+    final end = _resolveLocalSteps(
+      document: document,
+      spineIndex: spineIndex,
+      steps: endSteps,
+    );
+    if (start == null || end == null) return null;
+    if (start.node is! XmlText || end.node is! XmlText) return null;
+    return FrameEpubCfiRange(start: start, end: end);
+  }
+
+  static FrameEpubCfiLocation? _resolveLocalSteps({
+    required XmlDocument document,
+    required int spineIndex,
+    required List<_ParsedCfiStep> steps,
+  }) {
+    if (steps.isEmpty) return null;
     XmlNode current = document.rootElement;
-    for (var i = 0; i < parsed.localSteps.length; i++) {
-      final step = parsed.localSteps[i];
+    for (var i = 0; i < steps.length; i++) {
+      final step = steps[i];
       final children = _indexedChildren(current);
       if (step.index < 0 || step.index >= children.length) return null;
       final target = children[step.index];
@@ -140,7 +274,7 @@ class FrameEpubCfi {
 
       if (target is _CfiTextRun) {
         final point = _textPointAt(target, step.offset ?? 0);
-        if (point == null || i != parsed.localSteps.length - 1) return null;
+        if (point == null || i != steps.length - 1) return null;
         return FrameEpubCfiLocation(
           spineIndex: spineIndex,
           node: point.node,
@@ -150,16 +284,16 @@ class FrameEpubCfi {
 
       if (target is _CfiVirtualText) {
         final point = _virtualTextPoint(current, target);
-        if (point != null && i == parsed.localSteps.length - 1) {
+        if (point != null && i == steps.length - 1) {
           return FrameEpubCfiLocation(
             spineIndex: spineIndex,
             node: point.node,
             offset: point.offset,
           );
         }
-        if (i != parsed.localSteps.length - 1) return null;
+        if (i != steps.length - 1) return null;
       }
-      if (i == parsed.localSteps.length - 1) {
+      if (i == steps.length - 1) {
         return FrameEpubCfiLocation(
           spineIndex: spineIndex,
           node: current,
@@ -173,6 +307,42 @@ class FrameEpubCfi {
       node: current,
       offset: 0,
     );
+  }
+
+  static bool _samePath(
+    List<_ParsedCfiStep> first,
+    List<_ParsedCfiStep> second,
+  ) {
+    if (first.length != second.length) return false;
+    for (var i = 0; i < first.length; i++) {
+      final a = first[i];
+      final b = second[i];
+      if (a.index != b.index || a.id != b.id || a.offset != b.offset) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static String _serializeSteps(List<_ParsedCfiStep> steps) {
+    final output = StringBuffer();
+    for (final step in steps) {
+      output
+        ..write('/')
+        ..write(step.index);
+      if (step.id != null && step.id!.isNotEmpty) {
+        output
+          ..write('[')
+          ..write(_escape(step.id!))
+          ..write(']');
+      }
+      if (step.offset != null) {
+        output
+          ..write(':')
+          ..write(step.offset);
+      }
+    }
+    return output.toString();
   }
 
   static double textFraction(
@@ -408,23 +578,38 @@ class FrameEpubCfi {
     if (value.isEmpty) return null;
 
     final rangeParts = _splitOutside(value, ',');
-    if (rangeParts.length >= 3) {
-      value = rangeParts[0] + rangeParts[1];
-    }
-
-    final indirections = _splitOutside(value, '!');
+    if (rangeParts.length != 1 && rangeParts.length != 3) return null;
+    final base = rangeParts.first;
+    final indirections = _splitOutside(base, '!');
     if (indirections.length < 2) return null;
     final packageSteps = _parseSteps(indirections.first);
-    final localSteps = _parseSteps(indirections.last);
+    final parentSteps = _parseSteps(indirections.last);
     if (packageSteps == null ||
-        localSteps == null ||
-        packageSteps.length < 2 ||
-        localSteps.isEmpty) {
+        parentSteps == null ||
+        packageSteps.length < 2) {
+      return null;
+    }
+
+    if (rangeParts.length == 1) {
+      if (parentSteps.isEmpty) return null;
+      return _ParsedCfi(
+        packageSteps: packageSteps,
+        localSteps: parentSteps,
+      );
+    }
+
+    final relativeStart = _parseSteps(rangeParts[1]);
+    final relativeEnd = _parseSteps(rangeParts[2]);
+    if (relativeStart == null ||
+        relativeEnd == null ||
+        relativeStart.isEmpty ||
+        relativeEnd.isEmpty) {
       return null;
     }
     return _ParsedCfi(
       packageSteps: packageSteps,
-      localSteps: localSteps,
+      localSteps: [...parentSteps, ...relativeStart],
+      rangeEndSteps: [...parentSteps, ...relativeEnd],
     );
   }
 
@@ -526,9 +711,11 @@ class _ParsedCfi {
   const _ParsedCfi({
     required this.packageSteps,
     required this.localSteps,
+    this.rangeEndSteps,
   });
   final List<_ParsedCfiStep> packageSteps;
   final List<_ParsedCfiStep> localSteps;
+  final List<_ParsedCfiStep>? rangeEndSteps;
 }
 
 class _ParsedCfiStep {

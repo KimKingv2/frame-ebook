@@ -141,6 +141,153 @@ void main() {
       expect(location.offset, 2);
     });
 
+    test('creates and resolves a range within one text node', () {
+      final book = _book();
+      final document = XmlDocument.parse(
+        '<html><body><p id="para">selected words here</p></body></html>',
+      );
+      final text = document.descendants.whereType<XmlText>().firstWhere(
+            (node) => node.value.contains('selected'),
+          );
+
+      final cfi = FrameEpubCfi.createRange(
+        book: book,
+        spineIndex: 0,
+        startNode: text,
+        startOffset: 2,
+        endNode: text,
+        endOffset: 10,
+      );
+
+      expect(
+        cfi,
+        'epubcfi(/6/2[ref-one]!/2/2[para],/1:2,/1:10)',
+      );
+      final range = FrameEpubCfi.resolveRange(
+        book: book,
+        document: document,
+        cfi: cfi!,
+      );
+      expect(range, isNotNull);
+      expect(identical(range!.start.node, text), isTrue);
+      expect(range.start.offset, 2);
+      expect(identical(range.end.node, text), isTrue);
+      expect(range.end.offset, 10);
+      final leading = FrameEpubCfi.resolve(
+        book: book,
+        document: document,
+        cfi: cfi,
+      );
+      expect(leading!.offset, 2);
+    });
+
+    test('creates a Foliate-compatible range across inline elements', () {
+      final book = _book();
+      final document = XmlDocument.parse(
+        '<html><body><p id="para">alpha'
+        '<em id="bold">bold</em>omega</p></body></html>',
+      );
+      final paragraph = document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final start = paragraph.children.whereType<XmlText>().first;
+      final end = paragraph.children.whereType<XmlText>().last;
+
+      final cfi = FrameEpubCfi.createRange(
+        book: book,
+        spineIndex: 0,
+        startNode: start,
+        startOffset: 1,
+        endNode: end,
+        endOffset: 3,
+      );
+      expect(
+        cfi,
+        'epubcfi(/6/2[ref-one]!/2/2[para],/1:1,/3:3)',
+      );
+
+      final range = FrameEpubCfi.resolveRange(
+        book: book,
+        document: document,
+        cfi: cfi!,
+      );
+      expect(range, isNotNull);
+      expect(identical(range!.start.node, start), isTrue);
+      expect(range.start.offset, 1);
+      expect(identical(range.end.node, end), isTrue);
+      expect(range.end.offset, 3);
+    });
+
+    test('rejects reversed, collapsed and cross-document text ranges', () {
+      final book = _book();
+      final first = XmlDocument.parse(
+        '<html><body><p>first</p><p>second</p></body></html>',
+      );
+      final texts = first.descendants.whereType<XmlText>().toList();
+      expect(
+        FrameEpubCfi.createRange(
+          book: book,
+          spineIndex: 0,
+          startNode: texts[1],
+          startOffset: 2,
+          endNode: texts[0],
+          endOffset: 3,
+        ),
+        isNull,
+      );
+      expect(
+        FrameEpubCfi.createRange(
+          book: book,
+          spineIndex: 0,
+          startNode: texts[0],
+          startOffset: 2,
+          endNode: texts[0],
+          endOffset: 2,
+        ),
+        isNull,
+      );
+      final other = XmlDocument.parse('<html><body><p>other</p></body></html>');
+      final otherText = other.descendants.whereType<XmlText>().first;
+      expect(
+        FrameEpubCfi.createRange(
+          book: book,
+          spineIndex: 0,
+          startNode: texts[0],
+          startOffset: 0,
+          endNode: otherText,
+          endOffset: 2,
+        ),
+        isNull,
+      );
+    });
+
+    test('resolves an existing Foliate range CFI into both endpoints', () {
+      final book = _book();
+      final document = XmlDocument.parse(
+        '<html><head/><body id="body"><p id="para">alpha'
+        '<em>beta</em>gamma</p></body></html>',
+      );
+      const rangeCfi =
+          'epubcfi(/6/2[ref-one]!/4[body]/2[para],/1:2,/3:3)';
+
+      final range = FrameEpubCfi.resolveRange(
+        book: book,
+        document: document,
+        cfi: rangeCfi,
+      );
+      final paragraph = document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final firstText = paragraph.children.whereType<XmlText>().first;
+      final lastText = paragraph.children.whereType<XmlText>().last;
+
+      expect(range, isNotNull);
+      expect(identical(range!.start.node, firstText), isTrue);
+      expect(range.start.offset, 2);
+      expect(identical(range.end.node, lastText), isTrue);
+      expect(range.end.offset, 3);
+    });
+
     test('creates an element CFI for an image-only fixed-layout page', () {
       final book = _book();
       final document = XmlDocument.parse(
