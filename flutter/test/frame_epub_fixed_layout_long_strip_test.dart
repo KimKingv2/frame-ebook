@@ -8,8 +8,8 @@ void main() {
     final visited = <int>{};
     final reported = <int>[];
 
-    await tester.view.setPhysicalSize(const Size(400, 600));
-    await tester.view.setDevicePixelRatio(1);
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -50,8 +50,8 @@ void main() {
       (tester) async {
     final visited = <int>{};
 
-    await tester.view.setPhysicalSize(const Size(420, 700));
-    await tester.view.setDevicePixelRatio(1);
+    tester.view.physicalSize = const Size(420, 700);
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
