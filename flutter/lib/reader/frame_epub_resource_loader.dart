@@ -10,6 +10,7 @@ enum FrameEpubResourceKind {
   document,
   stylesheet,
   image,
+  svg,
   font,
   audio,
   video,
@@ -116,7 +117,8 @@ class FrameEpubChapterDocument {
 
   Iterable<FrameEpubDocumentReference> get images => references.where(
         (reference) =>
-            reference.kind == FrameEpubResourceKind.image &&
+            (reference.kind == FrameEpubResourceKind.image ||
+                reference.kind == FrameEpubResourceKind.svg) &&
             reference.reference.resource != null,
       );
 
@@ -169,6 +171,8 @@ class FrameEpubResourceLoader {
     this.maxXhtmlBytes = 16 * 1024 * 1024,
     this.maxStylesheetBytes = 4 * 1024 * 1024,
     this.maxImageBytes = 64 * 1024 * 1024,
+    this.maxSvgBytes = 8 * 1024 * 1024,
+    this.maxTotalStylesheetBytes = 16 * 1024 * 1024,
     this.maxFontBytes = 32 * 1024 * 1024,
     this.maxOtherResourceBytes = 16 * 1024 * 1024,
   }) {
@@ -189,6 +193,8 @@ class FrameEpubResourceLoader {
   final int maxXhtmlBytes;
   final int maxStylesheetBytes;
   final int maxImageBytes;
+  final int maxSvgBytes;
+  final int maxTotalStylesheetBytes;
   final int maxFontBytes;
   final int maxOtherResourceBytes;
 
@@ -316,7 +322,7 @@ class FrameEpubResourceLoader {
           FrameEpubDocumentReference(
             elementName: name,
             attributeName: attributeName,
-            kind: role,
+            kind: target.resource?.kind ?? role,
             reference: target,
           ),
         );
@@ -368,6 +374,7 @@ class FrameEpubResourceLoader {
 
     final loaded = <String, FrameEpubStylesheetDocument>{};
     final warnings = <String>[];
+    var totalStylesheetBytes = 0;
     final queue = <(String, int)>[(entryPath, 0)];
     final scheduled = <String>{entryPath};
 
@@ -393,10 +400,15 @@ class FrameEpubResourceLoader {
         continue;
       }
 
+      if (stylesheet.size > maxTotalStylesheetBytes - totalStylesheetBytes) {
+        warnings.add('CSS 總讀取量超過上限，略過：' + path);
+        continue;
+      }
       final css = await readText(
         stylesheet,
         maxBytes: maxStylesheetBytes,
       );
+      totalStylesheetBytes += stylesheet.size;
       final references = <FrameEpubResolvedCssReference>[];
       for (final reference in extractCssReferences(css)) {
         final resolved = resolve(reference.href, fromPath: path);
@@ -500,6 +512,8 @@ class FrameEpubResourceLoader {
         FrameEpubResourceKind.document => maxXhtmlBytes,
         FrameEpubResourceKind.stylesheet => maxStylesheetBytes,
         FrameEpubResourceKind.image => maxImageBytes,
+        FrameEpubResourceKind.svg => maxSvgBytes,
+        FrameEpubResourceKind.svg => maxSvgBytes,
         FrameEpubResourceKind.font => maxFontBytes,
         _ => maxOtherResourceBytes,
       };
@@ -523,16 +537,20 @@ FrameEpubResourceKind _resourceKind(String mediaType, String path) {
   if (type == 'text/css' || path.toLowerCase().endsWith('.css')) {
     return FrameEpubResourceKind.stylesheet;
   }
-  if (type.startsWith('image/') ||
-      type == 'image/svg+xml' ||
-      path.toLowerCase().endsWith('.svg')) {
-    return FrameEpubResourceKind.image;
+  if (type == 'image/svg+xml' || path.toLowerCase().endsWith('.svg')) {
+    return FrameEpubResourceKind.svg;
   }
+  if (type.startsWith('image/')) return FrameEpubResourceKind.image;
+  final lowerPath = path.toLowerCase();
   if (type.startsWith('font/') ||
       type.contains('font') ||
       type == 'application/vnd.ms-opentype' ||
       type == 'application/font-sfnt' ||
-      type == 'application/vnd.ms-fontobject') {
+      lowerPath.endsWith('.woff') ||
+      lowerPath.endsWith('.woff2') ||
+      lowerPath.endsWith('.ttf') ||
+      lowerPath.endsWith('.otf') ||
+      lowerPath.endsWith('.eot')) {
     return FrameEpubResourceKind.font;
   }
   if (type.startsWith('audio/')) return FrameEpubResourceKind.audio;
