@@ -46,7 +46,7 @@ Original EPUB/CBZ archives are read-only source files. Do not create full-archiv
 - Recent reading, four sort modes, search, grid/list, books/comics categories and folder detail navigation.
 - R2 cover retrieval with bounded in-memory cache.
 - Basic title, author and shelf metadata editing.
-- Opt-in Flutter EPUB Preview reader: continuous scrolling and single-page pagination; long rich-text paragraphs split at rendered line boundaries with original XHTML text offsets retained for CFI selection and annotations. Image loading triggers in-memory remeasurement. Inline widget content and custom padded/background blocks remain intact rather than being force-split; double-page spread is not yet implemented.
+- Opt-in Flutter EPUB Preview reader: continuous scrolling and single-page and responsive two-page spread pagination; long rich-text paragraphs split at rendered line boundaries with original XHTML text offsets retained for CFI selection and annotations. Image loading triggers in-memory remeasurement. Inline widget content and custom padded/background blocks remain intact rather than being force-split; two-page spreads are supported on wide layouts and fall back to single-page pagination on narrow screens.
 - Main Reader, Cloud Manager and Statistics routes remain available through a compatibility bridge while each feature is being ported.
 
 These items must still pass CI and device verification before being treated as complete. Other checklist items remain open.
