@@ -8,6 +8,135 @@ import 'frame_epub_cfi.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 
+/// A text selection mapped back to the original XHTML text nodes.
+class FrameEpubTextSelection {
+  const FrameEpubTextSelection({
+    required this.startNode,
+    required this.startOffset,
+    required this.endNode,
+    required this.endOffset,
+    required this.quote,
+  });
+
+  final XmlText startNode;
+  final int startOffset;
+  final XmlText endNode;
+  final int endOffset;
+  final String quote;
+}
+
+class _PreparedEpubText {
+  const _PreparedEpubText(this.text, this.sourceOffsets);
+
+  final String text;
+  final List<int> sourceOffsets;
+}
+
+class _TextSpanSource {
+  const _TextSpanSource(this.node, this.sourceOffsets);
+
+  final XmlText node;
+  final List<int> sourceOffsets;
+}
+
+class FrameEpubTextRangeSource {
+  const FrameEpubTextRangeSource({
+    required this.start,
+    required this.end,
+    required this.node,
+    required this.sourceOffsets,
+  });
+
+  final int start;
+  final int end;
+  final XmlText node;
+  final List<int> sourceOffsets;
+}
+
+class _TextSelectionEndpoint {
+  const _TextSelectionEndpoint(this.node, this.offset);
+
+  final XmlText node;
+  final int offset;
+}
+
+class FrameEpubTextSelectionMapper {
+  FrameEpubTextSelectionMapper._();
+
+  /// Maps the UTF-16 offsets reported by Flutter back to the source XHTML
+  /// text nodes used to create each rendered TextSpan.
+  static FrameEpubTextSelection? map({
+    required TextSelection selection,
+    required String displayedText,
+    required List<FrameEpubTextRangeSource> sources,
+  }) {
+    if (selection.isCollapsed ||
+        sources.isEmpty ||
+        selection.start < 0 ||
+        selection.end > displayedText.length ||
+        selection.end <= selection.start) {
+      return null;
+    }
+
+    _TextSelectionEndpoint endpoint(int offset, {required bool isEnd}) {
+      _TextSelectionEndpoint at(
+        FrameEpubTextRangeSource source,
+        int displayOffset,
+      ) {
+        final index = (displayOffset - source.start)
+            .clamp(0, source.sourceOffsets.length - 1)
+            .toInt();
+        return _TextSelectionEndpoint(
+          source.node,
+          source.sourceOffsets[index],
+        );
+      }
+
+      if (isEnd) {
+        for (final source in sources.reversed) {
+          if (offset > source.start && offset <= source.end) {
+            return at(source, offset);
+          }
+        }
+        for (final source in sources.reversed) {
+          if (source.end <= offset) return at(source, source.end);
+        }
+        return at(sources.first, sources.first.start);
+      }
+
+      for (final source in sources) {
+        if (offset >= source.start && offset < source.end) {
+          return at(source, offset);
+        }
+      }
+      for (final source in sources) {
+        if (source.start >= offset) return at(source, source.start);
+      }
+      final last = sources.last;
+      return at(last, last.end);
+    }
+
+    final start = endpoint(selection.start, isEnd: false);
+    final end = endpoint(selection.end, isEnd: true);
+    if (identical(start.node, end.node) && start.offset >= end.offset) {
+      return null;
+    }
+    final quote = displayedText
+        .substring(selection.start, selection.end)
+        .replaceAll('\uFFFC', '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (quote.isEmpty || quote.length > 12000) return null;
+    return FrameEpubTextSelection(
+      startNode: start.node,
+      startOffset: start.offset,
+      endNode: end.node,
+      endOffset: end.offset,
+      quote: quote,
+    );
+  }
+}
+
 /// Shared Flutter renderer for one parsed EPUB chapter.
 ///
 /// This is a reader-oriented XHTML/CSS subset, not a browser engine. It uses
@@ -32,6 +161,7 @@ class FrameEpubChapterView extends StatefulWidget {
     this.initialScrollFraction,
     this.scrollController,
     this.onReadingPosition,
+    this.onTextSelection,
     this.onInternalLink,
     this.onExternalLink,
     super.key,
@@ -56,6 +186,7 @@ class FrameEpubChapterView extends StatefulWidget {
   final double? initialScrollFraction;
   final ScrollController? scrollController;
   final void Function(String cfi, double chapterFraction)? onReadingPosition;
+  final ValueChanged<FrameEpubTextSelection?>? onTextSelection;
   final ValueChanged<String>? onInternalLink;
   final ValueChanged<Uri>? onExternalLink;
 
@@ -389,32 +520,88 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   ) {
     final widgets = <Widget>[];
     final inlineSpans = <InlineSpan>[];
+    final sourceSpans = HashMap<TextSpan, _TextSpanSource>.identity();
+
+    void appendText(
+      XmlText node,
+      Map<String, String> style, {
+      bool skipLeadingWhitespace = false,
+    }) {
+      final prepared = _prepareText(
+        node,
+        style['white-space'],
+        style['text-transform'],
+      );
+      if (prepared.text.isEmpty ||
+          (skipLeadingWhitespace &&
+              prepared.text.trim().isEmpty &&
+              inlineSpans.isEmpty)) {
+        return;
+      }
+      final span = TextSpan(text: prepared.text);
+      inlineSpans.add(span);
+      sourceSpans[span] = _TextSpanSource(node, prepared.sourceOffsets);
+    }
 
     void flushInline() {
       if (inlineSpans.isEmpty) return;
       final spans = List<InlineSpan>.unmodifiable(inlineSpans);
       inlineSpans.clear();
-      widgets.add(Text.rich(
-        TextSpan(style: _textStyle(parentStyle), children: spans),
+      final root = TextSpan(
+        style: _textStyle(parentStyle),
+        children: spans,
+      );
+      final positionedSources = <FrameEpubTextRangeSource>[];
+      final plainText = StringBuffer();
+      var cursor = 0;
+
+      void collect(InlineSpan span) {
+        if (span is TextSpan) {
+          final value = span.text;
+          if (value != null && value.isNotEmpty) {
+            final source = sourceSpans[span];
+            if (source != null) {
+              positionedSources.add(FrameEpubTextRangeSource(
+                start: cursor,
+                end: cursor + value.length,
+                node: source.node,
+                sourceOffsets: source.sourceOffsets,
+              ));
+            }
+            plainText.write(value);
+            cursor += value.length;
+          }
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collect(child);
+          }
+        } else if (span is WidgetSpan) {
+          plainText.write('\uFFFC');
+          cursor++;
+        }
+      }
+
+      collect(root);
+      sourceSpans.clear();
+      final displayedText = plainText.toString();
+      widgets.add(SelectableText.rich(
+        root,
         textAlign: _textAlign(parentStyle['text-align']),
         textDirection: _textDirection(parentStyle['direction']),
-        softWrap: true,
+        onSelectionChanged: (selection, cause) {
+          final callback = widget.onTextSelection;
+          if (callback == null) return;
+          callback(FrameEpubTextSelectionMapper.map(
+            selection: selection,
+            displayedText: displayedText,
+            sources: positionedSources,
+          ));
+        },
       ));
     }
 
     for (final child in parent.children) {
       if (child is XmlText) {
-        var text = child.value;
-        final whiteSpace = parentStyle['white-space'];
-        if (whiteSpace != 'pre' && whiteSpace != 'pre-wrap') {
-          text = text.replaceAll(RegExp(r'[\t\r\n ]+'), ' ');
-          if (text.trim().isEmpty && inlineSpans.isEmpty) continue;
-        }
-        if (text.isNotEmpty) {
-          inlineSpans.add(TextSpan(
-            text: _transformText(text, parentStyle['text-transform']),
-          ));
-        }
+        appendText(child, parentStyle, skipLeadingWhitespace: true);
         continue;
       }
       if (child is! XmlElement) continue;
@@ -432,11 +619,71 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         flushInline();
         widgets.add(_buildBlock(child, childStyle, cascade));
       } else {
-        inlineSpans.add(_inlineSpan(child, childStyle, cascade));
+        inlineSpans.add(_inlineSpan(
+          child,
+          childStyle,
+          cascade,
+          sourceSpans,
+        ));
       }
     }
     flushInline();
     return widgets;
+  }
+
+  _PreparedEpubText _prepareText(
+    XmlText node,
+    String? whiteSpace,
+    String? transform,
+  ) {
+    final source = node.value;
+    final collapseWhitespace = whiteSpace != 'pre' && whiteSpace != 'pre-wrap';
+    final output = StringBuffer();
+    final sourceOffsets = <int>[0];
+    var index = 0;
+
+    bool isCollapsibleWhitespace(int codeUnit) =>
+        codeUnit == 0x09 ||
+        codeUnit == 0x0A ||
+        codeUnit == 0x0D ||
+        codeUnit == 0x20;
+
+    while (index < source.length) {
+      final start = index;
+      final firstCodeUnit = source.codeUnitAt(index);
+      final hasSurrogatePair = firstCodeUnit >= 0xD800 &&
+          firstCodeUnit <= 0xDBFF &&
+          index + 1 < source.length &&
+          source.codeUnitAt(index + 1) >= 0xDC00 &&
+          source.codeUnitAt(index + 1) <= 0xDFFF;
+      final rune = hasSurrogatePair
+          ? 0x10000 +
+              ((firstCodeUnit - 0xD800) << 10) +
+              (source.codeUnitAt(index + 1) - 0xDC00)
+          : firstCodeUnit;
+      final codeUnits = hasSurrogatePair ? 2 : 1;
+      var end = index + codeUnits;
+      String rendered;
+      if (collapseWhitespace && isCollapsibleWhitespace(rune)) {
+        while (end < source.length &&
+            isCollapsibleWhitespace(source.codeUnitAt(end))) {
+          end++;
+        }
+        rendered = ' ';
+      } else {
+        rendered = _transformText(String.fromCharCode(rune), transform);
+      }
+
+      if (rendered.isNotEmpty) {
+        output.write(rendered);
+        for (var unit = 1; unit <= rendered.length; unit++) {
+          sourceOffsets.add(unit == rendered.length ? end : start);
+        }
+      }
+      index = end;
+    }
+
+    return _PreparedEpubText(output.toString(), sourceOffsets);
   }
 
   Widget _buildBlock(
@@ -549,6 +796,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     XmlElement element,
     Map<String, String> style,
     FrameEpubCssCascade cascade,
+    Map<TextSpan, _TextSpanSource> sourceSpans,
   ) {
     final tag = element.name.local.toLowerCase();
     if (_isNonVisualTag(tag) || style['display'] == 'none') {
@@ -571,9 +819,14 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final children = <InlineSpan>[];
     for (final child in element.children) {
       if (child is XmlText) {
-        children.add(TextSpan(
-          text: _transformText(child.value, style['text-transform']),
-        ));
+        final prepared = _prepareText(
+          child,
+          style['white-space'],
+          style['text-transform'],
+        );
+        final span = TextSpan(text: prepared.text);
+        children.add(span);
+        sourceSpans[span] = _TextSpanSource(child, prepared.sourceOffsets);
       } else if (child is XmlElement) {
         final childTag = child.name.local.toLowerCase();
         final childStyle = _computedStyle(child, cascade, style);
@@ -582,7 +835,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             childStyle['visibility'] == 'hidden') {
           continue;
         }
-        children.add(_inlineSpan(child, childStyle, cascade));
+        children.add(_inlineSpan(
+          child,
+          childStyle,
+          cascade,
+          sourceSpans,
+        ));
       }
     }
 
