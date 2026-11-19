@@ -9,7 +9,7 @@ import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
-import 'frame_book_details_dialog.dart';
+import 'frame_book_details_screen.dart';
 import 'frame_library_repository.dart';
 import 'frame_reader_screen.dart';
 
@@ -185,9 +185,10 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
   }
 
   Future<void> _showDetails(FrameBook book) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => FrameBookDetailsDialog(book: book, books: _books),
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => FrameBookDetailsScreen(book: book, books: _books),
+      ),
     );
     if (result != null && mounted) await _load(showLoading: false);
   }
@@ -541,27 +542,33 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: SizedBox(
             height: 36,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _cardActionButton(
-                    label: actionText,
+            child: folder
+                ? _cardActionButton(
+                    label: '開啟資料夾',
                     primary: true,
-                    onPressed: () => folder ? _openFolder(entry) : _openReader(book),
+                    onPressed: () => _openFolder(entry),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: _cardActionButton(
+                          label: actionText,
+                          primary: true,
+                          onPressed: () => _openReader(book),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        flex: 2,
+                        child: _cardActionButton(
+                          label: '作品資訊',
+                          primary: false,
+                          onPressed: () => _showDetails(book),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  flex: 2,
-                  child: _cardActionButton(
-                    label: folder ? '查看卷冊' : '作品資訊',
-                    primary: false,
-                    onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ],
@@ -638,11 +645,12 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
                 onPressed: () => folder ? _openFolder(entry) : _openReader(book),
                 icon: const Icon(Icons.arrow_forward_rounded, color: _accent),
               ),
-              IconButton(
-                tooltip: folder ? '查看卷冊' : '作品資訊',
-                onPressed: () => folder ? _openFolder(entry) : _showDetails(book),
-                icon: const Icon(Icons.more_horiz, color: _muted),
-              ),
+              if (!folder)
+                IconButton(
+                  tooltip: '作品資訊',
+                  onPressed: () => _showDetails(book),
+                  icon: const Icon(Icons.more_horiz, color: _muted),
+                ),
             ],
           ),
         ],
