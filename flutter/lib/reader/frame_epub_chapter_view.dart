@@ -10,6 +10,7 @@ import 'frame_epub_footnote.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 import 'frame_epub_page_layout.dart';
+import 'frame_epub_text_paginator.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
 class FrameEpubTextSelection {
@@ -61,6 +62,23 @@ class _TextSelectionEndpoint {
 
   final XmlText node;
   final int offset;
+}
+
+class _PaginatedTextPosition {
+  const _PaginatedTextPosition(this.node, this.offset);
+
+  final XmlText node;
+  final int offset;
+}
+
+class _TextSpanSlice {
+  const _TextSpanSlice({
+    required this.span,
+    required this.sources,
+  });
+
+  final TextSpan span;
+  final List<FrameEpubTextRangeSource> sources;
 }
 
 class _ResolvedTextAnnotation {
@@ -240,6 +258,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       TransformationController();
   bool _pageZoomed = false;
   final List<GlobalKey> _flowItemKeys = [];
+  final List<GlobalKey> _paginationTextKeys = [];
+  final Map<GlobalKey, _PaginatedTextPosition> _paginationTextPositions = {};
+  int _paginationTextKeyCursor = 0;
   List<FrameEpubPage> _paginationPages = const [];
   bool _paginationReady = false;
   bool _paginationMeasurementScheduled = false;
@@ -433,6 +454,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             color: widget.backgroundColor,
             child: LayoutBuilder(
               builder: (context, constraints) => _buildPaginatedLayout(
+                context: context,
                 body: body,
                 bodyStyle: bodyStyle,
                 cascade: snapshot.data!.cascade,
@@ -501,7 +523,94 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         child: items[index],
       );
 
+  GlobalKey _nextPaginationTextKey() {
+    if (_paginationTextKeyCursor == _paginationTextKeys.length) {
+      _paginationTextKeys.add(GlobalKey());
+    }
+    return _paginationTextKeys[_paginationTextKeyCursor++];
+  }
+
+  int? _flowItemIndexForFragment(RenderBox fragment) {
+    final origin = fragment.localToGlobal(Offset.zero);
+    final center = origin + Offset(
+      fragment.size.width / 2,
+      fragment.size.height / 2,
+    );
+    for (var index = 0; index < _flowItemKeys.length; index++) {
+      final object =
+          _flowItemKeys[index].currentContext?.findRenderObject();
+      if (object is! RenderBox || !object.hasSize) continue;
+      final itemOrigin = object.localToGlobal(Offset.zero);
+      final rect = itemOrigin & object.size;
+      if (rect.contains(center)) return index;
+    }
+    return null;
+  }
+
+  _TextSpanSlice? _sliceTextSpan({
+    required TextSpan span,
+    required int start,
+    required int end,
+    required Map<TextSpan, _TextSpanSource> sourceSpans,
+  }) {
+    var cursor = 0;
+    final sources = <FrameEpubTextRangeSource>[];
+
+    InlineSpan? slice(InlineSpan current) {
+      if (current is TextSpan) {
+        final value = current.text ?? '';
+        final nodeStart = cursor;
+        final nodeEnd = nodeStart + value.length;
+        final overlapStart = start > nodeStart ? start : nodeStart;
+        final overlapEnd = end < nodeEnd ? end : nodeEnd;
+        String? clippedText;
+        if (overlapStart < overlapEnd) {
+          final localStart = overlapStart - nodeStart;
+          final localEnd = overlapEnd - nodeStart;
+          clippedText = value.substring(localStart, localEnd);
+          final source = sourceSpans[current];
+          if (source != null) {
+            sources.add(FrameEpubTextRangeSource(
+              start: overlapStart - start,
+              end: overlapEnd - start,
+              node: source.node,
+              sourceOffsets:
+                  source.sourceOffsets.sublist(localStart, localEnd + 1),
+            ));
+          }
+        }
+        cursor = nodeEnd;
+        final children = <InlineSpan>[];
+        for (final child in current.children ?? const <InlineSpan>[]) {
+          final childSlice = slice(child);
+          if (childSlice != null) children.add(childSlice);
+        }
+        if (clippedText == null && children.isEmpty) return null;
+        return TextSpan(
+          text: clippedText,
+          style: current.style,
+          children: children,
+        );
+      }
+      if (current is WidgetSpan) {
+        final placeholderOffset = cursor++;
+        return placeholderOffset >= start && placeholderOffset < end
+            ? current
+            : null;
+      }
+      return null;
+    }
+
+    final clipped = slice(span);
+    if (clipped is! TextSpan) return null;
+    return _TextSpanSlice(
+      span: clipped,
+      sources: List<FrameEpubTextRangeSource>.unmodifiable(sources),
+    );
+  }
+
   Widget _buildPaginatedLayout({
+    required BuildContext context,
     required XmlElement body,
     required Map<String, String> bodyStyle,
     required FrameEpubCssCascade cascade,
@@ -527,11 +636,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ? viewportSize.width
         : widget.contentMaxWidth;
     final availableHeight = viewportSize.height - 60;
+    _paginationTextKeyCursor = 0;
+    _paginationTextPositions.clear();
     final items = _flowChildren(
       body,
       bodyStyle,
       cascade,
       flattenBlockContainers: true,
+      paginationWidth:
+          (contentWidth - widget.horizontalPadding * 2).clamp(1.0, contentWidth),
+      paginationMaxHeight: availableHeight > 1 ? availableHeight : 1,
+      paginationTextScaler:
+          MediaQuery.maybeOf(context)?.textScaler ?? TextScaler.noScaling,
     );
     _ensureFlowItemKeys(items.length);
 
@@ -664,6 +780,42 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   }
 
   int? _measureInitialAnchorPage(List<FrameEpubPage> pages) {
+    final anchor = widget.initialAnchor;
+    if (anchor != null) {
+      final point = FrameEpubCfi.firstTextPoint(anchor);
+      if (point != null) {
+        _PaginatedTextPosition? best;
+        GlobalKey? bestKey;
+        var bestDistance = 1 << 30;
+        for (final entry in _paginationTextPositions.entries) {
+          final position = entry.value;
+          if (!identical(position.node, point.node)) continue;
+          final distance = point.offset >= position.offset
+              ? point.offset - position.offset
+              : (1 << 29) + position.offset - point.offset;
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = position;
+            bestKey = entry.key;
+          }
+        }
+        final fragmentObject =
+            bestKey?.currentContext?.findRenderObject();
+        if (best != null &&
+            fragmentObject is RenderBox &&
+            fragmentObject.hasSize) {
+          final itemIndex = _flowItemIndexForFragment(fragmentObject);
+          if (itemIndex != null) {
+            for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+              if (pages[pageIndex].itemIndices.contains(itemIndex)) {
+                return pageIndex;
+              }
+            }
+          }
+        }
+      }
+    }
+
     RenderBox? anchorBox;
     XmlNode? current = widget.initialAnchor;
     while (current is XmlElement && anchorBox == null) {
@@ -763,6 +915,49 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final viewportBottom = viewportTop + viewportObject.size.height;
       final viewportLeft = viewportOrigin.dx;
       final viewportRight = viewportLeft + viewportObject.size.width;
+
+      if (widget.paginated) {
+        final visible = <({XmlText node, int offset, double top})>[];
+        for (final entry in _paginationTextPositions.entries) {
+          final object = entry.key.currentContext?.findRenderObject();
+          if (object is! RenderBox || !object.hasSize) continue;
+          final origin = object.localToGlobal(Offset.zero);
+          final top = origin.dy;
+          final bottom = top + object.size.height;
+          final right = origin.dx + object.size.width;
+          if (bottom <= viewportTop + 1 ||
+              top >= viewportBottom ||
+              right <= viewportLeft + 1 ||
+              origin.dx >= viewportRight - 1) {
+            continue;
+          }
+          visible.add((
+            node: entry.value.node,
+            offset: entry.value.offset,
+            top: top,
+          ));
+        }
+        if (visible.isEmpty) return;
+        visible.sort((a, b) => a.top.compareTo(b.top));
+        final first = visible.first;
+        final cfi = FrameEpubCfi.create(
+          book: widget.resourceLoader.book,
+          spineIndex: widget.spineIndex,
+          textNode: first.node,
+          offset: first.offset,
+        );
+        if (cfi == null) return;
+        final pageController = widget.pageController;
+        final fraction = pageController != null &&
+                pageController.hasClients &&
+                _paginationPages.length > 1
+            ? ((pageController.page ?? 0).round() /
+                    (_paginationPages.length - 1))
+                .clamp(0.0, 1.0)
+            : 0.0;
+        widget.onReadingPosition!(cfi, fraction);
+        return;
+      }
       final crossing = <({XmlElement element, double top, int depth})>[];
       final below = <({XmlElement element, double top, int depth})>[];
 
@@ -1045,12 +1240,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   Widget _buildFlow(
     XmlElement element,
     Map<String, String> style,
-    FrameEpubCssCascade cascade,
-  ) =>
+    FrameEpubCssCascade cascade, {
+    double? paginationWidth,
+    double? paginationMaxHeight,
+    TextScaler? paginationTextScaler,
+  }) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        children: _flowChildren(element, style, cascade),
+        children: _flowChildren(
+          element,
+          style,
+          cascade,
+          paginationWidth: paginationWidth,
+          paginationMaxHeight: paginationMaxHeight,
+          paginationTextScaler: paginationTextScaler,
+        ),
       );
 
   List<Widget> _flowChildren(
@@ -1058,6 +1263,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     Map<String, String> parentStyle,
     FrameEpubCssCascade cascade, {
     bool flattenBlockContainers = false,
+    double? paginationWidth,
+    double? paginationMaxHeight,
+    TextScaler? paginationTextScaler,
   }) {
     final widgets = <Widget>[];
     final inlineSpans = <InlineSpan>[];
@@ -1122,20 +1330,60 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       collect(root);
       sourceSpans.clear();
       final displayedText = plainText.toString();
-      widgets.add(SelectableText.rich(
-        root,
-        textAlign: _textAlign(parentStyle['text-align']),
-        textDirection: _textDirection(parentStyle['direction']),
-        onSelectionChanged: (selection, cause) {
-          final callback = widget.onTextSelection;
-          if (callback == null) return;
-          callback(FrameEpubTextSelectionMapper.map(
-            selection: selection,
-            displayedText: displayedText,
-            sources: positionedSources,
-          ));
-        },
-      ));
+      final textAlign = _textAlign(parentStyle['text-align']);
+      final textDirection = _textDirection(parentStyle['direction']);
+      final ranges = paginationWidth != null && paginationMaxHeight != null
+          ? FrameEpubTextPaginator.paginate(
+              text: root,
+              maxWidth: paginationWidth,
+              maxHeight: paginationMaxHeight,
+              textDirection: textDirection,
+              textAlign: textAlign,
+              textScaler: paginationTextScaler ?? TextScaler.noScaling,
+            )
+          : [TextRange(start: 0, end: displayedText.length)];
+
+      for (final range in ranges) {
+        final slice = _sliceTextSpan(
+          span: root,
+          start: range.start,
+          end: range.end,
+          sourceSpans: sourceSpans,
+        );
+        if (slice == null) continue;
+        final fragmentText =
+            displayedText.substring(range.start, range.end);
+        final selectionSources = slice.sources;
+        final fragmentKey = paginationWidth == null
+            ? null
+            : _nextPaginationTextKey();
+        if (fragmentKey != null && selectionSources.isNotEmpty) {
+          final source = selectionSources.first;
+          _paginationTextPositions[fragmentKey] = _PaginatedTextPosition(
+            source.node,
+            source.sourceOffsets.first,
+          );
+        }
+        final selectable = SelectableText.rich(
+          slice.span,
+          textAlign: textAlign,
+          textDirection: textDirection,
+          onSelectionChanged: (selection, cause) {
+            final callback = widget.onTextSelection;
+            if (callback == null) return;
+            callback(FrameEpubTextSelectionMapper.map(
+              selection: selection,
+              displayedText: fragmentText,
+              sources: selectionSources,
+            ));
+          },
+        );
+        widgets.add(
+          fragmentKey == null
+              ? selectable
+              : KeyedSubtree(key: fragmentKey, child: selectable),
+        );
+      }
     }
 
     for (final child in parent.children) {
@@ -1167,9 +1415,19 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             childStyle,
             cascade,
             flattenBlockContainers: true,
+            paginationWidth: paginationWidth,
+            paginationMaxHeight: paginationMaxHeight,
+            paginationTextScaler: paginationTextScaler,
           ));
         } else {
-          widgets.add(_buildBlock(child, childStyle, cascade));
+          widgets.add(_buildBlock(
+            child,
+            childStyle,
+            cascade,
+            paginationWidth: paginationWidth,
+            paginationMaxHeight: paginationMaxHeight,
+            paginationTextScaler: paginationTextScaler,
+          ));
         }
       } else {
         inlineSpans.add(_inlineSpan(
@@ -1252,6 +1510,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       'footer',
       'aside',
       'nav',
+      'p',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
     };
     if (!transparentContainers.contains(element.name.local.toLowerCase())) {
       return false;
@@ -1268,14 +1533,30 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   Widget _buildBlock(
     XmlElement element,
     Map<String, String> style,
-    FrameEpubCssCascade cascade,
-  ) {
+    FrameEpubCssCascade cascade, {
+    double? paginationWidth,
+    double? paginationMaxHeight,
+    TextScaler? paginationTextScaler,
+  }) {
     final tag = element.name.local.toLowerCase();
+    final blockPadding = _boxInsets(style, 'padding', widget.fontSize);
+    final blockMargin = _boxInsets(style, 'margin', widget.fontSize);
+    final innerWidth = paginationWidth == null
+        ? null
+        : (paginationWidth - blockPadding.horizontal - blockMargin.horizontal)
+            .clamp(1.0, paginationWidth);
     Widget child;
     if (tag == 'hr') {
       child = const Divider(color: Color(0x664D455B), height: 24);
     } else if (tag == 'ul' || tag == 'ol') {
-      child = _buildList(element, style, cascade);
+      child = _buildList(
+        element,
+        style,
+        cascade,
+        paginationWidth: innerWidth,
+        paginationMaxHeight: paginationMaxHeight,
+        paginationTextScaler: paginationTextScaler,
+      );
     } else if (tag == 'img') {
       child = _buildImage(element, style, block: true);
     } else if (tag == 'pre') {
@@ -1302,14 +1583,29 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           ),
         ),
         padding: const EdgeInsets.only(left: 16),
-        child: _buildFlow(element, style, cascade),
+        child: _buildFlow(
+          element,
+          style,
+          cascade,
+          paginationWidth:
+              innerWidth == null ? null : (innerWidth - 19).clamp(1.0, innerWidth),
+          paginationMaxHeight: paginationMaxHeight,
+          paginationTextScaler: paginationTextScaler,
+        ),
       );
     } else {
-      child = _buildFlow(element, style, cascade);
+      child = _buildFlow(
+        element,
+        style,
+        cascade,
+        paginationWidth: innerWidth,
+        paginationMaxHeight: paginationMaxHeight,
+        paginationTextScaler: paginationTextScaler,
+      );
     }
 
-    final padding = _boxInsets(style, 'padding', widget.fontSize);
-    final margin = _boxInsets(style, 'margin', widget.fontSize);
+    final padding = blockPadding;
+    final margin = blockMargin;
     final background = _cssColor(style['background-color']) ??
         _backgroundFromShorthand(style['background']);
     if (padding != EdgeInsets.zero) {
@@ -1330,8 +1626,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   Widget _buildList(
     XmlElement list,
     Map<String, String> style,
-    FrameEpubCssCascade cascade,
-  ) {
+    FrameEpubCssCascade cascade, {
+    double? paginationWidth,
+    double? paginationMaxHeight,
+    TextScaler? paginationTextScaler,
+  }) {
     final ordered = list.name.local.toLowerCase() == 'ol';
     final items = list.children.whereType<XmlElement>().where(
           (element) =>
@@ -1358,7 +1657,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _flowChildren(item, itemStyle, cascade),
+                  children: _flowChildren(
+                    item,
+                    itemStyle,
+                    cascade,
+                    paginationWidth: paginationWidth == null
+                        ? null
+                        : (paginationWidth - 28).clamp(1.0, paginationWidth),
+                    paginationMaxHeight: paginationMaxHeight,
+                    paginationTextScaler: paginationTextScaler,
+                  ),
                 ),
               ),
             ],
