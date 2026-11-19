@@ -6,7 +6,7 @@ Flutter/Dart is the only feature and product-logic source for Web, Android and m
 
 The shared Flutter core owns:
 
-- EPUB reading behaviour and parsing, including reflowable books and fixed-layout comics.
+- EPUB package parsing and resource resolution, including reflowable books and fixed-layout comics.
 - Bookshelf, folders, volume grouping and work details.
 - Reader UI, navigation, appearance, fullscreen and reading controls.
 - Bookmarks, highlights, notes, annotations and reading progress.
@@ -27,7 +27,7 @@ A file source should expose a streaming response with the information the reader
 - Content length, content type and content-range when present.
 - Whether the response is a full response or a partial Range response.
 
-The interface must support bounded Range reads for EPUB ZIP metadata and cover extraction and normal streaming for the active reading session.
+The interface must support bounded Range reads for EPUB ZIP metadata, chapter XHTML, CSS, images, SVG and font resources, plus streaming for larger active-session resources.
 
 ### 2. One native transport core for Android and macOS
 
@@ -76,7 +76,9 @@ Do not put EPUB parsing, reading UI, progress rules, annotation logic or general
 - D1 remains authoritative for user-specific reading progress, appearance, bookmarks, notes and reading events.
 - Private R2 remains the cover-thumbnail store.
 - Reuse the existing stable cloud book descriptor and APIs. Do not introduce a parallel catalogue, local-only reading-state model or D1 schema solely for the Flutter rewrite.
-- Do not add persistent archive, extracted ZIP, page-image or response caches. Keep active-session buffers bounded and transient.
+- Do not add persistent archive, extracted ZIP, page-image, font or response caches. Keep active-session buffers bounded and transient.
+- Resolve chapter-relative XHTML, SVG and CSS references against their containing archive paths. External HTTP/data references remain references only and are never fetched by the archive loader.
+- Enforce per-resource and total stylesheet read limits; CSS imports must be cycle-safe and bounded by depth and count.
 
 ## Update and packaging policy
 
@@ -110,9 +112,11 @@ Keep those bridges until the shared Dart transport and Flutter reader have passe
 2. **File-source contract:** add a platform-neutral streaming file-source interface and tests for response metadata, Range semantics, cancellation and errors.
 3. **Native adapter:** implement one Dart `HttpClient` adapter for Android/macOS, with the minimal cookie-store bridge and explicit credential-safe redirect handling.
 4. **Web adapter:** implement a Fetch-based same-origin streaming adapter with Range support and no native imports.
-5. **Flutter reader core:** move EPUB parsing, reader state and reading UI into shared Flutter/Dart modules. The reader consumes only the file-source interface.
-6. **Parity and retirement:** verify the complete main-branch parity inventory on Web, Android and macOS. Only then retire the legacy iframe/WebView reader bridges.
-7. **OTA release automation:** connect Shorebird app configuration and protected CI credentials, then verify a Dart-only patch on both native targets before relying on it as the normal update route.
+5. **EPUB package parser:** parse container.xml, OPF metadata, manifest, spine, EPUB 3 navigation and EPUB 2 NCX on top of the generic Range-backed ZIP reader.
+6. **EPUB resource loader:** resolve chapter-relative XHTML, CSS, SVG, image, font and internal-link references with bounded per-entry reads and no persistent content cache.
+7. **Flutter reader core:** build reflowable and fixed-layout EPUB experiences on the shared Dart models, then connect progress, annotations, appearance and reading events.
+8. **Parity and retirement:** verify the complete main-branch parity inventory on Web, Android and macOS. Only then retire the legacy iframe/WebView reader bridges.
+9. **OTA release automation:** connect Shorebird app configuration and protected CI credentials, then verify a Dart-only patch on both native targets before relying on it as the normal update route.
 
 ## Acceptance checks for the transport layer
 
