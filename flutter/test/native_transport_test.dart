@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frame_ebook/transport/frame_file_source.dart';
 import 'package:frame_ebook/transport/transport_factory.dart';
 import 'package:frame_ebook/transport/frame_transport.dart';
 
@@ -26,6 +27,19 @@ void main() {
                 : '"leaked"',
           );
           response.add(List<int>.filled(1024, 65));
+        } else if (request.uri.path == '/stream-auth-check') {
+          final safe =
+              request.headers.value(HttpHeaders.authorizationHeader) == null &&
+                  request.headers.value(HttpHeaders.cookieHeader) == null;
+          response.statusCode =
+              request.headers.value(HttpHeaders.rangeHeader) == 'bytes=4-7'
+                  ? HttpStatus.partialContent
+                  : HttpStatus.badRequest;
+          response.headers.set(HttpHeaders.contentRangeHeader, 'bytes 4-7/16');
+          response.headers.set(HttpHeaders.contentLengthHeader, '4');
+          response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+          response.headers.set(HttpHeaders.etagHeader, safe ? '"stripped"' : '"leaked"');
+          response.add([4, 5, 6, 7]);
         } else {
           response.statusCode = HttpStatus.notFound;
         }
@@ -45,6 +59,13 @@ void main() {
             response.headers.set(
               HttpHeaders.locationHeader,
               'http://127.0.0.1:${secondServer.port}/auth-check',
+            );
+            break;
+          case '/stream-cross-origin':
+            response.statusCode = HttpStatus.found;
+            response.headers.set(
+              HttpHeaders.locationHeader,
+              'http://127.0.0.1:${secondServer.port}/stream-auth-check',
             );
             break;
           case '/loop':
@@ -110,6 +131,52 @@ void main() {
       expect(result.statusCode, HttpStatus.ok);
       expect(result.bytesRead, 4096);
       expect(result.bodyTruncated, isTrue);
+    });
+
+
+    test('streams a 302 Range response without forwarding Access credentials',
+        () async {
+      final response = await transport.openStream(
+        uri: Uri.parse(
+          'http://127.0.0.1:\${firstServer.port}/stream-cross-origin',
+        ),
+        headers: const {
+          'Cookie': 'CF_Authorization=opaque-session',
+          'Authorization': 'Bearer not-a-real-secret',
+        },
+        range: FrameByteRange.from(start: 4, end: 7),
+      );
+
+      expect(response.statusCode, HttpStatus.partialContent);
+      expect(response.isPartialContent, isTrue);
+      expect(response.contentRange, 'bytes 4-7/16');
+      expect(response.contentLength, 4);
+      expect(response.acceptsRanges, isTrue);
+      expect(response.headers['etag'], '"stripped"');
+      expect(response.headers.containsKey('location'), isFalse);
+
+      final bytes = await response.stream.expand((chunk) => chunk).toList();
+      expect(bytes, [4, 5, 6, 7]);
+      await response.close();
+      await response.close();
+    });
+
+    test('cancels an in-flight native stream', () async {
+      final cancellation = FrameFileCancellation();
+      final response = await transport.openStream(
+        uri: Uri.parse('http://127.0.0.1:\${firstServer.port}/range'),
+        range: FrameByteRange.from(start: 0, end: 1023),
+        cancellation: cancellation,
+      );
+
+      expect(response.statusCode, HttpStatus.partialContent);
+      final received = <int>[];
+      final subscription = response.stream.listen(received.add);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      cancellation.cancel();
+      await subscription.cancel();
+      await response.close();
+      expect(response.isClosed, isTrue);
     });
 
     test('rejects a redirect loop', () async {
