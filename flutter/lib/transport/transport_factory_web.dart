@@ -107,7 +107,7 @@ class _BrowserFrameTransport implements FrameTransport {
 
     final abortController = web.AbortController();
     _activeStreams.add(abortController);
-    web.ReadableStreamDefaultReader<JSUint8Array>? reader;
+    web.ReadableStreamReader? reader;
     var cancelled = false;
     StreamController<List<int>>? bodyController;
 
@@ -117,7 +117,11 @@ class _BrowserFrameTransport implements FrameTransport {
       abortController.abort();
       final currentReader = reader;
       if (currentReader != null) {
-        unawaited(currentReader.cancel().toDart);
+        unawaited(
+          currentReader
+              .callMethod<JSPromise<JSAny?>>('cancel'.toJS)
+              .toDart,
+        );
       }
       final controller = bodyController;
       if (controller != null && !controller.isClosed) {
@@ -181,9 +185,12 @@ class _BrowserFrameTransport implements FrameTransport {
         while (!cancelled) {
           if (paused) await resumeSignal?.future;
           if (cancelled) break;
-          final result = await currentReader.read().toDart;
-          if (result.done) break;
-          final chunk = result.value;
+          final result = await currentReader
+              .callMethod<JSPromise<web.ReadableStreamReadResult>>('read'.toJS)
+              .toDart;
+          final done = result.getProperty<JSBoolean>('done'.toJS).toDart;
+          if (done) break;
+          final chunk = result.getProperty<JSUint8Array?>('value'.toJS);
           if (chunk != null && !controller.isClosed) {
             controller.add(chunk.toDart);
           }
