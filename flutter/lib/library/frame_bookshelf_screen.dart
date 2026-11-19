@@ -41,6 +41,7 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
   String? _error;
   String? _folderKey;
   List<FrameBook> _books = const [];
+  FrameBook? _detailsBook;
 
   Uri get _base => FrameAppConfig.apiBaseUri;
 
@@ -184,13 +185,8 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     );
   }
 
-  Future<void> _showDetails(FrameBook book) async {
-    final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
-        builder: (_) => FrameBookDetailsScreen(book: book, books: _books),
-      ),
-    );
-    if (result != null && mounted) await _load(showLoading: false);
+  void _showDetails(FrameBook book) {
+    setState(() => _detailsBook = book);
   }
 
   void _openFolder(FrameShelfEntry entry) {
@@ -1378,6 +1374,14 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final detailsBook = _detailsBook;
+    if (detailsBook != null) {
+      return FrameBookDetailsScreen(
+        book: detailsBook,
+        onBack: () => setState(() => _detailsBook = null),
+      );
+    }
+
     final width = MediaQuery.sizeOf(context).width;
     final folder = _findFolder();
     return Scaffold(
