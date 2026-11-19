@@ -518,20 +518,23 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final marker = ordered ? '$index.' : _listMarker(style['list-style-type']);
       widgets.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 28,
-              child: Text(marker, style: _textStyle(itemStyle)),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _flowChildren(item, itemStyle, cascade),
+        child: KeyedSubtree(
+          key: _elementKey(item),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(marker, style: _textStyle(itemStyle)),
               ),
-            ),
-          ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _flowChildren(item, itemStyle, cascade),
+                ),
+              ),
+            ],
+          ),
         ),
       ));
     }
