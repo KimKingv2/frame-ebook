@@ -389,6 +389,7 @@ class _FrameEpubReaderPreviewScreenState
               Positioned.fill(
                 child: FrameEpubPageTurnSurface(
                   controller: _chapterScrollController,
+                  fixedLayout: session.isFixedLayout,
                   onPreviousChapter: session.canGoPrevious
                       ? () async {
                           await _runNavigation(session.goToPreviousChapter);

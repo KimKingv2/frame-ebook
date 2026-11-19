@@ -14,6 +14,7 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
     required this.child,
     this.onPreviousChapter,
     this.onNextChapter,
+    this.fixedLayout = false,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   final Widget child;
   final Future<void> Function()? onPreviousChapter;
   final Future<void> Function()? onNextChapter;
+  final bool fixedLayout;
 
   @override
   State<FrameEpubPageTurnSurface> createState() =>
@@ -56,10 +58,11 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     _isTurning = true;
     try {
       final controller = widget.controller;
-      if (!controller.hasClients) {
+      if (widget.fixedLayout) {
         await _turnAdjacentChapter(forward: forward);
         return;
       }
+      if (!controller.hasClients) return;
 
       final position = controller.position;
       if (!position.hasContentDimensions ||
