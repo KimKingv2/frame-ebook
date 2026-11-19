@@ -82,7 +82,7 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve paragraph spacing choices: original, compact, standard and loose.
 - [ ] Preserve text alignment choices: original, left and justify.
 - [ ] Preserve EPUB reading modes: paginated and continuous scrolling. The Flutter Preview now has an initial single-page mode and continuous-scroll switch; full Legacy parity is still pending.
-- [ ] Preserve EPUB page layout: single-page and double-page preferred. Single-page pagination exists in Flutter Preview; double-page spread remains pending.
+- [ ] Preserve EPUB page layout: single-page and double-page preferred. Single-page pagination and responsive two-page spreads exist in the reflowable EPUB Flutter Preview; full Legacy parity remains pending.
 - [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px.
 - [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent.
 - [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling.
