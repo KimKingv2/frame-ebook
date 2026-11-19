@@ -161,7 +161,7 @@ void main() {
 
       expect(
         cfi,
-        'epubcfi(/6/2[ref-one]!/4[body]/2[para],/1:2,/1:10)',
+        'epubcfi(/6/2[ref-one]!/2[body]/2[para],/1:2,/1:10)',
       );
       final range = FrameEpubCfi.resolveRange(
         book: book,
@@ -203,7 +203,7 @@ void main() {
       );
       expect(
         cfi,
-        'epubcfi(/6/2[ref-one]!/4[body]/2[para],/1:1,/3:3)',
+        'epubcfi(/6/2[ref-one]!/2[body]/2[para],/1:1,/3:3)',
       );
 
       final range = FrameEpubCfi.resolveRange(
