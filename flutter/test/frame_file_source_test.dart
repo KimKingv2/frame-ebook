@@ -87,10 +87,19 @@ void main() {
       expect(response.contentLength, 3);
       expect(response.contentRange, 'bytes 1-3/10');
       expect(response.acceptsRanges, isTrue);
-      expect(response.headers.keys, everyElement(equals(
-        anyOf('content-type', 'content-length', 'content-range', 'accept-ranges'),
-      )));
-      expect(response.headers, throwsUnsupportedError);
+      expect(
+        response.headers.keys,
+        unorderedEquals([
+          'content-type',
+          'content-length',
+          'content-range',
+          'accept-ranges',
+        ]),
+      );
+      expect(
+        () => response.headers['x-test'] = 'mutable',
+        throwsUnsupportedError,
+      );
     });
 
     test('exposes a one-shot byte stream without buffering it', () async {
