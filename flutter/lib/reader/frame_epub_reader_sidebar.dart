@@ -42,25 +42,35 @@ class FrameEpubReaderSidebar extends StatefulWidget {
       _FrameEpubReaderSidebarState();
 }
 
-class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
+  late final PageController _pageController;
+  late int _activeTab;
   late List<FrameReaderAnnotation> _annotations;
 
   @override
   void initState() {
     super.initState();
     _annotations = List<FrameReaderAnnotation>.of(widget.annotations);
-    _tabController = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 2).toInt(),
-    )..addListener(_handleTabControllerChanged);
+    _activeTab = widget.initialTabIndex.clamp(0, 2).toInt();
+    _pageController = PageController(initialPage: _activeTab);
   }
 
-  void _handleTabControllerChanged() {
-    if (!mounted || _tabController.indexIsChanging) return;
-    setState(() {});
+  void _selectTab(int index) {
+    if (index == _activeTab) return;
+    setState(() => _activeTab = index);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _handlePageChanged(int index) {
+    if (mounted && _activeTab != index) {
+      setState(() => _activeTab = index);
+    }
   }
 
   @override
@@ -73,8 +83,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
 
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabControllerChanged);
-    _tabController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -150,8 +159,10 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
           ),
           const Divider(height: 1, color: Color(0x33393247)),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: _handlePageChanged,
+              physics: const PageScrollPhysics(),
               children: [
                 _buildToc(),
                 _buildAnnotations(bookmarksOnly: true),
@@ -165,12 +176,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar>
   }
 
   Widget _buildTabButton(String label, int index) {
-    final selected = _tabController.index == index;
+    final selected = _activeTab == index;
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3),
         child: TextButton(
-          onPressed: () => _tabController.animateTo(index),
+          onPressed: () => _selectTab(index),
           style: TextButton.styleFrom(
             foregroundColor: selected ? _sidebarAccent : _sidebarMuted,
             backgroundColor:
