@@ -12,8 +12,8 @@ const _dialogFaint = Color(0xFF797184);
 const _dialogAccent = Color(0xFFC5ADFF);
 const _dialogLine = Color(0xFF393247);
 
-class FrameBookDetailsDialog extends StatefulWidget {
-  const FrameBookDetailsDialog({
+class FrameBookDetailsScreen extends StatefulWidget {
+  const FrameBookDetailsScreen({
     required this.book,
     required this.books,
     super.key,
@@ -23,10 +23,10 @@ class FrameBookDetailsDialog extends StatefulWidget {
   final List<FrameBook> books;
 
   @override
-  State<FrameBookDetailsDialog> createState() => _FrameBookDetailsDialogState();
+  State<FrameBookDetailsScreen> createState() => _FrameBookDetailsScreenState();
 }
 
-class _FrameBookDetailsDialogState extends State<FrameBookDetailsDialog> {
+class _FrameBookDetailsScreenState extends State<FrameBookDetailsScreen> {
   late final TextEditingController _title;
   late final TextEditingController _author;
   late final TextEditingController _bangumiQuery;
@@ -316,199 +316,293 @@ class _FrameBookDetailsDialogState extends State<FrameBookDetailsDialog> {
       if (book.subjects.isNotEmpty) '主題：${book.subjects.join('、')}',
       if (book.description.isNotEmpty) '簡介：${book.description}',
     ];
+    final busy = _saving || _applyingBangumi || _linkingOldBook;
 
-    return AlertDialog(
-      backgroundColor: _dialogPanel,
-      surfaceTintColor: Colors.transparent,
-      title: Text(comic ? '漫畫資訊' : '電子書資訊'),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _label('書名'),
-              TextField(
-                controller: _title,
-                maxLength: 240,
-                decoration: const InputDecoration(hintText: '輸入作品名稱', counterText: ''),
-              ),
-              const SizedBox(height: 13),
-              _label('作者'),
-              TextField(
-                controller: _author,
-                maxLength: 240,
-                decoration: const InputDecoration(hintText: '作者未提供', counterText: ''),
-              ),
-              const SizedBox(height: 13),
-              _label('收藏分類'),
-              DropdownButtonFormField<String>(
-                initialValue: _shelf,
-                items: const [
-                  DropdownMenuItem(value: 'books', child: Text('電子書')),
-                  DropdownMenuItem(value: 'comics', child: Text('漫畫')),
-                ],
-                onChanged: book.format == 'CBZ'
-                    ? null
-                    : (value) {
-                        if (value != null) setState(() => _shelf = value);
-                      },
-              ),
-              const SizedBox(height: 17),
-              _metaRow('格式', book.format),
-              _metaRow(
-                '內容',
-                book.pageCount > 0
-                    ? '${book.pageCount}${book.format == 'CBZ' ? ' 頁' : ' 個內容項目'}'
-                    : '未提供',
-              ),
-              _metaRow('檔案', book.fileName),
-              _metaRow('大小', _formatBytes(book.size)),
-              _metaRow(
-                '閱讀進度',
-                book.progressPercent > 0
-                    ? '${book.progressPercent}% · ${book.progressLabel}'
-                    : '尚未開始',
-              ),
-              if (metadataLines.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Divider(color: _dialogLine),
-                for (final line in metadataLines)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text(line,
-                        style: const TextStyle(color: _dialogMuted, fontSize: 10, height: 1.5)),
-                  ),
-              ],
-              if (book.manualTitle || book.manualAuthor) ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _saving ? null : _resetOpf,
-                  icon: const Icon(Icons.restart_alt, size: 16),
-                  label: const Text('恢復 EPUB 內部資訊'),
-                ),
-              ],
-              if (comic) ...[
-                const SizedBox(height: 20),
-                const Divider(color: _dialogLine),
-                const Text(
-                  'BANGUMI 漫畫資料',
-                  style: TextStyle(color: _dialogAccent, fontSize: 10, letterSpacing: 1.6),
-                ),
-                if (bangumi.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '已關聯：${bangumi['nameCn'] ?? bangumi['name'] ?? 'Bangumi 作品'}',
-                    style: const TextStyle(color: _dialogText, fontSize: 11),
-                  ),
-                  if ((bangumi['author'] ?? '').toString().isNotEmpty)
-                    Text('作者：${bangumi['author']}',
-                        style: const TextStyle(color: _dialogMuted, fontSize: 10)),
-                  if ((bangumi['date'] ?? '').toString().isNotEmpty)
-                    Text('日期：${bangumi['date']}',
-                        style: const TextStyle(color: _dialogMuted, fontSize: 10)),
-                  if ((bangumi['score'] ?? 0).toString() != '0')
-                    Text(
-                      '評分：${bangumi['score']} · ${bangumi['ratingCount'] ?? 0} 人',
-                      style: const TextStyle(color: _dialogMuted, fontSize: 10),
+    return Scaffold(
+      backgroundColor: const Color(0xFF12101A),
+      appBar: AppBar(
+        title: Text(comic ? '漫畫資訊' : '電子書資訊'),
+        backgroundColor: const Color(0xFF12101A),
+        foregroundColor: _dialogText,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: _dialogPanel,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _dialogLine),
+                      ),
+                      padding: const EdgeInsets.all(18),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _label('書名'),
+                            TextField(
+                              controller: _title,
+                              maxLength: 240,
+                              decoration: const InputDecoration(
+                                hintText: '輸入作品名稱',
+                                counterText: '',
+                              ),
+                            ),
+                            const SizedBox(height: 13),
+                            _label('作者'),
+                            TextField(
+                              controller: _author,
+                              maxLength: 240,
+                              decoration: const InputDecoration(
+                                hintText: '作者未提供',
+                                counterText: '',
+                              ),
+                            ),
+                            const SizedBox(height: 13),
+                            _label('收藏分類'),
+                            DropdownButtonFormField<String>(
+                              initialValue: _shelf,
+                              items: const [
+                                DropdownMenuItem(value: 'books', child: Text('電子書')),
+                                DropdownMenuItem(value: 'comics', child: Text('漫畫')),
+                              ],
+                              onChanged: book.format == 'CBZ'
+                                  ? null
+                                  : (value) {
+                                      if (value != null) setState(() => _shelf = value);
+                                    },
+                            ),
+                            const SizedBox(height: 17),
+                            _metaRow('格式', book.format),
+                            _metaRow(
+                              '內容',
+                              book.pageCount > 0
+                                  ? '${book.pageCount}${book.format == 'CBZ' ? ' 頁' : ' 個內容項目'}'
+                                  : '未提供',
+                            ),
+                            _metaRow('檔案', book.fileName),
+                            _metaRow('大小', _formatBytes(book.size)),
+                            _metaRow(
+                              '閱讀進度',
+                              book.progressPercent > 0
+                                  ? '${book.progressPercent}% · ${book.progressLabel}'
+                                  : '尚未開始',
+                            ),
+                            if (metadataLines.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              const Divider(color: _dialogLine),
+                              for (final line in metadataLines)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 3),
+                                  child: Text(
+                                    line,
+                                    style: const TextStyle(
+                                      color: _dialogMuted,
+                                      fontSize: 10,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            if (book.manualTitle || book.manualAuthor) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _saving ? null : _resetOpf,
+                                icon: const Icon(Icons.restart_alt, size: 16),
+                                label: const Text('恢復 EPUB 內部資訊'),
+                              ),
+                            ],
+                            if (comic) ...[
+                              const SizedBox(height: 20),
+                              const Divider(color: _dialogLine),
+                              const Text(
+                                'BANGUMI 漫畫資料',
+                                style: TextStyle(
+                                  color: _dialogAccent,
+                                  fontSize: 10,
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                              if (bangumi.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  '已關聯：${bangumi['nameCn'] ?? bangumi['name'] ?? 'Bangumi 作品'}',
+                                  style: const TextStyle(color: _dialogText, fontSize: 11),
+                                ),
+                                if ((bangumi['author'] ?? '').toString().isNotEmpty)
+                                  Text(
+                                    '作者：${bangumi['author']}',
+                                    style: const TextStyle(color: _dialogMuted, fontSize: 10),
+                                  ),
+                                if ((bangumi['date'] ?? '').toString().isNotEmpty)
+                                  Text(
+                                    '日期：${bangumi['date']}',
+                                    style: const TextStyle(color: _dialogMuted, fontSize: 10),
+                                  ),
+                                if ((bangumi['score'] ?? 0).toString() != '0')
+                                  Text(
+                                    '評分：${bangumi['score']} · ${bangumi['ratingCount'] ?? 0} 人',
+                                    style: const TextStyle(color: _dialogMuted, fontSize: 10),
+                                  ),
+                                const SizedBox(height: 8),
+                              ],
+                              TextField(
+                                controller: _bangumiQuery,
+                                maxLength: 100,
+                                onSubmitted: (_) => _searchBangumi(),
+                                decoration: const InputDecoration(
+                                  hintText: '漫畫名稱、日文原名或別名',
+                                  counterText: '',
+                                ),
+                              ),
+                              const SizedBox(height: 7),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: FilledButton.tonalIcon(
+                                  onPressed: _searchingBangumi || _applyingBangumi
+                                      ? null
+                                      : _searchBangumi,
+                                  icon: _searchingBangumi
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.search, size: 16),
+                                  label: const Text('搜尋 Bangumi'),
+                                ),
+                              ),
+                              if (_bangumiStatus.isNotEmpty) ...[
+                                const SizedBox(height: 7),
+                                Text(
+                                  _bangumiStatus,
+                                  style: const TextStyle(
+                                    color: _dialogMuted,
+                                    fontSize: 10,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                              for (final item in _bangumiCandidates)
+                                _bangumiCandidate(item),
+                            ],
+                            const SizedBox(height: 20),
+                            const Divider(color: _dialogLine),
+                            const Text(
+                              '關聯舊書籍資料',
+                              style: TextStyle(
+                                color: _dialogAccent,
+                                fontSize: 10,
+                                letterSpacing: 1.6,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              '將舊書籍的閱讀進度、自訂資訊、閱讀統計與既有標註合併至目前檔案。',
+                              style: TextStyle(
+                                color: _dialogMuted,
+                                fontSize: 10,
+                                height: 1.5,
+                              ),
+                            ),
+                            if (_volumes.length > 1) ...[
+                              const SizedBox(height: 10),
+                              _label('選擇要接收舊資料的卷冊'),
+                              DropdownButtonFormField<String>(
+                                initialValue: _linkTargetId,
+                                items: _volumes
+                                    .map((volume) => DropdownMenuItem(
+                                          value: volume.id,
+                                          child: Text(
+                                            volume.fileName,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) setState(() => _linkTargetId = value);
+                                },
+                              ),
+                            ],
+                            const SizedBox(height: 9),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: OutlinedButton.icon(
+                                onPressed: _searchingLinks || _linkingOldBook
+                                    ? null
+                                    : _findOldBooks,
+                                icon: _searchingLinks
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.history, size: 16),
+                                label: const Text('搜尋舊書籍資料'),
+                              ),
+                            ),
+                            if (_linkStatus.isNotEmpty) ...[
+                              const SizedBox(height: 7),
+                              Text(
+                                _linkStatus,
+                                style: const TextStyle(
+                                  color: _dialogMuted,
+                                  fontSize: 10,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                            for (final candidate in _linkCandidates)
+                              _oldBookCandidate(candidate),
+                            if (busy) ...[
+                              const SizedBox(height: 10),
+                              const LinearProgressIndicator(
+                                color: _dialogAccent,
+                                backgroundColor: _dialogLine,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                  const SizedBox(height: 8),
-                ],
-                TextField(
-                  controller: _bangumiQuery,
-                  maxLength: 100,
-                  onSubmitted: (_) => _searchBangumi(),
-                  decoration: const InputDecoration(
-                    hintText: '漫畫名稱、日文原名或別名',
-                    counterText: '',
                   ),
                 ),
-                const SizedBox(height: 7),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.tonalIcon(
-                    onPressed: _searchingBangumi || _applyingBangumi ? null : _searchBangumi,
-                    icon: _searchingBangumi
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.search, size: 16),
-                    label: const Text('搜尋 Bangumi'),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  decoration: const BoxDecoration(
+                    color: _dialogPanel,
+                    border: Border(top: BorderSide(color: _dialogLine)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: busy ? null : () => Navigator.pop(context),
+                        child: const Text('返回'),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: busy ? null : _save,
+                        child: const Text('保存資訊'),
+                      ),
+                    ],
                   ),
                 ),
-                if (_bangumiStatus.isNotEmpty) ...[
-                  const SizedBox(height: 7),
-                  Text(_bangumiStatus,
-                      style: const TextStyle(color: _dialogMuted, fontSize: 10, height: 1.5)),
-                ],
-                for (final item in _bangumiCandidates) _bangumiCandidate(item),
               ],
-              const SizedBox(height: 20),
-              const Divider(color: _dialogLine),
-              const Text(
-                '關聯舊書籍資料',
-                style: TextStyle(color: _dialogAccent, fontSize: 10, letterSpacing: 1.6),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '將舊書籍的閱讀進度、自訂資訊、閱讀統計與既有標註合併至目前檔案。',
-                style: TextStyle(color: _dialogMuted, fontSize: 10, height: 1.5),
-              ),
-              if (_volumes.length > 1) ...[
-                const SizedBox(height: 10),
-                _label('選擇要接收舊資料的卷冊'),
-                DropdownButtonFormField<String>(
-                  initialValue: _linkTargetId,
-                  items: _volumes
-                      .map((volume) => DropdownMenuItem(
-                            value: volume.id,
-                            child: Text(volume.fileName, overflow: TextOverflow.ellipsis),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _linkTargetId = value);
-                  },
-                ),
-              ],
-              const SizedBox(height: 9),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: _searchingLinks || _linkingOldBook ? null : _findOldBooks,
-                  icon: _searchingLinks
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.history, size: 16),
-                  label: const Text('搜尋舊書籍資料'),
-                ),
-              ),
-              if (_linkStatus.isNotEmpty) ...[
-                const SizedBox(height: 7),
-                Text(_linkStatus,
-                    style: const TextStyle(color: _dialogMuted, fontSize: 10, height: 1.5)),
-              ],
-              for (final candidate in _linkCandidates) _oldBookCandidate(candidate),
-              if (_saving || _applyingBangumi || _linkingOldBook) ...[
-                const SizedBox(height: 10),
-                const LinearProgressIndicator(
-                  color: _dialogAccent,
-                  backgroundColor: _dialogLine,
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving || _applyingBangumi || _linkingOldBook
-              ? null
-              : () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: _saving || _applyingBangumi || _linkingOldBook ? null : _save,
-          child: const Text('保存資訊'),
-        ),
-      ],
     );
   }
 
