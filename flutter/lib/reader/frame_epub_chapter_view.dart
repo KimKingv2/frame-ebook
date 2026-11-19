@@ -6,6 +6,7 @@ import 'package:xml/xml.dart';
 
 import '../library/frame_reader_repository.dart';
 import 'frame_epub_cfi.dart';
+import 'frame_epub_footnote.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 
@@ -180,6 +181,7 @@ class FrameEpubChapterView extends StatefulWidget {
     this.onTextSelection,
     this.onPageZoomChanged,
     this.onInternalLink,
+    this.onFootnote,
     this.onExternalLink,
     super.key,
   })  : assert(fontSize >= 8 && fontSize <= 64),
@@ -207,6 +209,7 @@ class FrameEpubChapterView extends StatefulWidget {
   final ValueChanged<FrameEpubTextSelection?>? onTextSelection;
   final ValueChanged<bool>? onPageZoomChanged;
   final ValueChanged<String>? onInternalLink;
+  final ValueChanged<FrameEpubFootnote>? onFootnote;
   final ValueChanged<Uri>? onExternalLink;
 
   @override
@@ -845,7 +848,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final childStyle = _computedStyle(child, cascade, parentStyle);
       if (childStyle['display'] == 'none' ||
           childStyle['visibility'] == 'hidden' ||
-          _isNonVisualTag(tag)) {
+          _isNonVisualTag(tag) ||
+          FrameEpubFootnoteResolver.isFootnoteTarget(child)) {
         continue;
       }
       if (tag == 'br') {
@@ -991,7 +995,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   ) {
     final ordered = list.name.local.toLowerCase() == 'ol';
     final items = list.children.whereType<XmlElement>().where(
-          (element) => element.name.local.toLowerCase() == 'li',
+          (element) =>
+              element.name.local.toLowerCase() == 'li' &&
+              !FrameEpubFootnoteResolver.isFootnoteTarget(element),
         );
     final widgets = <Widget>[];
     var index = 0;
@@ -1028,6 +1034,24 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     );
   }
 
+
+  Future<void> _handleInternalAnchor(XmlElement anchor, String href) async {
+    final footnoteCallback = widget.onFootnote;
+    if (footnoteCallback != null) {
+      final footnote = await FrameEpubFootnoteResolver.resolve(
+        anchor: anchor,
+        chapter: widget.chapter,
+        resourceLoader: widget.resourceLoader,
+      );
+      if (!mounted) return;
+      if (footnote != null) {
+        footnoteCallback(footnote);
+        return;
+      }
+    }
+    if (mounted) widget.onInternalLink?.call(href);
+  }
+
   InlineSpan _inlineSpan(
     XmlElement element,
     Map<String, String> style,
@@ -1035,7 +1059,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     Map<TextSpan, _TextSpanSource> sourceSpans,
   ) {
     final tag = element.name.local.toLowerCase();
-    if (_isNonVisualTag(tag) || style['display'] == 'none') {
+    if (_isNonVisualTag(tag) ||
+        style['display'] == 'none' ||
+        FrameEpubFootnoteResolver.isFootnoteTarget(element)) {
       return const TextSpan();
     }
     if (tag == 'br') return const TextSpan(text: '\n');
@@ -1087,8 +1113,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           href,
           fromPath: widget.chapter.resource.path,
         );
-        if (reference.isInternal && widget.onInternalLink != null) {
-          onTap = () => widget.onInternalLink!(href);
+        if (reference.isInternal &&
+            (widget.onInternalLink != null || widget.onFootnote != null)) {
+          onTap = () => _handleInternalAnchor(element, href);
         } else if (reference.isExternal && widget.onExternalLink != null) {
           final uri = Uri.tryParse(href);
           if (uri != null) onTap = () => widget.onExternalLink!(uri);

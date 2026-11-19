@@ -10,6 +10,7 @@ import '../library/frame_reader_repository.dart';
 import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
+import 'frame_epub_footnote.dart';
 import 'frame_epub_cfi.dart';
 import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
@@ -432,6 +433,7 @@ class _FrameEpubReaderPreviewScreenState
                         _runNavigation(() => session.goToHref(href)),
                       );
                     },
+                    onFootnote: _showFootnote,
                   ),
                 ),
               ),
@@ -610,6 +612,71 @@ class _FrameEpubReaderPreviewScreenState
       flattened.addAll(_flattenToc(entry.children, depth: depth + 1));
     }
     return flattened;
+  }
+
+  Future<void> _showFootnote(FrameEpubFootnote footnote) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: _readerPanel,
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: 22,
+          vertical: 24,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.72,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        footnote.title,
+                        style: const TextStyle(
+                          color: _readerText,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '關閉註腳',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: _readerMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 12, color: Color(0x55393247)),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      footnote.content,
+                      style: const TextStyle(
+                        color: _readerText,
+                        fontSize: 15,
+                        height: 1.75,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showTableOfContents() async {
