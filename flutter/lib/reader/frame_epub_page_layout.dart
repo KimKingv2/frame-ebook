@@ -17,6 +17,22 @@ class FrameEpubPage {
 class FrameEpubPageLayout {
   FrameEpubPageLayout._();
 
+  /// Groups sequential single pages into two-page spreads.
+  ///
+  /// The final spread may contain one page. The renderer positions that page
+  /// in the first reading slot, respecting the book's reading direction.
+  static List<List<int>> groupIntoSpreads(int pageCount) {
+    if (pageCount <= 0) return const [];
+
+    final spreads = <List<int>>[];
+    for (var page = 0; page < pageCount; page += 2) {
+      spreads.add(List<int>.unmodifiable(
+        page + 1 < pageCount ? [page, page + 1] : [page],
+      ));
+    }
+    return List<List<int>>.unmodifiable(spreads);
+  }
+
   static List<FrameEpubPage> paginate({
     required List<double> itemHeights,
     required double availableHeight,
