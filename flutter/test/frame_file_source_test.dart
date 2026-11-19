@@ -122,6 +122,18 @@ void main() {
       ]));
     });
 
+
+    test('rejects broadcast streams so file bodies remain one-shot', () {
+      expect(
+        () => FrameFileResponse(
+          statusCode: 200,
+          stream: const Stream<List<int>>.empty().asBroadcastStream(),
+          onClose: () {},
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('close is idempotent and releases the source once', () async {
       var closeCount = 0;
       final response = FrameFileResponse(
