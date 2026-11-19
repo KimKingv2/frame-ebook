@@ -316,10 +316,13 @@ class FrameEpubResourceLoader {
         }
 
         if (name == 'link' && attributeName == 'href') {
-          final rel = element.attributes
-              .where((item) => item.name.local.toLowerCase() == 'rel')
-              .map((item) => item.value)
-              .firstOrNull ?? '';
+          var rel = '';
+          for (final item in element.attributes) {
+            if (item.name.local.toLowerCase() == 'rel') {
+              rel = item.value;
+              break;
+            }
+          }
           if (!_tokens(rel).contains('stylesheet')) continue;
         }
         final role = _documentAttributeRole(name, attributeName);
