@@ -183,6 +183,7 @@ class FrameEpubChapterView extends StatefulWidget {
     required this.resourceLoader,
     this.fixedLayout = false,
     this.paginated = false,
+    this.doublePageSpread = false,
     this.isRightToLeft = false,
     this.pageController,
     this.annotations = const [],
@@ -216,6 +217,7 @@ class FrameEpubChapterView extends StatefulWidget {
   final FrameEpubResourceLoader resourceLoader;
   final bool fixedLayout;
   final bool paginated;
+  final bool doublePageSpread;
   final bool isRightToLeft;
   final PageController? pageController;
   final List<FrameReaderAnnotation> annotations;
@@ -271,6 +273,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   int _paginationRevision = 0;
   Size? _paginationViewportSize;
   int? _initialPageForRestore;
+  bool _paginationSpreadActive = false;
   XmlText? _lastVisibleTextNode;
   int? _lastVisibleTextOffset;
 
@@ -308,6 +311,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       _restoreScheduled = false;
     } else {
       if (oldWidget.paginated != widget.paginated ||
+          oldWidget.doublePageSpread != widget.doublePageSpread ||
           oldWidget.isRightToLeft != widget.isRightToLeft ||
           oldWidget.pageController != widget.pageController ||
           oldWidget.fontSize != widget.fontSize ||
@@ -518,6 +522,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     _paginationPages = const [];
     _paginationViewportSize = null;
     _initialPageForRestore = null;
+    _paginationSpreadActive = false;
     _restoreScheduled = false;
   }
 
@@ -644,9 +649,20 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
 
     final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
-    final contentWidth = viewportSize.width < widget.contentMaxWidth
+    const spreadGutter = 24.0;
+    final spreadActive =
+        widget.doublePageSpread && viewportSize.width >= 760;
+    _paginationSpreadActive = spreadActive;
+
+    final singlePageWidth = viewportSize.width < widget.contentMaxWidth
         ? viewportSize.width
         : widget.contentMaxWidth;
+    final spreadWidthLimit = widget.contentMaxWidth * 2 + spreadGutter;
+    final spreadWidth = viewportSize.width < spreadWidthLimit
+        ? viewportSize.width
+        : spreadWidthLimit;
+    final pageWidth =
+        spreadActive ? (spreadWidth - spreadGutter) / 2 : singlePageWidth;
     final availableHeight = viewportSize.height - 60;
     _paginationTextKeyCursor = 0;
     _paginationTextPositions.clear();
@@ -655,8 +671,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       bodyStyle,
       cascade,
       flattenBlockContainers: true,
-      paginationWidth: (contentWidth - widget.horizontalPadding * 2)
-          .clamp(1.0, contentWidth)
+      paginationWidth: (pageWidth - widget.horizontalPadding * 2)
+          .clamp(1.0, pageWidth)
           .toDouble(),
       paginationMaxHeight: availableHeight > 1 ? availableHeight : 1,
       paginationTextScaler:
@@ -667,6 +683,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (_paginationViewportSize != null &&
         _paginationViewportSize != viewportSize) {
       _resetPaginationMeasurement();
+      _paginationSpreadActive = spreadActive;
     }
 
     if (!_paginationReady) {
@@ -681,7 +698,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               width: viewportSize.width,
               child: Center(
                 child: SizedBox(
-                  width: contentWidth,
+                  width: pageWidth,
                   child: Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: widget.horizontalPadding,
@@ -709,6 +726,38 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
     _scheduleInitialRestore();
     final pages = _paginationPages;
+    final spreads = spreadActive
+        ? FrameEpubPageLayout.groupIntoSpreads(pages.length)
+        : <List<int>>[
+            for (var index = 0; index < pages.length) [index],
+          ];
+
+    Widget buildPage(FrameEpubPage page) {
+      final pageItems = [
+        for (final itemIndex in page.itemIndices)
+          _keyedFlowItem(items, itemIndex),
+      ];
+      Widget content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: pageItems,
+      );
+      if (page.requiresVerticalScroll) {
+        content = SingleChildScrollView(child: content);
+      }
+      return SizedBox(
+        width: pageWidth,
+        height: viewportSize.height,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.horizontalPadding,
+            vertical: 30,
+          ),
+          child: content,
+        ),
+      );
+    }
+
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollUpdateNotification ||
@@ -721,36 +770,37 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         key: _viewportKey,
         controller: widget.pageController,
         reverse: widget.isRightToLeft,
-        itemCount: pages.length,
+        itemCount: spreads.length,
         onPageChanged: (_) => _scheduleVisiblePosition(),
-        itemBuilder: (context, pageIndex) {
-          final page = pages[pageIndex];
-          final pageItems = [
-            for (final itemIndex in page.itemIndices)
-              _keyedFlowItem(items, itemIndex),
-          ];
-          Widget content = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: pageItems,
-          );
-          if (page.requiresVerticalScroll) {
-            content = SingleChildScrollView(child: content);
+        itemBuilder: (context, spreadIndex) {
+          final pageIndices = spreads[spreadIndex];
+          final firstPage = pages[pageIndices.first];
+          if (!spreadActive) {
+            return SizedBox(
+              width: viewportSize.width,
+              height: viewportSize.height,
+              child: Center(child: buildPage(firstPage)),
+            );
           }
+
+          final children = <Widget>[buildPage(firstPage)];
+          if (pageIndices.length > 1) {
+            children.add(const SizedBox(width: spreadGutter));
+            children.add(buildPage(pages[pageIndices[1]]));
+          } else {
+            children.add(SizedBox(width: pageWidth + spreadGutter));
+          }
+
           return SizedBox(
-            width: viewportSize.width,
+            width: spreadWidth,
             height: viewportSize.height,
             child: Center(
-              child: SizedBox(
-                width: contentWidth,
-                height: viewportSize.height,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.horizontalPadding,
-                    vertical: 30,
-                  ),
-                  child: content,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textDirection: widget.isRightToLeft
+                    ? TextDirection.rtl
+                    : TextDirection.ltr,
+                children: children,
               ),
             ),
           );
@@ -894,14 +944,21 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       if (!mounted) return;
       if (widget.paginated && widget.pageController?.hasClients == true) {
         final controller = widget.pageController!;
-        final targetPage = _initialPageForRestore ??
+        final restoredSinglePage = _initialPageForRestore ??
             (widget.initialScrollFraction != null && _paginationPages.length > 1
                 ? (widget.initialScrollFraction! *
                         (_paginationPages.length - 1))
                     .round()
                 : 0);
+        final pageCount = _paginationSpreadActive
+            ? FrameEpubPageLayout.groupIntoSpreads(_paginationPages.length)
+                .length
+            : _paginationPages.length;
+        final targetPage = _paginationSpreadActive
+            ? restoredSinglePage ~/ 2
+            : restoredSinglePage;
         controller.jumpToPage(
-          targetPage.clamp(0, _paginationPages.length - 1).toInt(),
+          targetPage.clamp(0, pageCount - 1).toInt(),
         );
       } else {
         final controller = widget.scrollController;
@@ -942,7 +999,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final viewportRight = viewportLeft + viewportObject.size.width;
 
       if (widget.paginated) {
-        final visible = <({XmlText node, int offset, double top})>[];
+        final visible =
+            <({XmlText node, int offset, int itemIndex, double top})>[];
         for (final entry in _paginationTextPositions.entries) {
           final object = entry.key.currentContext?.findRenderObject();
           if (object is! RenderBox || !object.hasSize) continue;
@@ -956,14 +1014,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               origin.dx >= viewportRight - 1) {
             continue;
           }
+          final itemIndex = _flowItemIndexForFragment(object);
+          if (itemIndex == null) continue;
           visible.add((
             node: entry.value.node,
             offset: entry.value.offset,
+            itemIndex: itemIndex,
             top: top,
           ));
         }
         if (visible.isEmpty) return;
-        visible.sort((a, b) => a.top.compareTo(b.top));
+        visible.sort((a, b) {
+          final byReadingOrder = a.itemIndex.compareTo(b.itemIndex);
+          return byReadingOrder != 0
+              ? byReadingOrder
+              : a.top.compareTo(b.top);
+        });
         final first = visible.first;
         _lastVisibleTextNode = first.node;
         _lastVisibleTextOffset = first.offset;
@@ -975,11 +1041,14 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         );
         if (cfi == null) return;
         final pageController = widget.pageController;
+        final pageCount = _paginationSpreadActive
+            ? FrameEpubPageLayout.groupIntoSpreads(_paginationPages.length)
+                .length
+            : _paginationPages.length;
         final fraction = pageController != null &&
                 pageController.hasClients &&
-                _paginationPages.length > 1
-            ? ((pageController.page ?? 0).round() /
-                    (_paginationPages.length - 1))
+                pageCount > 1
+            ? ((pageController.page ?? 0).round() / (pageCount - 1))
                 .clamp(0.0, 1.0)
             : 0.0;
         widget.onReadingPosition!(cfi, fraction);
