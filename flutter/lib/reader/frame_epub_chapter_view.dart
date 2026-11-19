@@ -503,6 +503,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   }
 
 
+  void _handlePaginatedImageLayoutChanged() {
+    if (!mounted || !widget.paginated) return;
+    _resetPaginationMeasurement();
+    setState(() {});
+  }
+
   void _resetPaginationMeasurement() {
     _paginationRevision++;
     _paginationReady = false;
@@ -1857,6 +1863,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       maxHeight: _cssDimension(style['height'], widget.fontSize) ??
           (widget.fixedLayout ? double.infinity : 680),
       alt: alt,
+      onLayoutChanged:
+          widget.paginated ? _handlePaginatedImageLayoutChanged : null,
     );
   }
 
@@ -2280,6 +2288,7 @@ class _FrameEpubImage extends StatefulWidget {
     required this.maxWidth,
     required this.maxHeight,
     required this.alt,
+    this.onLayoutChanged,
   });
 
   final FrameEpubResourceLoader loader;
@@ -2289,6 +2298,7 @@ class _FrameEpubImage extends StatefulWidget {
   final double maxWidth;
   final double maxHeight;
   final String alt;
+  final VoidCallback? onLayoutChanged;
 
   @override
   State<_FrameEpubImage> createState() => _FrameEpubImageState();
@@ -2296,6 +2306,7 @@ class _FrameEpubImage extends StatefulWidget {
 
 class _FrameEpubImageState extends State<_FrameEpubImage> {
   late Future<Uint8List> _bytes;
+  bool _layoutChangeReported = false;
 
   @override
   void initState() {
@@ -2309,6 +2320,10 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
     if (!identical(oldWidget.resource, widget.resource) ||
         !identical(oldWidget.loader, widget.loader)) {
       _bytes = _load();
+      _layoutChangeReported = false;
+    }
+    if (oldWidget.onLayoutChanged != widget.onLayoutChanged) {
+      _layoutChangeReported = false;
     }
   }
 
@@ -2316,6 +2331,14 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
         widget.resource,
         maxBytes: widget.maxBytes,
       );
+
+  void _reportLayoutChanged() {
+    if (_layoutChangeReported || widget.onLayoutChanged == null) return;
+    _layoutChangeReported = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLayoutChanged?.call();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2340,6 +2363,7 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
             ),
           );
         }
+        _reportLayoutChanged();
         return LayoutBuilder(
           builder: (context, constraints) {
             final dpr = MediaQuery.devicePixelRatioOf(context);
