@@ -49,8 +49,12 @@ void main() {
         home: Scaffold(
           body: FrameEpubPageTurnSurface(
             controller: controller,
-            onNextChapter: () async => nextChapterCalls++,
-            onPreviousChapter: () async => previousChapterCalls++,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            onPreviousChapter: () async {
+              previousChapterCalls++;
+            },
             child: const SizedBox.expand(),
           ),
         ),
