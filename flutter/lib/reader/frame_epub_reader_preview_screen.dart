@@ -13,6 +13,7 @@ import '../transport/frame_file_source_factory.dart';
 import 'frame_epub_cfi.dart';
 import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
+import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
 
 const _readerChrome = Color(0xFF171420);
@@ -386,7 +387,19 @@ class _FrameEpubReaderPreviewScreenState
           child: Stack(
             children: [
               Positioned.fill(
-                child: FrameEpubChapterView(
+                child: FrameEpubPageTurnSurface(
+                  controller: _chapterScrollController,
+                  onPreviousChapter: session.canGoPrevious
+                      ? () async {
+                          await _runNavigation(session.goToPreviousChapter);
+                        }
+                      : null,
+                  onNextChapter: session.canGoNext
+                      ? () async {
+                          await _runNavigation(session.goToNextChapter);
+                        }
+                      : null,
+                  child: FrameEpubChapterView(
                   key: ValueKey(chapter.resource.path),
                   chapter: chapter,
                   resourceLoader: session.resourceLoader!,
@@ -406,6 +419,7 @@ class _FrameEpubReaderPreviewScreenState
                   onInternalLink: (href) {
                     unawaited(_runNavigation(() => session.goToHref(href)));
                   },
+                  ),
                 ),
               ),
               if (_selectedText != null && !session.isFixedLayout)
