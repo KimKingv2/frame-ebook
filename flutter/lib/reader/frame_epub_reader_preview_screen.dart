@@ -60,6 +60,7 @@ class _FrameEpubReaderPreviewScreenState
   int? _pendingPercent;
   String? _lastSavedCfi;
   _SelectedEpubText? _selectedText;
+  bool _isFixedPageZoomed = false;
 
   double _fontSize = 18;
   double _lineHeight = 1.75;
@@ -107,6 +108,7 @@ class _FrameEpubReaderPreviewScreenState
       _activeChapterPath = chapterPath;
       _lastSavedCfi = null;
       _selectedText = null;
+      _isFixedPageZoomed = false;
       final previousController = _chapterScrollController;
       _chapterScrollController = ScrollController();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -390,6 +392,10 @@ class _FrameEpubReaderPreviewScreenState
                 child: FrameEpubPageTurnSurface(
                   controller: _chapterScrollController,
                   fixedLayout: session.isFixedLayout,
+                  isRightToLeft: session.epub?.pageProgressionDirection ==
+                      FrameEpubPageProgressionDirection.rightToLeft,
+                  selectionActive: _selectedText != null,
+                  pageZoomed: _isFixedPageZoomed,
                   onPreviousChapter: session.canGoPrevious
                       ? () async {
                           await _runNavigation(session.goToPreviousChapter);
@@ -412,6 +418,10 @@ class _FrameEpubReaderPreviewScreenState
                     scrollController: _chapterScrollController,
                     onReadingPosition: _queueReadingPosition,
                     onTextSelection: _handleTextSelection,
+                    onPageZoomChanged: (zoomed) {
+                      if (!mounted || _isFixedPageZoomed == zoomed) return;
+                      setState(() => _isFixedPageZoomed = zoomed);
+                    },
                     backgroundColor: _pageBackground,
                     textColor: _pageText,
                     linkColor: _pageLink,

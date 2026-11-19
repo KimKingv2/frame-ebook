@@ -178,6 +178,7 @@ class FrameEpubChapterView extends StatefulWidget {
     this.scrollController,
     this.onReadingPosition,
     this.onTextSelection,
+    this.onPageZoomChanged,
     this.onInternalLink,
     this.onExternalLink,
     super.key,
@@ -204,6 +205,7 @@ class FrameEpubChapterView extends StatefulWidget {
   final ScrollController? scrollController;
   final void Function(String cfi, double chapterFraction)? onReadingPosition;
   final ValueChanged<FrameEpubTextSelection?>? onTextSelection;
+  final ValueChanged<bool>? onPageZoomChanged;
   final ValueChanged<String>? onInternalLink;
   final ValueChanged<Uri>? onExternalLink;
 
@@ -224,11 +226,32 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   Map<XmlText, List<_ResolvedTextAnnotation>> _annotationRangesByNode =
       HashMap.identity();
   bool _restoreScheduled = false;
+  final TransformationController _fixedLayoutTransformationController =
+      TransformationController();
+  bool _pageZoomed = false;
 
   @override
   void initState() {
     super.initState();
     _stylesFuture = _loadStylesheets();
+    _fixedLayoutTransformationController.addListener(_handleZoomChanged);
+  }
+
+  void _handleZoomChanged() {
+    final zoomed = _fixedLayoutTransformationController.value
+            .getMaxScaleOnAxis() >
+        1.02;
+    if (zoomed == _pageZoomed) return;
+    _pageZoomed = zoomed;
+    widget.onPageZoomChanged?.call(zoomed);
+  }
+
+  @override
+  void dispose() {
+    _fixedLayoutTransformationController
+      ..removeListener(_handleZoomChanged)
+      ..dispose();
+    super.dispose();
   }
 
   @override
@@ -351,6 +374,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             color: widget.backgroundColor,
             child: LayoutBuilder(
               builder: (context, constraints) => InteractiveViewer(
+                transformationController: _fixedLayoutTransformationController,
                 minScale: 1,
                 maxScale: 4,
                 boundaryMargin: const EdgeInsets.all(24),

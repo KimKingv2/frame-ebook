@@ -1,13 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Adds consistent keyboard page-turn behavior to the shared EPUB reader.
+/// Adds keyboard and touch page-turn behavior to the shared EPUB reader.
 ///
 /// Reflowable chapters move by approximately one viewport. At chapter edges,
-/// the callback loads the adjacent spine item. Fixed-layout EPUBs have no
-/// scrolling viewport, so each key press advances directly to the next page.
+/// the callback loads the adjacent spine item. Fixed-layout EPUBs navigate
+/// between spine items and keep zoomed image panning available.
 class FrameEpubPageTurnSurface extends StatefulWidget {
   const FrameEpubPageTurnSurface({
     required this.controller,
@@ -15,6 +16,9 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
     this.onPreviousChapter,
     this.onNextChapter,
     this.fixedLayout = false,
+    this.isRightToLeft = false,
+    this.selectionActive = false,
+    this.pageZoomed = false,
     super.key,
   });
 
@@ -23,14 +27,38 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   final Future<void> Function()? onPreviousChapter;
   final Future<void> Function()? onNextChapter;
   final bool fixedLayout;
+  final bool isRightToLeft;
+  final bool selectionActive;
+  final bool pageZoomed;
 
   @override
   State<FrameEpubPageTurnSurface> createState() =>
       _FrameEpubPageTurnSurfaceState();
 }
 
+class _TouchStart {
+  const _TouchStart({
+    required this.pointer,
+    required this.position,
+    required this.timeStamp,
+  });
+
+  final int pointer;
+  final Offset position;
+  final Duration timeStamp;
+}
+
 class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
+  static const _tapDuration = Duration(milliseconds: 300);
+  static const _swipeDuration = Duration(milliseconds: 500);
+  static const _tapSlop = 18.0;
+  static const _swipeDistance = 64.0;
+  static const _edgeFraction = 0.22;
+
   bool _isTurning = false;
+  final Set<int> _activeTouchPointers = {};
+  _TouchStart? _touchStart;
+  bool _multiTouchSequence = false;
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -51,6 +79,75 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     if (!backward && !forward) return KeyEventResult.ignored;
     unawaited(_turnPage(forward: forward));
     return KeyEventResult.handled;
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+
+    if (_activeTouchPointers.isNotEmpty) {
+      _multiTouchSequence = true;
+      _touchStart = null;
+    } else {
+      _multiTouchSequence = false;
+      _touchStart = _TouchStart(
+        pointer: event.pointer,
+        position: event.localPosition,
+        timeStamp: event.timeStamp,
+      );
+    }
+    _activeTouchPointers.add(event.pointer);
+  }
+
+  void _handlePointerUp(PointerUpEvent event, Size surfaceSize) {
+    if (!_activeTouchPointers.remove(event.pointer)) return;
+
+    final start = _touchStart;
+    final isMultiTouch = _multiTouchSequence || _activeTouchPointers.isNotEmpty;
+    if (_activeTouchPointers.isEmpty) {
+      _touchStart = null;
+      _multiTouchSequence = false;
+    }
+    if (isMultiTouch ||
+        start == null ||
+        start.pointer != event.pointer ||
+        widget.selectionActive ||
+        widget.pageZoomed ||
+        surfaceSize.width <= 0) {
+      return;
+    }
+
+    final elapsed = event.timeStamp - start.timeStamp;
+    if (elapsed.isNegative) return;
+    final delta = event.localPosition - start.position;
+    final dx = delta.dx;
+    final dy = delta.dy;
+
+    final horizontalSwipe = elapsed <= _swipeDuration &&
+        dx.abs() >= _swipeDistance &&
+        dx.abs() >= dy.abs() * 1.25;
+    if (horizontalSwipe) {
+      final forward = widget.isRightToLeft ? dx > 0 : dx < 0;
+      unawaited(_turnPage(forward: forward));
+      return;
+    }
+
+    final isTap = elapsed <= _tapDuration && delta.distance <= _tapSlop;
+    if (!isTap) return;
+
+    final edgeWidth = surfaceSize.width * _edgeFraction;
+    final onLeadingEdge = start.position.dx <= edgeWidth;
+    final onTrailingEdge =
+        start.position.dx >= surfaceSize.width - edgeWidth;
+    if (!onLeadingEdge && !onTrailingEdge) return;
+
+    final forward = widget.isRightToLeft ? onLeadingEdge : onTrailingEdge;
+    unawaited(_turnPage(forward: forward));
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (!_activeTouchPointers.remove(event.pointer)) return;
+    _touchStart = null;
+    if (_activeTouchPointers.isEmpty) _multiTouchSequence = false;
   }
 
   Future<void> _turnPage({required bool forward}) async {
@@ -95,16 +192,29 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   Future<void> _turnAdjacentChapter({required bool forward}) async {
-    final callback = forward
-        ? widget.onNextChapter
-        : widget.onPreviousChapter;
+    final callback =
+        forward ? widget.onNextChapter : widget.onPreviousChapter;
     if (callback != null) await callback();
   }
 
   @override
-  Widget build(BuildContext context) => Focus(
-        autofocus: true,
-        onKeyEvent: _handleKeyEvent,
-        child: widget.child,
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
+          return Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: _handlePointerDown,
+            onPointerUp: (event) => _handlePointerUp(event, size),
+            onPointerCancel: _handlePointerCancel,
+            child: Focus(
+              autofocus: true,
+              onKeyEvent: _handleKeyEvent,
+              child: widget.child,
+            ),
+          );
+        },
       );
 }

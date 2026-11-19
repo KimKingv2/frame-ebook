@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,6 +61,174 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
     await tester.pump();
+    expect(nextChapterCalls, 0);
+  });
+
+  testWidgets('fixed-layout left swipe advances to next page', (tester) async {
+    final controller = ScrollController();
+    var nextChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            fixedLayout: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      const Offset(600, 320),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(
+      const Offset(-120, 0),
+      timeStamp: const Duration(milliseconds: 100),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(nextChapterCalls, 1);
+  });
+
+  testWidgets('fixed-layout edge tap navigates according to reading direction',
+      (tester) async {
+    final controller = ScrollController();
+    var nextChapterCalls = 0;
+    var previousChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            fixedLayout: true,
+            isRightToLeft: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            onPreviousChapter: () async {
+              previousChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    var gesture = await tester.startGesture(
+      const Offset(30, 320),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.up();
+    await tester.pump();
+    expect(nextChapterCalls, 1);
+
+    gesture = await tester.startGesture(
+      const Offset(760, 320),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.up();
+    await tester.pump();
+    expect(previousChapterCalls, 1);
+  });
+
+  testWidgets('zoomed pages and selected text ignore touch page turns',
+      (tester) async {
+    final controller = ScrollController();
+    var nextChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            fixedLayout: true,
+            pageZoomed: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    var gesture = await tester.startGesture(
+      const Offset(760, 320),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.up();
+    await tester.pump();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            fixedLayout: true,
+            selectionActive: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    gesture = await tester.startGesture(
+      const Offset(760, 320),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(nextChapterCalls, 0);
+  });
+
+  testWidgets('vertical touch movement does not trigger page navigation',
+      (tester) async {
+    final controller = ScrollController();
+    var nextChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            fixedLayout: true,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      const Offset(400, 360),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(
+      const Offset(2, -140),
+      timeStamp: const Duration(milliseconds: 100),
+    );
+    await gesture.up();
+    await tester.pump();
+
     expect(nextChapterCalls, 0);
   });
 
