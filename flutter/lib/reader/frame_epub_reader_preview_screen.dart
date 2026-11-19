@@ -16,6 +16,7 @@ import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
+import 'frame_epub_reader_sidebar.dart';
 
 const _readerChrome = Color(0xFF171420);
 const _readerPanel = Color(0xFF211D2D);
@@ -425,7 +426,7 @@ class _FrameEpubReaderPreviewScreenState
             icon: const Icon(Icons.bookmark_add_outlined),
           ),
           IconButton(
-            tooltip: '筆記與書籤',
+            tooltip: '閱讀導覽',
             onPressed: session == null ? null : _showAnnotations,
             icon: const Icon(Icons.bookmarks_outlined),
           ),
@@ -728,18 +729,6 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  List<_FlattenedTocEntry> _flattenToc(
-    List<FrameEpubTocEntry> entries, {
-    int depth = 0,
-  }) {
-    final flattened = <_FlattenedTocEntry>[];
-    for (final entry in entries) {
-      flattened.add(_FlattenedTocEntry(entry, depth));
-      flattened.addAll(_flattenToc(entry.children, depth: depth + 1));
-    }
-    return flattened;
-  }
-
   Future<void> _showFootnote(FrameEpubFootnote footnote) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -805,14 +794,93 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Future<void> _showTableOfContents() async {
+  Future<void> _showTableOfContents() =>
+      _showReaderSidebar(initialTabIndex: 0);
+
+  Future<void> _showAnnotations() =>
+      _showReaderSidebar(initialTabIndex: 2);
+
+  Future<void> _showReaderSidebar({required int initialTabIndex}) async {
     final session = _session;
     if (session == null) return;
-    final entries = _flattenToc(session.toc);
-    final currentIndex = session.currentSpineIndex;
-    final currentPath = currentIndex == null
-        ? null
-        : session.epub?.spine[currentIndex].item.path;
+
+    Widget buildSidebar(BuildContext routeContext) =>
+        FrameEpubReaderSidebar(
+          toc: session.toc,
+          currentPath: session.currentSpineIndex == null
+              ? null
+              : session.epub?.spine[session.currentSpineIndex!].item.path,
+          annotations: session.annotations,
+          initialTabIndex: initialTabIndex,
+          onClose: () => Navigator.of(routeContext).pop(),
+          onSelectToc: (entry) {
+            Navigator.of(routeContext).pop();
+            unawaited(
+              _runNavigation(() => session.goToTocEntry(entry)),
+            );
+          },
+          onOpenAnnotation: (annotation) {
+            Navigator.of(routeContext).pop();
+            unawaited(_goToAnnotation(annotation));
+          },
+          onEditNote: (annotation) {
+            Navigator.of(routeContext).pop();
+            unawaited(_editNote(annotation: annotation));
+          },
+          onDeleteAnnotation: (annotation) async {
+            try {
+              await session.deleteAnnotation(annotation.id);
+              if (!mounted) return false;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已刪除標註。')),
+              );
+              return true;
+            } on Object catch (error) {
+              if (!mounted) return false;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('刪除標註失敗：$error')),
+              );
+              return false;
+            }
+          },
+        );
+
+    final screenSize = MediaQuery.sizeOf(context);
+    if (screenSize.width >= 840) {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: '關閉閱讀導覽',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          final width =
+              (MediaQuery.sizeOf(dialogContext).width * .42)
+                  .clamp(340.0, 460.0)
+                  .toDouble();
+          return Align(
+            alignment: Alignment.centerRight,
+            child: SafeArea(
+              child: SizedBox(
+                width: width,
+                height: double.infinity,
+                child: buildSidebar(dialogContext),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+          final position = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          ).animate(animation);
+          return SlideTransition(position: position, child: child);
+        },
+      );
+      return;
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -820,78 +888,8 @@ class _FrameEpubReaderPreviewScreenState
       useSafeArea: true,
       backgroundColor: _readerPanel,
       builder: (sheetContext) => SizedBox(
-        height: MediaQuery.of(sheetContext).size.height * 0.72,
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: Row(
-                children: [
-                  Icon(Icons.menu_book_outlined, color: _readerAccent),
-                  SizedBox(width: 10),
-                  Text(
-                    'EPUB 目錄',
-                    style: TextStyle(
-                      color: _readerText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Color(0x55393247)),
-            Expanded(
-              child: entries.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '這本 EPUB 沒有提供可用目錄。',
-                        style: TextStyle(color: _readerMuted),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final item = entries[index];
-                        final entry = item.entry;
-                        final available = !entry.isExternal &&
-                            entry.reference?.path != null;
-                        final selected = entry.path == currentPath;
-                        return Padding(
-                          padding: EdgeInsets.only(left: item.depth * 14),
-                          child: ListTile(
-                            dense: true,
-                            enabled: available,
-                            selected: selected,
-                            selectedTileColor: const Color(0x332A213B),
-                            title: Text(
-                              entry.label.isEmpty ? '未命名項目' : entry.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: selected
-                                    ? _readerAccent
-                                    : _readerText,
-                                fontSize: 13,
-                              ),
-                            ),
-                            onTap: available
-                                ? () {
-                                    Navigator.of(sheetContext).pop();
-                                    unawaited(
-                                      _runNavigation(
-                                        () => session.goToTocEntry(entry),
-                                      ),
-                                    );
-                                  }
-                                : null,
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+        height: MediaQuery.sizeOf(sheetContext).height * .84,
+        child: buildSidebar(sheetContext),
       ),
     );
   }
@@ -1261,138 +1259,6 @@ class _FrameEpubReaderPreviewScreenState
         SnackBar(content: Text('無法跳轉至標註位置：$error')),
       );
     }
-  }
-
-  Future<void> _showAnnotations() async {
-    final session = _session;
-    if (session == null) return;
-    var annotations = session.annotations;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _readerPanel,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => SizedBox(
-          height: MediaQuery.of(sheetContext).size.height * 0.68,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bookmarks_outlined, color: _readerAccent),
-                    const SizedBox(width: 10),
-                    Text(
-                      '筆記與書籤（${annotations.length}）',
-                      style: const TextStyle(
-                        color: _readerText,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0x55393247)),
-              Expanded(
-                child: annotations.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '目前沒有已保存的筆記或書籤。',
-                          style: TextStyle(color: _readerMuted),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: annotations.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1, color: Color(0x33393247)),
-                        itemBuilder: (context, index) {
-                          final annotation = annotations[index];
-                          final title = switch (annotation.type) {
-                            'bookmark' => '書籤',
-                            'highlight' => '劃線',
-                            _ => '筆記',
-                          };
-                          final detail = annotation.text.trim().isNotEmpty
-                              ? annotation.text.trim()
-                              : annotation.quote.trim();
-                          return ListTile(
-                            onTap: annotation.cfi.trim().isEmpty
-                                ? null
-                                : () {
-                                    Navigator.of(sheetContext).pop();
-                                    unawaited(_goToAnnotation(annotation));
-                                  },
-                            title: Text(
-                              title,
-                              style: const TextStyle(
-                                color: _readerText,
-                                fontSize: 13,
-                              ),
-                            ),
-                            subtitle: Text(
-                              detail.isEmpty ? '尚無文字內容' : detail,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _readerMuted,
-                                fontSize: 12,
-                                height: 1.5,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (annotation.type == 'note')
-                                  IconButton(
-                                    tooltip: '編輯筆記',
-                                    onPressed: () {
-                                      Navigator.of(sheetContext).pop();
-                                      unawaited(_editNote(annotation: annotation));
-                                    },
-                                    icon: const Icon(
-                                      Icons.edit_outlined,
-                                      color: _readerAccent,
-                                      size: 18,
-                                    ),
-                                  ),
-                                IconButton(
-                                  tooltip: '刪除$title',
-                                  onPressed: () async {
-                                    try {
-                                      await session.deleteAnnotation(annotation.id);
-                                      if (!mounted) return;
-                                      setSheetState(() {
-                                        annotations = session.annotations;
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('已刪除$title。')),
-                                      );
-                                    } on Object catch (error) {
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('刪除$title失敗：$error')),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    color: Color(0xFFBBAFCB),
-                                    size: 19,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _appearanceDropdown({
@@ -1784,11 +1650,4 @@ class _SelectedEpubText {
 
   final String cfi;
   final String quote;
-}
-
-class _FlattenedTocEntry {
-  const _FlattenedTocEntry(this.entry, this.depth);
-
-  final FrameEpubTocEntry entry;
-  final int depth;
 }
