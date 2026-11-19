@@ -146,6 +146,30 @@ class FrameEpubCfi {
     );
   }
 
+  static double textFraction(
+    XmlDocument document,
+    XmlNode node,
+    int offset,
+  ) {
+    final texts = document.descendants.whereType<XmlText>().toList();
+    final total = texts.fold<int>(0, (sum, item) => sum + item.value.length);
+    if (total <= 0) return 0;
+    var before = 0;
+    for (final text in texts) {
+      if (identical(text, node)) {
+        before += offset.clamp(0, text.value.length).toInt();
+        return (before / total).clamp(0.0, 1.0);
+      }
+      before += text.value.length;
+    }
+    if (node is XmlElement) {
+      for (final text in node.descendants.whereType<XmlText>()) {
+        return textFraction(document, text, 0);
+      }
+    }
+    return (before / total).clamp(0.0, 1.0);
+  }
+
   static XmlElement? anchorForFragment(
     XmlDocument document,
     String fragment,
