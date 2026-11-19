@@ -466,6 +466,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(Image), findsOneWidget);
+      final fitWidthSize = tester.getSize(find.byType(Image));
+      expect(fitWidthSize.width, closeTo(420, 1));
+      expect(fitWidthSize.height, closeTo(420, 1));
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(
@@ -484,6 +487,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(Image), findsOneWidget);
+      final fitPageSize = tester.getSize(find.byType(Image));
+      expect(fitPageSize.width, closeTo(420, 1));
+      expect(fitPageSize.height, closeTo(620, 1));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
