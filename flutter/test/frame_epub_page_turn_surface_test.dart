@@ -268,8 +268,8 @@ void main() {
   testWidgets('paginated mode advances and reverses one real page', (tester) async {
     final scrollController = ScrollController();
     final pageController = PageController();
-    await tester.view.setPhysicalSize(const Size(800, 600));
-    await tester.view.setDevicePixelRatio(1);
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -301,8 +301,8 @@ void main() {
     expect(pageController.page, 0);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.view.resetPhysicalSize();
-    await tester.view.resetDevicePixelRatio();
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
     pageController.dispose();
     scrollController.dispose();
   });
