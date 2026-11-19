@@ -38,6 +38,7 @@ class NativeBuildPolicyTests(unittest.TestCase):
             "flutter/pubspec.yaml",
             "flutter/pubspec.lock",
             "flutter/tool/prepare_platforms.py",
+            "flutter/tool/prepare_fonts.py",
             "flutter/assets/fonts/NotoSansTC-VF.ttf",
         ]
         self.assertEqual(native_targets(paths), (True, True))

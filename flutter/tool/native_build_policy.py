@@ -22,6 +22,7 @@ SHARED_NATIVE_FILES = {
     "flutter/pubspec.yaml",
     "flutter/pubspec.lock",
     "flutter/tool/prepare_platforms.py",
+    "flutter/tool/prepare_fonts.py",
 }
 
 
