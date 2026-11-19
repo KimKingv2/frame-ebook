@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Vertically presents fixed-layout EPUB spine items as a lazy comic strip.
 ///
