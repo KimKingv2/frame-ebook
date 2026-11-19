@@ -1,3 +1,4 @@
+import '../library/frame_book.dart';
 import 'frame_file_source.dart';
 import 'frame_transport.dart';
 
