@@ -77,14 +77,14 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve appearance panel and its open/close interactions.
 - [ ] Preserve font size options: 0.9, 1.0, 1.1, 1.2 and 1.3.
 - [ ] Preserve line-height options: 1.45, 1.65, 1.85 and 2.0.
-- [ ] Preserve font families: original, serif and sans.
-- [ ] Preserve font weight choices: original, normal and medium.
-- [ ] Preserve paragraph spacing choices: original, compact, standard and loose.
-- [ ] Preserve text alignment choices: original, left and justify.
+- [ ] Preserve font families: original, serif and sans. Flutter Preview now exposes all three; platform-specific font fallback parity still requires device verification.
+- [ ] Preserve font weight choices: original, normal and medium. Flutter Preview now exposes the Legacy values.
+- [ ] Preserve paragraph spacing choices: original, compact, standard and loose. Flutter Preview now exposes the Legacy values.
+- [ ] Preserve text alignment choices: original, left and justify. Flutter Preview now exposes the Legacy values.
 - [ ] Preserve EPUB reading modes: paginated and continuous scrolling. The Flutter Preview now has an initial single-page mode and continuous-scroll switch; full Legacy parity is still pending.
 - [ ] Preserve EPUB page layout: single-page and double-page preferred. Single-page pagination and responsive two-page spreads exist in the reflowable EPUB Flutter Preview; full Legacy parity remains pending.
-- [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px.
-- [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent.
+- [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px. Flutter Preview now exposes these values.
+- [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent. Flutter Preview now exposes these values for paginated layouts.
 - [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling.
 - [ ] Preserve comic page layouts: single-page and double-page preferred.
 - [ ] Preserve comic image fitting: fit-page and fit-width.
