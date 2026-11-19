@@ -3,7 +3,7 @@ name: FRAME Ebook Flutter CI
 on:
   push:
     branches:
-      - feat/flutter-three-platform
+      - "feat/flutter-*"
       - main
     paths:
       - "flutter/**"
