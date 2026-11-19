@@ -55,6 +55,9 @@ class _FrameEpubReaderPreviewScreenState
   FrameFileSource? _fileSource;
   FrameEpubReaderSession? _session;
   late ScrollController _chapterScrollController;
+  late PageController _chapterPageController;
+  String _layoutMode = 'continuous';
+  String? _lastVisibleCfi;
   String? _activeChapterPath;
   Timer? _progressSaveTimer;
   String? _pendingCfi;
@@ -71,6 +74,7 @@ class _FrameEpubReaderPreviewScreenState
   void initState() {
     super.initState();
     _chapterScrollController = ScrollController();
+    _chapterPageController = PageController();
   }
 
   @override
@@ -108,12 +112,16 @@ class _FrameEpubReaderPreviewScreenState
     if (chapterPath != null && chapterPath != _activeChapterPath) {
       _activeChapterPath = chapterPath;
       _lastSavedCfi = null;
+      _lastVisibleCfi = null;
       _selectedText = null;
       _isFixedPageZoomed = false;
       final previousController = _chapterScrollController;
+      final previousPageController = _chapterPageController;
       _chapterScrollController = ScrollController();
+      _chapterPageController = PageController();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         previousController.dispose();
+        previousPageController.dispose();
       });
     }
     if (session?.status == FrameEpubReaderStatus.ready &&
@@ -140,6 +148,11 @@ class _FrameEpubReaderPreviewScreenState
         .toDouble();
     final theme = appearance['frameFlutterTheme']?.toString() ?? 'dark';
     _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme : 'dark';
+    final layoutMode =
+        appearance['frameFlutterLayoutMode']?.toString() ?? 'continuous';
+    _layoutMode = const {'continuous', 'paginated'}.contains(layoutMode)
+        ? layoutMode
+        : 'continuous';
   }
 
   @override
@@ -160,11 +173,24 @@ class _FrameEpubReaderPreviewScreenState
     final source = _fileSource;
     if (source is FrameCloudFileSource) source.close();
     _chapterScrollController.dispose();
+    _chapterPageController.dispose();
   }
 
   XmlElement? _initialAnchorFor(FrameEpubReaderSession session) {
     final chapter = session.currentChapter;
-    if (chapter == null) return null;
+    final epub = session.epub;
+    if (chapter == null || epub == null) return null;
+    final visibleCfi = _lastVisibleCfi;
+    if (visibleCfi != null &&
+        FrameEpubCfi.spineIndexFromCfi(epub, visibleCfi) ==
+            session.currentSpineIndex) {
+      final location = FrameEpubCfi.resolve(
+        book: epub,
+        document: chapter.document,
+        cfi: visibleCfi,
+      );
+      if (location != null) return location.anchorElement;
+    }
     return session.initialAnchor ??
         FrameEpubCfi.anchorForFragment(
           chapter.document,
@@ -192,6 +218,7 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   void _queueReadingPosition(String cfi, double chapterFraction) {
+    _lastVisibleCfi = cfi;
     final session = _session;
     final index = session?.currentSpineIndex;
     final count = session?.epub?.spine.length ?? 0;
@@ -392,6 +419,8 @@ class _FrameEpubReaderPreviewScreenState
               Positioned.fill(
                 child: FrameEpubPageTurnSurface(
                   controller: _chapterScrollController,
+                  pageController: _chapterPageController,
+                  paginated: _layoutMode == 'paginated' && !session.isFixedLayout,
                   fixedLayout: session.isFixedLayout,
                   isRightToLeft: session.epub?.pageProgressionDirection ==
                       FrameEpubPageProgressionDirection.rightToLeft,
@@ -412,6 +441,11 @@ class _FrameEpubReaderPreviewScreenState
                     chapter: chapter,
                     resourceLoader: session.resourceLoader!,
                     fixedLayout: session.isFixedLayout,
+                    paginated: _layoutMode == 'paginated' && !session.isFixedLayout,
+                    isRightToLeft:
+                        session.epub?.pageProgressionDirection ==
+                            FrameEpubPageProgressionDirection.rightToLeft,
+                    pageController: _chapterPageController,
                     annotations: session.annotations,
                     spineIndex: chapterIndex,
                     initialAnchor: _initialAnchorFor(session),
@@ -1275,6 +1309,7 @@ class _FrameEpubReaderPreviewScreenState
     var fontSize = _fontSize;
     var lineHeight = _lineHeight;
     var theme = _theme;
+    var layoutMode = _layoutMode;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1348,7 +1383,44 @@ class _FrameEpubReaderPreviewScreenState
                 onChanged: (value) =>
                     setSheetState(() => lineHeight = value),
               ),
+              const SizedBox(height: 14),
+              const Text(
+                '版面模式',
+                style: TextStyle(color: _readerMuted),
+              ),
               const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('連續捲動'),
+                    selected: layoutMode == 'continuous',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'continuous',
+                            ),
+                  ),
+                  ChoiceChip(
+                    label: const Text('單頁分頁'),
+                    selected: layoutMode == 'paginated',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'paginated',
+                            ),
+                  ),
+                ],
+              ),
+              if (session.isFixedLayout)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    '固定版面 EPUB 會依原始頁面顯示，這項設定不適用。',
+                    style: TextStyle(color: _readerMuted, fontSize: 11),
+                  ),
+                ),
+              const SizedBox(height: 14),
               const Text(
                 '閱讀主題',
                 style: TextStyle(color: _readerMuted),
@@ -1380,10 +1452,20 @@ class _FrameEpubReaderPreviewScreenState
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: () async {
+                  if (_layoutMode != layoutMode ||
+                      _fontSize != fontSize ||
+                      _lineHeight != lineHeight) {
+                    final previousPageController = _chapterPageController;
+                    _chapterPageController = PageController();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      previousPageController.dispose();
+                    });
+                  }
                   setState(() {
                     _fontSize = fontSize;
                     _lineHeight = lineHeight;
                     _theme = theme;
+                    _layoutMode = layoutMode;
                   });
                   Navigator.of(sheetContext).pop();
                   try {
@@ -1391,6 +1473,7 @@ class _FrameEpubReaderPreviewScreenState
                       'frameFlutterFontSize': fontSize,
                       'frameFlutterLineHeight': lineHeight,
                       'frameFlutterTheme': theme,
+                      'frameFlutterLayoutMode': layoutMode,
                     });
                   } on Object catch (error) {
                     if (!mounted) return;
