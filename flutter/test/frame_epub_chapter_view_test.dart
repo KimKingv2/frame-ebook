@@ -424,8 +424,8 @@ void main() {
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
 
-      await tester.view.setPhysicalSize(const Size(320, 220));
-      await tester.view.setDevicePixelRatio(1);
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: FrameEpubChapterView(
@@ -451,8 +451,8 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
-      await tester.view.resetPhysicalSize();
-      await tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
       pageController.dispose();
       await archive.close();
     }
