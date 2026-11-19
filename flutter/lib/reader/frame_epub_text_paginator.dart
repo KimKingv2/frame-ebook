@@ -1,4 +1,5 @@
 import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
 
 /// Splits rich text into line-aligned fragments that fit a page's height.
 ///
