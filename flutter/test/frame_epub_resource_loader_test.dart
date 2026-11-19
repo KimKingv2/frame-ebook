@@ -282,7 +282,9 @@ void main() {
         final inlineSvg = chapter.references.firstWhere(
           (reference) => reference.reference.path == 'OPS/Images/inline.svg',
         );
-        expect(inlineSvg.kind, FrameEpubResourceKind.image);
+        expect(inlineSvg.kind, FrameEpubResourceKind.svg);
+        final svgResource = loader.resource('OPS/Images/inline.svg')!;
+        expect(await loader.readText(svgResource), '<svg/>');
 
         final sameChapterLink = chapter.references.firstWhere(
           (reference) =>
