@@ -39,16 +39,18 @@ class _TextSpanSource {
   final List<int> sourceOffsets;
 }
 
-class _PositionedTextSource {
-  const _PositionedTextSource({
+class FrameEpubTextRangeSource {
+  const FrameEpubTextRangeSource({
     required this.start,
     required this.end,
-    required this.source,
+    required this.node,
+    required this.sourceOffsets,
   });
 
   final int start;
   final int end;
-  final _TextSpanSource source;
+  final XmlText node;
+  final List<int> sourceOffsets;
 }
 
 class _TextSelectionEndpoint {
@@ -56,6 +58,83 @@ class _TextSelectionEndpoint {
 
   final XmlText node;
   final int offset;
+}
+
+class FrameEpubTextSelectionMapper {
+  FrameEpubTextSelectionMapper._();
+
+  /// Maps the UTF-16 offsets reported by Flutter back to the source XHTML
+  /// text nodes used to create each rendered TextSpan.
+  static FrameEpubTextSelection? map({
+    required TextSelection selection,
+    required String displayedText,
+    required List<FrameEpubTextRangeSource> sources,
+  }) {
+    if (selection.isCollapsed ||
+        sources.isEmpty ||
+        selection.start < 0 ||
+        selection.end > displayedText.length ||
+        selection.end <= selection.start) {
+      return null;
+    }
+
+    _TextSelectionEndpoint endpoint(int offset, {required bool isEnd}) {
+      _TextSelectionEndpoint at(
+        FrameEpubTextRangeSource source,
+        int displayOffset,
+      ) {
+        final index = (displayOffset - source.start)
+            .clamp(0, source.sourceOffsets.length - 1)
+            .toInt();
+        return _TextSelectionEndpoint(
+          source.node,
+          source.sourceOffsets[index],
+        );
+      }
+
+      if (isEnd) {
+        for (final source in sources.reversed) {
+          if (offset > source.start && offset <= source.end) {
+            return at(source, offset);
+          }
+        }
+        for (final source in sources.reversed) {
+          if (source.end <= offset) return at(source, source.end);
+        }
+        return at(sources.first, sources.first.start);
+      }
+
+      for (final source in sources) {
+        if (offset >= source.start && offset < source.end) {
+          return at(source, offset);
+        }
+      }
+      for (final source in sources) {
+        if (source.start >= offset) return at(source, source.start);
+      }
+      final last = sources.last;
+      return at(last, last.end);
+    }
+
+    final start = endpoint(selection.start, isEnd: false);
+    final end = endpoint(selection.end, isEnd: true);
+    if (identical(start.node, end.node) && start.offset >= end.offset) {
+      return null;
+    }
+    final quote = displayedText
+        .substring(selection.start, selection.end)
+        .replaceAll('\uFFFC', '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (quote.isEmpty || quote.length > 12000) return null;
+    return FrameEpubTextSelection(
+      startNode: start.node,
+      startOffset: start.offset,
+      endNode: end.node,
+      endOffset: end.offset,
+      quote: quote,
+    );
+  }
 }
 
 /// Shared Flutter renderer for one parsed EPUB chapter.
@@ -472,7 +551,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         style: _textStyle(parentStyle),
         children: spans,
       );
-      final positionedSources = <_PositionedTextSource>[];
+      final positionedSources = <FrameEpubTextRangeSource>[];
       final plainText = StringBuffer();
       var cursor = 0;
 
@@ -482,10 +561,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           if (value != null && value.isNotEmpty) {
             final source = sourceSpans[span];
             if (source != null) {
-              positionedSources.add(_PositionedTextSource(
+              positionedSources.add(FrameEpubTextRangeSource(
                 start: cursor,
                 end: cursor + value.length,
-                source: source,
+                node: source.node,
+                sourceOffsets: source.sourceOffsets,
               ));
             }
             plainText.write(value);
@@ -510,10 +590,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         onSelectionChanged: (selection, cause) {
           final callback = widget.onTextSelection;
           if (callback == null) return;
-          callback(_mapSelection(
-            selection,
-            displayedText,
-            positionedSources,
+          callback(FrameEpubTextSelectionMapper.map(
+            selection: selection,
+            displayedText: displayedText,
+            sources: positionedSources,
           ));
         },
       ));
@@ -604,77 +684,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
 
     return _PreparedEpubText(output.toString(), sourceOffsets);
-  }
-
-  FrameEpubTextSelection? _mapSelection(
-    TextSelection selection,
-    String displayedText,
-    List<_PositionedTextSource> sources,
-  ) {
-    if (selection.isCollapsed ||
-        sources.isEmpty ||
-        selection.start < 0 ||
-        selection.end > displayedText.length ||
-        selection.end <= selection.start) {
-      return null;
-    }
-
-    _TextSelectionEndpoint endpoint(int offset, {required bool isEnd}) {
-      _TextSelectionEndpoint at(
-        _PositionedTextSource source,
-        int displayOffset,
-      ) {
-        final index = (displayOffset - source.start)
-            .clamp(0, source.source.sourceOffsets.length - 1)
-            .toInt();
-        return _TextSelectionEndpoint(
-          source.source.node,
-          source.source.sourceOffsets[index],
-        );
-      }
-
-      if (isEnd) {
-        for (final source in sources.reversed) {
-          if (offset > source.start && offset <= source.end) {
-            return at(source, offset);
-          }
-        }
-        for (final source in sources.reversed) {
-          if (source.end <= offset) return at(source, source.end);
-        }
-        return at(sources.first, sources.first.start);
-      }
-
-      for (final source in sources) {
-        if (offset >= source.start && offset < source.end) {
-          return at(source, offset);
-        }
-      }
-      for (final source in sources) {
-        if (source.start >= offset) return at(source, source.start);
-      }
-      final last = sources.last;
-      return at(last, last.end);
-    }
-
-    final start = endpoint(selection.start, isEnd: false);
-    final end = endpoint(selection.end, isEnd: true);
-    if (identical(start.node, end.node) && start.offset >= end.offset) {
-      return null;
-    }
-    final quote = displayedText
-        .substring(selection.start, selection.end)
-        .replaceAll('\uFFFC', '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (quote.isEmpty || quote.length > 12000) return null;
-    return FrameEpubTextSelection(
-      startNode: start.node,
-      startOffset: start.offset,
-      endNode: end.node,
-      endOffset: end.offset,
-      quote: quote,
-    );
   }
 
   Widget _buildBlock(

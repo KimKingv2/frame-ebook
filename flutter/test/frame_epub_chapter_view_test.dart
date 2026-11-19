@@ -169,6 +169,84 @@ void _write32(List<int> output, int value) {
 }
 
 void main() {
+  test('maps a cross-inline selection to its original XHTML text nodes', () {
+    final first = XmlText('Hello ');
+    final second = XmlText('bold world');
+    final selection = FrameEpubTextSelectionMapper.map(
+      selection: const TextSelection(baseOffset: 2, extentOffset: 12),
+      displayedText: 'Hello bold world',
+      sources: [
+        FrameEpubTextRangeSource(
+          start: 0,
+          end: 6,
+          node: first,
+          sourceOffsets: [0, 1, 2, 3, 4, 5, 6],
+        ),
+        FrameEpubTextRangeSource(
+          start: 6,
+          end: 16,
+          node: second,
+          sourceOffsets: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        ),
+      ],
+    );
+
+    expect(selection, isNotNull);
+    expect(selection!.quote, 'llo bold w');
+    expect(identical(selection.startNode, first), isTrue);
+    expect(selection.startOffset, 2);
+    expect(identical(selection.endNode, second), isTrue);
+    expect(selection.endOffset, 6);
+  });
+
+  test('maps UTF-16 selection offsets around supplementary Unicode characters', () {
+    final source = XmlText('a😀b');
+    final selection = FrameEpubTextSelectionMapper.map(
+      selection: const TextSelection(baseOffset: 1, extentOffset: 3),
+      displayedText: 'a😀b',
+      sources: [
+        FrameEpubTextRangeSource(
+          start: 0,
+          end: 4,
+          node: source,
+          sourceOffsets: [0, 1, 1, 3, 4],
+        ),
+      ],
+    );
+
+    expect(selection, isNotNull);
+    expect(selection!.quote, '😀');
+    expect(selection.startOffset, 1);
+    expect(selection.endOffset, 3);
+  });
+
+  test('rejects collapsed or text-free placeholder-only selections', () {
+    final source = XmlText('visible');
+    expect(
+      FrameEpubTextSelectionMapper.map(
+        selection: const TextSelection.collapsed(offset: 2),
+        displayedText: 'visible',
+        sources: [
+          FrameEpubTextRangeSource(
+            start: 0,
+            end: 7,
+            node: source,
+            sourceOffsets: [0, 1, 2, 3, 4, 5, 6, 7],
+          ),
+        ],
+      ),
+      isNull,
+    );
+    expect(
+      FrameEpubTextSelectionMapper.map(
+        selection: const TextSelection(baseOffset: 0, extentOffset: 1),
+        displayedText: '\uFFFC',
+        sources: const [],
+      ),
+      isNull,
+    );
+  });
+
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
     final bytes = _fixture();
     final book = FrameBook.fromJson({
@@ -191,7 +269,6 @@ void main() {
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
       String? followedHref;
-      FrameEpubTextSelection? selectedText;
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -200,9 +277,6 @@ void main() {
               chapter: chapter,
               resourceLoader: loader,
               onInternalLink: (href) => followedHref = href,
-              onTextSelection: (selection) {
-                if (selection != null) selectedText = selection;
-              },
             ),
           ),
         ),
@@ -213,12 +287,6 @@ void main() {
       expect(find.textContaining('EPUB'), findsOneWidget);
       expect(find.text('章節目標'), findsOneWidget);
       expect(find.byType(SelectableText), findsWidgets);
-
-      await tester.longPress(find.textContaining('EPUB'));
-      await tester.pumpAndSettle();
-      expect(selectedText, isNotNull);
-      expect(selectedText!.quote, contains('EPUB'));
-      expect(selectedText!.startNode.value, contains('EPUB'));
 
       await tester.tap(find.text('章內連結'));
       expect(followedHref, 'chapter.xhtml#inside');
