@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
+import '../library/frame_reader_repository.dart';
 import 'frame_epub_cfi.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
@@ -58,6 +59,20 @@ class _TextSelectionEndpoint {
 
   final XmlText node;
   final int offset;
+}
+
+class _ResolvedTextAnnotation {
+  const _ResolvedTextAnnotation({
+    required this.start,
+    required this.end,
+    required this.type,
+    required this.color,
+  });
+
+  final int start;
+  final int end;
+  final String type;
+  final String color;
 }
 
 class FrameEpubTextSelectionMapper {
@@ -147,6 +162,7 @@ class FrameEpubChapterView extends StatefulWidget {
     required this.chapter,
     required this.resourceLoader,
     this.fixedLayout = false,
+    this.annotations = const [],
     this.backgroundColor = const Color(0xFF171420),
     this.textColor = const Color(0xFFECE7F4),
     this.linkColor = const Color(0xFFBFA4FF),
@@ -172,6 +188,7 @@ class FrameEpubChapterView extends StatefulWidget {
   final FrameEpubChapterDocument chapter;
   final FrameEpubResourceLoader resourceLoader;
   final bool fixedLayout;
+  final List<FrameReaderAnnotation> annotations;
   final Color backgroundColor;
   final Color textColor;
   final Color linkColor;
@@ -204,6 +221,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   late Future<_EpubStylesheetBundle> _stylesFuture;
   final GlobalKey _viewportKey = GlobalKey();
   final Map<XmlElement, GlobalKey> _elementKeys = HashMap.identity();
+  Map<XmlText, List<_ResolvedTextAnnotation>> _annotationRangesByNode =
+      HashMap.identity();
   bool _restoreScheduled = false;
 
   @override
@@ -311,6 +330,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
         final body = _bodyElement(widget.chapter.document);
         if (body == null) return _message('EPUB 章節沒有可顯示的 body 內容。');
+        _annotationRangesByNode = _resolveAnnotationRanges();
 
         final baseStyle = <String, String>{
           'display': 'block',
@@ -502,6 +522,200 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ),
       );
 
+  Map<XmlText, List<_ResolvedTextAnnotation>> _resolveAnnotationRanges() {
+    final result = HashMap<XmlText, List<_ResolvedTextAnnotation>>.identity();
+    if (widget.annotations.isEmpty) return result;
+
+    final book = widget.resourceLoader.book;
+    final document = widget.chapter.document;
+    final textNodes = document.descendants.whereType<XmlText>().toList();
+    final indices = HashMap<XmlText, int>.identity();
+    for (var index = 0; index < textNodes.length; index++) {
+      indices[textNodes[index]] = index;
+    }
+
+    for (final annotation in widget.annotations) {
+      if (annotation.type != 'highlight' && annotation.type != 'note') {
+        continue;
+      }
+      if (FrameEpubCfi.spineIndexFromCfi(book, annotation.cfi) !=
+          widget.spineIndex) {
+        continue;
+      }
+      final range = FrameEpubCfi.resolveRange(
+        book: book,
+        document: document,
+        cfi: annotation.cfi,
+      );
+      if (range == null ||
+          range.start.node is! XmlText ||
+          range.end.node is! XmlText) {
+        continue;
+      }
+
+      final startNode = range.start.node as XmlText;
+      final endNode = range.end.node as XmlText;
+      final startIndex = indices[startNode];
+      final endIndex = indices[endNode];
+      if (startIndex == null ||
+          endIndex == null ||
+          startIndex > endIndex ||
+          range.start.offset < 0 ||
+          range.start.offset > startNode.value.length ||
+          range.end.offset < 0 ||
+          range.end.offset > endNode.value.length ||
+          (startIndex == endIndex &&
+              range.start.offset >= range.end.offset)) {
+        continue;
+      }
+
+      for (var index = startIndex; index <= endIndex; index++) {
+        final node = textNodes[index];
+        final start = index == startIndex ? range.start.offset : 0;
+        final end = index == endIndex ? range.end.offset : node.value.length;
+        if (start >= end) continue;
+        result.putIfAbsent(node, () => []).add(
+              _ResolvedTextAnnotation(
+                start: start,
+                end: end,
+                type: annotation.type,
+                color: annotation.color,
+              ),
+            );
+      }
+    }
+
+    return result;
+  }
+
+  List<TextSpan> _sourceTextSpans(
+    XmlText node,
+    _PreparedEpubText prepared,
+    Map<TextSpan, _TextSpanSource> sourceSpans,
+  ) {
+    final text = prepared.text;
+    if (text.isEmpty) return const [];
+    final ranges = _annotationRangesByNode[node] ??
+        const <_ResolvedTextAnnotation>[];
+    if (ranges.isEmpty) {
+      final span = TextSpan(text: text);
+      sourceSpans[span] = _TextSpanSource(node, prepared.sourceOffsets);
+      return [span];
+    }
+
+    TextStyle? styleForUnit(int index) {
+      final sourceStart = prepared.sourceOffsets[index];
+      final sourceEnd = prepared.sourceOffsets[index + 1];
+      _ResolvedTextAnnotation? highlight;
+      _ResolvedTextAnnotation? underline;
+      _ResolvedTextAnnotation? note;
+      for (final range in ranges) {
+        final overlaps = sourceEnd > sourceStart
+            ? sourceStart < range.end && sourceEnd > range.start
+            : sourceStart >= range.start && sourceStart < range.end;
+        if (!overlaps) continue;
+        if (range.type == 'note') {
+          note ??= range;
+        } else if (range.color == 'underline') {
+          underline ??= range;
+        } else {
+          highlight ??= range;
+        }
+      }
+
+      Color? background;
+      Color? decorationColor;
+      TextDecorationStyle? decorationStyle;
+      double? decorationThickness;
+      final decorations = <TextDecoration>[];
+
+      if (highlight != null) {
+        background = _highlightBackgroundColor(highlight.color);
+      }
+      if (underline != null) {
+        decorations.add(TextDecoration.underline);
+        decorationColor = const Color(0xFFA78BFA);
+        decorationThickness = 2.2;
+      }
+      if (note != null) {
+        if (!decorations.contains(TextDecoration.underline)) {
+          decorations.add(TextDecoration.underline);
+        }
+        decorationColor = const Color(0xFF9873D6);
+        decorationStyle = TextDecorationStyle.wavy;
+        decorationThickness = 1.5;
+      }
+      if (background == null && decorations.isEmpty) return null;
+      return TextStyle(
+        backgroundColor: background,
+        decoration: decorations.isEmpty
+            ? null
+            : TextDecoration.combine(decorations),
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        decorationThickness: decorationThickness,
+      );
+    }
+
+    final spans = <TextSpan>[];
+    var runStart = 0;
+    TextStyle? runStyle = styleForUnit(0);
+    for (var index = 1; index < text.length; index++) {
+      final nextStyle = styleForUnit(index);
+      if (nextStyle == runStyle) continue;
+      _appendStyledSourceRun(
+        spans,
+        sourceSpans,
+        node,
+        prepared,
+        runStart,
+        index,
+        runStyle,
+      );
+      runStart = index;
+      runStyle = nextStyle;
+    }
+    _appendStyledSourceRun(
+      spans,
+      sourceSpans,
+      node,
+      prepared,
+      runStart,
+      text.length,
+      runStyle,
+    );
+    return spans;
+  }
+
+  void _appendStyledSourceRun(
+    List<TextSpan> spans,
+    Map<TextSpan, _TextSpanSource> sourceSpans,
+    XmlText node,
+    _PreparedEpubText prepared,
+    int start,
+    int end,
+    TextStyle? style,
+  ) {
+    if (start >= end) return;
+    final span = TextSpan(
+      text: prepared.text.substring(start, end),
+      style: style,
+    );
+    spans.add(span);
+    sourceSpans[span] = _TextSpanSource(
+      node,
+      prepared.sourceOffsets.sublist(start, end + 1),
+    );
+  }
+
+  Color _highlightBackgroundColor(String name) => switch (name) {
+        'violet' => const Color(0x66A78BFA),
+        'mint' => const Color(0x6665C9A5),
+        'rose' => const Color(0x66E88EAF),
+        'sky' => const Color(0x666FB9E8),
+        _ => const Color(0x66F2C94C),
+      };
+
   Widget _buildFlow(
     XmlElement element,
     Map<String, String> style,
@@ -538,9 +752,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               inlineSpans.isEmpty)) {
         return;
       }
-      final span = TextSpan(text: prepared.text);
-      inlineSpans.add(span);
-      sourceSpans[span] = _TextSpanSource(node, prepared.sourceOffsets);
+      inlineSpans.addAll(_sourceTextSpans(node, prepared, sourceSpans));
     }
 
     void flushInline() {
@@ -824,9 +1036,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           style['white-space'],
           style['text-transform'],
         );
-        final span = TextSpan(text: prepared.text);
-        children.add(span);
-        sourceSpans[span] = _TextSpanSource(child, prepared.sourceOffsets);
+        children.addAll(_sourceTextSpans(child, prepared, sourceSpans));
       } else if (child is XmlElement) {
         final childTag = child.name.local.toLowerCase();
         final childStyle = _computedStyle(child, cascade, style);
