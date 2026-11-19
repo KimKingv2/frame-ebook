@@ -4,6 +4,7 @@ import 'frame_book.dart';
 
 const _bg = Color(0xFF12101A);
 const _panel = Color(0xFF1B1825);
+const _raised = Color(0xFF211D2D);
 const _ink = Color(0xFFF4F0FA);
 const _muted = Color(0xFFAAA2B8);
 const _faint = Color(0xFF81788F);
