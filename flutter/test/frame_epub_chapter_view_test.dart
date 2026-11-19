@@ -401,4 +401,62 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('paginated renderer lays out XHTML as horizontal pages', (tester) async {
+    final bytes = _fixture();
+    final book = FrameBook.fromJson({
+      'id': 'chapter-pagination-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/pagination.epub',
+      'fileName': 'pagination.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.view.setPhysicalSize(const Size(320, 220));
+      await tester.view.setDevicePixelRatio(1);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.byType(SelectableText), findsWidgets);
+      expect(pageController.hasClients, isTrue);
+      expect(pageController.position.maxScrollExtent, greaterThan(0));
+      await pageController.nextPage(
+        duration: const Duration(milliseconds: 1),
+        curve: Curves.linear,
+      );
+      await tester.pumpAndSettle();
+      expect(pageController.page, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      await tester.view.resetPhysicalSize();
+      await tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+
 }
