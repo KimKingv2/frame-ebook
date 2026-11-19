@@ -28,6 +28,21 @@ void main() {
     expect(pages[2].requiresVerticalScroll, isFalse);
   });
 
+  test('groups pages into two-page spreads and preserves the final page', () {
+    expect(
+      FrameEpubPageLayout.groupIntoSpreads(5),
+      [
+        [0, 1],
+        [2, 3],
+        [4],
+      ],
+    );
+  });
+
+  test('returns no spreads for an empty chapter', () {
+    expect(FrameEpubPageLayout.groupIntoSpreads(0), isEmpty);
+  });
+
   test('produces one empty page for an empty chapter', () {
     final pages = FrameEpubPageLayout.paginate(
       itemHeights: const [],
