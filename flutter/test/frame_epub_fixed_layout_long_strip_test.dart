@@ -25,7 +25,7 @@ void main() {
               visited.add(index);
               return ColoredBox(
                 color: Colors.white,
-                child: Center(child: Text('漫畫頁 \${index + 1}')),
+                child: Center(child: Text('漫畫頁 ${index + 1}')),
               );
             },
           ),
@@ -64,7 +64,7 @@ void main() {
             onPageChanged: (_) {},
             pageBuilder: (context, index) {
               visited.add(index);
-              return Center(child: Text('第 \${index + 1} 頁'));
+              return Center(child: Text('第 ${index + 1} 頁'));
             },
           ),
         ),
