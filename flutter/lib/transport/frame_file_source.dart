@@ -76,7 +76,15 @@ class FrameFileResponse {
     Map<String, String> headers = const {},
     this.requestedRange,
   })  : headers = _normalizeHeaders(headers),
-        _onClose = onClose;
+        _onClose = onClose {
+    if (stream.isBroadcast) {
+      throw ArgumentError.value(
+        stream,
+        'stream',
+        'File responses must use a single-subscription stream.',
+      );
+    }
+  }
 
   final int statusCode;
 
