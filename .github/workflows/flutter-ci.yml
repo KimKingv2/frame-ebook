@@ -18,7 +18,8 @@ jobs:
     name: Detect native platform source changes
     runs-on: ubuntu-latest
     outputs:
-      native: ${{ steps.detect.outputs.native }}
+      android: ${{ steps.detect.outputs.android }}
+      macos: ${{ steps.detect.outputs.macos }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,26 +41,34 @@ jobs:
             CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")"
           fi
 
-          NATIVE=false
+          ANDROID=false
+          MACOS=false
           while IFS= read -r path; do
-            [[ "$path" == flutter/* ]] || continue
             case "$path" in
-              flutter/lib/library/frame_reader_engine_web.dart|\
-              flutter/lib/library/frame_bookshelf_screen.dart|\
-              flutter/lib/library/frame_book_details_dialog.dart|\
-              flutter/lib/library/frame_book_details_screen.dart|\
-              flutter/lib/library/frame_library_repository.dart|\
-              flutter/lib/main.dart|\
-              flutter/pubspec.yaml|\
-              flutter/tool/prepare_fonts.py)
-                continue
+              flutter/android/*|flutter/tool/android/*)
+                ANDROID=true
+                ;;
+              flutter/macos/*|flutter/tool/macos/*)
+                MACOS=true
+                ;;
+              flutter/pubspec.yaml|flutter/pubspec.lock|flutter/tool/prepare_platforms.py)
+                # Plugin dependencies and generated platform permissions/bridges
+                # are packaged into both native applications.
+                ANDROID=true
+                MACOS=true
                 ;;
             esac
-            NATIVE=true
+            # App-bundled fonts and other assets are not Dart-only OTA patches.
+            if [[ "$path" == flutter/assets/* ]]; then
+              ANDROID=true
+              MACOS=true
+            fi
           done <<< "$CHANGED_FILES"
 
-          echo "native=$NATIVE" >> "$GITHUB_OUTPUT"
-          echo "Native platform sources changed: $NATIVE"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
+          echo "macos=$MACOS" >> "$GITHUB_OUTPUT"
+          echo "Native Android package rebuild required: $ANDROID"
+          echo "Native macOS package rebuild required: $MACOS"
 
   web:
     name: Analyze, test and build Web
@@ -166,7 +175,7 @@ jobs:
   macos:
     name: Build macOS
     needs: detect-native-changes
-    if: needs.detect-native-changes.outputs.native == 'true'
+    if: needs.detect-native-changes.outputs.macos == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +209,7 @@ jobs:
   android:
     name: Build Android APK
     needs: detect-native-changes
-    if: needs.detect-native-changes.outputs.native == 'true'
+    if: needs.detect-native-changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
