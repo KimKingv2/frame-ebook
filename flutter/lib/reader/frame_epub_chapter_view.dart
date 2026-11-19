@@ -283,6 +283,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   final TransformationController _fixedLayoutTransformationController =
       TransformationController();
   bool _pageZoomed = false;
+  Size? _fixedLayoutViewportSize;
   final List<GlobalKey> _flowItemKeys = [];
   final List<GlobalKey> _paginationTextKeys = [];
   final Map<GlobalKey, _PaginatedTextPosition> _paginationTextPositions = {};
@@ -465,6 +466,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                 BoxDecoration(color: widget.backgroundColor),
             child: LayoutBuilder(
               builder: (context, constraints) {
+                if (constraints.maxWidth.isFinite &&
+                    constraints.maxHeight.isFinite) {
+                  _fixedLayoutViewportSize = constraints.biggest;
+                }
                 final page = _buildFlow(
                   body,
                   bodyStyle,
@@ -1998,15 +2003,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _cssDimension(value, widget.fontSize);
     }
 
+    final pageSize = _fixedLayoutViewportSize;
     return _FrameEpubImage(
       loader: widget.resourceLoader,
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
       maxWidth: fixedDimension(style['width']) ??
-          (block ? double.infinity : 320),
+          (widget.fixedLayout
+              ? pageSize?.width ?? double.infinity
+              : (block ? double.infinity : 320)),
       maxHeight: fixedDimension(style['height']) ??
-          (widget.fixedLayout ? double.infinity : 680),
+          (widget.fixedLayout
+              ? (widget.fixedLayoutImageFit == 'fit-page'
+                  ? pageSize?.height ?? double.infinity
+                  : double.infinity)
+              : 680),
       alt: alt,
       onLayoutChanged:
           widget.paginated ? _handlePaginatedImageLayoutChanged : null,
