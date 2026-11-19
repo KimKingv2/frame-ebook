@@ -729,7 +729,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final spreads = spreadActive
         ? FrameEpubPageLayout.groupIntoSpreads(pages.length)
         : <List<int>>[
-            for (var index = 0; index < pages.length) [index],
+            for (var index = 0; index < pages.length; index++) [index],
           ];
 
     Widget buildPage(FrameEpubPage page) {
