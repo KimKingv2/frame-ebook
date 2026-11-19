@@ -38,6 +38,31 @@ void main() {
     expect(controller.offset, closeTo(0, 1));
   });
 
+  testWidgets('reflowable layout does not change chapters before scroll attaches',
+      (tester) async {
+    final controller = ScrollController();
+    var nextChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            onNextChapter: () async {
+              nextChapterCalls++;
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pump();
+    expect(nextChapterCalls, 0);
+  });
+
   testWidgets('fixed-layout key turns call the adjacent chapter callback',
       (tester) async {
     final controller = ScrollController();
@@ -49,6 +74,7 @@ void main() {
         home: Scaffold(
           body: FrameEpubPageTurnSurface(
             controller: controller,
+            fixedLayout: true,
             onNextChapter: () async {
               nextChapterCalls++;
             },
