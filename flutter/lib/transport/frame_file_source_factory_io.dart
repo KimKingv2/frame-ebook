@@ -14,7 +14,7 @@ FrameFileSource createFrameFileSource({required Uri baseUri}) {
       final cookies = await cookieManager.getCookies(domain: origin);
       return cookies
           .where((cookie) => cookie.name.isNotEmpty)
-          .map((cookie) => '\${cookie.name}=\${cookie.value}')
+          .map((cookie) => '${cookie.name}=${cookie.value}')
           .join('; ');
     },
   );
