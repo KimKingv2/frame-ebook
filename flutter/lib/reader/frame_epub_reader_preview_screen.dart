@@ -864,7 +864,7 @@ class _FrameEpubReaderPreviewScreenState
   }) {
     final label = session.currentChapterLabel.trim();
     final pageStep = _comicPageStep(context, session);
-    final canGoPrevious = chapterIndex >= pageStep;
+    final canGoPrevious = chapterIndex > 0;
     final canGoNext = chapterIndex + pageStep < spineCount;
     return Material(
       color: _readerPanel,
@@ -1478,6 +1478,7 @@ class _FrameEpubReaderPreviewScreenState
     required String value,
     required List<({String value, String label})> options,
     required ValueChanged<String> onChanged,
+    bool enabled = true,
   }) {
     return SizedBox(
       width: 148,
@@ -1488,6 +1489,9 @@ class _FrameEpubReaderPreviewScreenState
           Text(label, style: const TextStyle(color: _readerMuted, fontSize: 11)),
           DropdownButton<String>(
             value: value,
+            onChanged: enabled ? (next) {
+              if (next != null) onChanged(next);
+            } : null,
             isExpanded: true,
             dropdownColor: _readerPanel,
             style: const TextStyle(color: _readerText, fontSize: 12),
@@ -1499,9 +1503,6 @@ class _FrameEpubReaderPreviewScreenState
                   child: Text(option.label, overflow: TextOverflow.ellipsis),
                 ),
             ],
-            onChanged: (next) {
-              if (next != null) onChanged(next);
-            },
           ),
         ],
       ),
@@ -1780,6 +1781,7 @@ class _FrameEpubReaderPreviewScreenState
                     ],
                     onChanged: (value) =>
                         setSheetState(() => comicReadingMode = value),
+                    enabled: session.isFixedLayout,
                   ),
                   _appearanceDropdown(
                     label: '頁面編排',
@@ -1790,6 +1792,8 @@ class _FrameEpubReaderPreviewScreenState
                     ],
                     onChanged: (value) =>
                         setSheetState(() => comicPageLayout = value),
+                    enabled: session.isFixedLayout &&
+                        comicReadingMode == 'paginated',
                   ),
                   _appearanceDropdown(
                     label: '圖片縮放',
@@ -1800,6 +1804,8 @@ class _FrameEpubReaderPreviewScreenState
                     ],
                     onChanged: (value) =>
                         setSheetState(() => comicImageFit = value),
+                    enabled: session.isFixedLayout &&
+                        comicReadingMode == 'paginated',
                   ),
                 ],
               ),
