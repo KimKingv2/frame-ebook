@@ -2025,7 +2025,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final size = _cssFontSize(
       style['font-size'],
       parentSize,
-      widget.fontSize,
+      widget.fontSize * widget.fontScale,
     );
     style['font-size'] = '${size}px';
 
