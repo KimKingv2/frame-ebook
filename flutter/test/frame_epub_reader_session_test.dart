@@ -400,6 +400,7 @@ void main() {
       );
 
       await session.open();
+      expect(await session.goToSpineIndex(1), isTrue);
       final chapter = session.currentChapter!;
       final paragraph = chapter.document.descendants
           .whereType<XmlElement>()
@@ -411,6 +412,7 @@ void main() {
         textNode: textNode,
         offset: 2,
       )!;
+      expect(await session.goToSpineIndex(0), isTrue);
 
       expect(await session.goToCfi(targetCfi), isTrue);
       expect(session.currentSpineIndex, 1);
