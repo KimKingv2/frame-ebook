@@ -158,6 +158,7 @@ class FrameEpubCssCascade {
           'margin-block-start': '0.67em',
           'margin-block-end': '0.67em',
         });
+        break;
       case 'h2':
         result.addAll({
           'font-size': '1.5em',
@@ -165,6 +166,7 @@ class FrameEpubCssCascade {
           'margin-block-start': '0.83em',
           'margin-block-end': '0.83em',
         });
+        break;
       case 'h3':
         result.addAll({
           'font-size': '1.17em',
@@ -172,6 +174,7 @@ class FrameEpubCssCascade {
           'margin-block-start': '1em',
           'margin-block-end': '1em',
         });
+        break;
       case 'h4':
       case 'h5':
       case 'h6':
@@ -181,11 +184,13 @@ class FrameEpubCssCascade {
           'margin-block-start': '1.33em',
           'margin-block-end': '1.33em',
         });
+        break;
       case 'p':
         result.addAll({
           'margin-block-start': '1em',
           'margin-block-end': '1em',
         });
+        break;
       case 'blockquote':
         result.addAll({
           'margin-block-start': '1em',
@@ -193,19 +198,24 @@ class FrameEpubCssCascade {
           'margin-inline-start': '40px',
           'margin-inline-end': '40px',
         });
+        break;
       case 'pre':
         result.addAll({
           'white-space': 'pre',
           'font-family': 'monospace',
         });
+        break;
       case 'strong':
       case 'b':
         result['font-weight'] = 'bold';
+        break;
       case 'em':
       case 'i':
         result['font-style'] = 'italic';
+        break;
       case 'a':
         result['text-decoration'] = 'underline';
+        break;
       case 'ul':
       case 'ol':
         result.addAll({
@@ -213,6 +223,7 @@ class FrameEpubCssCascade {
           'margin-block-end': '1em',
           'padding-inline-start': '40px',
         });
+        break;
     }
     return result;
   }
