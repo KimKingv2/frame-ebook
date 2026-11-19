@@ -468,33 +468,36 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
     }
 
-    GestureRecognizer? recognizer;
+    var linkedChildren = children;
+    var textStyle = _textStyle(style);
     if (tag == 'a') {
       final href = _attribute(element, 'href') ?? '';
+      TapGestureRecognizer? tap;
       if (href.isNotEmpty) {
         final reference = widget.resourceLoader.resolve(
           href,
           fromPath: widget.chapter.resource.path,
         );
         if (reference.isInternal && widget.onInternalLink != null) {
-          final tap = TapGestureRecognizer()
+          tap = TapGestureRecognizer()
             ..onTap = () => widget.onInternalLink!(href);
-          _recognizers.add(tap);
-          recognizer = tap;
         } else if (reference.isExternal && widget.onExternalLink != null) {
           final uri = Uri.tryParse(href);
           if (uri != null) {
-            final tap = TapGestureRecognizer()
+            tap = TapGestureRecognizer()
               ..onTap = () => widget.onExternalLink!(uri);
-            _recognizers.add(tap);
-            recognizer = tap;
           }
         }
       }
-    }
-
-    var textStyle = _textStyle(style);
-    if (tag == 'a') {
+      if (tap != null) {
+        _recognizers.add(tap);
+        // TextSpan recognizers only receive hits for the text owned by that
+        // span, not for descendant spans. Attach the same recognizer to the
+        // descendant text leaves so styled inline children remain clickable.
+        linkedChildren = children
+            .map((child) => _attachRecognizer(child, tap!))
+            .toList(growable: false);
+      }
       textStyle = textStyle.copyWith(
         color: widget.linkColor,
         decoration: TextDecoration.underline,
@@ -506,8 +509,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
     return TextSpan(
       style: textStyle,
-      recognizer: recognizer,
-      children: children,
+      children: linkedChildren,
+    );
+  }
+
+  InlineSpan _attachRecognizer(
+    InlineSpan span,
+    TapGestureRecognizer recognizer,
+  ) {
+    if (span is! TextSpan) return span;
+    return TextSpan(
+      text: span.text,
+      style: span.style,
+      recognizer: span.text == null ? span.recognizer : recognizer,
+      children: span.children
+          ?.map((child) => _attachRecognizer(child, recognizer))
+          .toList(growable: false),
     );
   }
 
