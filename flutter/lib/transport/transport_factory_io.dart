@@ -52,7 +52,7 @@ class _NativeFrameTransport implements FrameTransport {
       request.headers.set(HttpHeaders.acceptHeader, '*/*');
       request.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
 
-      final sameOrigin = _origin(current) == originalOrigin;
+      final sameOrigin = redirectCount == 0 && _origin(current) == originalOrigin;
       for (final entry in headers.entries) {
         final name = entry.key.toLowerCase();
         if (_blockedRequestHeaders.contains(name)) continue;
