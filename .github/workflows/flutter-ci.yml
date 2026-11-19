@@ -46,6 +46,8 @@ jobs:
             case "$path" in
               flutter/lib/library/frame_reader_engine_web.dart|\
               flutter/lib/library/frame_bookshelf_screen.dart|\
+              flutter/lib/library/frame_book_details_dialog.dart|\
+              flutter/lib/library/frame_book_details_screen.dart|\
               flutter/lib/main.dart|\
               flutter/pubspec.yaml|\
               flutter/tool/prepare_fonts.py)
