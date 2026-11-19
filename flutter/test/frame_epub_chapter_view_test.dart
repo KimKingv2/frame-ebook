@@ -9,6 +9,7 @@ import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
 import 'package:frame_ebook/reader/frame_zip_archive.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:xml/xml.dart';
 
 class _ZipItem {
   const _ZipItem(this.name, this.bytes);
