@@ -442,11 +442,12 @@ void main() {
       expect(find.byType(SelectableText), findsWidgets);
       expect(pageController.hasClients, isTrue);
       expect(pageController.position.maxScrollExtent, greaterThan(0));
-      await pageController.nextPage(
+      final nextPage = pageController.nextPage(
         duration: const Duration(milliseconds: 1),
         curve: Curves.linear,
       );
       await tester.pumpAndSettle();
+      await nextPage;
       expect(pageController.page, 1);
 
       await tester.pumpWidget(const SizedBox.shrink());
