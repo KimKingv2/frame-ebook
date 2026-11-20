@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -9,6 +10,7 @@ import '../library/frame_book.dart';
 import '../reader/frame_epub_parser.dart';
 import '../reader/frame_zip_archive.dart';
 import '../transport/frame_file_source.dart';
+import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
 import 'frame_cloud_models.dart';
 import 'frame_cloud_repository.dart';
