@@ -45,7 +45,6 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   String? _error;
   String? _directoryError;
   FrameCloudSession? _session;
-  FrameCloudPreferences? _preferences;
   FrameCloudProvider _provider = FrameCloudProvider.vps;
   FrameCloudLibrary _library = FrameCloudLibrary.books;
   LocalOpenListClient? _localClient;
@@ -108,7 +107,6 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       if (!mounted) return;
       setState(() {
         _session = session;
-        _preferences = preferences;
         _provider = preferences.activeProvider;
         _library = preferences.activeLibrary;
         if (savedLocalUrl != null) _localUrl.text = savedLocalUrl;
