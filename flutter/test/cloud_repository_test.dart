@@ -13,6 +13,28 @@ class _FakeApi implements FrameApiClient {
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
     getRequests.add(path);
+    if (path.startsWith('/api/cloud/scan-list?')) {
+      return {
+        'ok': true,
+        'provider': 'worker',
+        'library': 'books',
+        'rootPath': '/books',
+        'path': '/books/Novel',
+        'page': 2,
+        'perPage': 2,
+        'total': 5,
+        'items': [
+          {
+            'name': 'Volume 03.epub',
+            'path': '/books/Novel/Volume 03.epub',
+            'parentPath': '/books/Novel',
+            'isDir': false,
+            'format': 'EPUB',
+            'size': 4096,
+          },
+        ],
+      };
+    }
     if (path.startsWith('/api/cloud/books?')) {
       return {
         'ok': true,
@@ -179,6 +201,26 @@ void main() {
       expect(pair['books'], '/media/Books');
       expect(pair['comics'], '/media/Comics');
     }
+  });
+
+  test('loads paginated live directory results from the existing scan-list API', () async {
+    final api = _FakeApi();
+    final page = await FrameCloudRepository(api).loadServerDirectoryPage(
+      provider: FrameCloudProvider.worker,
+      library: FrameCloudLibrary.books,
+      rootPath: '/books',
+      path: '/books/Novel',
+      page: 2,
+      perPage: 2,
+    );
+
+    expect(page.page, 2);
+    expect(page.perPage, 2);
+    expect(page.total, 5);
+    expect(page.pageCount, 3);
+    expect(page.items.single.name, 'Volume 03.epub');
+    expect(api.getRequests.single, contains('page=2'));
+    expect(api.getRequests.single, contains('per_page=2'));
   });
 
   test('loads indexed pages from the existing D1 bookshelf API', () async {
