@@ -117,3 +117,6 @@ These items must still pass CI and device verification before being treated as c
 ### EPUB annotation refresh parity update
 - The Flutter reader sidebar now has a refresh action that reloads bookmarks, highlights and notes through the existing `/api/reading/annotations` contract.
 - Refreshes are guarded against stale responses: a refresh cannot overwrite a newer local save/delete, nor can an older overlapping refresh replace a newer one. Session and sidebar widget tests cover remote annotation reload and the refresh control.
+
+### EPUB selection toolbar dismissal parity update
+- Flutter now clears the active annotation selection whenever the renderer reports a collapsed/empty selection, a selection that cannot be mapped to a CFI, or an incompatible reader state. This prevents the toolbar from remaining attached to a previous quote after text selection is cancelled.

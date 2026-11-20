@@ -1384,7 +1384,14 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   void _handleTextSelection(FrameEpubTextSelection? selection) {
-    if (!mounted || selection == null) return;
+    if (!mounted) return;
+    if (selection == null) {
+      if (_selectedText != null) {
+        setState(() => _selectedText = null);
+      }
+      return;
+    }
+
     final session = _session;
     final chapter = session?.currentChapter;
     final spineIndex = session?.currentSpineIndex;
@@ -1394,6 +1401,9 @@ class _FrameEpubReaderPreviewScreenState
         book == null ||
         spineIndex == null ||
         session.isFixedLayout) {
+      if (_selectedText != null) {
+        setState(() => _selectedText = null);
+      }
       return;
     }
 
@@ -1405,7 +1415,12 @@ class _FrameEpubReaderPreviewScreenState
       endNode: selection.endNode,
       endOffset: selection.endOffset,
     );
-    if (cfi == null) return;
+    if (cfi == null) {
+      if (_selectedText != null) {
+        setState(() => _selectedText = null);
+      }
+      return;
+    }
     if (_selectedText?.cfi == cfi && _selectedText?.quote == selection.quote) {
       return;
     }
