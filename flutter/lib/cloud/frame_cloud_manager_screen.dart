@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
