@@ -93,7 +93,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('確定刪除這筆標註嗎？'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.text('刪除').last);
     await tester.pumpAndSettle();
 
     expect(deleteCalls, 1);
