@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../core/frame_api_client.dart';
 import 'frame_stats_export_service.dart';
