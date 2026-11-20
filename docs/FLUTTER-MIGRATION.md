@@ -95,7 +95,7 @@ These items must still pass CI and device verification before being treated as c
 - [ ] Preserve reading preferences, annotations, reading-time events, history and statistics.
 - [x] Flutter statistics screen reads the existing D1 stats/preferences APIs and renders period summaries, goal, streaks, calendar, trends, top books, time-of-day and recent sessions.
 - [ ] Validate foreground/idle event aggregation against the original tracker on all three targets.
-- [ ] Preserve native file-based JSON and CSV export on Web, macOS and Android. Current Flutter statistics screen copies JSON/CSV text to the clipboard.
+- Flutter statistics now exports JSON and CSV through a user-selected system save dialog on Web, macOS and Android. Web browsers without the File System Access API fall back to a standard browser download; the bytes are generated in memory and no intermediate export file is created. Native device/window acceptance remains pending.
 
 ### F5 — Three-platform release
 - [ ] Separate Flutter Web preview and browser Access validation.
