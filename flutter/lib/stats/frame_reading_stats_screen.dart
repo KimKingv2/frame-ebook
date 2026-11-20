@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/frame_api_client.dart';
+import 'frame_stats_export_service.dart';
 
 class FrameReadingStatsScreen extends StatefulWidget {
   const FrameReadingStatsScreen({required this.api, super.key});
@@ -14,6 +15,7 @@ class FrameReadingStatsScreen extends StatefulWidget {
 }
 
 class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
+  final FrameStatsExportService _exportService = FrameStatsExportService();
   static const bg = Color(0xFF12101A);
   static const panel = Color(0xFF1B1825);
   static const soft = Color(0xFF211C2B);
@@ -198,10 +200,20 @@ class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
         }
         output = '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
       }
-      await Clipboard.setData(ClipboardData(text: output));
+      final extension = kind == 'JSON' ? 'json' : 'csv';
+      final fileName =
+          'frame-ebook-reading-${keyOf(r.$1)}-${keyOf(r.$2)}.$extension';
+      final saved = await _exportService.save(
+        bytes: Uint8List.fromList(utf8.encode(output)),
+        fileName: fileName,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('雲端 $kind 已複製到剪貼簿。')),
+          SnackBar(
+            content: Text(saved
+                ? '雲端 $kind 已保存：$fileName'
+                : '已取消 $kind 匯出，沒有保存檔案。'),
+          ),
         );
       }
     } catch (e) {
@@ -720,8 +732,8 @@ class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
                         Expanded(child: Text(
                           periodNames[period]! + ' · ' + keyOf(r.$1) + ' 至 ' + keyOf(r.$2) + ' · 雲端 D1',
                           style: const TextStyle(color: muted, fontSize: 9))),
-                        IconButton(tooltip: '複製 JSON', onPressed: () => export('JSON'), icon: const Icon(Icons.data_object, size: 18)),
-                        IconButton(tooltip: '複製 CSV', onPressed: () => export('CSV'), icon: const Icon(Icons.table_view, size: 18)),
+                        IconButton(tooltip: '匯出 JSON', onPressed: busy ? null : () => export('JSON'), icon: const Icon(Icons.data_object, size: 18)),
+                        IconButton(tooltip: '匯出 CSV', onPressed: busy ? null : () => export('CSV'), icon: const Icon(Icons.table_view, size: 18)),
                       ]),
                       const SizedBox(height: 8),
                       Wrap(spacing: 9, runSpacing: 9, children: [

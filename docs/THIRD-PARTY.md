@@ -18,3 +18,12 @@
 - The upstream bundle retains its original copyright and license banner.
 
 These dependencies are included for static Cloudflare Pages deployment. Their licenses remain separate from original FRAME Reader code.
+
+## file_picker
+
+- Project: https://pub.dev/packages/file_picker
+- Version: 13.4.0
+- License: MIT
+- Used by the Flutter reading statistics screen to save in-memory JSON and CSV bytes using the platform save-file dialog on Android and macOS, with a browser download fallback on Web.
+- The app does not create an intermediate export file. The save operation is initiated only after the user selects the export action.
+- The macOS app sandbox grants only user-selected file read/write access for the save panel; it does not receive broad Downloads-folder access.

@@ -21,6 +21,7 @@ dependencies:
   flutter_fullscreen: ^1.2.0
   xml: ^7.1.0
   crypto: ^3.0.6
+  file_picker: ^13.4.0
 
 dev_dependencies:
   flutter_test:

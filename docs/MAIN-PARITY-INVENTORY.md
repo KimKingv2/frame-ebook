@@ -109,7 +109,7 @@ Source: pages/reading-stats/index.html, pages/assets/reading-stats.js, pages/ass
 - [ ] Preserve reading trend chart and unit selection.
 - [ ] Preserve top books, time-of-day distribution and recent sessions.
 - [ ] Preserve cloud account/session status and refresh actions.
-- [ ] Preserve JSON and CSV export.
+- [ ] Preserve JSON and CSV export through a user-selected file dialog. Flutter Preview now generates both formats in memory and uses the system save dialog (browser download fallback on unsupported Web browsers); native device acceptance remains pending.
 
 ## 5. Existing API and data contracts
 
