@@ -166,6 +166,48 @@ void main() {
     expect(api.indexedPaths, ['comics:/comics/Comic.cbz']);
   });
 
+  test('pause between libraries resumes at the unstarted library', () async {
+    final api = _AllScanApi();
+    final runner = FrameCloudScanAllRunner(
+      repository: FrameCloudRepository(api),
+    );
+
+    final paused = await runner.run(
+      provider: FrameCloudProvider.vps,
+      rootPaths: {
+        FrameCloudLibrary.books: '/books',
+        FrameCloudLibrary.comics: '/comics',
+      },
+      onProgress: (library, progress) {
+        if (library == FrameCloudLibrary.books &&
+            progress.phase == '目錄索引完成') {
+          runner.requestPause();
+        }
+      },
+    );
+
+    expect(paused.paused, isTrue);
+    expect(paused.libraries, hasLength(1));
+    expect(paused.libraries.single.library, FrameCloudLibrary.books);
+    expect(api.savedStates['comics|/comics'], isNotNull);
+
+    final resumed = await runner.run(
+      provider: FrameCloudProvider.vps,
+      rootPaths: {
+        FrameCloudLibrary.books: '/books',
+        FrameCloudLibrary.comics: '/comics',
+      },
+    );
+
+    expect(resumed.completed, isTrue);
+    expect(resumed.libraries.first.skippedExisting, isTrue);
+    expect(api.completedLibraries, ['books', 'comics']);
+    expect(api.indexedPaths, [
+      'books:/books/Novel.epub',
+      'comics:/comics/Comic.cbz',
+    ]);
+  });
+
   test('clearing error details preserves scan cursor and counters', () {
     final state = FrameCloudScanState.fromJson({
       'version': 1,
