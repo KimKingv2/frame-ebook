@@ -12,6 +12,7 @@ import 'frame_cloud_archive_processor.dart';
 import 'frame_cloud_scan_all_runner.dart';
 import 'frame_cloud_scan_runner.dart';
 import 'local_openlist_client.dart';
+import 'local_openlist_session.dart';
 import 'local_openlist_settings_store.dart';
 
 const _cloudBg = Color(0xFF12101A);
@@ -41,6 +42,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   late final TabController _tabs;
   late FrameCloudRepository _repository;
   late LocalOpenListSettingsStore _localSettings;
+  FrameLocalOpenListSession? _localOpenListSession;
   bool _dependenciesReady = false;
   bool _loading = true;
   bool _loadingDirectory = false;
@@ -81,6 +83,8 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     if (_dependenciesReady) return;
     _dependenciesReady = true;
     _repository = FrameCloudRepository(FrameApiScope.of(context));
+    _localOpenListSession = FrameApiScope.localSessionOf(context);
+    _localClient = _localOpenListSession?.client;
     _localSettings = LocalOpenListSettingsStore();
     unawaited(_load());
   }
@@ -96,7 +100,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     _localUsername.dispose();
     _localPassword.dispose();
     _search.dispose();
-    _localClient?.close();
+    if (_localOpenListSession == null) _localClient?.close();
     super.dispose();
   }
 
@@ -336,7 +340,12 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         candidate.close();
         return;
       }
-      _localClient?.close();
+      final sharedSession = _localOpenListSession;
+      if (sharedSession != null) {
+        sharedSession.replaceClient(candidate!);
+      } else {
+        _localClient?.close();
+      }
       _localClient = candidate;
       candidate = null;
       _localPassword.clear();
@@ -1034,7 +1043,12 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   }
 
   void _logoutLocalOpenList() {
-    _localClient?.logout();
+    final sharedSession = _localOpenListSession;
+    if (sharedSession != null) {
+      sharedSession.logout();
+    } else {
+      _localClient?.logout();
+    }
     setState(() {
       _items = const [];
       _directoryError = null;

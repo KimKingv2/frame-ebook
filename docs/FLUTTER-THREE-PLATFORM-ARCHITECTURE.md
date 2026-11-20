@@ -126,6 +126,8 @@ Keep those bridges until the shared Dart transport and Flutter reader have passe
 8. **Parity and retirement:** test the preview with representative reflowable books and fixed-layout EPUB comics on Web, Android and macOS. Keep the legacy Reader route until the complete main-branch parity inventory passes. Only then retire the legacy iframe/WebView reader bridges.
 9. **OTA release automation:** connect Shorebird app configuration and protected CI credentials, then verify a Dart-only patch on both native targets before relying on it as the normal update route.
 
+Local OpenList Flutter EPUB reading uses the current in-memory client only to obtain the file URL, then reads the original archive in bounded 1 MiB Range requests. Never persist the local token or forward it to the raw file host.
+
 ## Acceptance checks for the transport layer
 
 - A valid byte range is forwarded and a server `206` response retains its `Content-Range` semantics.

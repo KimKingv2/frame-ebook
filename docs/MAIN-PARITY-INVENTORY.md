@@ -49,6 +49,8 @@ Flutter Preview now has a native Cloud Manager with four source choices and read
 - [ ] Preserve cover hashing and private R2 upload/retrieval semantics.
 - [ ] Preserve scan/index error handling and retry behaviour without creating duplicate catalog rows.
 
+Flutter Preview now has a local OpenList file source: the authenticated client resolves the raw file URL, then the shared reader consumes sequential Range slices capped at 1 MiB. The local OpenList token remains in a shared app-memory session and is not sent to the file URL. Actual Android/macOS/Web and CORS acceptance remains pending.
+
 ### Source-specific file delivery
 
 - [ ] Preserve the current cloud file endpoint contract and authenticated source validation.

@@ -136,12 +136,18 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
   }
 
   Future<void> _openPage(Uri uri, String title, {bool toolbar = true}) async {
+    final api = FrameApiScope.of(context);
+    final localSession = FrameApiScope.localSessionOf(context);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => buildFrameLegacyPage(
-          uri: uri,
-          title: title,
-          showToolbar: toolbar,
+        builder: (_) => FrameApiScope(
+          api: api,
+          localOpenListSession: localSession,
+          child: buildFrameLegacyPage(
+            uri: uri,
+            title: title,
+            showToolbar: toolbar,
+          ),
         ),
       ),
     );
@@ -150,10 +156,12 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
 
   Future<void> _openManager() async {
     final api = FrameApiScope.of(context);
+    final localSession = FrameApiScope.localSessionOf(context);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => FrameApiScope(
           api: api,
+          localOpenListSession: localSession,
           child: const FrameCloudManagerScreen(),
         ),
       ),
@@ -166,9 +174,15 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
 
   Future<void> _openReader(FrameBook book) async {
     if (kIsWeb) {
+      final api = FrameApiScope.of(context);
+      final localSession = FrameApiScope.localSessionOf(context);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => FrameReaderScreen(book: book),
+          builder: (_) => FrameApiScope(
+            api: api,
+            localOpenListSession: localSession,
+            child: FrameReaderScreen(book: book),
+          ),
         ),
       );
       if (mounted) unawaited(_load(showLoading: false));

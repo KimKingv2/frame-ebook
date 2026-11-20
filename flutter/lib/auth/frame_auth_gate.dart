@@ -9,6 +9,7 @@ import '../core/frame_api_factory.dart';
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../core/frame_webview_api_client.dart';
+import '../cloud/local_openlist_session.dart';
 
 class FrameAuthGate extends StatefulWidget {
   const FrameAuthGate({required this.child, super.key});
@@ -19,6 +20,8 @@ class FrameAuthGate extends StatefulWidget {
 }
 
 class _FrameAuthGateState extends State<FrameAuthGate> {
+  final FrameLocalOpenListSession _localOpenListSession =
+      FrameLocalOpenListSession();
   late final Uri _baseUri;
   FrameApiClient? _api;
   WebViewController? _webController;
@@ -61,6 +64,7 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
 
   @override
   void dispose() {
+    _localOpenListSession.dispose();
     _api?.close();
     super.dispose();
   }
@@ -224,13 +228,21 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
 
     if (kIsWeb) {
       if (_checking) return const _AuthLoadingScreen();
-      if (_authenticated) return FrameApiScope(api: _api!, child: widget.child);
+      if (_authenticated) return FrameApiScope(
+        api: _api!,
+        localOpenListSession: _localOpenListSession,
+        child: widget.child,
+      );
       return _AccessWebNotice(error: _error, onRetry: _checkSession);
     }
 
     final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
     if (_authenticated && isMacOS) {
-      return FrameApiScope(api: _api!, child: widget.child);
+      return FrameApiScope(
+        api: _api!,
+        localOpenListSession: _localOpenListSession,
+        child: widget.child,
+      );
     }
     if (!_authenticated && isMacOS) {
       return Scaffold(
@@ -262,7 +274,11 @@ class _FrameAuthGateState extends State<FrameAuthGate> {
         ),
         if (_authenticated)
           Positioned.fill(
-            child: FrameApiScope(api: _api!, child: widget.child),
+            child: FrameApiScope(
+        api: _api!,
+        localOpenListSession: _localOpenListSession,
+        child: widget.child,
+      ),
           )
         else
           Positioned.fill(

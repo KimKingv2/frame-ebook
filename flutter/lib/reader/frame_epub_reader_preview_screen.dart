@@ -12,6 +12,7 @@ import '../library/frame_reader_repository.dart';
 import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
+import '../transport/frame_local_openlist_file_source.dart';
 import 'frame_epub_footnote.dart';
 import 'frame_epub_fixed_layout_long_strip.dart';
 import 'frame_epub_resource_loader.dart';
@@ -220,8 +221,7 @@ class _FrameEpubReaderPreviewScreenState
       }
       final repository = widget.repository ??
           FrameReaderRepository(FrameApiScope.of(context));
-      final source = widget.fileSource ??
-          createFrameFileSource(baseUri: FrameAppConfig.apiBaseUri);
+      final source = widget.fileSource ?? _createFileSource();
       _fileSource = source;
 
       final session = FrameEpubReaderSession(
@@ -235,6 +235,19 @@ class _FrameEpubReaderPreviewScreenState
     } on Object catch (error) {
       _setupError = error.toString();
     }
+  }
+
+  FrameFileSource _createFileSource() {
+    if (widget.book.provider == 'local') {
+      final client = FrameApiScope.localSessionOf(context)?.client;
+      if (client == null || !client.isAuthenticated) {
+        throw StateError(
+          '本地 OpenList 登入只保留在目前工作階段記憶體中，請返回「檔案瀏覽」重新登入。',
+        );
+      }
+      return FrameLocalOpenListFileSource(client: client);
+    }
+    return createFrameFileSource(baseUri: FrameAppConfig.apiBaseUri);
   }
 
   void _handleSessionChanged() {
