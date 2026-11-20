@@ -531,6 +531,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PageView), findsOneWidget);
+      expect(pageController.hasClients, isTrue);
+      final pageCount =
+          (pageController.position.maxScrollExtent /
+                  pageController.position.viewportDimension)
+              .round() +
+          1;
+      await pageController.jumpToPage(pageCount - 1);
+      await tester.pumpAndSettle();
+
       expect(find.byType(SingleChildScrollView), findsWidgets);
       expect(find.text('章節 0'), findsOneWidget);
       expect(tester.takeException(), isNull);
