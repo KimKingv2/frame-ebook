@@ -7,6 +7,7 @@ import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_cloud_models.dart';
 import 'frame_cloud_repository.dart';
+import 'frame_cloud_archive_processor.dart';
 import 'frame_cloud_scan_runner.dart';
 import 'local_openlist_client.dart';
 import 'local_openlist_settings_store.dart';
@@ -55,6 +56,8 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   int _directoryPage = 1;
   int _totalItems = 0;
   bool _scanRunning = false;
+  bool _archiveProcessing = false;
+  int _pendingCovers = 0;
   FrameCloudScanState? _scanState;
   FrameCloudScanRunner? _activeScanRunner;
   String _scanMessage = '尚無索引掃描紀錄';
@@ -365,14 +368,113 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                     ? '找到手動暫停的進度，可從保存位置續掃。'
                     : '找到尚未完成的進度，可從保存位置續掃。';
       });
+      await _refreshPendingCovers();
     } catch (error) {
       if (!mounted) return;
       setState(() => _scanMessage = '讀取 D1 掃描進度失敗：$error');
     }
   }
 
+  Future<void> _refreshPendingCovers() async {
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    if (root == null) return;
+    try {
+      final queue = await _repository.loadPendingCovers(
+        provider: _provider,
+        library: _library,
+        rootPath: root,
+        limit: 1,
+      );
+      if (mounted) setState(() => _pendingCovers = queue.total);
+    } catch (_) {
+      // Keep the last visible count if the queue endpoint is temporarily
+      // unavailable; the scanner and reading bookshelf remain usable.
+    }
+  }
+
+  Future<void> _processArchiveQueue({bool retryFailures = false}) async {
+    if (_archiveProcessing || _scanRunning) return;
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    if (root == null) {
+      _showMessage('請先設定有效的書庫根目錄。');
+      return;
+    }
+    if (_provider == FrameCloudProvider.local &&
+        !(_localClient?.isAuthenticated ?? false)) {
+      _showMessage('請先登入本地 OpenList。');
+      return;
+    }
+    if (_provider.isServerSide &&
+        !(_session?.providers[_provider]?.configured ?? false)) {
+      _showMessage('目前來源尚未在 Cloudflare Pages 設定完成。');
+      return;
+    }
+
+    final processor = FrameCloudArchiveProcessor(
+      repository: _repository,
+      localClient: _localClient,
+    );
+    setState(() {
+      _archiveProcessing = true;
+      _scanMessage = retryFailures
+          ? '正在重設失敗封面並重新處理…'
+          : '正在讀取待處理的封面與 EPUB OPF 元資料…';
+    });
+    try {
+      if (retryFailures) {
+        final retried = await processor.retryFailed(
+          provider: _provider,
+          library: _library,
+          rootPath: root,
+        );
+        if (retried == 0) {
+          if (mounted) {
+            setState(() {
+              _archiveProcessing = false;
+              _scanMessage = '目前沒有可重試的失敗封面。';
+            });
+          }
+          await _refreshPendingCovers();
+          return;
+        }
+      }
+      final result = await processor.processPendingBatch(
+        provider: _provider,
+        library: _library,
+        rootPath: root,
+        maxItems: 8,
+        scanState: _scanState,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _scanMessage = progress.message;
+            if (progress.state != null) _scanState = progress.state;
+          });
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _archiveProcessing = false;
+        _scanState = result.state ?? _scanState;
+        _scanMessage = '本批完成：處理 ${result.processed} 本，封面上傳 ${result.uploaded} 本，'
+            '無封面 ${result.missing} 本，失敗 ${result.failed} 本，'
+            'EPUB 元資料更新 ${result.metadataProcessed} 本；待處理 ${result.pending} 本。';
+      });
+      await _loadScanState();
+      await _refreshPendingCovers();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _archiveProcessing = false;
+        _scanMessage = '封面／元資料處理失敗：$error';
+      });
+      _showMessage('封面／元資料處理失敗：$error');
+      await _refreshPendingCovers();
+    }
+  }
+
   Future<void> _startScan({bool forceRescan = false}) async {
-    if (_scanRunning) return;
+    if (_scanRunning || _archiveProcessing) return;
     if (_provider == FrameCloudProvider.local &&
         !(_localClient?.isAuthenticated ?? false)) {
       _showMessage('請先登入本地 OpenList。');
@@ -444,6 +546,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                   ? '已暫停，D1 掃描游標已保存。'
                   : '本批已結束，D1 掃描游標已保存，可再次續掃。');
     });
+    await _loadScanState();
+    if (result.error == null && !result.paused) {
+      await _processArchiveQueue();
+    }
     await _loadScanState();
     await _loadDirectory();
     if (result.error != null) _showMessage('索引掃描失敗：${result.error}');
@@ -686,7 +792,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                     ),
                 ],
               ),
-              onTap: _scanRunning ? null : () => _selectProvider(provider),
+              onTap: (_scanRunning || _archiveProcessing) ? null : () => _selectProvider(provider),
             ),
           );
         }),
@@ -719,7 +825,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
             hint: '/path/to/comics'),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: _savingRoots || _scanRunning ? null : _saveRoots,
+          onPressed: _savingRoots || _scanRunning || _archiveProcessing ? null : _saveRoots,
           icon: _savingRoots
               ? const SizedBox(
                   width: 16,
@@ -731,7 +837,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         ),
         const SizedBox(height: 22),
         OutlinedButton.icon(
-          onPressed: _scanRunning ? null : _openLegacyManager,
+          onPressed: (_scanRunning || _archiveProcessing) ? null : _openLegacyManager,
           icon: const Icon(Icons.settings_suggest_outlined),
           label: const Text('開啟完整連接與掃描管理器'),
         ),
@@ -836,7 +942,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                   ),
                 ],
                 selected: {_library},
-                onSelectionChanged: _scanRunning
+                onSelectionChanged: (_scanRunning || _archiveProcessing)
                     ? null
                     : (value) => _selectLibrary(value.first),
               ),
@@ -876,7 +982,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                     ),
                   IconButton(
                     tooltip: '重新載入目錄',
-                    onPressed: _loadingDirectory
+                    onPressed: (_loadingDirectory || _scanRunning || _archiveProcessing)
                         ? null
                         : () => _loadDirectory(page: _directoryPage),
                     icon: const Icon(Icons.refresh),
@@ -935,7 +1041,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                             ),
                           ],
                         ),
-                        if (_scanRunning) ...[
+                        if (_scanRunning || _archiveProcessing) ...[
                           const SizedBox(height: 9),
                           const LinearProgressIndicator(minHeight: 2),
                         ],
@@ -959,6 +1065,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                               _scanMetric('已讀取', _scanState!.scannedCount),
                               _scanMetric('資料夾', _scanState!.visitedFolderCount),
                               _scanMetric('失敗', _scanState!.failedCount),
+                              _scanMetric('封面待處理', _pendingCovers),
+                              _scanMetric('封面已完成', _scanState!.coverReadyCount),
+                              _scanMetric('封面失敗', _scanState!.coverFailedCount),
+                              _scanMetric('元資料', _scanState!.metadataProcessedCount),
                             ],
                           ),
                         ],
@@ -977,6 +1087,21 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                               ),
                             ),
                             OutlinedButton.icon(
+                              onPressed: (_scanRunning || _archiveProcessing || _pendingCovers == 0)
+                                  ? null
+                                  : () => _processArchiveQueue(),
+                              icon: const Icon(Icons.image_outlined, size: 18),
+                              label: const Text('封面／元資料'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: (_scanRunning || _archiveProcessing ||
+                                      (_scanState?.coverFailedCount ?? 0) == 0)
+                                  ? null
+                                  : () => _processArchiveQueue(retryFailures: true),
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('重試失敗'),
+                            ),
+                            OutlinedButton.icon(
                               onPressed: _scanRunning ? _pauseScan : null,
                               icon: const Icon(Icons.pause, size: 18),
                               label: const Text('暫停'),
@@ -992,7 +1117,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          '原生掃描會逐頁寫入 D1 並保存續掃游標；封面提取、R2 上傳及 EPUB OPF 元資料仍可在完整管理器處理。',
+                          '索引掃描會逐頁寫入 D1 並保存續掃游標。封面與 OPF 元資料透過 ZIP Range 讀取，縮圖上傳私有 R2；不會下載整本 EPUB／CBZ。',
                           style: TextStyle(
                             color: _cloudMuted,
                             fontSize: 10,
