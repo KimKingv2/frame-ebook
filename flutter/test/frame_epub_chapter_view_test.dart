@@ -562,6 +562,96 @@ void main() {
     }
   });
 
+  testWidgets('restores a highlight range across inline XHTML text nodes',
+      (tester) async {
+    final bytes = _fixture();
+    final book = FrameBook.fromJson({
+      'id': 'chapter-cross-inline-annotation-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/cross-inline.epub',
+      'fileName': 'cross-inline.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final nodes = chapter.document.descendants.whereType<XmlText>();
+      final startNode =
+          nodes.firstWhere((node) => node.value == '這是一段 ');
+      final middleNode = nodes.firstWhere((node) => node.value == 'EPUB');
+      final endNode = nodes.firstWhere((node) => node.value == ' 文字。');
+      final cfi = FrameEpubCfi.createRange(
+        book: epub,
+        spineIndex: 0,
+        startNode: startNode,
+        startOffset: 0,
+        endNode: endNode,
+        endOffset: endNode.value.length,
+      )!;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                annotations: [
+                  FrameReaderAnnotation(
+                    id: 'cross-inline-highlight',
+                    bookId: book.id,
+                    type: 'highlight',
+                    cfi: cfi,
+                    quote: '${startNode.value}${middleNode.value}${endNode.value}',
+                    color: 'rose',
+                    createdAt: 30,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final rendered = <TextSpan>[];
+      void collect(InlineSpan span) {
+        if (span is! TextSpan) return;
+        rendered.add(span);
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          collect(child);
+        }
+      }
+
+      for (final selectable
+          in tester.widgetList<SelectableText>(find.byType(SelectableText))) {
+        final span = selectable.textSpan;
+        if (span != null) collect(span);
+      }
+
+      final expectedColor = const Color(0x66E88EAF);
+      for (final text in [
+        startNode.value,
+        middleNode.value,
+        endNode.value,
+      ]) {
+        final span = rendered.firstWhere((candidate) => candidate.text == text);
+        expect(span.style?.backgroundColor, expectedColor);
+      }
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('renders EPUB table headers, cells and colspan without overflow',
       (tester) async {
     const table = '''
