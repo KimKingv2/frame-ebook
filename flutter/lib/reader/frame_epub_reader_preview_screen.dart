@@ -91,13 +91,23 @@ class _FrameEpubReaderPreviewScreenState
   FrameReadingTimeTracker? _readingTimeTracker;
   int _readingSeconds = 0;
   bool _isImmersive = false;
+  bool _fullScreenListenerRegistered = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    FullScreen.addListener(this);
-    _isImmersive = FullScreen.isFullScreen;
+    try {
+      FullScreen.addListener(this);
+      _fullScreenListenerRegistered = true;
+      _isImmersive = FullScreen.isFullScreen;
+    } on Object {
+      // Widget tests and embedded hosts may mount this screen without running
+      // the app-level fullscreen plugin bootstrap. Keep normal reader mode
+      // available; the production app initializes the plugin in main().
+      _fullScreenListenerRegistered = false;
+      _isImmersive = false;
+    }
     HardwareKeyboard.instance.addHandler(_handleReadingKeyEvent);
     _chapterScrollController = ScrollController();
     _chapterPageController = PageController();
@@ -345,8 +355,12 @@ class _FrameEpubReaderPreviewScreenState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    FullScreen.removeListener(this);
-    if (FullScreen.isFullScreen) FullScreen.setFullScreen(false);
+    try {
+      if (_fullScreenListenerRegistered) FullScreen.removeListener(this);
+      if (FullScreen.isFullScreen) FullScreen.setFullScreen(false);
+    } on Object {
+      // The plugin may never have been initialized in an embedding/test host.
+    }
     HardwareKeyboard.instance.removeHandler(_handleReadingKeyEvent);
     unawaited(_releaseResources());
     super.dispose();
