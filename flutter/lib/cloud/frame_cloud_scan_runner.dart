@@ -128,11 +128,7 @@ class FrameCloudScanRunner {
     _running = true;
     _pauseRequested = false;
     final startedAt = _clock();
-    var state = await _repository.loadScanState(
-      provider: provider,
-      library: library,
-      rootPath: root,
-    );
+    FrameCloudScanState? state;
     var scanned = 0;
     var indexed = 0;
     var skipped = 0;
@@ -140,6 +136,11 @@ class FrameCloudScanRunner {
     var removed = 0;
 
     try {
+      state = await _repository.loadScanState(
+        provider: provider,
+        library: library,
+        rootPath: root,
+      );
       final matchesScope = state != null &&
           state.version == 1 &&
           state.provider == provider &&
@@ -152,7 +153,9 @@ class FrameCloudScanRunner {
           rootPath: root,
           scanId: _createScanId(),
         );
-        state.raw['scanMode'] = forceRescan ? '完整重掃' : '首次完整掃描';
+        state = _withRaw(state, {
+          'scanMode': forceRescan ? '完整重掃' : '首次完整掃描',
+        });
         await _repository.saveScanState(state);
       } else if (state.completed) {
         return FrameCloudScanRunResult(
@@ -295,8 +298,10 @@ class FrameCloudScanRunner {
           rootPath: root,
           scanId: state.scanId,
         );
-        state.raw['removedCount'] = removed;
-        state.raw['completedAt'] = _clock().toIso8601String();
+        state = _withRaw(state, {
+          'removedCount': removed,
+          'completedAt': _clock().toIso8601String(),
+        });
         state = state.copyWith(
           completed: true,
           pausedByUser: false,
@@ -338,7 +343,7 @@ class FrameCloudScanRunner {
               0,
               min(700, error.toString().length),
             );
-        state.raw['lastError'] = message;
+        state = _withRaw(state, {'lastError': message});
         state.errors.add({
           'path': state.currentFolder ?? root,
           'message': message,
@@ -417,12 +422,6 @@ class FrameCloudScanRunner {
             coverError: null,
           );
         })
-        .where((entry) {
-          if (entry.isDirectory) return true;
-          return library == FrameCloudLibrary.books
-              ? entry.format == 'EPUB'
-              : entry.format == 'EPUB' || entry.format == 'CBZ';
-        })
         .toList(growable: false);
     return FrameCloudDirectoryPage(
       provider: provider,
@@ -437,6 +436,39 @@ class FrameCloudScanRunner {
       items: items,
     );
   }
+
+  static FrameCloudScanState _withRaw(
+    FrameCloudScanState state,
+    Map<String, dynamic> updates,
+  ) =>
+      FrameCloudScanState(
+        version: state.version,
+        provider: state.provider,
+        library: state.library,
+        rootPath: state.rootPath,
+        scanId: state.scanId,
+        pendingFolders: state.pendingFolders,
+        currentFolder: state.currentFolder,
+        page: state.page,
+        seenFolders: state.seenFolders,
+        scannedCount: state.scannedCount,
+        indexedCount: state.indexedCount,
+        skippedCount: state.skippedCount,
+        failedCount: state.failedCount,
+        visitedFolderCount: state.visitedFolderCount,
+        coverReadyCount: state.coverReadyCount,
+        coverMissingCount: state.coverMissingCount,
+        coverFailedCount: state.coverFailedCount,
+        metadataProcessedCount: state.metadataProcessedCount,
+        metadataFailedCount: state.metadataFailedCount,
+        pausedByUser: state.pausedByUser,
+        resumeOnNextOpen: state.resumeOnNextOpen,
+        completed: state.completed,
+        errors: state.errors,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+        raw: {...state.raw, ...updates},
+      );
 
   static Map<String, dynamic> _entryJson(
     FrameCloudEntry item,
