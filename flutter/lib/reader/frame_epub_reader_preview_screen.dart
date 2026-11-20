@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
+import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -11,11 +13,15 @@ import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
 import 'frame_epub_footnote.dart';
+import 'frame_epub_fixed_layout_long_strip.dart';
+import 'frame_epub_resource_loader.dart';
 import 'frame_epub_cfi.dart';
 import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
+import 'frame_reading_time_tracker.dart';
+import 'frame_epub_reader_sidebar.dart';
 
 const _readerChrome = Color(0xFF171420);
 const _readerPanel = Color(0xFF211D2D);
@@ -48,13 +54,17 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
 }
 
 class _FrameEpubReaderPreviewScreenState
-    extends State<FrameEpubReaderPreviewScreen> {
+    extends State<FrameEpubReaderPreviewScreen>
+    with WidgetsBindingObserver, FullScreenListener {
   bool _initialized = false;
   bool _appearanceInitialized = false;
   String? _setupError;
   FrameFileSource? _fileSource;
   FrameEpubReaderSession? _session;
   late ScrollController _chapterScrollController;
+  late PageController _chapterPageController;
+  String _layoutMode = 'continuous';
+  String? _lastVisibleCfi;
   String? _activeChapterPath;
   Timer? _progressSaveTimer;
   String? _pendingCfi;
@@ -64,13 +74,138 @@ class _FrameEpubReaderPreviewScreenState
   bool _isFixedPageZoomed = false;
 
   double _fontSize = 18;
-  double _lineHeight = 1.75;
-  String _theme = 'dark';
+  double _lineHeight = 1.65;
+  double _fontScale = 1;
+  String _fontFamilyPreference = 'original';
+  String _fontWeightPreference = 'original';
+  String _paragraphSpacingPreference = 'original';
+  String _textAlignPreference = 'original';
+  double _verticalMargin = 16;
+  double _horizontalMarginPercent = 7;
+  String _theme = 'light';
+  String _comicReadingMode = 'paginated';
+  String _comicPageLayout = '2';
+  String _comicImageFit = 'fit-page';
+  String _comicBackdrop = 'wood';
+  Timer? _comicSpineNavigationTimer;
+  FrameReadingTimeTracker? _readingTimeTracker;
+  int _readingSeconds = 0;
+  bool _isImmersive = false;
+  bool _fullScreenListenerRegistered = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    try {
+      FullScreen.addListener(this);
+      _fullScreenListenerRegistered = true;
+      _isImmersive = FullScreen.isFullScreen;
+    } on Object {
+      // Widget tests and embedded hosts may mount this screen without running
+      // the app-level fullscreen plugin bootstrap. Keep normal reader mode
+      // available; the production app initializes the plugin in main().
+      _fullScreenListenerRegistered = false;
+      _isImmersive = false;
+    }
+    HardwareKeyboard.instance.addHandler(_handleReadingKeyEvent);
     _chapterScrollController = ScrollController();
+    _chapterPageController = PageController();
+  }
+
+  @override
+  void onFullScreenChanged(bool enabled, SystemUiMode? systemUiMode) {
+    if (!mounted || _isImmersive == enabled) return;
+    setState(() => _isImmersive = enabled);
+  }
+
+  void _toggleImmersiveMode() {
+    try {
+      FullScreen.setFullScreen(!_isImmersive);
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法切換全螢幕：$error')),
+      );
+    }
+  }
+
+  void _exitImmersiveMode() {
+    if (!_isImmersive) return;
+    try {
+      FullScreen.setFullScreen(false);
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法退出全螢幕：$error')),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final tracker = _readingTimeTracker;
+    if (tracker == null) return;
+    unawaited(tracker.setForeground(state == AppLifecycleState.resumed));
+  }
+
+  void _startReadingTimeTracking(FrameEpubReaderSession session) {
+    if (_readingTimeTracker != null) return;
+    final tracker = FrameReadingTimeTracker(
+      book: widget.book,
+      repository: session.repository,
+      onUpdate: (seconds) {
+        if (!mounted) return;
+        setState(() => _readingSeconds = seconds);
+      },
+      onError: (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('閱讀時光尚未同步：$error')),
+        );
+      },
+    );
+    _readingTimeTracker = tracker;
+    unawaited(
+      tracker.start(
+        foreground: WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+      ).catchError((Object error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('無法啟動閱讀時光記錄：$error')),
+        );
+      }),
+    );
+  }
+
+  bool _handleReadingKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      _recordReadingActivity();
+      if (event.logicalKey == LogicalKeyboardKey.escape && _isImmersive) {
+        _exitImmersiveMode();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _recordReadingActivity() {
+    _readingTimeTracker?.activity();
+  }
+
+  String _readingDurationLabel(int seconds) {
+    final safe = seconds < 0 ? 0 : seconds;
+    final hours = safe ~/ 3600;
+    final minutes = (safe % 3600) ~/ 60;
+    final remainder = safe % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:'
+          '${minutes.toString().padLeft(2, '0')}:'
+          '${remainder.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${remainder.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -108,18 +243,28 @@ class _FrameEpubReaderPreviewScreenState
     if (chapterPath != null && chapterPath != _activeChapterPath) {
       _activeChapterPath = chapterPath;
       _lastSavedCfi = null;
+      _lastVisibleCfi = null;
       _selectedText = null;
       _isFixedPageZoomed = false;
-      final previousController = _chapterScrollController;
-      _chapterScrollController = ScrollController();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        previousController.dispose();
-      });
+      final isLongStrip =
+          session?.isFixedLayout == true && _comicReadingMode == 'scrolled';
+      if (!isLongStrip) {
+        final previousController = _chapterScrollController;
+        final previousPageController = _chapterPageController;
+        _chapterScrollController = ScrollController();
+        _chapterPageController = PageController();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          previousController.dispose();
+          previousPageController.dispose();
+        });
+      }
     }
-    if (session?.status == FrameEpubReaderStatus.ready &&
-        !_appearanceInitialized) {
-      _restoreAppearance(session!.readerState.appearance);
-      _appearanceInitialized = true;
+    if (session?.status == FrameEpubReaderStatus.ready) {
+      _startReadingTimeTracking(session!);
+      if (!_appearanceInitialized) {
+        _restoreAppearance(session.readerState.appearance);
+        _appearanceInitialized = true;
+      }
     }
     if (mounted) setState(() {});
   }
@@ -135,22 +280,99 @@ class _FrameEpubReaderPreviewScreenState
     _fontSize = value(appearance['frameFlutterFontSize'], 18)
         .clamp(14, 30)
         .toDouble();
-    _lineHeight = value(appearance['frameFlutterLineHeight'], 1.75)
-        .clamp(1.2, 2.4)
+    _fontScale = value(appearance['fontScale'], 1)
+        .clamp(.9, 1.3)
         .toDouble();
-    final theme = appearance['frameFlutterTheme']?.toString() ?? 'dark';
-    _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme : 'dark';
+    _lineHeight = value(
+      appearance['frameFlutterLineHeight'] ?? appearance['lineHeight'],
+      1.65,
+    ).clamp(1.2, 2.4).toDouble();
+    _fontFamilyPreference =
+        const {'original', 'serif', 'sans'}.contains(appearance['fontFamily'])
+            ? appearance['fontFamily'].toString()
+            : 'original';
+    _fontWeightPreference =
+        const {'original', 'normal', 'medium'}.contains(appearance['fontWeight'])
+            ? appearance['fontWeight'].toString()
+            : 'original';
+    _paragraphSpacingPreference =
+        const {'original', 'compact', 'standard', 'loose'}
+                .contains(appearance['paragraphSpacing'])
+            ? appearance['paragraphSpacing'].toString()
+            : 'original';
+    _textAlignPreference =
+        const {'original', 'left', 'justify'}.contains(appearance['textAlign'])
+            ? appearance['textAlign'].toString()
+            : 'original';
+    _verticalMargin = value(appearance['verticalMargin'], 16)
+        .clamp(8, 64)
+        .toDouble();
+    _horizontalMarginPercent = value(appearance['horizontalMargin'], 7)
+        .clamp(0, 20)
+        .toDouble();
+
+    final savedTheme = appearance['frameFlutterTheme']?.toString();
+    final legacyTheme = appearance['theme']?.toString();
+    final theme = savedTheme ??
+        (legacyTheme == 'paper'
+            ? 'light'
+            : legacyTheme == 'night'
+                ? 'dark'
+                : legacyTheme);
+    _theme = const {'dark', 'sepia', 'light'}.contains(theme) ? theme! : 'light';
+
+    final savedLayout = appearance['frameFlutterLayoutMode']?.toString();
+    final legacyReadingMode = appearance['readingMode']?.toString();
+    final legacyPageLayout = appearance['pageLayout']?.toString();
+    final layoutMode = savedLayout ??
+        (legacyReadingMode == 'scrolled'
+            ? 'continuous'
+            : legacyPageLayout == '2'
+                ? 'doublePage'
+                : 'paginated');
+    _layoutMode = const {'continuous', 'paginated', 'doublePage'}
+            .contains(layoutMode)
+        ? layoutMode
+        : 'continuous';
+    _comicReadingMode =
+        const {'paginated', 'scrolled'}.contains(appearance['comicReadingMode'])
+            ? appearance['comicReadingMode'].toString()
+            : 'paginated';
+    _comicPageLayout =
+        const {'1', '2'}.contains(appearance['comicPageLayout'])
+            ? appearance['comicPageLayout'].toString()
+            : '2';
+    _comicImageFit =
+        const {'fit-page', 'fit-width'}.contains(appearance['comicImageFit'])
+            ? appearance['comicImageFit'].toString()
+            : 'fit-page';
+    _comicBackdrop =
+        const {'wood', 'linen', 'slate'}.contains(appearance['backdrop'])
+            ? appearance['backdrop'].toString()
+            : 'wood';
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      if (_fullScreenListenerRegistered) FullScreen.removeListener(this);
+      if (FullScreen.isFullScreen) FullScreen.setFullScreen(false);
+    } on Object {
+      // The plugin may never have been initialized in an embedding/test host.
+    }
+    HardwareKeyboard.instance.removeHandler(_handleReadingKeyEvent);
     unawaited(_releaseResources());
     super.dispose();
   }
 
   Future<void> _releaseResources() async {
+    final readingTracker = _readingTimeTracker;
+    _readingTimeTracker = null;
+    if (readingTracker != null) await readingTracker.stop();
     await _flushReadingPosition();
     _progressSaveTimer?.cancel();
+    _comicSpineNavigationTimer?.cancel();
     final session = _session;
     if (session != null) {
       session.removeListener(_handleSessionChanged);
@@ -160,16 +382,58 @@ class _FrameEpubReaderPreviewScreenState
     final source = _fileSource;
     if (source is FrameCloudFileSource) source.close();
     _chapterScrollController.dispose();
+    _chapterPageController.dispose();
+  }
+
+  FrameEpubCfiLocation? _initialCfiLocationFor(
+    FrameEpubReaderSession session,
+  ) {
+    final chapter = session.currentChapter;
+    final epub = session.epub;
+    if (chapter == null || epub == null) return null;
+    final visibleCfi = _lastVisibleCfi;
+    if (visibleCfi != null &&
+        FrameEpubCfi.spineIndexFromCfi(epub, visibleCfi) ==
+            session.currentSpineIndex) {
+      final location = FrameEpubCfi.resolve(
+        book: epub,
+        document: chapter.document,
+        cfi: visibleCfi,
+      );
+      if (location != null) return location;
+    }
+    final restoredCfi = session.initialCfi;
+    if (restoredCfi == null) return null;
+    return FrameEpubCfi.resolve(
+      book: epub,
+      document: chapter.document,
+      cfi: restoredCfi,
+    );
   }
 
   XmlElement? _initialAnchorFor(FrameEpubReaderSession session) {
     final chapter = session.currentChapter;
     if (chapter == null) return null;
-    return session.initialAnchor ??
+    return _initialCfiLocationFor(session)?.anchorElement ??
+        session.initialAnchor ??
         FrameEpubCfi.anchorForFragment(
           chapter.document,
           session.currentFragment,
         );
+  }
+
+  FrameEpubCfiPoint? _initialTextPointFor(
+    FrameEpubReaderSession session,
+  ) {
+    final location = _initialCfiLocationFor(session);
+    if (location?.node is XmlText) {
+      return FrameEpubCfiPoint(
+        node: location!.node as XmlText,
+        offset: location.offset,
+      );
+    }
+    final anchor = _initialAnchorFor(session);
+    return anchor == null ? null : FrameEpubCfi.firstTextPoint(anchor);
   }
 
   double? _initialScrollFractionFor(FrameEpubReaderSession session) {
@@ -192,6 +456,7 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   void _queueReadingPosition(String cfi, double chapterFraction) {
+    _lastVisibleCfi = cfi;
     final session = _session;
     final index = session?.currentSpineIndex;
     final count = session?.epub?.spine.length ?? 0;
@@ -254,6 +519,87 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
+  BoxDecoration get _comicBackdropDecoration {
+    switch (_comicBackdrop) {
+      case 'linen':
+        return const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFC2B9AA),
+              Color(0xFF8E877D),
+              Color(0xFF68635D),
+            ],
+          ),
+        );
+      case 'slate':
+        return const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(-.55, -.8),
+            radius: 1.35,
+            colors: [
+              Color(0xFF514A5D),
+              Color(0xFF24232D),
+              Color(0xFF15141C),
+            ],
+          ),
+        );
+      case 'wood':
+      default:
+        return const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF98704A),
+              Color(0xFF63442F),
+              Color(0xFF35251F),
+            ],
+          ),
+        );
+    }
+  }
+
+  bool _usesComicDoublePage(BuildContext context, FrameEpubReaderSession session) =>
+      session.isFixedLayout &&
+      _comicReadingMode == 'paginated' &&
+      _comicPageLayout == '2' &&
+      session.epub?.spread.toLowerCase() != 'none' &&
+      MediaQuery.sizeOf(context).width >= 760;
+
+  int _comicPageStep(BuildContext context, FrameEpubReaderSession session) =>
+      _usesComicDoublePage(context, session) ? 2 : 1;
+
+  Future<bool> _navigateComicChapter(
+    FrameEpubReaderSession session,
+    int direction,
+  ) async {
+    final index = session.currentSpineIndex;
+    final count = session.epub?.spine.length ?? 0;
+    if (index == null || count <= 0) return false;
+    final step = _comicPageStep(context, session);
+    final target = (index + direction * step).clamp(0, count - 1).toInt();
+    if (target == index) return false;
+    _comicSpineNavigationTimer?.cancel();
+    return session.goToSpineIndex(target);
+  }
+
+  void _scheduleComicSpineNavigation(
+    FrameEpubReaderSession session,
+    int targetIndex,
+  ) {
+    if (session.currentSpineIndex == targetIndex) return;
+    _comicSpineNavigationTimer?.cancel();
+    _comicSpineNavigationTimer = Timer(
+      const Duration(milliseconds: 140),
+      () {
+        if (!mounted || session.currentSpineIndex == targetIndex) return;
+        unawaited(session.goToSpineIndex(targetIndex));
+      },
+    );
+  }
+
   Color get _pageText {
     switch (_theme) {
       case 'sepia':
@@ -281,9 +627,17 @@ class _FrameEpubReaderPreviewScreenState
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    return Scaffold(
-      backgroundColor: _readerChrome,
-      appBar: AppBar(
+    return PopScope<Object?>(
+      canPop: !_isImmersive,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _exitImmersiveMode();
+      },
+      child: Listener(
+        onPointerDown: (_) => _recordReadingActivity(),
+        onPointerSignal: (_) => _recordReadingActivity(),
+        child: Scaffold(
+          backgroundColor: _readerChrome,
+          appBar: _isImmersive ? null : AppBar(
         backgroundColor: _readerChrome,
         foregroundColor: _readerText,
         titleSpacing: 0,
@@ -298,7 +652,9 @@ class _FrameEpubReaderPreviewScreenState
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             Text(
-              'Flutter EPUB 預覽',
+              _readingTimeTracker == null
+                  ? 'Flutter EPUB 預覽'
+                  : '本次閱讀 ${_readingDurationLabel(_readingSeconds)}',
               style: TextStyle(color: _readerMuted, fontSize: 10),
             ),
           ],
@@ -318,7 +674,7 @@ class _FrameEpubReaderPreviewScreenState
             icon: const Icon(Icons.bookmark_add_outlined),
           ),
           IconButton(
-            tooltip: '筆記與書籤',
+            tooltip: '閱讀導覽',
             onPressed: session == null ? null : _showAnnotations,
             icon: const Icon(Icons.bookmarks_outlined),
           ),
@@ -327,11 +683,27 @@ class _FrameEpubReaderPreviewScreenState
             onPressed: session == null ? null : _showAppearance,
             icon: const Icon(Icons.text_fields_rounded),
           ),
+          IconButton(
+            tooltip: '進入沉浸式全螢幕',
+            onPressed: session == null ? null : _toggleImmersiveMode,
+            icon: const Icon(Icons.fullscreen_rounded),
+          ),
         ],
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(session),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollStartNotification ||
+                notification is ScrollUpdateNotification) {
+              _recordReadingActivity();
+            }
+            return false;
+          },
+          child: _buildBody(session),
+        ),
+        ),
+      ),
       ),
     );
   }
@@ -357,6 +729,7 @@ class _FrameEpubReaderPreviewScreenState
     final chapter = session.currentChapter!;
     final spineCount = session.epub?.spine.length ?? 0;
     final chapterIndex = session.currentSpineIndex ?? 0;
+    final initialTextPoint = _initialTextPointFor(session);
 
     return Column(
       children: [
@@ -392,48 +765,45 @@ class _FrameEpubReaderPreviewScreenState
               Positioned.fill(
                 child: FrameEpubPageTurnSurface(
                   controller: _chapterScrollController,
+                  pageController: _chapterPageController,
+                  paginated: _layoutMode != 'continuous' && !session.isFixedLayout,
                   fixedLayout: session.isFixedLayout,
                   isRightToLeft: session.epub?.pageProgressionDirection ==
                       FrameEpubPageProgressionDirection.rightToLeft,
                   selectionActive: _selectedText != null,
                   pageZoomed: _isFixedPageZoomed,
-                  onPreviousChapter: session.canGoPrevious
+                  immersive: _isImmersive,
+                  onToggleImmersive: _toggleImmersiveMode,
+                  onExitImmersive: _exitImmersiveMode,
+                  onPreviousChapter: session.currentSpineIndex != null &&
+                          session.currentSpineIndex! >=
+                              _comicPageStep(context, session)
                       ? () async {
-                          await _runNavigation(session.goToPreviousChapter);
+                          if (session.isFixedLayout) {
+                            await _navigateComicChapter(session, -1);
+                          } else {
+                            await _runNavigation(session.goToPreviousChapter);
+                          }
                         }
                       : null,
-                  onNextChapter: session.canGoNext
+                  onNextChapter: session.currentSpineIndex != null &&
+                          session.currentSpineIndex! +
+                                  _comicPageStep(context, session) <
+                              spineCount
                       ? () async {
-                          await _runNavigation(session.goToNextChapter);
+                          if (session.isFixedLayout) {
+                            await _navigateComicChapter(session, 1);
+                          } else {
+                            await _runNavigation(session.goToNextChapter);
+                          }
                         }
                       : null,
-                  child: FrameEpubChapterView(
-                    key: ValueKey(chapter.resource.path),
+                  child: _buildReaderChapterContent(
+                    context: context,
+                    session: session,
                     chapter: chapter,
-                    resourceLoader: session.resourceLoader!,
-                    fixedLayout: session.isFixedLayout,
-                    annotations: session.annotations,
                     spineIndex: chapterIndex,
-                    initialAnchor: _initialAnchorFor(session),
-                    initialScrollFraction: _initialScrollFractionFor(session),
-                    scrollController: _chapterScrollController,
-                    onReadingPosition: _queueReadingPosition,
-                    onTextSelection: _handleTextSelection,
-                    onPageZoomChanged: (zoomed) {
-                      if (!mounted || _isFixedPageZoomed == zoomed) return;
-                      setState(() => _isFixedPageZoomed = zoomed);
-                    },
-                    backgroundColor: _pageBackground,
-                    textColor: _pageText,
-                    linkColor: _pageLink,
-                    fontSize: _fontSize,
-                    lineHeight: _lineHeight,
-                    onInternalLink: (href) {
-                      unawaited(
-                        _runNavigation(() => session.goToHref(href)),
-                      );
-                    },
-                    onFootnote: _showFootnote,
+                    initialTextPoint: initialTextPoint,
                   ),
                 ),
               ),
@@ -525,12 +895,135 @@ class _FrameEpubReaderPreviewScreenState
         ),
       );
 
+  Widget _buildReaderChapterContent({
+    required BuildContext context,
+    required FrameEpubReaderSession session,
+    required FrameEpubChapterDocument chapter,
+    required int spineIndex,
+    required FrameEpubCfiPoint? initialTextPoint,
+  }) {
+    final loader = session.resourceLoader!;
+    final epub = session.epub!;
+    final isRightToLeft =
+        epub.pageProgressionDirection == FrameEpubPageProgressionDirection.rightToLeft;
+
+    if (session.isFixedLayout) {
+      if (_comicReadingMode == 'scrolled') {
+        return FrameEpubFixedLayoutLongStrip(
+          pageCount: epub.spine.length,
+          currentPageIndex: spineIndex,
+          cachePages: 1,
+          onPageChanged: (index) =>
+              _scheduleComicSpineNavigation(session, index),
+          pageBuilder: (pageContext, index) => _FixedLayoutComicPage(
+            key: ValueKey(epub.spine[index].item.path),
+            resourceLoader: loader,
+            spineItem: epub.spine[index],
+            imageFit: 'fit-page',
+            allowZoom: false,
+            backgroundColor: _pageBackground,
+            backdropDecoration: _comicBackdropDecoration,
+            textColor: _pageText,
+            linkColor: _pageLink,
+          ),
+        );
+      }
+
+      final currentPage = _FixedLayoutComicPage(
+        key: ValueKey(epub.spine[spineIndex].item.path),
+        resourceLoader: loader,
+        spineItem: epub.spine[spineIndex],
+        chapter: chapter,
+        imageFit: _comicImageFit,
+        allowZoom: true,
+        backgroundColor: _pageBackground,
+        backdropDecoration: _comicBackdropDecoration,
+        textColor: _pageText,
+        linkColor: _pageLink,
+        onZoomChanged: (zoomed) {
+          if (!mounted || _isFixedPageZoomed == zoomed) return;
+          setState(() => _isFixedPageZoomed = zoomed);
+        },
+      );
+      if (!_usesComicDoublePage(context, session)) return currentPage;
+
+      final nextIndex = spineIndex + 1;
+      final nextPage = nextIndex < epub.spine.length
+          ? _FixedLayoutComicPage(
+              key: ValueKey(epub.spine[nextIndex].item.path),
+              resourceLoader: loader,
+              spineItem: epub.spine[nextIndex],
+              imageFit: _comicImageFit,
+              allowZoom: true,
+              backgroundColor: _pageBackground,
+              backdropDecoration: _comicBackdropDecoration,
+              textColor: _pageText,
+              linkColor: _pageLink,
+              onZoomChanged: (zoomed) {
+                if (!mounted || _isFixedPageZoomed == zoomed) return;
+                setState(() => _isFixedPageZoomed = zoomed);
+              },
+            )
+          : DecoratedBox(
+              decoration: _comicBackdropDecoration,
+              child: const SizedBox.expand(),
+            );
+      final pages = isRightToLeft
+          ? [Expanded(child: nextPage), const SizedBox(width: 8), Expanded(child: currentPage)]
+          : [Expanded(child: currentPage), const SizedBox(width: 8), Expanded(child: nextPage)];
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: pages,
+      );
+    }
+
+    return FrameEpubChapterView(
+      key: ValueKey(chapter.resource.path),
+      chapter: chapter,
+      resourceLoader: loader,
+      paginated: _layoutMode != 'continuous',
+      doublePageSpread: _layoutMode == 'doublePage',
+      isRightToLeft: isRightToLeft,
+      pageController: _chapterPageController,
+      annotations: session.annotations,
+      spineIndex: spineIndex,
+      initialAnchor: _initialAnchorFor(session),
+      initialTextNode: initialTextPoint?.node,
+      initialTextOffset: initialTextPoint?.offset,
+      initialScrollFraction: _initialScrollFractionFor(session),
+      scrollController: _chapterScrollController,
+      onReadingPosition: _queueReadingPosition,
+      onTextSelection: _handleTextSelection,
+      backgroundColor: _pageBackground,
+      textColor: _pageText,
+      linkColor: _pageLink,
+      fontSize: _fontSize,
+      lineHeight: _lineHeight,
+      fontScale: _fontScale,
+      fontFamilyPreference: _fontFamilyPreference,
+      fontWeightPreference: _fontWeightPreference,
+      paragraphSpacingPreference: _paragraphSpacingPreference,
+      textAlignPreference: _textAlignPreference,
+      verticalMargin: _verticalMargin,
+      horizontalMarginPercent: _horizontalMarginPercent,
+      onInternalLink: (href) {
+        unawaited(_runNavigation(() => session.goToHref(href)));
+      },
+      onFootnote: _showFootnote,
+    );
+  }
+
   Widget _chapterControls(
     FrameEpubReaderSession session, {
     required int chapterIndex,
     required int spineCount,
   }) {
     final label = session.currentChapterLabel.trim();
+    final pageStep = _comicPageStep(context, session);
+    final previousLabel = session.isFixedLayout ? '上一頁' : '上一章';
+    final nextLabel = session.isFixedLayout ? '下一頁' : '下一章';
+    final canGoPrevious = chapterIndex > 0;
+    final canGoNext = chapterIndex + pageStep < spineCount;
     return Material(
       color: _readerPanel,
       child: SafeArea(
@@ -543,10 +1036,12 @@ class _FrameEpubReaderPreviewScreenState
               Row(
                 children: [
                   IconButton(
-                    tooltip: '上一章',
-                    onPressed: session.canGoPrevious
+                    tooltip: previousLabel,
+                    onPressed: canGoPrevious
                         ? () => unawaited(
-                              _runNavigation(session.goToPreviousChapter),
+                              session.isFixedLayout
+                                  ? _navigateComicChapter(session, -1)
+                                  : _runNavigation(session.goToPreviousChapter),
                             )
                         : null,
                     icon: const Icon(Icons.chevron_left_rounded),
@@ -576,10 +1071,12 @@ class _FrameEpubReaderPreviewScreenState
                     ),
                   ),
                   IconButton(
-                    tooltip: '下一章',
-                    onPressed: session.canGoNext
+                    tooltip: nextLabel,
+                    onPressed: canGoNext
                         ? () => unawaited(
-                              _runNavigation(session.goToNextChapter),
+                              session.isFixedLayout
+                                  ? _navigateComicChapter(session, 1)
+                                  : _runNavigation(session.goToNextChapter),
                             )
                         : null,
                     icon: const Icon(Icons.chevron_right_rounded),
@@ -600,18 +1097,6 @@ class _FrameEpubReaderPreviewScreenState
         ),
       ),
     );
-  }
-
-  List<_FlattenedTocEntry> _flattenToc(
-    List<FrameEpubTocEntry> entries, {
-    int depth = 0,
-  }) {
-    final flattened = <_FlattenedTocEntry>[];
-    for (final entry in entries) {
-      flattened.add(_FlattenedTocEntry(entry, depth));
-      flattened.addAll(_flattenToc(entry.children, depth: depth + 1));
-    }
-    return flattened;
   }
 
   Future<void> _showFootnote(FrameEpubFootnote footnote) async {
@@ -679,14 +1164,93 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Future<void> _showTableOfContents() async {
+  Future<void> _showTableOfContents() =>
+      _showReaderSidebar(initialTabIndex: 0);
+
+  Future<void> _showAnnotations() =>
+      _showReaderSidebar(initialTabIndex: 2);
+
+  Future<void> _showReaderSidebar({required int initialTabIndex}) async {
     final session = _session;
     if (session == null) return;
-    final entries = _flattenToc(session.toc);
-    final currentIndex = session.currentSpineIndex;
-    final currentPath = currentIndex == null
-        ? null
-        : session.epub?.spine[currentIndex].item.path;
+
+    Widget buildSidebar(BuildContext routeContext) =>
+        FrameEpubReaderSidebar(
+          toc: session.toc,
+          currentPath: session.currentSpineIndex == null
+              ? null
+              : session.epub?.spine[session.currentSpineIndex!].item.path,
+          annotations: session.annotations,
+          initialTabIndex: initialTabIndex,
+          onClose: () => Navigator.of(routeContext).pop(),
+          onSelectToc: (entry) {
+            Navigator.of(routeContext).pop();
+            unawaited(
+              _runNavigation(() => session.goToTocEntry(entry)),
+            );
+          },
+          onOpenAnnotation: (annotation) {
+            Navigator.of(routeContext).pop();
+            unawaited(_goToAnnotation(annotation));
+          },
+          onEditNote: (annotation) {
+            Navigator.of(routeContext).pop();
+            unawaited(_editNote(annotation: annotation));
+          },
+          onDeleteAnnotation: (annotation) async {
+            try {
+              await session.deleteAnnotation(annotation.id);
+              if (!mounted) return false;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已刪除標註。')),
+              );
+              return true;
+            } on Object catch (error) {
+              if (!mounted) return false;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('刪除標註失敗：$error')),
+              );
+              return false;
+            }
+          },
+        );
+
+    final screenSize = MediaQuery.sizeOf(context);
+    if (screenSize.width >= 840) {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: '關閉閱讀導覽',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          final width =
+              (MediaQuery.sizeOf(dialogContext).width * .42)
+                  .clamp(340.0, 460.0)
+                  .toDouble();
+          return Align(
+            alignment: Alignment.centerRight,
+            child: SafeArea(
+              child: SizedBox(
+                width: width,
+                height: double.infinity,
+                child: buildSidebar(dialogContext),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+          final position = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          ).animate(animation);
+          return SlideTransition(position: position, child: child);
+        },
+      );
+      return;
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -694,78 +1258,8 @@ class _FrameEpubReaderPreviewScreenState
       useSafeArea: true,
       backgroundColor: _readerPanel,
       builder: (sheetContext) => SizedBox(
-        height: MediaQuery.of(sheetContext).size.height * 0.72,
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
-              child: Row(
-                children: [
-                  Icon(Icons.menu_book_outlined, color: _readerAccent),
-                  SizedBox(width: 10),
-                  Text(
-                    'EPUB 目錄',
-                    style: TextStyle(
-                      color: _readerText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Color(0x55393247)),
-            Expanded(
-              child: entries.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '這本 EPUB 沒有提供可用目錄。',
-                        style: TextStyle(color: _readerMuted),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final item = entries[index];
-                        final entry = item.entry;
-                        final available = !entry.isExternal &&
-                            entry.reference?.path != null;
-                        final selected = entry.path == currentPath;
-                        return Padding(
-                          padding: EdgeInsets.only(left: item.depth * 14),
-                          child: ListTile(
-                            dense: true,
-                            enabled: available,
-                            selected: selected,
-                            selectedTileColor: const Color(0x332A213B),
-                            title: Text(
-                              entry.label.isEmpty ? '未命名項目' : entry.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: selected
-                                    ? _readerAccent
-                                    : _readerText,
-                                fontSize: 13,
-                              ),
-                            ),
-                            onTap: available
-                                ? () {
-                                    Navigator.of(sheetContext).pop();
-                                    unawaited(
-                                      _runNavigation(
-                                        () => session.goToTocEntry(entry),
-                                      ),
-                                    );
-                                  }
-                                : null,
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+        height: MediaQuery.sizeOf(sheetContext).height * .84,
+        child: buildSidebar(sheetContext),
       ),
     );
   }
@@ -1137,134 +1631,38 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
-  Future<void> _showAnnotations() async {
-    final session = _session;
-    if (session == null) return;
-    var annotations = session.annotations;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _readerPanel,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => SizedBox(
-          height: MediaQuery.of(sheetContext).size.height * 0.68,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bookmarks_outlined, color: _readerAccent),
-                    const SizedBox(width: 10),
-                    Text(
-                      '筆記與書籤（${annotations.length}）',
-                      style: const TextStyle(
-                        color: _readerText,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+  Widget _appearanceDropdown({
+    required String label,
+    required String value,
+    required List<({String value, String label})> options,
+    required ValueChanged<String> onChanged,
+    bool enabled = true,
+  }) {
+    return SizedBox(
+      width: 148,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: _readerMuted, fontSize: 11)),
+          DropdownButton<String>(
+            value: value,
+            onChanged: enabled ? (next) {
+              if (next != null) onChanged(next);
+            } : null,
+            isExpanded: true,
+            dropdownColor: _readerPanel,
+            style: const TextStyle(color: _readerText, fontSize: 12),
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final option in options)
+                DropdownMenuItem<String>(
+                  value: option.value,
+                  child: Text(option.label, overflow: TextOverflow.ellipsis),
                 ),
-              ),
-              const Divider(height: 1, color: Color(0x55393247)),
-              Expanded(
-                child: annotations.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '目前沒有已保存的筆記或書籤。',
-                          style: TextStyle(color: _readerMuted),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: annotations.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1, color: Color(0x33393247)),
-                        itemBuilder: (context, index) {
-                          final annotation = annotations[index];
-                          final title = switch (annotation.type) {
-                            'bookmark' => '書籤',
-                            'highlight' => '劃線',
-                            _ => '筆記',
-                          };
-                          final detail = annotation.text.trim().isNotEmpty
-                              ? annotation.text.trim()
-                              : annotation.quote.trim();
-                          return ListTile(
-                            onTap: annotation.cfi.trim().isEmpty
-                                ? null
-                                : () {
-                                    Navigator.of(sheetContext).pop();
-                                    unawaited(_goToAnnotation(annotation));
-                                  },
-                            title: Text(
-                              title,
-                              style: const TextStyle(
-                                color: _readerText,
-                                fontSize: 13,
-                              ),
-                            ),
-                            subtitle: Text(
-                              detail.isEmpty ? '尚無文字內容' : detail,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _readerMuted,
-                                fontSize: 12,
-                                height: 1.5,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (annotation.type == 'note')
-                                  IconButton(
-                                    tooltip: '編輯筆記',
-                                    onPressed: () {
-                                      Navigator.of(sheetContext).pop();
-                                      unawaited(_editNote(annotation: annotation));
-                                    },
-                                    icon: const Icon(
-                                      Icons.edit_outlined,
-                                      color: _readerAccent,
-                                      size: 18,
-                                    ),
-                                  ),
-                                IconButton(
-                                  tooltip: '刪除$title',
-                                  onPressed: () async {
-                                    try {
-                                      await session.deleteAnnotation(annotation.id);
-                                      if (!mounted) return;
-                                      setSheetState(() {
-                                        annotations = session.annotations;
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('已刪除$title。')),
-                                      );
-                                    } on Object catch (error) {
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('刪除$title失敗：$error')),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    color: Color(0xFFBBAFCB),
-                                    size: 19,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1274,7 +1672,19 @@ class _FrameEpubReaderPreviewScreenState
     if (session == null) return;
     var fontSize = _fontSize;
     var lineHeight = _lineHeight;
+    var fontScale = _fontScale;
+    var fontFamilyPreference = _fontFamilyPreference;
+    var fontWeightPreference = _fontWeightPreference;
+    var paragraphSpacingPreference = _paragraphSpacingPreference;
+    var textAlignPreference = _textAlignPreference;
+    var verticalMargin = _verticalMargin;
+    var horizontalMarginPercent = _horizontalMarginPercent;
     var theme = _theme;
+    var layoutMode = _layoutMode;
+    var comicReadingMode = _comicReadingMode;
+    var comicPageLayout = _comicPageLayout;
+    var comicImageFit = _comicImageFit;
+    var comicBackdrop = _comicBackdrop;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1289,10 +1699,15 @@ class _FrameEpubReaderPreviewScreenState
             20,
             18 + MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * .86,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               const Text(
                 '閱讀外觀',
                 style: TextStyle(
@@ -1348,7 +1763,253 @@ class _FrameEpubReaderPreviewScreenState
                 onChanged: (value) =>
                     setSheetState(() => lineHeight = value),
               ),
+              const SizedBox(height: 12),
+              const Text(
+                '文字排版',
+                style: TextStyle(color: _readerMuted),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 2,
+                children: [
+                  _appearanceDropdown(
+                    label: '字級比例',
+                    value: fontScale.toStringAsFixed(1),
+                    options: const [
+                      (value: '0.9', label: '偏小 90%'),
+                      (value: '1.0', label: '標準 100%'),
+                      (value: '1.1', label: '稍大 110%'),
+                      (value: '1.2', label: '大字 120%'),
+                      (value: '1.3', label: '特大 130%'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontScale = double.parse(v)),
+                  ),
+                  _appearanceDropdown(
+                    label: '字體',
+                    value: fontFamilyPreference,
+                    options: const [
+                      (value: 'original', label: '原書字體'),
+                      (value: 'serif', label: '明體'),
+                      (value: 'sans', label: '黑體'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontFamilyPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '字重',
+                    value: fontWeightPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'normal', label: '標準 400'),
+                      (value: 'medium', label: '稍厚 500'),
+                    ],
+                    onChanged: (v) => setSheetState(() => fontWeightPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '段落間距',
+                    value: paragraphSpacingPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'compact', label: '緊湊'),
+                      (value: 'standard', label: '舒適'),
+                      (value: 'loose', label: '寬鬆'),
+                    ],
+                    onChanged: (v) => setSheetState(() => paragraphSpacingPreference = v),
+                  ),
+                  _appearanceDropdown(
+                    label: '文字對齊',
+                    value: textAlignPreference,
+                    options: const [
+                      (value: 'original', label: '原書設定'),
+                      (value: 'left', label: '靠左對齊'),
+                      (value: 'justify', label: '左右對齊'),
+                    ],
+                    onChanged: (v) => setSheetState(() => textAlignPreference = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('頁面留白', style: TextStyle(color: _readerMuted)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 2,
+                children: [
+                  _appearanceDropdown(
+                    label: '上下留白',
+                    value: verticalMargin.round().toString(),
+                    options: const [
+                      (value: '8', label: '窄 8 px'),
+                      (value: '16', label: '標準 16 px'),
+                      (value: '24', label: '寬 24 px'),
+                      (value: '32', label: '更寬 32 px'),
+                      (value: '40', label: '寬裕 40 px'),
+                      (value: '48', label: '大留白 48 px'),
+                      (value: '64', label: '極寬 64 px'),
+                    ],
+                    onChanged: (v) => setSheetState(() => verticalMargin = double.parse(v)),
+                  ),
+                  _appearanceDropdown(
+                    label: '左右外側留白',
+                    value: horizontalMarginPercent.round().toString(),
+                    options: const [
+                      (value: '0', label: '0%'),
+                      (value: '2', label: '2%'),
+                      (value: '4', label: '4%'),
+                      (value: '7', label: '7%'),
+                      (value: '10', label: '10%'),
+                      (value: '13', label: '13%'),
+                      (value: '16', label: '16%'),
+                      (value: '20', label: '20%'),
+                    ],
+                    onChanged: (v) => setSheetState(() => horizontalMarginPercent = double.parse(v)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                '版面模式',
+                style: TextStyle(color: _readerMuted),
+              ),
               const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('連續捲動'),
+                    selected: layoutMode == 'continuous',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'continuous',
+                            ),
+                  ),
+                  ChoiceChip(
+                    label: const Text('單頁分頁'),
+                    selected: layoutMode == 'paginated',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'paginated',
+                            ),
+                  ),
+                  ChoiceChip(
+                    label: const Text('雙頁跨頁'),
+                    selected: layoutMode == 'doublePage',
+                    onSelected: session.isFixedLayout
+                        ? null
+                        : (_) => setSheetState(
+                              () => layoutMode = 'doublePage',
+                            ),
+                  ),
+                ],
+              ),
+              if (!session.isFixedLayout)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    '雙頁模式會在寬螢幕並排顯示；窄螢幕會自動退回單頁。',
+                    style: TextStyle(color: _readerMuted, fontSize: 11),
+                  ),
+                ),
+              if (session.isFixedLayout)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    '固定版面 EPUB 會依原始頁面顯示，這項設定不適用。',
+                    style: TextStyle(color: _readerMuted, fontSize: 11),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              const Text(
+                '漫畫與圖像',
+                style: TextStyle(color: _readerMuted),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 2,
+                children: [
+                  _appearanceDropdown(
+                    label: '漫畫閱讀模式',
+                    value: comicReadingMode,
+                    options: const [
+                      (value: 'paginated', label: '分頁翻頁'),
+                      (value: 'scrolled', label: '直式長卷'),
+                    ],
+                    onChanged: (value) =>
+                        setSheetState(() => comicReadingMode = value),
+                    enabled: session.isFixedLayout,
+                  ),
+                  _appearanceDropdown(
+                    label: '頁面編排',
+                    value: comicPageLayout,
+                    options: const [
+                      (value: '1', label: '單頁'),
+                      (value: '2', label: '雙頁優先'),
+                    ],
+                    onChanged: (value) =>
+                        setSheetState(() => comicPageLayout = value),
+                    enabled: session.isFixedLayout &&
+                        comicReadingMode == 'paginated',
+                  ),
+                  _appearanceDropdown(
+                    label: '圖片縮放',
+                    value: comicImageFit,
+                    options: const [
+                      (value: 'fit-page', label: '適合整頁'),
+                      (value: 'fit-width', label: '適合寬度'),
+                    ],
+                    onChanged: (value) =>
+                        setSheetState(() => comicImageFit = value),
+                    enabled: session.isFixedLayout &&
+                        comicReadingMode == 'paginated',
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  !session.isFixedLayout
+                      ? '固定版面 EPUB 載入後才會啟用漫畫排版選項。'
+                      : comicReadingMode == 'scrolled'
+                          ? '直式長卷會按需載入章節，垂直連續閱讀；圖片縮放固定為適合整頁。'
+                          : comicPageLayout == '2'
+                              ? '雙頁優先會在寬度足夠時並排，窄螢幕自動切回單頁。'
+                              : '單頁翻頁模式，每次顯示一個固定版面。',
+                  style: const TextStyle(color: _readerMuted, fontSize: 11),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                '閱讀背景',
+                style: TextStyle(color: _readerMuted),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('木質桌面'),
+                    selected: comicBackdrop == 'wood',
+                    onSelected: (_) =>
+                        setSheetState(() => comicBackdrop = 'wood'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('亞麻暖灰'),
+                    selected: comicBackdrop == 'linen',
+                    onSelected: (_) =>
+                        setSheetState(() => comicBackdrop = 'linen'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('深色石板'),
+                    selected: comicBackdrop == 'slate',
+                    onSelected: (_) =>
+                        setSheetState(() => comicBackdrop = 'slate'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               const Text(
                 '閱讀主題',
                 style: TextStyle(color: _readerMuted),
@@ -1364,13 +2025,13 @@ class _FrameEpubReaderPreviewScreenState
                         setSheetState(() => theme = 'dark'),
                   ),
                   ChoiceChip(
-                    label: const Text('紙本'),
+                    label: const Text('暖紙'),
                     selected: theme == 'sepia',
                     onSelected: (_) =>
                         setSheetState(() => theme = 'sepia'),
                   ),
                   ChoiceChip(
-                    label: const Text('明亮'),
+                    label: const Text('紙白'),
                     selected: theme == 'light',
                     onSelected: (_) =>
                         setSheetState(() => theme = 'light'),
@@ -1380,17 +2041,62 @@ class _FrameEpubReaderPreviewScreenState
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: () async {
+                  if (_layoutMode != layoutMode ||
+                      _fontSize != fontSize ||
+                      _lineHeight != lineHeight ||
+                      _fontScale != fontScale ||
+                      _fontFamilyPreference != fontFamilyPreference ||
+                      _fontWeightPreference != fontWeightPreference ||
+                      _paragraphSpacingPreference != paragraphSpacingPreference ||
+                      _textAlignPreference != textAlignPreference ||
+                      _verticalMargin != verticalMargin ||
+                      _horizontalMarginPercent != horizontalMarginPercent) {
+                    final previousPageController = _chapterPageController;
+                    _chapterPageController = PageController();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      previousPageController.dispose();
+                    });
+                  }
                   setState(() {
                     _fontSize = fontSize;
                     _lineHeight = lineHeight;
+                    _fontScale = fontScale;
+                    _fontFamilyPreference = fontFamilyPreference;
+                    _fontWeightPreference = fontWeightPreference;
+                    _paragraphSpacingPreference = paragraphSpacingPreference;
+                    _textAlignPreference = textAlignPreference;
+                    _verticalMargin = verticalMargin;
+                    _horizontalMarginPercent = horizontalMarginPercent;
                     _theme = theme;
+                    _layoutMode = layoutMode;
+                    _comicReadingMode = comicReadingMode;
+                    _comicPageLayout = comicPageLayout;
+                    _comicImageFit = comicImageFit;
+                    _comicBackdrop = comicBackdrop;
                   });
                   Navigator.of(sheetContext).pop();
                   try {
                     await session.saveAppearance({
+                      // Legacy D1 keys keep Flutter and the existing reader in sync.
+                      'fontScale': fontScale.toString(),
+                      'lineHeight': lineHeight.toString(),
+                      'verticalMargin': verticalMargin.round().toString(),
+                      'horizontalMargin': horizontalMarginPercent.round().toString(),
+                      'fontFamily': fontFamilyPreference,
+                      'fontWeight': fontWeightPreference,
+                      'paragraphSpacing': paragraphSpacingPreference,
+                      'textAlign': textAlignPreference,
+                      'readingMode': layoutMode == 'continuous' ? 'scrolled' : 'paginated',
+                      'pageLayout': layoutMode == 'doublePage' ? '2' : '1',
+                      'theme': theme == 'light' ? 'paper' : theme == 'dark' ? 'night' : 'sepia',
                       'frameFlutterFontSize': fontSize,
                       'frameFlutterLineHeight': lineHeight,
                       'frameFlutterTheme': theme,
+                      'frameFlutterLayoutMode': layoutMode,
+                      'comicReadingMode': comicReadingMode,
+                      'comicPageLayout': comicPageLayout,
+                      'comicImageFit': comicImageFit,
+                      'backdrop': comicBackdrop,
                     });
                   } on Object catch (error) {
                     if (!mounted) return;
@@ -1401,10 +2107,114 @@ class _FrameEpubReaderPreviewScreenState
                 },
                 child: const Text('保存設定'),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FixedLayoutComicPage extends StatefulWidget {
+  const _FixedLayoutComicPage({
+    required this.resourceLoader,
+    required this.spineItem,
+    required this.imageFit,
+    required this.allowZoom,
+    required this.backgroundColor,
+    required this.backdropDecoration,
+    required this.textColor,
+    required this.linkColor,
+    this.chapter,
+    this.onZoomChanged,
+    super.key,
+  });
+
+  final FrameEpubResourceLoader resourceLoader;
+  final FrameEpubSpineItem spineItem;
+  final FrameEpubChapterDocument? chapter;
+  final String imageFit;
+  final bool allowZoom;
+  final Color backgroundColor;
+  final BoxDecoration backdropDecoration;
+  final Color textColor;
+  final Color linkColor;
+  final ValueChanged<bool>? onZoomChanged;
+
+  @override
+  State<_FixedLayoutComicPage> createState() => _FixedLayoutComicPageState();
+}
+
+class _FixedLayoutComicPageState extends State<_FixedLayoutComicPage> {
+  late Future<FrameEpubChapterDocument> _chapterFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _chapterFuture = _loadChapter();
+  }
+
+  Future<FrameEpubChapterDocument> _loadChapter() =>
+      widget.chapter != null
+          ? Future.value(widget.chapter)
+          : widget.resourceLoader.loadChapter(widget.spineItem);
+
+  @override
+  void didUpdateWidget(covariant _FixedLayoutComicPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.spineItem.item.path != widget.spineItem.item.path ||
+        !identical(oldWidget.resourceLoader, widget.resourceLoader) ||
+        oldWidget.chapter != widget.chapter) {
+      _chapterFuture = _loadChapter();
+    }
+  }
+
+  Widget _buildChapter(FrameEpubChapterDocument chapter) =>
+      FrameEpubChapterView(
+        key: ValueKey(widget.spineItem.item.path),
+        chapter: chapter,
+        resourceLoader: widget.resourceLoader,
+        fixedLayout: true,
+        fixedLayoutImageFit: widget.imageFit,
+        fixedLayoutAllowZoom: widget.allowZoom,
+        fixedLayoutBackdropDecoration: widget.backdropDecoration,
+        backgroundColor: widget.backgroundColor,
+        textColor: widget.textColor,
+        linkColor: widget.linkColor,
+        onPageZoomChanged: widget.onZoomChanged,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final supplied = widget.chapter;
+    if (supplied != null) return _buildChapter(supplied);
+    return FutureBuilder<FrameEpubChapterDocument>(
+      future: _chapterFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                '漫畫頁載入失敗：${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFFFFC1C1), fontSize: 12),
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFFC5ADFF),
+              strokeWidth: 1.8,
+            ),
+          );
+        }
+        return _buildChapter(snapshot.data!);
+      },
     );
   }
 }
@@ -1414,11 +2224,4 @@ class _SelectedEpubText {
 
   final String cfi;
   final String quote;
-}
-
-class _FlattenedTocEntry {
-  const _FlattenedTocEntry(this.entry, this.depth);
-
-  final FrameEpubTocEntry entry;
-  final int depth;
 }

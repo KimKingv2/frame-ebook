@@ -46,6 +46,12 @@ Original EPUB/CBZ archives are read-only source files. Do not create full-archiv
 - Recent reading, four sort modes, search, grid/list, books/comics categories and folder detail navigation.
 - R2 cover retrieval with bounded in-memory cache.
 - Basic title, author and shelf metadata editing.
+- Opt-in Flutter EPUB Preview reader: continuous scrolling and single-page and responsive two-page spread pagination; long rich-text paragraphs split at rendered line boundaries with original XHTML text offsets retained for CFI selection and annotations. Image loading triggers in-memory remeasurement. Inline widget content and custom padded/background blocks remain intact rather than being force-split; two-page spreads are supported on wide layouts and fall back to single-page pagination on narrow screens.
+- Unified EPUB navigation drawer with nested TOC, separate bookmark and note tabs, annotation deletion/edit actions, CFI jump navigation, a bottom-sheet presentation on compact widths and a right-side drawer on wide layouts. Device-level visual and interaction parity remains pending.
+- Fixed-layout EPUB comic reader now has paginated single-page mode, responsive two-page spreads (including RTL ordering), and a lazy vertical long-strip mode. It restores and saves the current spine page through the existing D1 progress fields; adjacent long-strip chapters are loaded on demand through the same Range-backed resource loader.
+- Fixed-layout image fitting now supports fit-page and fit-width. The reader appearance sheet now exposes comic reading mode, page layout, image fit and wood/linen/slate backdrops, persisted using the existing Legacy appearance keys. CBZ remains intentionally out of scope; fixed-layout EPUB acceptance on actual manga files and all three targets is still pending.
+- Flutter EPUB Preview now records reading sessions through the existing `/api/reading/events` API. A 30-second heartbeat accumulates only while the app is foregrounded and recently active, pauses at the five-minute idle limit or when the app backgrounds, resumes on activity/foreground, splits events at local midnight, and displays the live duration. Events remain bounded and are sent directly to the existing endpoint without a persistent local queue.
+- Flutter EPUB Preview now has true cross-platform fullscreen/immersive mode using the fullscreen platform adapter. It hides the reader AppBar while immersive, toggles via the top 20% touch/mouse zone, exits via Escape or Android back, and restores system UI when leaving the reader. CI and actual Android/macOS/Web fullscreen behavior still require acceptance.
 - Main Reader, Cloud Manager and Statistics routes remain available through a compatibility bridge while each feature is being ported.
 
 These items must still pass CI and device verification before being treated as complete. Other checklist items remain open.
@@ -96,3 +102,8 @@ These items must still pass CI and device verification before being treated as c
 - [ ] Android install and full Reader tests on target devices.
 - [ ] Run the complete main-parity acceptance checklist on each platform.
 - [ ] Cut over Web only after explicit user acceptance.
+
+
+### Reader appearance parity update
+- Flutter EPUB Preview now reads and writes the existing Legacy D1 appearance keys for font scale, font family, weight, paragraph spacing, text alignment, vertical and horizontal margins, reading mode, page layout and theme.
+- The Flutter preview exposes these typography and margin settings in its appearance panel. Comic image-fit, backdrop and fullscreen parity remain open.

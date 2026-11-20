@@ -13,16 +13,23 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   const FrameEpubPageTurnSurface({
     required this.controller,
     required this.child,
+    this.pageController,
+    this.paginated = false,
     this.onPreviousChapter,
     this.onNextChapter,
     this.fixedLayout = false,
     this.isRightToLeft = false,
     this.selectionActive = false,
     this.pageZoomed = false,
+    this.immersive = false,
+    this.onToggleImmersive,
+    this.onExitImmersive,
     super.key,
   });
 
   final ScrollController controller;
+  final PageController? pageController;
+  final bool paginated;
   final Widget child;
   final Future<void> Function()? onPreviousChapter;
   final Future<void> Function()? onNextChapter;
@@ -30,6 +37,9 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   final bool isRightToLeft;
   final bool selectionActive;
   final bool pageZoomed;
+  final bool immersive;
+  final VoidCallback? onToggleImmersive;
+  final VoidCallback? onExitImmersive;
 
   @override
   State<FrameEpubPageTurnSurface> createState() =>
@@ -58,12 +68,17 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   bool _isTurning = false;
   final Set<int> _activeTouchPointers = {};
   _TouchStart? _touchStart;
+  _TouchStart? _mouseStart;
   bool _multiTouchSequence = false;
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape && widget.immersive) {
+      widget.onExitImmersive?.call();
+      return KeyEventResult.handled;
+    }
     final backward = key == LogicalKeyboardKey.pageUp ||
         key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowLeft ||
@@ -82,6 +97,14 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      _mouseStart = _TouchStart(
+        pointer: event.pointer,
+        position: event.localPosition,
+        timeStamp: event.timeStamp,
+      );
+      return;
+    }
     if (event.kind != PointerDeviceKind.touch) return;
 
     if (_activeTouchPointers.isNotEmpty) {
@@ -99,6 +122,25 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerUp(PointerUpEvent event, Size surfaceSize) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      final start = _mouseStart;
+      _mouseStart = null;
+      if (start == null ||
+          start.pointer != event.pointer ||
+          widget.onToggleImmersive == null ||
+          surfaceSize.height <= 0) {
+        return;
+      }
+      final elapsed = event.timeStamp - start.timeStamp;
+      final delta = event.localPosition - start.position;
+      if (!elapsed.isNegative &&
+          elapsed <= _tapDuration &&
+          delta.distance <= _tapSlop &&
+          start.position.dy <= surfaceSize.height * .2) {
+        widget.onToggleImmersive?.call();
+      }
+      return;
+    }
     if (!_activeTouchPointers.remove(event.pointer)) return;
 
     final start = _touchStart;
@@ -110,9 +152,8 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     if (isMultiTouch ||
         start == null ||
         start.pointer != event.pointer ||
-        widget.selectionActive ||
-        widget.pageZoomed ||
-        surfaceSize.width <= 0) {
+        surfaceSize.width <= 0 ||
+        surfaceSize.height <= 0) {
       return;
     }
 
@@ -121,17 +162,26 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     final delta = event.localPosition - start.position;
     final dx = delta.dx;
     final dy = delta.dy;
+    final isTap = elapsed <= _tapDuration && delta.distance <= _tapSlop;
+    if (isTap &&
+        widget.onToggleImmersive != null &&
+        start.position.dy <= surfaceSize.height * .2) {
+      widget.onToggleImmersive?.call();
+      return;
+    }
+    if (widget.selectionActive || widget.pageZoomed) return;
 
     final horizontalSwipe = elapsed <= _swipeDuration &&
         dx.abs() >= _swipeDistance &&
         dx.abs() >= dy.abs() * 1.25;
-    if (horizontalSwipe) {
+    // PageView owns horizontal drag gestures in paginated mode. Handling
+    // the same pointer-up here would enqueue a second page turn.
+    if (horizontalSwipe && !widget.paginated) {
       final forward = widget.isRightToLeft ? dx > 0 : dx < 0;
       unawaited(_turnPage(forward: forward));
       return;
     }
 
-    final isTap = elapsed <= _tapDuration && delta.distance <= _tapSlop;
     if (!isTap) return;
 
     final edgeWidth = surfaceSize.width * _edgeFraction;
@@ -145,6 +195,10 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      _mouseStart = null;
+      return;
+    }
     if (!_activeTouchPointers.remove(event.pointer)) return;
     _touchStart = null;
     if (_activeTouchPointers.isEmpty) _multiTouchSequence = false;
@@ -154,11 +208,36 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     if (_isTurning || !mounted) return;
     _isTurning = true;
     try {
-      final controller = widget.controller;
       if (widget.fixedLayout) {
         await _turnAdjacentChapter(forward: forward);
         return;
       }
+      if (widget.paginated) {
+        final pageController = widget.pageController;
+        if (pageController == null || !pageController.hasClients) return;
+        final position = pageController.position;
+        if (!position.hasContentDimensions ||
+            !position.viewportDimension.isFinite ||
+            position.viewportDimension <= 0) {
+          return;
+        }
+        final current = (pageController.page ?? 0).round();
+        final lastPage =
+            (position.maxScrollExtent / position.viewportDimension).round();
+        final boundary = forward ? current >= lastPage : current <= 0;
+        if (boundary) {
+          await _turnAdjacentChapter(forward: forward);
+          return;
+        }
+        await pageController.animateToPage(
+          current + (forward ? 1 : -1),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+
+      final controller = widget.controller;
       if (!controller.hasClients) return;
 
       final position = controller.position;

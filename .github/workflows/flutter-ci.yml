@@ -3,7 +3,7 @@ name: FRAME Ebook Flutter CI
 on:
   push:
     branches:
-      - feat/flutter-three-platform
+      - "feat/flutter-*"
       - main
     paths:
       - "flutter/**"
@@ -221,7 +221,7 @@ jobs:
 
   deploy-preview:
     name: Publish Flutter Web to Cloudflare Preview
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/flutter-three-platform'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/flutter-')
     needs: web
     runs-on: ubuntu-latest
     permissions:

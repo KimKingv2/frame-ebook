@@ -73,32 +73,32 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve EPUB CFI progress restoration and CBZ/fixed-layout page-index restoration.
 - [ ] Preserve debounced progress saving and final flush when changing books or leaving the reader.
 - [ ] Preserve reading-session start/stop and live reading duration indicator.
-- [ ] Preserve sidebar show/hide, mobile TOC/notes/bookmarks tabs, drawer/backdrop and responsive controls.
+- [ ] Preserve sidebar show/hide, mobile TOC/notes/bookmarks tabs, drawer/backdrop and responsive controls. Flutter Preview now has one adaptive navigation drawer with TOC, bookmark and note tabs (bottom sheet on compact widths, right-side drawer on wide layouts); Web/macOS/Android interaction and sizing still require device acceptance.
 - [ ] Preserve appearance panel and its open/close interactions.
 - [ ] Preserve font size options: 0.9, 1.0, 1.1, 1.2 and 1.3.
 - [ ] Preserve line-height options: 1.45, 1.65, 1.85 and 2.0.
-- [ ] Preserve font families: original, serif and sans.
-- [ ] Preserve font weight choices: original, normal and medium.
-- [ ] Preserve paragraph spacing choices: original, compact, standard and loose.
-- [ ] Preserve text alignment choices: original, left and justify.
-- [ ] Preserve EPUB reading modes: paginated and continuous scrolling.
-- [ ] Preserve EPUB page layout: single-page and double-page preferred.
-- [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px.
-- [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent.
-- [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling.
-- [ ] Preserve comic page layouts: single-page and double-page preferred.
-- [ ] Preserve comic image fitting: fit-page and fit-width.
-- [ ] Preserve themes: paper, sepia and night.
-- [ ] Preserve reading backdrops: wood, linen and slate.
-- [ ] Preserve fullscreen and immersive fullscreen action states.
+- [ ] Preserve font families: original, serif and sans. Flutter Preview now exposes all three; platform-specific font fallback parity still requires device verification.
+- [ ] Preserve font weight choices: original, normal and medium. Flutter Preview now exposes the Legacy values.
+- [ ] Preserve paragraph spacing choices: original, compact, standard and loose. Flutter Preview now exposes the Legacy values.
+- [ ] Preserve text alignment choices: original, left and justify. Flutter Preview now exposes the Legacy values.
+- [ ] Preserve EPUB reading modes: paginated and continuous scrolling. The Flutter Preview now has an initial single-page mode and continuous-scroll switch; full Legacy parity is still pending.
+- [ ] Preserve EPUB page layout: single-page and double-page preferred. Single-page pagination and responsive two-page spreads exist in the reflowable EPUB Flutter Preview; full Legacy parity remains pending.
+- [ ] Preserve vertical margin options 8, 16, 24, 32, 40, 48 and 64 px. Flutter Preview now exposes these values.
+- [ ] Preserve horizontal margin options 0, 2, 4, 7, 10, 13, 16 and 20 percent. Flutter Preview now exposes these values for paginated layouts.
+- [ ] Preserve comic reading modes: paginated and vertical long-strip scrolling. Flutter Preview now has a lazy, vertically scrolling fixed-layout EPUB long strip with per-spine progress restoration; device performance and visual parity remain pending.
+- [ ] Preserve comic page layouts: single-page and double-page preferred. Flutter Preview now displays two consecutive fixed-layout EPUB pages side by side on wide layouts, respecting RTL order and falling back to one page on narrow layouts.
+- [ ] Preserve comic image fitting: fit-page and fit-width. Flutter Preview now has both fixed-layout image fitting paths; real-world EPUB image/CSS compatibility still needs book-level acceptance.
+- [ ] Preserve themes: paper, sepia and night. Flutter Preview already exposes these theme choices; verify their interaction with fixed-layout artwork on all targets.
+- [ ] Preserve reading backdrops: wood, linen and slate. Flutter Preview now exposes all three backdrop surfaces for fixed-layout pages.
+- [ ] Preserve fullscreen and immersive fullscreen action states. Flutter Preview now uses the cross-platform fullscreen adapter, hides the reader AppBar while immersive, toggles from the upper 20% touch/mouse zone, and exits through Escape or Android back; actual device/window behavior still requires macOS and Android acceptance.
 - [ ] Preserve fixed-layout EPUB as well as CBZ comic behaviour.
 
 ## 4. Reading statistics and time tracking
 
 Source: pages/reading-stats/index.html, pages/assets/reading-stats.js, pages/assets/reading-stats.css and pages/assets/reading-tracker.js.
 
-- [ ] Preserve foreground-only reading-time tracking, including heartbeat, idle timeout, visibility, blur and focus handling.
-- [ ] Preserve session persistence and aggregation from the existing reading events API.
+- [ ] Preserve foreground-only reading-time tracking, including heartbeat, idle timeout, visibility, blur and focus handling. Flutter EPUB Preview now starts a 30-second heartbeat when a cloud EPUB is ready, counts foreground activity only, pauses after five minutes idle or when the app leaves the foreground, and shows the live session duration; Web/macOS/Android lifecycle behavior still requires device acceptance.
+- [ ] Preserve session persistence and aggregation from the existing reading events API. Flutter Preview writes bounded event records to the existing `/api/reading/events` endpoint, splits intervals at local midnight, and does not add a local event database or disk queue.
 - [ ] Preserve period selection and period summary.
 - [ ] Preserve total reading time, reading days, daily average and books opened.
 - [ ] Preserve daily goal selector, goal percentage/ring, today's time, goal-target label and goal-days count.

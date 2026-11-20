@@ -1,9 +1,13 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'auth/frame_auth_gate.dart';
 import 'library/frame_bookshelf_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FullScreen.ensureInitialized();
   runApp(const FrameEbookApp());
 }
 
