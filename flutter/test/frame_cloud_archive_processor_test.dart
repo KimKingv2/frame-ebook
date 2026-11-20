@@ -272,6 +272,8 @@ void main() {
       scanState: state,
     );
 
+    print('ARCHIVE_PROCESSOR_RESULT: $result');
+    print('ARCHIVE_PROCESSOR_ERRORS: ${result.state?.errors}');
     expect(result.processed, 1);
     expect(result.uploaded, 1);
     expect(result.missing, 0);
