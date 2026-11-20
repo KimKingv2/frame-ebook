@@ -156,7 +156,7 @@ const _package = '''
 ''';
 
 const _onePixelPng =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
 Uint8List _zipFixture() {
   final items = <(String, Uint8List)>[
     ('mimetype', Uint8List.fromList(utf8.encode('application/epub+zip'))),
