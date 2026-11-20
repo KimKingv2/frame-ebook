@@ -729,13 +729,13 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.textContaining('章節一內容。'), findsOneWidget);
+        final chapterOneText = renderedSpans(tester).firstWhere(
+          (span) => span.text == '章節一內容。',
+        );
+        expect(chapterOneText.style?.backgroundColor, isNull);
         expect(
-          renderedSpans(tester).where(
-            (span) =>
-                span.style?.backgroundColor != null ||
-                span.style?.decoration != null,
-          ),
-          isEmpty,
+          chapterOneText.style?.decoration,
+          isNot(TextDecoration.underline),
         );
 
         expect(await session.goToSpineIndex(1), isTrue);

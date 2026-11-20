@@ -126,3 +126,5 @@ These items must still pass CI and device verification before being treated as c
 
 ### Cross-chapter annotation restoration verification
 - Added a two-spine EPUB widget test that creates a CFI annotation in chapter two, verifies it is not painted in chapter one, then navigates to chapter two and verifies the correct highlight is restored. This checks chapter scoping and text-layer rendering together.
+
+- The cross-chapter test explicitly ignores the renderer's baseline `TextDecoration.none` style and asserts only that the chapter-one target text has no annotation highlight or underline.
