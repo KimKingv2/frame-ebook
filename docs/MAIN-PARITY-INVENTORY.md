@@ -27,6 +27,8 @@ Source: pages/index.html, pages/assets/library.js, pages/assets/library-store.js
 
 Source: pages/cloud/index.html, pages/assets/cloud-library.js, pages/assets/cloud-library.css, pages/assets/local-openlist.js and functions/api/cloud/*.
 
+Flutter Preview now has an initial native Cloud Manager: four source choices and readiness indicators, local OpenList URL/login lifecycle (credentials and token remain in memory), separate Books/Comics roots, live directory browsing, breadcrumbs, current-page search and pagination. The native D1 index scanner uses the existing scan-list/index APIs, saves per-page checkpoints, resumes interrupted scans, supports manual pause, and confirms before a full rescan. Cover extraction, R2 upload/retry, EPUB OPF parsing, scan log management, full scan controls and the remaining source configuration workflows are still served by the Legacy compatibility manager; this partial port does not close the checklist items below.
+
 - [ ] Preserve the four source choices: VPS Alist, OpenList Worker, Mobile Device Alist and local OpenList.
 - [ ] Preserve server-configured source readiness indicators and the existing distinction between server-side credentials and local OpenList login.
 - [ ] Preserve local OpenList URL validation, username/password login, in-memory access token, saved base URL, logout and expired-login handling. Do not persist the local OpenList password or token.
