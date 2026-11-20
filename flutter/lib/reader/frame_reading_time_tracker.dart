@@ -53,7 +53,7 @@ class FrameReadingTimeTracker {
       _lastActivityAt != null &&
       now.difference(_lastActivityAt!) <= idleLimit;
 
-  Future<void> start({DateTime? at}) async {
+  Future<void> start({DateTime? at, bool foreground = true}) async {
     if (_running) await stop(at: at);
     if (!RegExp(r'^cloud:[a-f0-9]{64}$').hasMatch(book.id)) {
       throw ArgumentError('只能為已掃描索引的雲端書籍記錄閱讀時間。');
@@ -61,11 +61,11 @@ class FrameReadingTimeTracker {
 
     final now = at ?? _clock();
     _running = true;
-    _foreground = true;
+    _foreground = foreground;
     _sessionMilliseconds = 0;
     _lastTickAt = now;
     _lastActivityAt = now;
-    _tickWasActive = true;
+    _tickWasActive = foreground;
     _cloudBackoffUntil = null;
     onUpdate?.call(0);
 
