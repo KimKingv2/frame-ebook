@@ -2322,7 +2322,54 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     return (width: width, height: height);
   }
 
-  String? _inlineSvgMarkup(XmlElement element) {
+  String? _sanitizeEpubSvgMarkup(String markup, {required int maxLength}) {
+  if (markup.length > maxLength) return null;
+
+  // Keep SVG self-contained: scripts, embedded HTML, stylesheets, event
+  // handlers and external resource references are not executable EPUB data.
+  markup = markup.replaceAll(
+    RegExp(
+      r'<(script|style|foreignObject|iframe|object|embed)\b[^>]*>.*?</\1\s*>',
+      caseSensitive: false,
+      dotAll: true,
+    ),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(
+      r'<(?:script|style|foreignObject|iframe|object|embed)\b[^>]*/\s*>',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(
+      r"""\s+on[a-z][a-z0-9_-]*\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)""",
+      caseSensitive: false,
+    ),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(
+      r"""\s+(?:href|xlink:href|src|xml:base)\s*=\s*("[^"]*"|'[^']*')""",
+      caseSensitive: false,
+    ),
+    (match) {
+      final attribute = match.group(0) ?? '';
+      final value = RegExp(r'''(["'])(.*?)\1''')
+          .firstMatch(attribute)
+          ?.group(2)
+          ?.trim();
+      return value?.startsWith('#') == true ? attribute : '';
+    },
+  );
+  final root = RegExp(r'^<svg\b[^>]*>', caseSensitive: false)
+      .firstMatch(markup.trimLeft());
+  if (root == null) return null;
+  return markup;
+}
+
+String? _inlineSvgMarkup(XmlElement element) {
     var markup = element.toXmlString();
     if (markup.length > 1024 * 1024) return null;
 
@@ -2346,7 +2393,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     }
     markup = opening + markup.substring(root.end);
-    return markup;
+    return _sanitizeEpubSvgMarkup(markup, maxLength: 1024 * 1024);
   }
 
   Widget _buildSvgElement(
@@ -2359,7 +2406,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _imagePlaceholder('SVG 圖形過大或根節點格式不支援');
     }
     final size = _svgWidgetSize(style, element, block: block);
-    final title = element.findElements('title').firstOrNull?.innerText;
+    final titles = element.findElements('title');
+    final title = titles.isEmpty ? null : titles.first.innerText;
     return SvgPicture.string(
       markup,
       width: size.width,
@@ -2863,10 +2911,20 @@ class _FrameEpubSvgState extends State<_FrameEpubSvg> {
     }
   }
 
-  Future<String> _load() => widget.loader.readText(
-        widget.resource,
-        maxBytes: widget.maxBytes,
-      );
+  Future<String> _load() async {
+    final markup = await widget.loader.readText(
+      widget.resource,
+      maxBytes: widget.maxBytes,
+    );
+    final sanitized = _sanitizeEpubSvgMarkup(
+      markup,
+      maxLength: widget.maxBytes,
+    );
+    if (sanitized == null) {
+      throw const FormatException('SVG 文件無效或超過讀取上限。');
+    }
+    return sanitized;
+  }
 
   void _reportLayoutChanged() {
     if (_layoutChangeReported || widget.onLayoutChanged == null) return;
