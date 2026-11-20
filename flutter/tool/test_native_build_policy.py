@@ -98,6 +98,13 @@ class NativeBuildPolicyTests(unittest.TestCase):
             (False, False),
         )
 
+    def test_sha256_dependency_is_dart_only(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "  web: ^1.1.1\n",
+            "  web: ^1.1.1\n  crypto: ^3.0.6\n",
+        )
+        self.assertTrue(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+
     def test_xml_parser_dependency_is_dart_only(self) -> None:
         after = BASE_PUBSPEC.replace(
             "  web: ^1.1.1\n",
