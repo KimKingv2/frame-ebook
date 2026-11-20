@@ -136,16 +136,17 @@ class FrameCloudScanRunner {
     var removed = 0;
 
     try {
-      state = await _repository.loadScanState(
+      final loadedState = await _repository.loadScanState(
         provider: provider,
         library: library,
         rootPath: root,
       );
-      final matchesScope = state != null &&
-          state.version == 1 &&
-          state.provider == provider &&
-          state.library == library &&
-          state.rootPath == root;
+      state = loadedState;
+      final matchesScope = loadedState != null &&
+          loadedState.version == 1 &&
+          loadedState.provider == provider &&
+          loadedState.library == library &&
+          loadedState.rootPath == root;
       if (!matchesScope || forceRescan) {
         state = FrameCloudScanState.initial(
           provider: provider,
@@ -157,19 +158,19 @@ class FrameCloudScanRunner {
           'scanMode': forceRescan ? '完整重掃' : '首次完整掃描',
         });
         await _repository.saveScanState(state);
-      } else if (state.completed) {
+      } else if (loadedState.completed) {
         return FrameCloudScanRunResult(
-          state: state,
+          state: loadedState,
           scannedThisBatch: 0,
           indexedThisBatch: 0,
           skippedThisBatch: 0,
           foldersThisBatch: 0,
-          removedCount: _safeInt(state.raw['removedCount']),
+          removedCount: _safeInt(loadedState.raw['removedCount']),
           completed: true,
           paused: false,
         );
       } else {
-        state = state.copyWith(pausedByUser: false, resumeOnNextOpen: false);
+        state = loadedState.copyWith(pausedByUser: false, resumeOnNextOpen: false);
         await _repository.saveScanState(state);
       }
       if (state == null) {
