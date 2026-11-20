@@ -1,10 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frame_ebook/core/frame_api_client.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_reading_time_tracker.dart';
 
 FrameBook _book() => FrameBook.fromJson({
-      'id': 'cloud:NaN',
+      'id': 'cloud:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'provider': 'vps',
       'library': 'books',
       'rootPath': '/Books',
