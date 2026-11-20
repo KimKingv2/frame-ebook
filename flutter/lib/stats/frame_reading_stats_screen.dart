@@ -206,7 +206,6 @@ class _FrameReadingStatsScreenState extends State<FrameReadingStatsScreen> {
       final saved = await _exportService.save(
         bytes: Uint8List.fromList(utf8.encode(output)),
         fileName: fileName,
-        mimeType: kind == 'JSON' ? 'application/json' : 'text/csv',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
