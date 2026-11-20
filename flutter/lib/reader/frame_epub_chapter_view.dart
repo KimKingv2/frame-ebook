@@ -2329,11 +2329,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     // XmlElement serialization may omit an inherited namespace declaration
     // when a node is rendered independently. Normalize only the SVG root so
     // the SVG parser never mistakes its inherited XHTML namespace for SVG.
-    final rootPattern = RegExp(r'^<svg\\b[^>]*>');
+    final rootPattern = RegExp(r'^<svg\b[^>]*>');
     final root = rootPattern.firstMatch(markup);
     if (root == null) return null;
     var opening = root.group(0)!;
-    final xmlnsPattern = RegExp(r'\\sxmlns=(["\']).*?\\1');
+    final xmlnsPattern = RegExp(r'\sxmlns="[^"]*"');
     if (xmlnsPattern.hasMatch(opening)) {
       opening = opening.replaceFirst(
         xmlnsPattern,
@@ -2341,7 +2341,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     } else {
       opening = opening.replaceFirst(
-        RegExp(r'^<svg\\b'),
+        RegExp(r'^<svg\b'),
         '<svg xmlns="http://www.w3.org/2000/svg"',
       );
     }
@@ -2814,6 +2814,104 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   static String _colorToCss(Color color) =>
       '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+}
+
+class _FrameEpubSvg extends StatefulWidget {
+  const _FrameEpubSvg({
+    required this.loader,
+    required this.resource,
+    required this.maxBytes,
+    required this.width,
+    required this.height,
+    required this.alt,
+    this.onLayoutChanged,
+  });
+
+  final FrameEpubResourceLoader loader;
+  final FrameEpubResource resource;
+  final int maxBytes;
+  final double width;
+  final double height;
+  final String alt;
+  final VoidCallback? onLayoutChanged;
+
+  @override
+  State<_FrameEpubSvg> createState() => _FrameEpubSvgState();
+}
+
+class _FrameEpubSvgState extends State<_FrameEpubSvg> {
+  late Future<String> _markup;
+  bool _layoutChangeReported = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _markup = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrameEpubSvg oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.resource, widget.resource) ||
+        !identical(oldWidget.loader, widget.loader) ||
+        oldWidget.maxBytes != widget.maxBytes) {
+      _markup = _load();
+      _layoutChangeReported = false;
+    }
+    if (oldWidget.onLayoutChanged != widget.onLayoutChanged) {
+      _layoutChangeReported = false;
+    }
+  }
+
+  Future<String> _load() => widget.loader.readText(
+        widget.resource,
+        maxBytes: widget.maxBytes,
+      );
+
+  void _reportLayoutChanged() {
+    if (_layoutChangeReported || widget.onLayoutChanged == null) return;
+    _layoutChangeReported = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLayoutChanged?.call();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _markup,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return SizedBox(
+            width: widget.width,
+            height: widget.height,
+            child: Center(
+              child: snapshot.hasError
+                  ? const Icon(
+                      Icons.broken_image_outlined,
+                      color: Color(0xFF8F829F),
+                    )
+                  : const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+            ),
+          );
+        }
+        _reportLayoutChanged();
+        return SvgPicture.string(
+          snapshot.data!,
+          width: widget.width,
+          height: widget.height,
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          semanticsLabel: widget.alt,
+        );
+      },
+    );
+  }
 }
 
 class _FrameEpubImage extends StatefulWidget {
