@@ -642,10 +642,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     final summary = result.libraries.map((item) {
       final status = item.skippedExisting
           ? '沿用已完成'
-          : item.completed
-              ? '完成'
-              : item.paused
-                  ? '已暫停'
+          : item.paused
+              ? '已暫停'
+              : item.completed
+                  ? '完成'
                   : '未完成';
       return '${item.library.label}：$status，掃描 ${item.scannedCount}，'
           '索引 ${item.indexedCount}，略過 ${item.skippedCount}，'
