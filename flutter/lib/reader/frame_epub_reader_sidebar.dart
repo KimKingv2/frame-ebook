@@ -109,22 +109,54 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (dialogContext, animation, secondaryAnimation) => Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: AlertDialog(
-            title: Text(isBookmark ? '刪除書籤' : '刪除標註'),
-            content: Text(
-              isBookmark ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？',
+          constraints: const BoxConstraints(minWidth: 280, maxWidth: 420),
+          child: Material(
+            color: _sidebarPanel,
+            elevation: 24,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 20, 18, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBookmark ? '刪除書籤' : '刪除標註',
+                    style: const TextStyle(
+                      color: _sidebarText,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isBookmark ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？',
+                    style: const TextStyle(
+                      color: _sidebarMuted,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(false),
+                        child: const Text('取消'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () =>
+                            Navigator.of(dialogContext).pop(true),
+                        child: const Text('刪除'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('刪除'),
-              ),
-            ],
           ),
         ),
       ),
