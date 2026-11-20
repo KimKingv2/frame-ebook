@@ -172,6 +172,9 @@ class FrameCloudScanRunner {
         state = state.copyWith(pausedByUser: false, resumeOnNextOpen: false);
         await _repository.saveScanState(state);
       }
+      if (state == null) {
+        throw StateError('D1 掃描工作未能初始化。');
+      }
 
       _emit(
         onProgress,
