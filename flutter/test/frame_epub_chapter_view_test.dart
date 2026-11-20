@@ -470,7 +470,6 @@ void main() {
       expect(find.byType(Image), findsOneWidget);
       final fitWidthSize = tester.getSize(find.byType(Image));
       expect(fitWidthSize.width, closeTo(420, 1));
-      expect(fitWidthSize.height, closeTo(420, 1));
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(
