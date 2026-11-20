@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -63,6 +64,7 @@ class _FakeApi implements FrameApiClient {
 
   Map<String, dynamic> state;
   List<dynamic> annotations;
+  Future<Map<String, dynamic>> Function()? annotationsLoader;
   Map<String, dynamic>? postedState;
 
   @override
@@ -71,6 +73,8 @@ class _FakeApi implements FrameApiClient {
       return {'state': state};
     }
     if (Uri.parse(path).path == '/api/reading/annotations') {
+      final loader = annotationsLoader;
+      if (loader != null) return await loader();
       return {'annotations': annotations};
     }
     throw StateError('Unexpected GET $path');
@@ -403,6 +407,129 @@ void main() {
             .quote,
         '遠端摘錄',
       );
+      await session.close();
+    });
+
+    test('discards a pending refresh after a local annotation deletion',
+        () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi(
+        annotations: [
+          {
+            'id': 'local-note',
+            'bookId': 'epub-session-test',
+            'type': 'note',
+            'cfi': 'epubcfi(/6/2!/4/2:3)',
+            'quote': '原文',
+            'text': '舊筆記',
+            'color': 'violet',
+            'createdAt': 10,
+          },
+        ],
+      );
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+      await session.open();
+      expect(session.annotations, hasLength(1));
+
+      final pendingResponse = Completer<Map<String, dynamic>>();
+      api.annotationsLoader = () => pendingResponse.future;
+      final refresh = session.refreshAnnotations();
+      await Future<void>.delayed(Duration.zero);
+
+      await session.deleteAnnotation('local-note');
+      pendingResponse.complete({
+        'annotations': [
+          {
+            'id': 'local-note',
+            'bookId': 'epub-session-test',
+            'type': 'note',
+            'cfi': 'epubcfi(/6/2!/4/2:3)',
+            'quote': '原文',
+            'text': '舊筆記',
+            'color': 'violet',
+            'createdAt': 10,
+          },
+          {
+            'id': 'stale-remote-note',
+            'bookId': 'epub-session-test',
+            'type': 'note',
+            'cfi': 'epubcfi(/6/2!/4/2:8)',
+            'quote': '另一段',
+            'text': '過期回應',
+            'color': 'violet',
+            'createdAt': 11,
+          },
+        ],
+      });
+      await refresh;
+
+      expect(session.annotations, isEmpty);
+      await session.close();
+    });
+
+    test('keeps the newest overlapping annotation refresh response',
+        () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+      await session.open();
+
+      final olderResponse = Completer<Map<String, dynamic>>();
+      final newerResponse = Completer<Map<String, dynamic>>();
+      var requestIndex = 0;
+      api.annotationsLoader = () {
+        requestIndex++;
+        return requestIndex == 1
+            ? olderResponse.future
+            : newerResponse.future;
+      };
+
+      final olderRefresh = session.refreshAnnotations();
+      await Future<void>.delayed(Duration.zero);
+      final newerRefresh = session.refreshAnnotations();
+      await Future<void>.delayed(Duration.zero);
+
+      newerResponse.complete({
+        'annotations': [
+          {
+            'id': 'newest-note',
+            'bookId': 'epub-session-test',
+            'type': 'note',
+            'cfi': 'epubcfi(/6/2!/4/2:8)',
+            'quote': '新引文',
+            'text': '最新結果',
+            'color': 'violet',
+            'createdAt': 20,
+          },
+        ],
+      });
+      await newerRefresh;
+
+      olderResponse.complete({
+        'annotations': [
+          {
+            'id': 'older-note',
+            'bookId': 'epub-session-test',
+            'type': 'note',
+            'cfi': 'epubcfi(/6/2!/4/2:3)',
+            'quote': '舊引文',
+            'text': '較舊結果',
+            'color': 'violet',
+            'createdAt': 10,
+          },
+        ],
+      });
+      await olderRefresh;
+
+      expect(session.annotations.map((item) => item.id), ['newest-note']);
       await session.close();
     });
 
