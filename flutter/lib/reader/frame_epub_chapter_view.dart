@@ -2570,8 +2570,22 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
                 .round()
                 .clamp(96, 2048)
                 .toInt();
+            final maxWidth = widget.maxWidth.isFinite
+                ? widget.maxWidth
+                : constraints.maxWidth;
+            final maxHeight = widget.maxHeight.isFinite
+                ? widget.maxHeight
+                : constraints.maxHeight;
             final image = Image.memory(
               snapshot.data!,
+              width: widget.useViewportBounds && maxWidth.isFinite
+                  ? maxWidth
+                  : null,
+              height: widget.useViewportBounds &&
+                      widget.fit == BoxFit.contain &&
+                      maxHeight.isFinite
+                  ? maxHeight
+                  : null,
               fit: widget.fit,
               cacheWidth: cacheWidth,
               filterQuality: FilterQuality.medium,
@@ -2581,12 +2595,6 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
               ),
               semanticLabel: widget.alt,
             );
-            final maxWidth = widget.maxWidth.isFinite
-                ? widget.maxWidth
-                : constraints.maxWidth;
-            final maxHeight = widget.maxHeight.isFinite
-                ? widget.maxHeight
-                : constraints.maxHeight;
             if (widget.useViewportBounds &&
                 maxWidth.isFinite &&
                 maxHeight.isFinite &&
