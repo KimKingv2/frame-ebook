@@ -125,7 +125,7 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
       _ZipItem(
         'OPS/Images/page.png',
         base64Decode(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jH0sAAAAASUVORK5CYII=',
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
         ),
       ),
   ]);
