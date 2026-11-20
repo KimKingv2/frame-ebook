@@ -53,6 +53,9 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   String _currentPath = FrameCloudDefaults.booksRoot;
   String _query = '';
   int _directoryPage = 1;
+  int _totalItems = 0;
+
+  int get _pageCount => _totalItems == 0 ? 1 : (_totalItems + 99) ~/ 100;
 
   @override
   void initState() {
@@ -132,6 +135,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     if (root == null || path == null || !frameCloudPathIsWithinRoot(path, root)) {
       setState(() {
         _items = const [];
+        _totalItems = 0;
         _directoryError = '請先設定有效的絕對根目錄。';
         _loadingDirectory = false;
       });
@@ -141,6 +145,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         !(_localClient?.isAuthenticated ?? false)) {
       setState(() {
         _items = const [];
+        _totalItems = 0;
         _directoryError = null;
         _loadingDirectory = false;
       });
@@ -153,12 +158,14 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     });
     try {
       final List<FrameCloudEntry> items;
+      var totalItems = 0;
       if (_provider == FrameCloudProvider.local) {
         final directory = await _localClient!.listDirectory(
           path,
           page: page,
           perPage: 100,
         );
+        totalItems = directory.total;
         items = directory.items
             .map((item) => FrameCloudEntry(
                   name: item.name,
@@ -175,7 +182,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                 ))
             .toList(growable: false);
       } else {
-        items = await _repository.listServerDirectory(
+        final directory = await _repository.loadServerDirectoryPage(
           provider: _provider,
           library: _library,
           rootPath: root,
@@ -183,10 +190,13 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
           page: page,
           perPage: 100,
         );
+        items = directory.items;
+        totalItems = directory.total;
       }
       if (!mounted) return;
       setState(() {
         _items = items;
+        _totalItems = totalItems;
         _loadingDirectory = false;
         _directoryError = null;
       });
@@ -747,9 +757,25 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
             child: Row(
               children: [
                 Expanded(
-                  child: Text(_visibleItems.length.toString() + ' 個項目',
-                      style:
-                          const TextStyle(color: _cloudMuted, fontSize: 12)),
+                  child: Text(
+                    _totalItems.toString() + ' 個項目 · 第 ' +
+                        _directoryPage.toString() + ' / ' + _pageCount.toString() + ' 頁',
+                    style: const TextStyle(color: _cloudMuted, fontSize: 12),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '上一頁',
+                  onPressed: _directoryPage > 1 && !_loadingDirectory
+                      ? () => _loadDirectory(page: _directoryPage - 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                IconButton(
+                  tooltip: '下一頁',
+                  onPressed: _directoryPage < _pageCount && !_loadingDirectory
+                      ? () => _loadDirectory(page: _directoryPage + 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
                 ),
                 TextButton.icon(
                   onPressed: _openLegacyManager,
