@@ -651,21 +651,23 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
           '移除過期索引 ${item.removedCount}';
     }).join('；');
 
+    final finalMessage = result.error != null
+        ? '全庫流程中止：${result.error}（$summary）'
+        : result.paused
+            ? '全庫掃描已暫停，可再次執行全庫掃描續接。（$summary）'
+            : result.completed
+                ? 'Books 與 Comics 全部掃描完成。（$summary）'
+                : '全庫掃描尚未全部完成。（$summary）';
     setState(() {
       _scanRunning = false;
       _activeScanAllRunner = null;
       _scanState = _libraryScanStates[_library];
-      _scanMessage = result.error != null
-          ? '全庫流程中止：${result.error}（$summary）'
-          : result.paused
-              ? '全庫掃描已暫停，可再次執行全庫掃描續接。（$summary）'
-              : result.completed
-                  ? 'Books 與 Comics 全部掃描完成。（$summary）'
-                  : '全庫掃描尚未全部完成。（$summary）';
+      _scanMessage = finalMessage;
     });
 
     await _loadScanState();
     await _loadDirectory();
+    if (mounted) setState(() => _scanMessage = finalMessage);
     if (result.error != null) {
       _showMessage('全庫掃描中止：${result.error}');
     } else if (result.completed) {
