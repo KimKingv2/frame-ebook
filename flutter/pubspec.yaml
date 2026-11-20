@@ -20,6 +20,7 @@ dependencies:
   koni_zip: ^0.9.0
   flutter_fullscreen: ^1.2.0
   xml: ^7.1.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
