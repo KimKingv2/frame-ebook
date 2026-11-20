@@ -120,3 +120,6 @@ These items must still pass CI and device verification before being treated as c
 
 ### EPUB selection toolbar dismissal parity update
 - Flutter now clears the active annotation selection whenever the renderer reports a collapsed/empty selection, a selection that cannot be mapped to a CFI, or an incompatible reader state. This prevents the toolbar from remaining attached to a previous quote after text selection is cancelled.
+
+### EPUB annotation rendering verification
+- Added a chapter-renderer widget regression test proving that yellow, violet, mint and rose highlights, plus the underline style, are restored from CFI-backed annotation records into the reflowable EPUB text layer. The test exercises actual rendered TextSpans rather than only checking saved JSON.

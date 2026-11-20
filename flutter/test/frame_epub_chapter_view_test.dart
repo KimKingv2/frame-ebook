@@ -424,6 +424,144 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('restores all highlight colors and underline annotations',
+      (tester) async {
+    final bytes = _fixture(
+      additionalIntroText: ' <span>下劃線測試</span>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-annotation-style-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/annotation-style.epub',
+      'fileName': 'annotation-style.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final textNodes = chapter.document.descendants.whereType<XmlText>();
+      final colorNode =
+          textNodes.firstWhere((node) => node.value == 'EPUB');
+      final underlineNode =
+          textNodes.firstWhere((node) => node.value == '下劃線測試');
+
+      FrameReaderAnnotation annotation({
+        required String id,
+        required XmlText node,
+        required int start,
+        required int end,
+        required String color,
+      }) =>
+          FrameReaderAnnotation(
+            id: id,
+            bookId: book.id,
+            type: 'highlight',
+            cfi: FrameEpubCfi.createRange(
+              book: epub,
+              spineIndex: 0,
+              startNode: node,
+              startOffset: start,
+              endNode: node,
+              endOffset: end,
+            )!,
+            quote: node.value.substring(start, end),
+            color: color,
+          );
+
+      final annotations = [
+        annotation(
+          id: 'yellow',
+          node: colorNode,
+          start: 0,
+          end: 1,
+          color: 'yellow',
+        ),
+        annotation(
+          id: 'violet',
+          node: colorNode,
+          start: 1,
+          end: 2,
+          color: 'violet',
+        ),
+        annotation(
+          id: 'mint',
+          node: colorNode,
+          start: 2,
+          end: 3,
+          color: 'mint',
+        ),
+        annotation(
+          id: 'rose',
+          node: colorNode,
+          start: 3,
+          end: 4,
+          color: 'rose',
+        ),
+        annotation(
+          id: 'underline',
+          node: underlineNode,
+          start: 0,
+          end: underlineNode.value.length,
+          color: 'underline',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                annotations: annotations,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final spans = <TextSpan>[];
+      void collect(InlineSpan span) {
+        if (span is! TextSpan) return;
+        spans.add(span);
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          collect(child);
+        }
+      }
+
+      for (final selectable
+          in tester.widgetList<SelectableText>(find.byType(SelectableText))) {
+        final span = selectable.textSpan;
+        if (span != null) collect(span);
+      }
+
+      TextSpan marked(String text) =>
+          spans.firstWhere((span) => span.text == text);
+
+      expect(marked('E').style?.backgroundColor, const Color(0x66F2C94C));
+      expect(marked('P').style?.backgroundColor, const Color(0x66A78BFA));
+      expect(marked('U').style?.backgroundColor, const Color(0x6665C9A5));
+      expect(marked('B').style?.backgroundColor, const Color(0x66E88EAF));
+      expect(
+        marked('下劃線測試').style?.decoration,
+        TextDecoration.underline,
+      );
+      expect(marked('下劃線測試').style?.decorationThickness, 2.2);
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('renders EPUB table headers, cells and colspan without overflow',
       (tester) async {
     const table = '''
