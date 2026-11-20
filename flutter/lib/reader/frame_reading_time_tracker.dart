@@ -104,7 +104,6 @@ class FrameReadingTimeTracker {
       _foreground = false;
       _advance(now);
       _tickWasActive = false;
-      await _writeTail;
       return;
     }
 
@@ -154,7 +153,8 @@ class FrameReadingTimeTracker {
     _running = false;
     _lastTickAt = null;
     _lastActivityAt = null;
-    await _writeTail;
+    // Do not hold reader disposal on a possibly stalled network request. The
+    // single in-flight write remains bounded and completes independently.
     onUpdate?.call(sessionSeconds);
   }
 
