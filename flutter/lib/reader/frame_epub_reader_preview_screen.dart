@@ -123,7 +123,10 @@ class _FrameEpubReaderPreviewScreenState
     );
     _readingTimeTracker = tracker;
     unawaited(
-      tracker.start().catchError((Object error) {
+      tracker.start(
+        foreground: WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+      ).catchError((Object error) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('無法啟動閱讀時光記錄：$error')),
