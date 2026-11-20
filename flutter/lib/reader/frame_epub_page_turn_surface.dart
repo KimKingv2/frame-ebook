@@ -21,6 +21,9 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
     this.isRightToLeft = false,
     this.selectionActive = false,
     this.pageZoomed = false,
+    this.immersive = false,
+    this.onToggleImmersive,
+    this.onExitImmersive,
     super.key,
   });
 
@@ -34,6 +37,9 @@ class FrameEpubPageTurnSurface extends StatefulWidget {
   final bool isRightToLeft;
   final bool selectionActive;
   final bool pageZoomed;
+  final bool immersive;
+  final VoidCallback? onToggleImmersive;
+  final VoidCallback? onExitImmersive;
 
   @override
   State<FrameEpubPageTurnSurface> createState() =>
@@ -62,12 +68,17 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   bool _isTurning = false;
   final Set<int> _activeTouchPointers = {};
   _TouchStart? _touchStart;
+  _TouchStart? _mouseStart;
   bool _multiTouchSequence = false;
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape && widget.immersive) {
+      widget.onExitImmersive?.call();
+      return KeyEventResult.handled;
+    }
     final backward = key == LogicalKeyboardKey.pageUp ||
         key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowLeft ||
@@ -86,6 +97,14 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      _mouseStart = _TouchStart(
+        pointer: event.pointer,
+        position: event.localPosition,
+        timeStamp: event.timeStamp,
+      );
+      return;
+    }
     if (event.kind != PointerDeviceKind.touch) return;
 
     if (_activeTouchPointers.isNotEmpty) {
@@ -103,6 +122,25 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerUp(PointerUpEvent event, Size surfaceSize) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      final start = _mouseStart;
+      _mouseStart = null;
+      if (start == null ||
+          start.pointer != event.pointer ||
+          widget.onToggleImmersive == null ||
+          surfaceSize.height <= 0) {
+        return;
+      }
+      final elapsed = event.timeStamp - start.timeStamp;
+      final delta = event.localPosition - start.position;
+      if (!elapsed.isNegative &&
+          elapsed <= _tapDuration &&
+          delta.distance <= _tapSlop &&
+          start.position.dy <= surfaceSize.height * .2) {
+        widget.onToggleImmersive?.call();
+      }
+      return;
+    }
     if (!_activeTouchPointers.remove(event.pointer)) return;
 
     final start = _touchStart;
@@ -114,9 +152,8 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     if (isMultiTouch ||
         start == null ||
         start.pointer != event.pointer ||
-        widget.selectionActive ||
-        widget.pageZoomed ||
-        surfaceSize.width <= 0) {
+        surfaceSize.width <= 0 ||
+        surfaceSize.height <= 0) {
       return;
     }
 
@@ -125,6 +162,14 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
     final delta = event.localPosition - start.position;
     final dx = delta.dx;
     final dy = delta.dy;
+    final isTap = elapsed <= _tapDuration && delta.distance <= _tapSlop;
+    if (isTap &&
+        widget.onToggleImmersive != null &&
+        start.position.dy <= surfaceSize.height * .2) {
+      widget.onToggleImmersive?.call();
+      return;
+    }
+    if (widget.selectionActive || widget.pageZoomed) return;
 
     final horizontalSwipe = elapsed <= _swipeDuration &&
         dx.abs() >= _swipeDistance &&
@@ -137,7 +182,6 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
       return;
     }
 
-    final isTap = elapsed <= _tapDuration && delta.distance <= _tapSlop;
     if (!isTap) return;
 
     final edgeWidth = surfaceSize.width * _edgeFraction;
@@ -151,6 +195,10 @@ class _FrameEpubPageTurnSurfaceState extends State<FrameEpubPageTurnSurface> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      _mouseStart = null;
+      return;
+    }
     if (!_activeTouchPointers.remove(event.pointer)) return;
     _touchStart = null;
     if (_activeTouchPointers.isEmpty) _multiTouchSequence = false;
