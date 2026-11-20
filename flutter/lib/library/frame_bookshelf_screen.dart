@@ -13,6 +13,7 @@ import 'frame_book.dart';
 import 'frame_book_details_screen.dart';
 import 'frame_library_repository.dart';
 import 'frame_reader_screen.dart';
+import '../reader/frame_epub_reader_preview_screen.dart';
 
 const _bg = Color(0xFF12101A);
 const _panel = Color(0xFF1B1825);
@@ -173,6 +174,22 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
       _openPage(_base.replace(path: '/reading-stats/'), '閱讀時光');
 
   Future<void> _openReader(FrameBook book) async {
+    if (book.provider == 'local') {
+      final api = FrameApiScope.of(context);
+      final localSession = FrameApiScope.localSessionOf(context);
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => FrameApiScope(
+            api: api,
+            localOpenListSession: localSession,
+            child: FrameEpubReaderPreviewScreen(book: book),
+          ),
+        ),
+      );
+      if (mounted) unawaited(_load(showLoading: false));
+      return;
+    }
+
     if (kIsWeb) {
       final api = FrameApiScope.of(context);
       final localSession = FrameApiScope.localSessionOf(context);
