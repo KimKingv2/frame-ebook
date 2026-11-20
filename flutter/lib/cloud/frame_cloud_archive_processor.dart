@@ -55,7 +55,7 @@ typedef FrameCloudArchiveProgressCallback = void Function(
 );
 
 /// Processes the existing D1 pending-cover queue without downloading an
-/// original archive in full. EPUB OPF metadata and its cover are read from
+/// original archive in full or writing temporary archive/image files. EPUB OPF metadata and its cover are read from
 /// bounded ZIP entries backed by FrameFileSource HTTP Range requests. CBZ
 /// covers use the first natural-sort image, preferring cover/front names.
 class FrameCloudArchiveProcessor {
