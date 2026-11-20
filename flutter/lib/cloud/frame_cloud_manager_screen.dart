@@ -895,34 +895,144 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Text(
-                    _totalItems.toString() + ' 個項目 · 第 ' +
-                        _directoryPage.toString() + ' / ' + _pageCount.toString() + ' 頁',
-                    style: const TextStyle(color: _cloudMuted, fontSize: 12),
+                Card(
+                  color: _cloudPanel,
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.sync_alt, color: _cloudAccent, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'D1 書庫索引',
+                                style: TextStyle(
+                                  color: _cloudInk,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _scanState?.completed == true
+                                  ? '已完成'
+                                  : _scanState == null
+                                      ? '尚未掃描'
+                                      : '可續掃',
+                              style: const TextStyle(
+                                color: _cloudMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_scanRunning) ...[
+                          const SizedBox(height: 9),
+                          const LinearProgressIndicator(minHeight: 2),
+                        ],
+                        const SizedBox(height: 6),
+                        Text(
+                          _scanMessage,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _cloudMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        if (_scanState != null) ...[
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              _scanMetric('索引', _scanState!.indexedCount),
+                              _scanMetric('已讀取', _scanState!.scannedCount),
+                              _scanMetric('資料夾', _scanState!.visitedFolderCount),
+                              _scanMetric('失敗', _scanState!.failedCount),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 9),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _scanRunning ? null : _startScan,
+                              icon: const Icon(Icons.play_arrow, size: 18),
+                              label: Text(
+                                _scanState?.completed == true
+                                    ? '索引已完成'
+                                    : '開始／續掃',
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _scanRunning ? _pauseScan : null,
+                              icon: const Icon(Icons.pause, size: 18),
+                              label: const Text('暫停'),
+                            ),
+                            TextButton.icon(
+                              onPressed: _scanRunning
+                                  ? null
+                                  : () => _startScan(forceRescan: true),
+                              icon: const Icon(Icons.restart_alt, size: 18),
+                              label: const Text('完整重掃'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          '原生掃描會逐頁寫入 D1 並保存續掃游標；封面提取、R2 上傳及 EPUB OPF 元資料仍可在完整管理器處理。',
+                          style: TextStyle(
+                            color: _cloudMuted,
+                            fontSize: 10,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                IconButton(
-                  tooltip: '上一頁',
-                  onPressed: _directoryPage > 1 && !_loadingDirectory
-                      ? () => _loadDirectory(page: _directoryPage - 1)
-                      : null,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                IconButton(
-                  tooltip: '下一頁',
-                  onPressed: _directoryPage < _pageCount && !_loadingDirectory
-                      ? () => _loadDirectory(page: _directoryPage + 1)
-                      : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-                TextButton.icon(
-                  onPressed: _openLegacyManager,
-                  icon: const Icon(Icons.tune, size: 16),
-                  label: const Text('掃描與封面管理'),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _totalItems.toString() + ' 個項目 · 第 ' +
+                            _directoryPage.toString() + ' / ' + _pageCount.toString() + ' 頁',
+                        style: const TextStyle(color: _cloudMuted, fontSize: 11),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '上一頁',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _directoryPage > 1 && !_loadingDirectory
+                          ? () => _loadDirectory(page: _directoryPage - 1)
+                          : null,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    IconButton(
+                      tooltip: '下一頁',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _directoryPage < _pageCount && !_loadingDirectory
+                          ? () => _loadDirectory(page: _directoryPage + 1)
+                          : null,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                    TextButton.icon(
+                      onPressed: _openLegacyManager,
+                      icon: const Icon(Icons.tune, size: 16),
+                      label: const Text('完整管理器'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1041,6 +1151,22 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       ),
     );
   }
+
+  Widget _scanMetric(String label, int value) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: _cloudMuted, fontSize: 10)),
+          const SizedBox(width: 4),
+          Text(
+            value.toString(),
+            style: const TextStyle(
+              color: _cloudInk,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
 
   Widget _sectionTitle(String title, String subtitle) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
