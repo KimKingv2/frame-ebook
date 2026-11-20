@@ -142,12 +142,12 @@ class FrameCloudScanRunner {
         rootPath: root,
       );
       state = loadedState;
-      final matchesScope = loadedState != null &&
-          loadedState.version == 1 &&
-          loadedState.provider == provider &&
-          loadedState.library == library &&
-          loadedState.rootPath == root;
-      if (!matchesScope || forceRescan) {
+      if (loadedState == null ||
+          loadedState.version != 1 ||
+          loadedState.provider != provider ||
+          loadedState.library != library ||
+          loadedState.rootPath != root ||
+          forceRescan) {
         state = FrameCloudScanState.initial(
           provider: provider,
           library: library,
