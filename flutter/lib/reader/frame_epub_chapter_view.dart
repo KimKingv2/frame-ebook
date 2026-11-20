@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:xml/xml.dart';
 
 import '../library/frame_reader_repository.dart';
@@ -1727,6 +1728,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     } else if (tag == 'img') {
       child = _buildImage(element, style, block: true);
+    } else if (tag == 'svg') {
+      child = _buildSvgElement(element, style, block: true);
     } else if (tag == 'table') {
       child = _buildTable(
         element,
@@ -2134,7 +2137,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         child: _buildImage(element, style),
       );
     }
-    if (tag == 'svg' || tag == 'math') {
+    if (tag == 'svg') {
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: _buildSvgElement(element, style),
+      );
+    }
+    if (tag == 'math') {
       return WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: _unsupportedInlineObject(tag),
@@ -2226,9 +2235,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       fromPath: widget.chapter.resource.path,
     );
     final resource = reference.resource;
-    if (!reference.isInternal ||
-        resource == null ||
-        resource.kind != FrameEpubResourceKind.image) {
+    if (!reference.isInternal || resource == null) {
+      return _imagePlaceholder(alt);
+    }
+    if (resource.kind == FrameEpubResourceKind.svg) {
+      if (resource.size > widget.resourceLoader.maxSvgBytes) {
+        return _imagePlaceholder('$alt（SVG 超過 8 MiB 讀取上限）');
+      }
+      final svgSize = _svgWidgetSize(style, element, block: block);
+      return _FrameEpubSvg(
+        loader: widget.resourceLoader,
+        resource: resource,
+        maxBytes: widget.resourceLoader.maxSvgBytes,
+        width: svgSize.width,
+        height: svgSize.height,
+        alt: alt,
+        onLayoutChanged:
+            widget.paginated ? _handlePaginatedImageLayoutChanged : null,
+      );
+    }
+    if (resource.kind != FrameEpubResourceKind.image) {
       return _imagePlaceholder(alt);
     }
     if (resource.size > widget.maxImageBytes) {
@@ -2267,6 +2293,81 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       alt: alt,
       onLayoutChanged:
           widget.paginated ? _handlePaginatedImageLayoutChanged : null,
+    );
+  }
+
+  ({double width, double height}) _svgWidgetSize(
+    Map<String, String> style,
+    XmlElement element, {
+    bool block = false,
+  }) {
+    double? dimension(String? value) {
+      if (widget.fixedLayout && value?.trim().endsWith('%') == true) {
+        return null;
+      }
+      return _cssDimension(value, widget.fontSize);
+    }
+
+    final pageSize = _fixedLayoutViewportSize;
+    final width = dimension(style['width']) ??
+        dimension(_attribute(element, 'width')) ??
+        (widget.fixedLayout
+            ? pageSize?.width ?? widget.contentMaxWidth
+            : (block ? widget.contentMaxWidth : widget.fontSize * 2.4));
+    final height = dimension(style['height']) ??
+        dimension(_attribute(element, 'height')) ??
+        (widget.fixedLayout
+            ? pageSize?.height ?? width * 0.65
+            : (block ? width * 0.65 : widget.fontSize * 1.6));
+    return (width: width, height: height);
+  }
+
+  String? _inlineSvgMarkup(XmlElement element) {
+    var markup = element.toXmlString();
+    if (markup.length > 1024 * 1024) return null;
+
+    // XmlElement serialization may omit an inherited namespace declaration
+    // when a node is rendered independently. Normalize only the SVG root so
+    // the SVG parser never mistakes its inherited XHTML namespace for SVG.
+    final rootPattern = RegExp(r'^<svg\\b[^>]*>');
+    final root = rootPattern.firstMatch(markup);
+    if (root == null) return null;
+    var opening = root.group(0)!;
+    final xmlnsPattern = RegExp(r'\\sxmlns=(["\']).*?\\1');
+    if (xmlnsPattern.hasMatch(opening)) {
+      opening = opening.replaceFirst(
+        xmlnsPattern,
+        ' xmlns="http://www.w3.org/2000/svg"',
+      );
+    } else {
+      opening = opening.replaceFirst(
+        RegExp(r'^<svg\\b'),
+        '<svg xmlns="http://www.w3.org/2000/svg"',
+      );
+    }
+    markup = opening + markup.substring(root.end);
+    return markup;
+  }
+
+  Widget _buildSvgElement(
+    XmlElement element,
+    Map<String, String> style, {
+    bool block = false,
+  }) {
+    final markup = _inlineSvgMarkup(element);
+    if (markup == null) {
+      return _imagePlaceholder('SVG 圖形過大或根節點格式不支援');
+    }
+    final size = _svgWidgetSize(style, element, block: block);
+    final title = element.findElements('title').firstOrNull?.innerText;
+    return SvgPicture.string(
+      markup,
+      width: size.width,
+      height: size.height,
+      fit: BoxFit.contain,
+      alignment: Alignment.center,
+      clipBehavior: Clip.hardEdge,
+      semanticsLabel: title?.isNotEmpty == true ? title : 'EPUB SVG 圖形',
     );
   }
 
