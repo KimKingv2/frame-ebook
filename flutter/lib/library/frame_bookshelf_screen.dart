@@ -149,9 +149,13 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
   }
 
   Future<void> _openManager() async {
+    final api = FrameApiScope.of(context);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => const FrameCloudManagerScreen(),
+        builder: (_) => FrameApiScope(
+          api: api,
+          child: const FrameCloudManagerScreen(),
+        ),
       ),
     );
     if (mounted) unawaited(_load(showLoading: false));
