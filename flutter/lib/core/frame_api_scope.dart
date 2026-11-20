@@ -20,6 +20,26 @@ class FrameApiScope extends InheritedWidget {
     return scope.api;
   }
 
+  /// Copies the nearest API scope into a route created by the Navigator.
+  ///
+  /// Navigator routes are inserted above the current route subtree, so an
+  /// InheritedWidget that only wraps the current route is not inherited by a
+  /// newly pushed route unless it is explicitly re-provided.
+  static Widget inherit({
+    required BuildContext context,
+    required Widget child,
+  }) {
+    final scope = context.dependOnInheritedWidgetOfExactType<FrameApiScope>();
+    if (scope == null) {
+      throw StateError('FrameApiScope 尚未建立，無法開啟需要雲端 API 的頁面。');
+    }
+    return FrameApiScope(
+      api: scope.api,
+      localOpenListSession: scope.localOpenListSession,
+      child: child,
+    );
+  }
+
   static FrameLocalOpenListSession? localSessionOf(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<FrameApiScope>();
     return scope?.localOpenListSession;

@@ -131,3 +131,7 @@ These items must still pass CI and device verification before being treated as c
 
 ### Cross-inline annotation range verification
 - Added an EPUB renderer widget test where one CFI highlight begins in paragraph text, crosses a bold inline element, and ends in following paragraph text. All three underlying XHTML text nodes must receive the same restored highlight color.
+
+### Navigator API scope propagation fix
+- The legacy reading room's optional Flutter EPUB Preview route now explicitly inherits the current `FrameApiScope` and in-memory Local OpenList session. This fixes the route boundary where a newly pushed Navigator page did not inherit the old route's provider.
+- The legacy EPUB/CBZ HTML reader itself remains unchanged. A widget regression test verifies that the API scope is available after pushing a nested route and that a missing scope produces a clear setup error.

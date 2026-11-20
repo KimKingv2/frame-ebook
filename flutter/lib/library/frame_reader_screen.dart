@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../reader/frame_epub_reader_preview_screen.dart';
 import 'frame_book.dart';
@@ -109,8 +110,10 @@ class _FrameReaderScreenState extends State<FrameReaderScreen> {
               unawaited(
                 Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        FrameEpubReaderPreviewScreen(book: widget.book),
+                    builder: (_) => FrameApiScope.inherit(
+                      context: context,
+                      child: FrameEpubReaderPreviewScreen(book: widget.book),
+                    ),
                   ),
                 ),
               );
