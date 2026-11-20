@@ -113,3 +113,7 @@ These items must still pass CI and device verification before being treated as c
 ### EPUB note editor parity update
 - The Flutter note editor now exposes a delete action while editing an existing note, matching the original reader's in-editor delete path. The editor returns an explicit delete intent; the reader asks for confirmation before deleting the annotation through the existing session/repository API.
 - New widget tests cover the edit-only delete action, preserved quotation context, new-note mode without a delete action, and save-result handling. This does not change the D1 schema or the legacy reader.
+
+### EPUB annotation refresh parity update
+- The Flutter reader sidebar now has a refresh action that reloads bookmarks, highlights and notes through the existing `/api/reading/annotations` contract.
+- Refreshes are guarded against stale responses: a refresh cannot overwrite a newer local save/delete, nor can an older overlapping refresh replace a newer one. Session and sidebar widget tests cover remote annotation reload and the refresh control.

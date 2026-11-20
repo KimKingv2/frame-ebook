@@ -95,6 +95,8 @@ class FrameEpubReaderSession extends ChangeNotifier {
   bool _started = false;
   bool _closed = false;
   int _navigationRevision = 0;
+  int _annotationMutationRevision = 0;
+  int _annotationRefreshRequest = 0;
 
   List<FrameEpubTocEntry> get toc => _epub?.toc ?? const [];
 
@@ -452,6 +454,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
       ..._annotations.where((item) => item.id != saved.id),
       saved,
     ];
+    _annotationMutationRevision++;
     notifyListeners();
     return saved;
   }
@@ -461,6 +464,25 @@ class FrameEpubReaderSession extends ChangeNotifier {
     _annotations = _annotations
         .where((item) => item.id != annotationId)
         .toList(growable: false);
+    _annotationMutationRevision++;
+    notifyListeners();
+  }
+
+  /// Reloads this book's annotations from the existing D1-backed API.
+  ///
+  /// A response is discarded when a newer refresh or a local annotation
+  /// mutation has happened while the request was in flight.
+  Future<void> refreshAnnotations() async {
+    if (_closed) return;
+    final mutationRevision = _annotationMutationRevision;
+    final request = ++_annotationRefreshRequest;
+    final refreshed = await repository.loadAnnotations(book);
+    if (_closed ||
+        request != _annotationRefreshRequest ||
+        mutationRevision != _annotationMutationRevision) {
+      return;
+    }
+    _annotations = refreshed;
     notifyListeners();
   }
 

@@ -23,6 +23,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
     required this.onOpenAnnotation,
     required this.onEditNote,
     required this.onDeleteAnnotation,
+    required this.onRefreshAnnotations,
     required this.onClose,
     super.key,
   });
@@ -35,6 +36,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
   final ValueChanged<FrameReaderAnnotation> onOpenAnnotation;
   final ValueChanged<FrameReaderAnnotation> onEditNote;
   final Future<bool> Function(FrameReaderAnnotation) onDeleteAnnotation;
+  final Future<void> Function() onRefreshAnnotations;
   final VoidCallback onClose;
 
   @override
@@ -46,6 +48,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   late final PageController _pageController;
   late int _activeTab;
   late List<FrameReaderAnnotation> _annotations;
+  bool _refreshingAnnotations = false;
 
   @override
   void initState() {
@@ -70,6 +73,16 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   void _handlePageChanged(int index) {
     if (mounted && _activeTab != index) {
       setState(() => _activeTab = index);
+    }
+  }
+
+  Future<void> _refreshAnnotations() async {
+    if (_refreshingAnnotations) return;
+    setState(() => _refreshingAnnotations = true);
+    try {
+      await widget.onRefreshAnnotations();
+    } finally {
+      if (mounted) setState(() => _refreshingAnnotations = false);
     }
   }
 
@@ -198,6 +211,25 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                IconButton(
+                  tooltip: '重新整理標註',
+                  visualDensity: VisualDensity.compact,
+                  onPressed:
+                      _refreshingAnnotations ? null : _refreshAnnotations,
+                  icon: _refreshingAnnotations
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _sidebarAccent,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.refresh_rounded,
+                          color: _sidebarMuted,
+                        ),
                 ),
                 IconButton(
                   tooltip: '關閉閱讀導覽',

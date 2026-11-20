@@ -55,9 +55,14 @@ class _MemoryFrameFileSource implements FrameFileSource {
 }
 
 class _FakeApi implements FrameApiClient {
-  _FakeApi({Map<String, dynamic>? state}) : state = state ?? {};
+  _FakeApi({
+    Map<String, dynamic>? state,
+    List<dynamic>? annotations,
+  })  : state = state ?? {},
+        annotations = annotations ?? [];
 
   Map<String, dynamic> state;
+  List<dynamic> annotations;
   Map<String, dynamic>? postedState;
 
   @override
@@ -66,7 +71,7 @@ class _FakeApi implements FrameApiClient {
       return {'state': state};
     }
     if (Uri.parse(path).path == '/api/reading/annotations') {
-      return {'annotations': []};
+      return {'annotations': annotations};
     }
     throw StateError('Unexpected GET $path');
   }
@@ -348,6 +353,55 @@ void main() {
       expect(
         source.requests.any((range) => range.$2 - range.$1 + 1 == fixture.length),
         isFalse,
+      );
+      await session.close();
+    });
+
+    test('refreshes bookmarks and notes from the existing annotations API',
+        () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+
+      await session.open();
+      expect(session.annotations, isEmpty);
+
+      api.annotations = [
+        {
+          'id': 'remote-bookmark',
+          'bookId': 'epub-session-test',
+          'type': 'bookmark',
+          'cfi': 'epubcfi(/6/2!/4/2:3)',
+          'color': 'violet',
+          'createdAt': 10,
+        },
+        {
+          'id': 'remote-note',
+          'bookId': 'epub-session-test',
+          'type': 'note',
+          'cfi': 'epubcfi(/6/2!/4/2:8)',
+          'quote': '遠端摘錄',
+          'text': '另一台裝置新增的筆記',
+          'color': 'violet',
+          'createdAt': 11,
+        },
+      ];
+
+      await session.refreshAnnotations();
+
+      expect(
+        session.annotations.map((item) => item.id),
+        containsAll(['remote-bookmark', 'remote-note']),
+      );
+      expect(
+        session.annotations
+            .firstWhere((item) => item.id == 'remote-note')
+            .quote,
+        '遠端摘錄',
       );
       await session.close();
     });

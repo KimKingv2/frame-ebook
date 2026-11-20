@@ -28,6 +28,7 @@ void main() {
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},
+            onRefreshAnnotations: () async {},
             onDeleteAnnotation: (_) async {
               deleteCalls++;
               return true;
@@ -50,6 +51,40 @@ void main() {
     expect(find.text('目前沒有已保存的書籤。'), findsNothing);
     expect(find.byTooltip('刪除書籤'), findsOneWidget);
 
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('refresh button calls the annotation refresh handler',
+      (tester) async {
+    var refreshCalls = 0;
+
+    await tester.binding.setSurfaceSize(const Size(420, 760));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubReaderSidebar(
+            toc: const [],
+            currentPath: null,
+            annotations: const [],
+            initialTabIndex: 2,
+            onSelectToc: (_) {},
+            onOpenAnnotation: (_) {},
+            onEditNote: (_) {},
+            onDeleteAnnotation: (_) async => true,
+            onRefreshAnnotations: () async {
+              refreshCalls++;
+            },
+            onClose: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('重新整理標註'));
+    await tester.pumpAndSettle();
+
+    expect(refreshCalls, 1);
     await tester.binding.setSurfaceSize(null);
   });
 
@@ -78,6 +113,7 @@ void main() {
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},
+            onRefreshAnnotations: () async {},
             onDeleteAnnotation: (_) async {
               deleteCalls++;
               return true;

@@ -1257,6 +1257,20 @@ class _FrameEpubReaderPreviewScreenState
               return false;
             }
           },
+          onRefreshAnnotations: () async {
+            try {
+              await session.refreshAnnotations();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已重新整理本書標註與書籤。')),
+              );
+            } on Object catch (error) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('讀取標註失敗：$error')),
+              );
+            }
+          },
         );
 
     final screenSize = MediaQuery.sizeOf(context);
