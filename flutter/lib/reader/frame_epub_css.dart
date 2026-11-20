@@ -205,6 +205,9 @@ class FrameEpubCssCascade {
           'font-family': 'monospace',
         });
         break;
+      case 'th':
+        result.addAll({'font-weight': 'bold', 'text-align': 'center'});
+        break;
       case 'strong':
       case 'b':
         result['font-weight'] = 'bold';

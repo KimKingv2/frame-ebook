@@ -1727,6 +1727,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     } else if (tag == 'img') {
       child = _buildImage(element, style, block: true);
+    } else if (tag == 'table') {
+      child = _buildTable(
+        element,
+        style,
+        cascade,
+        paginationWidth: innerWidth,
+        paginationMaxHeight: paginationMaxHeight,
+        paginationTextScaler: paginationTextScaler,
+      );
     } else if (tag == 'pre') {
       child = Container(
         width: double.infinity,
@@ -1791,6 +1800,241 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       child = Padding(padding: margin, child: child);
     }
     return KeyedSubtree(key: _elementKey(element), child: child);
+  }
+
+  Widget _buildTable(
+    XmlElement table,
+    Map<String, String> tableStyle,
+    FrameEpubCssCascade cascade, {
+    double? paginationWidth,
+    double? paginationMaxHeight,
+    TextScaler? paginationTextScaler,
+  }) {
+    final rows = <({XmlElement element, bool header})>[];
+
+    void collectRows(XmlElement parent, {bool header = false}) {
+      for (final child in parent.children.whereType<XmlElement>()) {
+        final tag = child.name.local.toLowerCase();
+        if (tag == 'tr') {
+          rows.add((element: child, header: header));
+        } else if (tag == 'thead' || tag == 'tbody' || tag == 'tfoot') {
+          collectRows(child, header: tag == 'thead' || header);
+        }
+      }
+    }
+
+    collectRows(table);
+    if (rows.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final rawRows = <List<XmlElement>>[];
+    var columnCount = 1;
+    for (final row in rows) {
+      final cells = row.element.children
+          .whereType<XmlElement>()
+          .where((cell) {
+            final tag = cell.name.local.toLowerCase();
+            return tag == 'td' || tag == 'th';
+          })
+          .toList(growable: false);
+      rawRows.add(cells);
+      final columns = cells.fold<int>(
+        0,
+        (total, cell) =>
+            total +
+            (int.tryParse(_attribute(cell, 'colspan') ?? '') ?? 1)
+                .clamp(1, 12)
+                .toInt(),
+      );
+      if (columns > columnCount) columnCount = columns;
+    }
+
+    final carryRows = List<int>.filled(columnCount, 0);
+    final gridRows = <List<({XmlElement? element, int span, bool header})>>[];
+    for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      final cells = rawRows[rowIndex];
+      final placements =
+          <({XmlElement? element, int span, bool header})>[];
+      final nextCarry = List<int>.from(carryRows);
+      var column = 0;
+      var cellIndex = 0;
+
+      while (column < columnCount) {
+        if (carryRows[column] > 0) {
+          var span = 1;
+          while (column + span < columnCount &&
+              carryRows[column + span] > 0) {
+            span++;
+          }
+          for (var offset = 0; offset < span; offset++) {
+            nextCarry[column + offset] =
+                (nextCarry[column + offset] - 1).clamp(0, rows.length);
+          }
+          placements.add((element: null, span: span, header: false));
+          column += span;
+          continue;
+        }
+
+        if (cellIndex >= cells.length) {
+          placements.add((element: null, span: 1, header: false));
+          column++;
+          continue;
+        }
+
+        final cell = cells[cellIndex++];
+        final cellTag = cell.name.local.toLowerCase();
+        final span = (int.tryParse(_attribute(cell, 'colspan') ?? '') ?? 1)
+            .clamp(1, columnCount - column)
+            .toInt();
+        final rowSpan = (int.tryParse(_attribute(cell, 'rowspan') ?? '') ?? 1)
+            .clamp(1, rows.length - rowIndex)
+            .toInt();
+        for (var offset = 0; offset < span; offset++) {
+          final target = column + offset;
+          final remaining = rowSpan - 1;
+          if (remaining > nextCarry[target]) {
+            nextCarry[target] = remaining;
+          }
+        }
+        placements.add((
+          element: cell,
+          span: span,
+          header: cellTag == 'th' || rows[rowIndex].header,
+        ));
+        column += span;
+      }
+      gridRows.add(placements);
+      for (var index = 0; index < columnCount; index++) {
+        carryRows[index] = nextCarry[index];
+      }
+    }
+
+    final requestedWidth = paginationWidth ?? widget.contentMaxWidth;
+    final minimumColumnWidth = 104.0;
+    final gridMinimumWidth = minimumColumnWidth * columnCount;
+    final tableWidth =
+        requestedWidth > gridMinimumWidth ? requestedWidth : gridMinimumWidth;
+    final tableBorderAttribute = _attribute(table, 'border');
+    final hasBorder = (int.tryParse(tableBorderAttribute ?? '') ?? 0) > 0 ||
+        tableStyle.containsKey('border') ||
+        tableStyle.containsKey('border-width');
+    final borderColor = _cssColor(tableStyle['border-color']) ??
+        const Color(0xFF51495E);
+    final tablePadding = _boxInsets(tableStyle, 'padding', widget.fontSize);
+    final rowsWidgets = <Widget>[];
+
+    for (var rowIndex = 0; rowIndex < gridRows.length; rowIndex++) {
+      final row = rows[rowIndex];
+      final rowStyle = _computedStyle(row.element, cascade, tableStyle);
+      final rowBackground = _cssColor(rowStyle['background-color']);
+      final children = <Widget>[];
+
+      for (final placement in gridRows[rowIndex]) {
+        final cell = placement.element;
+        if (cell == null) {
+          children.add(Expanded(
+            flex: placement.span,
+            child: const SizedBox.shrink(),
+          ));
+          continue;
+        }
+
+        final cellStyle = _computedStyle(cell, cascade, rowStyle);
+        final padding = _boxInsets(cellStyle, 'padding', widget.fontSize);
+        final cellPadding =
+            padding == EdgeInsets.zero ? const EdgeInsets.all(7) : padding;
+        final cellBackground = _cssColor(cellStyle['background-color']) ??
+            (placement.header
+                ? const Color(0x332F2940)
+                : rowBackground);
+        final alignment = switch (cellStyle['vertical-align']) {
+          'middle' => Alignment.centerLeft,
+          'bottom' => Alignment.bottomLeft,
+          _ => Alignment.topLeft,
+        };
+        final cellTextWidth = (tableWidth * placement.span / columnCount -
+                cellPadding.horizontal)
+            .clamp(1.0, tableWidth)
+            .toDouble();
+        final contents = _flowChildren(
+          cell,
+          cellStyle,
+          cascade,
+          paginationWidth: cellTextWidth,
+          paginationTextScaler: paginationTextScaler,
+        );
+        Widget cellContent = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: contents,
+        );
+        cellContent = Align(
+          alignment: alignment,
+          child: Padding(
+            padding: cellPadding,
+            child: cellContent,
+          ),
+        );
+        if (cellBackground != null || hasBorder) {
+          cellContent = DecoratedBox(
+            decoration: BoxDecoration(
+              color: cellBackground,
+              border: hasBorder
+                  ? Border.all(color: borderColor, width: 0.6)
+                  : null,
+            ),
+            child: cellContent,
+          );
+        }
+        children.add(Expanded(
+          flex: placement.span,
+          child: KeyedSubtree(
+            key: _elementKey(cell),
+            child: cellContent,
+          ),
+        ));
+      }
+
+      rowsWidgets.add(IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ));
+    }
+
+    Widget content = SizedBox(
+      width: tableWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: rowsWidgets,
+      ),
+    );
+    if (tablePadding != EdgeInsets.zero) {
+      content = Padding(padding: tablePadding, child: content);
+    }
+    content = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: content,
+    );
+    if (paginationMaxHeight != null) {
+      // A long table is one paginated block. Keep it within the page viewport
+      // and allow the reader to scroll inside the table instead of letting it
+      // push later page items beyond the page's measured bounds.
+      content = ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: paginationMaxHeight.clamp(1.0, double.infinity).toDouble(),
+        ),
+        child: SingleChildScrollView(
+          child: content,
+        ),
+      );
+    }
+    // _buildBlock already keys the table element; do not attach the same
+    // GlobalKey a second time inside the table renderer.
+    return content;
   }
 
   Widget _buildList(
