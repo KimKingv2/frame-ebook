@@ -18,3 +18,12 @@
 - The upstream bundle retains its original copyright and license banner.
 
 These dependencies are included for static Cloudflare Pages deployment. Their licenses remain separate from original FRAME Reader code.
+
+## public_file_saver
+
+- Project: https://pub.dev/packages/public_file_saver
+- Version: 1.2.2
+- License: MIT
+- Used by the Flutter reading statistics screen to export JSON and CSV through a user-selected system save dialog (Android Storage Access Framework, macOS save panel, and browser Save As/download fallback).
+- The app passes export bytes directly from memory. It does not create an intermediate file or save without the user's explicit dialog action.
+- Sandboxed macOS builds enable only the user-selected file read/write entitlement; the broader Downloads-folder entitlement is not enabled.
