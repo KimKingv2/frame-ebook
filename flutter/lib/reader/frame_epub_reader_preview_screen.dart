@@ -174,6 +174,7 @@ class _FrameEpubReaderPreviewScreenState
       _recordReadingActivity();
       if (event.logicalKey == LogicalKeyboardKey.escape && _isImmersive) {
         _exitImmersiveMode();
+        return true;
       }
     }
     return false;
