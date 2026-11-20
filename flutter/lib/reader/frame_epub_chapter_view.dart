@@ -2032,7 +2032,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ),
       );
     }
-    return KeyedSubtree(key: _elementKey(table), child: content);
+    // _buildBlock already keys the table element; do not attach the same
+    // GlobalKey a second time inside the table renderer.
+    return content;
   }
 
   Widget _buildList(
