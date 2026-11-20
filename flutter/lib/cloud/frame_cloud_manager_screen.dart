@@ -7,6 +7,7 @@ import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_cloud_models.dart';
 import 'frame_cloud_repository.dart';
+import 'frame_cloud_scan_runner.dart';
 import 'local_openlist_client.dart';
 import 'local_openlist_settings_store.dart';
 
@@ -53,6 +54,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   String _query = '';
   int _directoryPage = 1;
   int _totalItems = 0;
+  bool _scanRunning = false;
+  FrameCloudScanState? _scanState;
+  FrameCloudScanRunner? _activeScanRunner;
+  String _scanMessage = '尚無索引掃描紀錄';
 
   int get _pageCount => _totalItems == 0 ? 1 : (_totalItems + 99) ~/ 100;
 
@@ -74,6 +79,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
 
   @override
   void dispose() {
+    _activeScanRunner?.requestPause();
     _tabs.dispose();
     _booksRoot.dispose();
     _comicsRoot.dispose();
@@ -118,6 +124,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         _loading = false;
       });
       await _loadDirectory();
+      await _loadScanState();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -236,6 +243,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     }
     if (!mounted) return;
     await _loadDirectory();
+    await _loadScanState();
   }
 
   Future<void> _selectLibrary(FrameCloudLibrary value) async {
@@ -253,6 +261,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     }
     if (!mounted) return;
     await _loadDirectory();
+    await _loadScanState();
   }
 
   Future<void> _saveRoots() async {
@@ -281,6 +290,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
           ? 'Books 與 Comics 根目錄已儲存至雲端偏好設定。'
           : '本次工作階段已套用根目錄。');
       await _loadDirectory();
+      await _loadScanState();
     } catch (error) {
       if (!mounted) return;
       setState(() => _savingRoots = false);
@@ -317,12 +327,132 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         _loggingIn = false;
       });
       await _loadDirectory();
+      await _loadScanState();
       _showMessage('本地 OpenList 已登入。Token 僅保留在目前工作階段記憶體中。');
     } catch (error) {
       candidate?.close();
       if (!mounted) return;
       setState(() => _loggingIn = false);
       _showMessage(error.toString());
+    }
+  }
+
+  Future<void> _loadScanState() async {
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    if (root == null) {
+      if (mounted) {
+        setState(() {
+          _scanState = null;
+          _scanMessage = '請先設定有效的書庫根目錄。';
+        });
+      }
+      return;
+    }
+    try {
+      final state = await _repository.loadScanState(
+        provider: _provider,
+        library: _library,
+        rootPath: root,
+      );
+      if (!mounted) return;
+      setState(() {
+        _scanState = state;
+        _scanMessage = state == null
+            ? '目前沒有 D1 掃描紀錄。'
+            : state.completed
+                ? '目錄索引已完成。重新掃描不會自動執行。'
+                : state.pausedByUser
+                    ? '找到手動暫停的進度，可從保存位置續掃。'
+                    : '找到尚未完成的進度，可從保存位置續掃。';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _scanMessage = '讀取 D1 掃描進度失敗：$error');
+    }
+  }
+
+  Future<void> _startScan({bool forceRescan = false}) async {
+    if (_scanRunning) return;
+    if (_provider == FrameCloudProvider.local &&
+        !(_localClient?.isAuthenticated ?? false)) {
+      _showMessage('請先登入本地 OpenList。');
+      return;
+    }
+    if (_provider.isServerSide &&
+        !(_session?.providers[_provider]?.configured ?? false)) {
+      _showMessage('目前來源尚未在 Cloudflare Pages 設定完成。');
+      return;
+    }
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    if (root == null) {
+      _showMessage('請先設定有效的書庫根目錄。');
+      return;
+    }
+    if (forceRescan) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('重新建立完整索引？'),
+          content: Text(
+            '將重新遍歷「$root」，完成後依據新一輪結果清理 D1 中已不存在的項目。原始 EPUB／CBZ 不會下載或修改。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('開始完整重掃'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    final runner = FrameCloudScanRunner(
+      repository: _repository,
+      localClient: _localClient,
+    );
+    _activeScanRunner = runner;
+    setState(() {
+      _scanRunning = true;
+      _scanMessage = forceRescan ? '正在建立新一輪完整索引…' : '正在開始／續掃…';
+    });
+    final result = await runner.run(
+      provider: _provider,
+      library: _library,
+      rootPath: root,
+      forceRescan: forceRescan,
+      onProgress: (progress) {
+        if (!mounted) return;
+        setState(() {
+          _scanState = progress.state;
+          _scanMessage = progress.phase;
+        });
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _scanRunning = false;
+      _activeScanRunner = null;
+      if (result.state != null) _scanState = result.state;
+      _scanMessage = result.error ??
+          (result.completed
+              ? '目錄索引已完成。待處理封面與 EPUB metadata 可在完整管理器中繼續處理。'
+              : result.paused
+                  ? '已暫停，D1 掃描游標已保存。'
+                  : '本批已結束，D1 掃描游標已保存，可再次續掃。');
+    });
+    await _loadScanState();
+    await _loadDirectory();
+    if (result.error != null) _showMessage('索引掃描失敗：${result.error}');
+  }
+
+  void _pauseScan() {
+    _activeScanRunner?.requestPause();
+    if (mounted && _scanRunning) {
+      setState(() => _scanMessage = '已要求暫停，待目前目錄頁完成並保存游標…');
     }
   }
 
