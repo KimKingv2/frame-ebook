@@ -9,6 +9,7 @@ import 'package:frame_ebook/core/frame_api_client.dart';
 class _FakeApi implements FrameApiClient {
   final List<String> getRequests = [];
   final List<MapEntry<String, Map<String, dynamic>>> postRequests = [];
+  final List<(String, Uint8List, String, Map<String, String>)> binaryPosts = [];
 
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
@@ -112,6 +113,17 @@ class _FakeApi implements FrameApiClient {
       return {'ok': true, 'updated': (body['entries'] as List).length};
     }
     return {'ok': true, 'value': body['value']};
+  }
+
+  @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async {
+    binaryPosts.add((path, body, contentType, Map.from(headers)));
+    return {'ok': true};
   }
 
   @override
