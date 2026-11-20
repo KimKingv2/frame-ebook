@@ -47,6 +47,10 @@ def patch_macos_entitlements(path: Path) -> None:
         entitlements = plistlib.load(source)
     if entitlements.get("com.apple.security.app-sandbox") is True:
         entitlements["com.apple.security.network.client"] = True
+        # User-selected save dialogs grant access only to the destination
+        # chosen for this export; no broad Downloads-folder entitlement is
+        # needed because the app never writes exports without user consent.
+        entitlements["com.apple.security.files.user-selected.read-write"] = True
         with path.open("wb") as target:
             plistlib.dump(entitlements, target, fmt=plistlib.FMT_XML, sort_keys=True)
 
@@ -142,7 +146,7 @@ def main() -> None:
     patch_web_index(root / "web/index.html")
     for name in ("DebugProfile.entitlements", "Release.entitlements"):
         patch_macos_entitlements(root / "macos/Runner" / name)
-    print("Platform boot and network settings configured: Web dark startup fallback; Android INTERNET; macOS outgoing network client.")
+    print("Platform settings configured: Web dark startup fallback; Android INTERNET; macOS outgoing network client and user-selected file-save access.")
 
 
 if __name__ == "__main__":
