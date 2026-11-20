@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -54,7 +55,7 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
 
 class _FrameEpubReaderPreviewScreenState
     extends State<FrameEpubReaderPreviewScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, FullScreenListener {
   bool _initialized = false;
   bool _appearanceInitialized = false;
   String? _setupError;
@@ -89,14 +90,46 @@ class _FrameEpubReaderPreviewScreenState
   Timer? _comicSpineNavigationTimer;
   FrameReadingTimeTracker? _readingTimeTracker;
   int _readingSeconds = 0;
+  bool _isImmersive = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    FullScreen.addListener(this);
+    _isImmersive = FullScreen.isFullScreen;
     HardwareKeyboard.instance.addHandler(_handleReadingKeyEvent);
     _chapterScrollController = ScrollController();
     _chapterPageController = PageController();
+  }
+
+  @override
+  void onFullScreenChanged(bool enabled, SystemUiMode? systemUiMode) {
+    if (!mounted || _isImmersive == enabled) return;
+    setState(() => _isImmersive = enabled);
+  }
+
+  void _toggleImmersiveMode() {
+    try {
+      FullScreen.setFullScreen(!_isImmersive);
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法切換全螢幕：$error')),
+      );
+    }
+  }
+
+  void _exitImmersiveMode() {
+    if (!_isImmersive) return;
+    try {
+      FullScreen.setFullScreen(false);
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法退出全螢幕：$error')),
+      );
+    }
   }
 
   @override
@@ -137,7 +170,12 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   bool _handleReadingKeyEvent(KeyEvent event) {
-    if (event is KeyDownEvent) _recordReadingActivity();
+    if (event is KeyDownEvent) {
+      _recordReadingActivity();
+      if (event.logicalKey == LogicalKeyboardKey.escape && _isImmersive) {
+        _exitImmersiveMode();
+      }
+    }
     return false;
   }
 
@@ -306,6 +344,8 @@ class _FrameEpubReaderPreviewScreenState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    FullScreen.removeListener(this);
+    if (FullScreen.isFullScreen) FullScreen.setFullScreen(false);
     HardwareKeyboard.instance.removeHandler(_handleReadingKeyEvent);
     unawaited(_releaseResources());
     super.dispose();
@@ -572,12 +612,17 @@ class _FrameEpubReaderPreviewScreenState
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    return Listener(
-      onPointerDown: (_) => _recordReadingActivity(),
-      onPointerSignal: (_) => _recordReadingActivity(),
-      child: Scaffold(
-      backgroundColor: _readerChrome,
-      appBar: AppBar(
+    return PopScope<Object?>(
+      canPop: !_isImmersive,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _exitImmersiveMode();
+      },
+      child: Listener(
+        onPointerDown: (_) => _recordReadingActivity(),
+        onPointerSignal: (_) => _recordReadingActivity(),
+        child: Scaffold(
+          backgroundColor: _readerChrome,
+          appBar: _isImmersive ? null : AppBar(
         backgroundColor: _readerChrome,
         foregroundColor: _readerText,
         titleSpacing: 0,
@@ -623,6 +668,11 @@ class _FrameEpubReaderPreviewScreenState
             onPressed: session == null ? null : _showAppearance,
             icon: const Icon(Icons.text_fields_rounded),
           ),
+          IconButton(
+            tooltip: '進入沉浸式全螢幕',
+            onPressed: session == null ? null : _toggleImmersiveMode,
+            icon: const Icon(Icons.fullscreen_rounded),
+          ),
         ],
       ),
       body: SafeArea(
@@ -636,6 +686,7 @@ class _FrameEpubReaderPreviewScreenState
             return false;
           },
           child: _buildBody(session),
+        ),
         ),
       ),
       ),
@@ -706,6 +757,9 @@ class _FrameEpubReaderPreviewScreenState
                       FrameEpubPageProgressionDirection.rightToLeft,
                   selectionActive: _selectedText != null,
                   pageZoomed: _isFixedPageZoomed,
+                  immersive: _isImmersive,
+                  onToggleImmersive: _toggleImmersiveMode,
+                  onExitImmersive: _exitImmersiveMode,
                   onPreviousChapter: session.currentSpineIndex != null &&
                           session.currentSpineIndex! >=
                               _comicPageStep(context, session)
