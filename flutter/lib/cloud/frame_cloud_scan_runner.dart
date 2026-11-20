@@ -129,6 +129,7 @@ class FrameCloudScanRunner {
     _pauseRequested = false;
     final startedAt = _clock();
     FrameCloudScanState? state;
+    late FrameCloudScanState activeState;
     var scanned = 0;
     var indexed = 0;
     var skipped = 0;
@@ -141,23 +142,22 @@ class FrameCloudScanRunner {
         library: library,
         rootPath: root,
       );
-      state = loadedState;
-      if (loadedState == null ||
+            if (loadedState == null ||
           loadedState.version != 1 ||
           loadedState.provider != provider ||
           loadedState.library != library ||
           loadedState.rootPath != root ||
           forceRescan) {
-        state = FrameCloudScanState.initial(
+        activeState = FrameCloudScanState.initial(
           provider: provider,
           library: library,
           rootPath: root,
           scanId: _createScanId(),
         );
-        state = _withRaw(state, {
+        activeState = _withRaw(activeState, {
           'scanMode': forceRescan ? '完整重掃' : '首次完整掃描',
         });
-        await _repository.saveScanState(state);
+        await _repository.saveScanState(activeState);
       } else if (loadedState.completed) {
         return FrameCloudScanRunResult(
           state: loadedState,
@@ -170,43 +170,41 @@ class FrameCloudScanRunner {
           paused: false,
         );
       } else {
-        state = loadedState.copyWith(pausedByUser: false, resumeOnNextOpen: false);
-        await _repository.saveScanState(state);
+        activeState = loadedState.copyWith(pausedByUser: false, resumeOnNextOpen: false);
+        await _repository.saveScanState(activeState);
       }
-      if (state == null) {
-        throw StateError('D1 掃描工作未能初始化。');
-      }
+      state = activeState;
 
       _emit(
         onProgress,
         '已載入 D1 掃描進度',
-        state,
+        activeState,
         scanned,
         indexed,
         skipped,
         folders,
       );
 
-      while (!state.completed &&
+      while (!activeState.completed &&
           scanned < maxEntriesPerBatch &&
           folders < maxFoldersPerBatch &&
           _clock().difference(startedAt) < maxDuration &&
           !_pauseRequested) {
-        if (state.currentFolder == null) {
-          if (state.pendingFolders.isEmpty) break;
-          final nextFolder = state.pendingFolders.removeAt(0);
-          state = state.copyWith(
+        if (activeState.currentFolder == null) {
+          if (activeState.pendingFolders.isEmpty) break;
+          final nextFolder = activeState.pendingFolders.removeAt(0);
+          activeState = activeState.copyWith(
             currentFolder: nextFolder,
             page: 1,
-            pendingFolders: state.pendingFolders,
+            pendingFolders: activeState.pendingFolders,
           );
-          await _repository.saveScanState(state);
+          await _repository.saveScanState(activeState);
           _emit(onProgress, '進入資料夾：$nextFolder', state, scanned, indexed,
               skipped, folders);
         }
 
-        final folder = state.currentFolder!;
-        final page = state.page.clamp(1, 100000).toInt();
+        final folder = activeState.currentFolder!;
+        final page = activeState.page.clamp(1, 100000).toInt();
         final listing = await _loadDirectory(
           provider: provider,
           library: library,
@@ -217,7 +215,7 @@ class FrameCloudScanRunner {
         );
 
         final entries = <Map<String, dynamic>>[];
-        final seen = state.seenFolders.toSet();
+        final seen = activeState.seenFolders.toSet();
         var foundFolders = 0;
         for (final item in listing.items) {
           final path = normalizeFrameCloudPath(item.path);
@@ -231,8 +229,8 @@ class FrameCloudScanRunner {
             entries.add(_entryJson(item, folder));
             foundFolders++;
             if (seen.add(path)) {
-              state.seenFolders.add(path);
-              state.pendingFolders.add(path);
+              activeState.seenFolders.add(path);
+              activeState.pendingFolders.add(path);
             }
             continue;
           }
@@ -252,7 +250,7 @@ class FrameCloudScanRunner {
             provider: provider,
             library: library,
             rootPath: root,
-            scanId: state.scanId,
+            scanId: activeState.scanId,
             entries: entries,
           );
         }
@@ -260,32 +258,32 @@ class FrameCloudScanRunner {
 
         final nextPage = page * listing.perPage < listing.total;
         if (nextPage) {
-          state = state.copyWith(
+          activeState = activeState.copyWith(
             page: page + 1,
-            scannedCount: state.scannedCount + listing.items.length,
-            indexedCount: state.indexedCount + saved,
-            skippedCount: state.skippedCount + pageSkipped,
-            pendingFolders: state.pendingFolders,
-            seenFolders: state.seenFolders,
+            scannedCount: activeState.scannedCount + listing.items.length,
+            indexedCount: activeState.indexedCount + saved,
+            skippedCount: activeState.skippedCount + pageSkipped,
+            pendingFolders: activeState.pendingFolders,
+            seenFolders: activeState.seenFolders,
           );
         } else {
-          state = state.copyWith(
+          activeState = activeState.copyWith(
             clearCurrentFolder: true,
             page: 1,
-            visitedFolderCount: state.visitedFolderCount + 1,
-            scannedCount: state.scannedCount + listing.items.length,
-            indexedCount: state.indexedCount + saved,
-            skippedCount: state.skippedCount + pageSkipped,
-            pendingFolders: state.pendingFolders,
-            seenFolders: state.seenFolders,
+            visitedFolderCount: activeState.visitedFolderCount + 1,
+            scannedCount: activeState.scannedCount + listing.items.length,
+            indexedCount: activeState.indexedCount + saved,
+            skippedCount: activeState.skippedCount + pageSkipped,
+            pendingFolders: activeState.pendingFolders,
+            seenFolders: activeState.seenFolders,
           );
           folders++;
         }
-        await _repository.saveScanState(state);
+        await _repository.saveScanState(activeState);
         _emit(
           onProgress,
           '已保存 $folder 第 $page 頁：新增／更新 $saved 筆索引',
-          state,
+          activeState,
           scanned,
           indexed,
           skipped,
@@ -294,36 +292,36 @@ class FrameCloudScanRunner {
       }
 
       if (!_pauseRequested &&
-          state.currentFolder == null &&
-          state.pendingFolders.isEmpty) {
+          activeState.currentFolder == null &&
+          activeState.pendingFolders.isEmpty) {
         removed = await _repository.completeScan(
           provider: provider,
           library: library,
           rootPath: root,
-          scanId: state.scanId,
+          scanId: activeState.scanId,
         );
-        state = _withRaw(state, {
+        activeState = _withRaw(activeState, {
           'removedCount': removed,
           'completedAt': _clock().toIso8601String(),
         });
-        state = state.copyWith(
+        activeState = activeState.copyWith(
           completed: true,
           pausedByUser: false,
           resumeOnNextOpen: false,
         );
-        await _repository.saveScanState(state);
+        await _repository.saveScanState(activeState);
         _emit(onProgress, '目錄索引完成', state, scanned, indexed, skipped,
             folders);
       } else {
-        state = state.copyWith(
+        activeState = activeState.copyWith(
           pausedByUser: _pauseRequested,
           resumeOnNextOpen: false,
         );
-        await _repository.saveScanState(state);
+        await _repository.saveScanState(activeState);
         _emit(
           onProgress,
           _pauseRequested ? '已暫停，掃描游標已保存' : '本批已結束，掃描游標已保存',
-          state,
+          activeState,
           scanned,
           indexed,
           skipped,
@@ -332,13 +330,13 @@ class FrameCloudScanRunner {
       }
 
       return FrameCloudScanRunResult(
-        state: state,
+        state: activeState,
         scannedThisBatch: scanned,
         indexedThisBatch: indexed,
         skippedThisBatch: skipped,
         foldersThisBatch: folders,
         removedCount: removed,
-        completed: state.completed,
+        completed: activeState.completed,
         paused: _pauseRequested,
       );
     } catch (error) {
