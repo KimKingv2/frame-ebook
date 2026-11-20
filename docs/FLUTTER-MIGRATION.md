@@ -108,3 +108,8 @@ These items must still pass CI and device verification before being treated as c
 ### Reader appearance parity update
 - Flutter EPUB Preview now reads and writes the existing Legacy D1 appearance keys for font scale, font family, weight, paragraph spacing, text alignment, vertical and horizontal margins, reading mode, page layout and theme.
 - The Flutter preview exposes these typography and margin settings in its appearance panel. Comic image-fit, backdrop and fullscreen parity remain open.
+
+
+### EPUB note editor parity update
+- The Flutter note editor now exposes a delete action while editing an existing note, matching the original reader's in-editor delete path. The editor returns an explicit delete intent; the reader asks for confirmation before deleting the annotation through the existing session/repository API.
+- New widget tests cover the edit-only delete action, preserved quotation context, new-note mode without a delete action, and save-result handling. This does not change the D1 schema or the legacy reader.

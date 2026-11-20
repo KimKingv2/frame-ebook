@@ -23,6 +23,7 @@ import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
 import 'frame_reading_time_tracker.dart';
 import 'frame_epub_reader_sidebar.dart';
+import 'frame_epub_note_editor_dialog.dart';
 
 const _readerChrome = Color(0xFF171420);
 const _readerPanel = Color(0xFF211D2D);
@@ -1489,77 +1490,65 @@ class _FrameEpubReaderPreviewScreenState
     if (session == null || (annotation == null && selected == null)) return;
 
     final quote = annotation?.quote ?? selected?.quote ?? '';
-    final controller = TextEditingController(text: annotation?.text ?? '');
-    final value = await showDialog<String>(
+    final result = await showDialog<FrameEpubNoteEditorResult>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _readerPanel,
-        title: Text(
-          annotation == null ? '新增閱讀筆記' : '編輯閱讀筆記',
-          style: const TextStyle(color: _readerText, fontSize: 17),
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (quote.isNotEmpty)
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0x332B2635),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      quote,
-                      style: const TextStyle(
-                        color: _readerMuted,
-                        fontSize: 12,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                minLines: 4,
-                maxLines: 9,
-                maxLength: 20000,
-                style: const TextStyle(color: _readerText, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: '記下你的想法、解讀或補充資料……',
-                  hintStyle: const TextStyle(color: _readerMuted),
-                  filled: true,
-                  fillColor: const Color(0x332B2635),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('保存筆記'),
-          ),
-        ],
+      builder: (dialogContext) => FrameEpubNoteEditorDialog(
+        quote: quote,
+        initialText: annotation?.text ?? '',
+        isEditing: annotation != null,
       ),
     );
-    controller.dispose();
-    if (!mounted || value == null) return;
-    final text = value.trim();
+    if (!mounted || result == null) return;
+
+    if (result.action == FrameEpubNoteEditorAction.delete) {
+      if (annotation == null) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: _readerPanel,
+          title: const Text(
+            '刪除閱讀筆記',
+            style: TextStyle(color: _readerText, fontSize: 17),
+          ),
+          content: const Text(
+            '確定刪除這筆筆記嗎？刪除後無法復原。',
+            style: TextStyle(color: _readerMuted, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF9F526D),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('刪除筆記'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      try {
+        await session.deleteAnnotation(annotation.id);
+        if (!mounted) return;
+        setState(() => _selectedText = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('筆記已刪除。')),
+        );
+      } on Object catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('筆記刪除失敗：$error')),
+        );
+      }
+      return;
+    }
+
+    final text = (result.text ?? '').trim();
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('筆記內容不可為空白。')),
