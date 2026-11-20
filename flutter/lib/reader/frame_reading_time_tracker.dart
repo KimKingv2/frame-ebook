@@ -42,6 +42,7 @@ class FrameReadingTimeTracker {
   bool _running = false;
   int _sessionMilliseconds = 0;
   int _eventSequence = 0;
+  bool _syncing = false;
   Future<void> _writeTail = Future<void>.value();
 
   bool get isRunning => _running;
@@ -72,7 +73,7 @@ class FrameReadingTimeTracker {
     if (autoHeartbeat) {
       _timer = Timer.periodic(
         heartbeatInterval,
-        (_) => unawaited(tick()),
+        (_) => _advance(_clock()),
       );
     }
   }
@@ -98,11 +99,12 @@ class FrameReadingTimeTracker {
     if (!_running || _foreground == foreground) return;
     final now = at ?? _clock();
     if (!foreground) {
-      // Mark the window inactive before awaiting network persistence so a
-      // second heartbeat cannot count time while the app is backgrounding.
+      // Mark the window inactive before advancing so another timer tick
+      // cannot count time while the app is backgrounding.
       _foreground = false;
-      await tick(at: now);
+      _advance(now);
       _tickWasActive = false;
+      await _writeTail;
       return;
     }
 
@@ -116,8 +118,12 @@ class FrameReadingTimeTracker {
   /// Processes one heartbeat. Exposed for deterministic tests as well as the
   /// periodic timer.
   Future<void> tick({DateTime? at}) async {
+    _advance(at ?? _clock());
+    await _writeTail;
+  }
+
+  void _advance(DateTime now) {
     if (!_running) return;
-    final now = at ?? _clock();
     final previous = _lastTickAt;
     if (_tickWasActive && previous != null && now.isAfter(previous)) {
       final idleDeadline = _lastActivityAt?.add(idleLimit) ?? now;
@@ -135,7 +141,6 @@ class FrameReadingTimeTracker {
 
     _lastTickAt = now;
     _tickWasActive = isActiveAt(now);
-    await _writeTail;
   }
 
   Future<void> stop({DateTime? at}) async {
@@ -143,15 +148,9 @@ class FrameReadingTimeTracker {
     final now = at ?? _clock();
     _timer?.cancel();
     _timer = null;
-    if (_tickWasActive && _foreground) {
-      // tick() uses the previously active interval once, then observes the
-      // foreground flag as false and will not admit another interval.
-      _foreground = false;
-      await tick(at: now);
-    }
-
-    _tickWasActive = false;
     _foreground = false;
+    _advance(now);
+    _tickWasActive = false;
     _running = false;
     _lastTickAt = null;
     _lastActivityAt = null;
@@ -160,6 +159,17 @@ class FrameReadingTimeTracker {
   }
 
   void _queueInterval(DateTime start, DateTime end) {
+    if (_syncing || end.difference(start) <= Duration.zero) return;
+    final retryAt = _cloudBackoffUntil;
+    if (retryAt != null && _clock().isBefore(retryAt)) return;
+
+    _syncing = true;
+    _writeTail = _persistInterval(start, end).whenComplete(() {
+      _syncing = false;
+    });
+  }
+
+  Future<void> _persistInterval(DateTime start, DateTime end) async {
     var cursor = start;
     final sourceTitle = book.title.trim().isEmpty ? book.fileName : book.title;
     final title = sourceTitle.substring(
@@ -173,32 +183,24 @@ class FrameReadingTimeTracker {
       final chunkLimit = cursor.add(eventChunkLimit);
       final segmentEnd = _minimumDate(_minimumDate(end, midnight), chunkLimit);
       final seconds = segmentEnd.difference(cursor).inSeconds;
-      if (seconds > 0) {
-        final eventEnd = cursor.add(Duration(seconds: seconds));
-        final event = FrameReadingEvent(
-          id: _nextEventId(cursor),
-          bookId: book.id,
-          dayKey: _localDayKey(cursor),
-          seconds: seconds.clamp(1, 30).toInt(),
-          startedAt: cursor.millisecondsSinceEpoch,
-          endedAt: eventEnd.millisecondsSinceEpoch,
-          localHour: cursor.hour,
-          bookTitle: title,
-          format: format,
-        );
-        _enqueueEvent(event);
-        cursor = eventEnd;
-      } else {
+      if (seconds <= 0) {
         // Drop sub-second fragments rather than manufacturing reading time.
         cursor = segmentEnd;
+        continue;
       }
-    }
-  }
 
-  void _enqueueEvent(FrameReadingEvent event) {
-    _writeTail = _writeTail.then((_) async {
-      final retryAt = _cloudBackoffUntil;
-      if (retryAt != null && _clock().isBefore(retryAt)) return;
+      final eventEnd = cursor.add(Duration(seconds: seconds));
+      final event = FrameReadingEvent(
+        id: _nextEventId(cursor),
+        bookId: book.id,
+        dayKey: _localDayKey(cursor),
+        seconds: seconds.clamp(1, 30).toInt(),
+        startedAt: cursor.millisecondsSinceEpoch,
+        endedAt: eventEnd.millisecondsSinceEpoch,
+        localHour: cursor.hour,
+        bookTitle: title,
+        format: format,
+      );
       try {
         final accepted = await _writeEvent(event);
         if (!accepted) {
@@ -207,8 +209,10 @@ class FrameReadingTimeTracker {
       } on Object catch (error) {
         _cloudBackoffUntil = _clock().add(cloudRetryDelay);
         onError?.call(error);
+        return;
       }
-    });
+      cursor = eventEnd;
+    }
   }
 
   String _nextEventId(DateTime timestamp) {
