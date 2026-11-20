@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/frame_api_scope.dart';
+import '../cloud/frame_cloud_manager_screen.dart';
 import '../core/frame_app_config.dart';
 import '../legacy/frame_legacy_page.dart';
 import 'frame_book.dart';
@@ -147,10 +148,14 @@ class _FrameBookshelfScreenState extends State<FrameBookshelfScreen> {
     if (mounted) unawaited(_load(showLoading: false));
   }
 
-  Future<void> _openManager() => _openPage(
-        _base.replace(path: '/cloud/', queryParameters: const {'manager': '1'}),
-        '連接與掃描',
-      );
+  Future<void> _openManager() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const FrameCloudManagerScreen(),
+      ),
+    );
+    if (mounted) unawaited(_load(showLoading: false));
+  }
 
   Future<void> _openStats() =>
       _openPage(_base.replace(path: '/reading-stats/'), '閱讀時光');
