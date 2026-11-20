@@ -2363,6 +2363,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return value?.startsWith('#') == true ? attribute : '';
     },
   );
+  // CSS url() references may load remote files. Keep only fragment-local
+  // paint servers such as url(#gradient).
+  markup = markup.replaceAll(
+    RegExp(
+      r"""\s+[a-zA-Z_:][a-zA-Z0-9_.:-]*\s*=\s*("[^"]*url\s*\(\s*(?!#)[^"]*"|'[^']*url\s*\(\s*(?!#)[^']*')""",
+      caseSensitive: false,
+    ),
+    '',
+  );
   final root = RegExp(r'^<svg\b[^>]*>', caseSensitive: false)
       .firstMatch(markup.trimLeft());
   if (root == null) return null;
