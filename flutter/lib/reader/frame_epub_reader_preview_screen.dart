@@ -93,6 +93,7 @@ class _FrameEpubReaderPreviewScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    HardwareKeyboard.instance.addHandler(_handleReadingKeyEvent);
     _chapterScrollController = ScrollController();
     _chapterPageController = PageController();
   }
@@ -129,6 +130,11 @@ class _FrameEpubReaderPreviewScreenState
         );
       }),
     );
+  }
+
+  bool _handleReadingKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) _recordReadingActivity();
+    return false;
   }
 
   void _recordReadingActivity() {
@@ -296,6 +302,7 @@ class _FrameEpubReaderPreviewScreenState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    HardwareKeyboard.instance.removeHandler(_handleReadingKeyEvent);
     unawaited(_releaseResources());
     super.dispose();
   }
@@ -613,24 +620,18 @@ class _FrameEpubReaderPreviewScreenState
       ),
       body: SafeArea(
         top: false,
-        child: Focus(
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) _recordReadingActivity();
-            return KeyEventResult.ignored;
-          },
-          child: Listener(
-            onPointerDown: (_) => _recordReadingActivity(),
-            onPointerSignal: (_) => _recordReadingActivity(),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification is ScrollStartNotification ||
-                    notification is ScrollUpdateNotification) {
-                  _recordReadingActivity();
-                }
-                return false;
-              },
-              child: _buildBody(session),
-            ),
+        child: Listener(
+          onPointerDown: (_) => _recordReadingActivity(),
+          onPointerSignal: (_) => _recordReadingActivity(),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification ||
+                  notification is ScrollUpdateNotification) {
+                _recordReadingActivity();
+              }
+              return false;
+            },
+            child: _buildBody(session),
           ),
         ),
       ),
