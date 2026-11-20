@@ -116,6 +116,35 @@ void main() {
     expect(events.fold<int>(0, (sum, event) => sum + event.seconds), 75);
   });
 
+  test('starts paused when the reader opens in the background', () async {
+    final events = <FrameReadingEvent>[];
+    final tracker = FrameReadingTimeTracker(
+      book: _book(),
+      repository: FrameReaderRepository(_UnusedApi()),
+      autoHeartbeat: false,
+      writeEvent: (event) async {
+        events.add(event);
+        return true;
+      },
+    );
+    final start = DateTime(2026, 11, 20, 11);
+
+    await tracker.start(at: start, foreground: false);
+    await tracker.tick(at: start.add(const Duration(seconds: 30)));
+    expect(tracker.sessionSeconds, 0);
+    expect(events, isEmpty);
+
+    await tracker.setForeground(
+      true,
+      at: start.add(const Duration(seconds: 60)),
+    );
+    await tracker.tick(at: start.add(const Duration(seconds: 90)));
+    await tracker.stop(at: start.add(const Duration(seconds: 90)));
+
+    expect(tracker.sessionSeconds, 30);
+    expect(events.fold<int>(0, (sum, event) => sum + event.seconds), 30);
+  });
+
   test('rejects a non-cloud book before activating a timer', () async {
     final invalid = FrameBook.fromJson({
       'id': 'local-book-id',
