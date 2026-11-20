@@ -34,14 +34,21 @@ class _BrowserFrameApiClient implements FrameApiClient {
     required String method,
     required String path,
     Map<String, dynamic>? body,
+    List<int>? bodyBytes,
+    String? contentType,
+    Map<String, String> headers = const {},
   }) async {
     final request = http.Request(method, _resolve(path))
       ..followRedirects = true
       ..maxRedirects = 5
-      ..headers['Accept'] = 'application/json';
+      ..headers['Accept'] = 'application/json'
+      ..headers.addAll(headers);
     if (body != null) {
       request.headers['Content-Type'] = 'application/json';
       request.body = jsonEncode(body);
+    } else if (bodyBytes != null) {
+      request.headers['Content-Type'] = contentType ?? 'application/octet-stream';
+      request.bodyBytes = bodyBytes;
     }
     try {
       final streamed = await _client.send(request).timeout(
@@ -89,6 +96,21 @@ class _BrowserFrameApiClient implements FrameApiClient {
     Map<String, dynamic> body,
   ) async =>
       _decodeJson(await _send(method: 'POST', path: path, body: body));
+
+  @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async =>
+      _decodeJson(await _send(
+        method: 'POST',
+        path: path,
+        bodyBytes: body,
+        contentType: contentType,
+        headers: headers,
+      ));
 
   @override
   Future<Map<String, dynamic>> deleteJson(
