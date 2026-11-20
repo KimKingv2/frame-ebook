@@ -90,7 +90,7 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve comic image fitting: fit-page and fit-width. Flutter Preview now has both fixed-layout image fitting paths; real-world EPUB image/CSS compatibility still needs book-level acceptance.
 - [ ] Preserve themes: paper, sepia and night. Flutter Preview already exposes these theme choices; verify their interaction with fixed-layout artwork on all targets.
 - [ ] Preserve reading backdrops: wood, linen and slate. Flutter Preview now exposes all three backdrop surfaces for fixed-layout pages.
-- [ ] Preserve fullscreen and immersive fullscreen action states.
+- [ ] Preserve fullscreen and immersive fullscreen action states. Flutter Preview now uses the cross-platform fullscreen adapter, hides the reader AppBar while immersive, toggles from the upper 20% touch/mouse zone, and exits through Escape or Android back; actual device/window behavior still requires macOS and Android acceptance.
 - [ ] Preserve fixed-layout EPUB as well as CBZ comic behaviour.
 
 ## 4. Reading statistics and time tracking
