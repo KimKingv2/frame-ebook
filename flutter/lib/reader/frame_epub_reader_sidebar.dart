@@ -101,24 +101,35 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
 
   Future<void> _deleteAnnotation(FrameReaderAnnotation annotation) async {
     final isBookmark = annotation.type == 'bookmark';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGeneralDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(isBookmark ? '刪除書籤' : '刪除標註'),
-        content: Text(
-          isBookmark ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？',
+      barrierDismissible: true,
+      barrierLabel: '關閉刪除確認',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: AlertDialog(
+            title: Text(isBookmark ? '刪除書籤' : '刪除標註'),
+            content: Text(
+              isBookmark ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('刪除'),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('刪除'),
-          ),
-        ],
       ),
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) =>
+          FadeTransition(opacity: animation, child: child),
     );
     if (!mounted || confirmed != true) return;
 
