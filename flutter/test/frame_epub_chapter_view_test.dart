@@ -448,7 +448,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: FrameEpubChapterView(
+            body: SizedBox.expand(
+            child: FrameEpubChapterView(
               chapter: chapter,
               resourceLoader: loader,
               fixedLayout: true,
@@ -460,6 +461,7 @@ void main() {
                 ),
               ),
             ),
+          ),
           ),
         ),
       );
@@ -474,13 +476,15 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: FrameEpubChapterView(
+            body: SizedBox.expand(
+            child: FrameEpubChapterView(
               chapter: chapter,
               resourceLoader: loader,
               fixedLayout: true,
               fixedLayoutImageFit: 'fit-page',
               fixedLayoutAllowZoom: true,
             ),
+          ),
           ),
         ),
       );
