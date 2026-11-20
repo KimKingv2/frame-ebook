@@ -19,11 +19,11 @@
 
 These dependencies are included for static Cloudflare Pages deployment. Their licenses remain separate from original FRAME Reader code.
 
-## public_file_saver
+## file_picker
 
-- Project: https://pub.dev/packages/public_file_saver
-- Version: 1.2.2
+- Project: https://pub.dev/packages/file_picker
+- Version: 13.4.0
 - License: MIT
-- Used by the Flutter reading statistics screen to export JSON and CSV through a user-selected system save dialog (Android Storage Access Framework, macOS save panel, and browser Save As/download fallback).
-- The app passes export bytes directly from memory. It does not create an intermediate file or save without the user's explicit dialog action.
-- Sandboxed macOS builds enable only the user-selected file read/write entitlement; the broader Downloads-folder entitlement is not enabled.
+- Used by the Flutter reading statistics screen to save in-memory JSON and CSV bytes using the platform save-file dialog on Android and macOS, with a browser download fallback on Web.
+- The app does not create an intermediate export file. The save operation is initiated only after the user selects the export action.
+- The macOS app sandbox grants only user-selected file read/write access for the save panel; it does not receive broad Downloads-folder access.
