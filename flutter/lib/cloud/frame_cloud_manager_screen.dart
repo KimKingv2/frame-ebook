@@ -46,6 +46,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   bool _loadingDirectory = false;
   bool _savingRoots = false;
   bool _loggingIn = false;
+  bool _testingConnection = false;
   String? _error;
   String? _directoryError;
   FrameCloudSession? _session;
@@ -114,14 +115,18 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         _repository.loadSession(),
         _repository.loadPreferences(),
         _localSettings.loadBaseUrl(),
+        _localSettings.loadLocalSelected(),
       ]);
       final session = results[0] as FrameCloudSession;
       final preferences = results[1] as FrameCloudPreferences;
       final savedLocalUrl = results[2] as String?;
+      final localSelected = results[3] as bool;
       if (!mounted) return;
       setState(() {
         _session = session;
-        _provider = preferences.activeProvider;
+        _provider = localSelected
+            ? FrameCloudProvider.local
+            : preferences.activeProvider;
         _library = preferences.activeLibrary;
         if (savedLocalUrl != null) _localUrl.text = savedLocalUrl;
         _booksRoot.text =
@@ -241,16 +246,22 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   Future<void> _selectProvider(FrameCloudProvider? value) async {
     if (_scanRunning || _archiveProcessing) return;
     if (value == null || value == _provider) return;
+    try {
+      if (value == FrameCloudProvider.local) {
+        await _localSettings.saveLocalSelected(true);
+      } else {
+        await _localSettings.saveLocalSelected(false);
+        await _repository.saveActiveProvider(value);
+      }
+    } catch (error) {
+      _showMessage('切換來源失敗：$error');
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _provider = value;
       _currentPath = _selectedRoot;
     });
-    try {
-      await _repository.saveActiveProvider(value);
-    } catch (error) {
-      _showMessage(error.toString());
-    }
-    if (!mounted) return;
     await _loadDirectory();
     await _loadScanState();
   }
@@ -283,12 +294,12 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     }
     setState(() => _savingRoots = true);
     try {
-      if (_provider.isServerSide) {
-        await _repository.saveSharedRoots(
-          booksRoot: books,
-          comicsRoot: comics,
-        );
-      }
+      // Root selection is shared across VPS, Worker, Mobile and local
+      // OpenList. It is non-sensitive user preference data, not a credential.
+      await _repository.saveSharedRoots(
+        booksRoot: books,
+        comicsRoot: comics,
+      );
       if (!mounted) return;
       setState(() {
         _booksRoot.text = books;
@@ -296,9 +307,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         _currentPath = _selectedRoot;
         _savingRoots = false;
       });
-      _showMessage(_provider.isServerSide
-          ? 'Books 與 Comics 根目錄已儲存至雲端偏好設定。'
-          : '本次工作階段已套用根目錄。');
+      _showMessage('Books 與 Comics 根目錄已保存至雲端 D1，所有來源共用這兩個路徑。');
       await _loadDirectory();
       await _loadScanState();
     } catch (error) {
@@ -322,6 +331,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       candidate = LocalOpenListClient(baseUrl: url);
       await candidate.login(username: username, password: password);
       await _localSettings.saveBaseUrl(candidate.baseUrl);
+      await _localSettings.saveLocalSelected(true);
       if (!mounted) {
         candidate.close();
         return;
@@ -345,6 +355,70 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       setState(() => _loggingIn = false);
       _showMessage(error.toString());
     }
+  }
+
+  Future<void> _testConnection() async {
+    if (_testingConnection || _scanRunning || _archiveProcessing) return;
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    if (root == null) {
+      _showMessage('請先設定有效的根目錄，再測試連線。');
+      return;
+    }
+    if (_provider == FrameCloudProvider.local &&
+        !(_localClient?.isAuthenticated ?? false)) {
+      _showMessage('本地 OpenList 尚未登入，請先登入再測試。');
+      return;
+    }
+    if (_provider.isServerSide &&
+        !(_session?.providers[_provider]?.configured ?? false)) {
+      _showMessage('目前來源尚未在 Cloudflare Pages Variables／Secrets 設定完成。');
+      return;
+    }
+
+    setState(() => _testingConnection = true);
+    try {
+      final total = _provider == FrameCloudProvider.local
+          ? (await _localClient!.listDirectory(
+              root,
+              page: 1,
+              perPage: 1,
+            )).total
+          : (await _repository.loadServerDirectoryPage(
+              provider: _provider,
+              library: _library,
+              rootPath: root,
+              path: root,
+              page: 1,
+              perPage: 1,
+            )).total;
+      if (!mounted) return;
+      _showMessage(
+        '連線成功：${_provider.label} · ${_library.label}，根目錄共 $total 個項目。',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('來源連線測試失敗：$error');
+    } finally {
+      if (mounted) setState(() => _testingConnection = false);
+    }
+  }
+
+  void _setCurrentDirectoryAsRoot(FrameCloudLibrary library) {
+    final root = normalizeFrameCloudPath(_selectedRoot);
+    final current = normalizeFrameCloudPath(_currentPath);
+    if (root == null ||
+        current == null ||
+        !frameCloudPathIsWithinRoot(current, root)) {
+      _showMessage('目前目錄不在所選書庫根目錄內，無法直接套用。');
+      return;
+    }
+    final controller =
+        library == FrameCloudLibrary.books ? _booksRoot : _comicsRoot;
+    controller.text = current;
+    _tabs.animateTo(0);
+    _showMessage(
+      '已將目前目錄填入${library.label}根目錄欄位，請確認後按「儲存兩個根目錄」。',
+    );
   }
 
   Future<void> _loadScanState() async {
@@ -1210,8 +1284,22 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                   session.cloudAnnotationsConfigured ? '已就緒' : '未就緒'),
             ],
           ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: _testingConnection || _scanRunning || _archiveProcessing
+              ? null
+              : _testConnection,
+          icon: _testingConnection
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.wifi_tethering_outlined),
+          label: const Text('測試目前來源連線'),
+        ),
         const SizedBox(height: 18),
-        _sectionTitle('書庫根目錄', 'Books 與 Comics 分開設定，兩個路徑互不取代'),
+        _sectionTitle('書庫根目錄', 'Books 與 Comics 分開設定，所有來源共用這兩個路徑'),
         const SizedBox(height: 12),
         _rootField(
             controller: _booksRoot, label: 'Books 根目錄', hint: '/path/to/books'),
@@ -1391,6 +1479,34 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: _cloudMuted, fontSize: 11),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _scanRunning || _archiveProcessing
+                          ? null
+                          : () => _setCurrentDirectoryAsRoot(
+                                FrameCloudLibrary.books,
+                              ),
+                      icon: const Icon(Icons.menu_book_outlined, size: 16),
+                      label: const Text('設為 Books 根目錄'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _scanRunning || _archiveProcessing
+                          ? null
+                          : () => _setCurrentDirectoryAsRoot(
+                                FrameCloudLibrary.comics,
+                              ),
+                      icon: const Icon(Icons.auto_stories_outlined, size: 16),
+                      label: const Text('設為 Comics 根目錄'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
