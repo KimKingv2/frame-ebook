@@ -62,8 +62,10 @@ class FrameCloudArchiveProcessor {
   FrameCloudArchiveProcessor({
     required FrameCloudRepository repository,
     LocalOpenListClient? localClient,
+    FrameFileSource Function(FrameBook book)? fileSourceFactory,
   })  : _repository = repository,
-        _localClient = localClient;
+        _localClient = localClient,
+        _fileSourceFactory = fileSourceFactory;
 
   static const int _maxOriginalCoverBytes = 15 * 1024 * 1024;
   static const int _maxUploadBytes = 2 * 1024 * 1024;
@@ -72,6 +74,7 @@ class FrameCloudArchiveProcessor {
 
   final FrameCloudRepository _repository;
   final LocalOpenListClient? _localClient;
+  final FrameFileSource Function(FrameBook book)? _fileSourceFactory;
   bool _running = false;
 
   bool get isRunning => _running;
@@ -261,8 +264,10 @@ class FrameCloudArchiveProcessor {
     });
 
     final FrameFileSource source;
-    final bool localSource = provider == FrameCloudProvider.local;
-    if (localSource) {
+    final injectedSource = _fileSourceFactory;
+    if (injectedSource != null) {
+      source = injectedSource(book);
+    } else if (provider == FrameCloudProvider.local) {
       source = _LocalOpenListArchiveSource(
         client: _localClient!,
         path: item.path,
