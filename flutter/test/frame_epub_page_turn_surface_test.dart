@@ -383,4 +383,81 @@ void main() {
     scrollController.dispose();
   });
 
+
+  testWidgets('upper viewport taps toggle immersive mode without turning pages',
+      (tester) async {
+    final controller = ScrollController();
+    var immersiveToggles = 0;
+    var nextChapterCalls = 0;
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            onToggleImmersive: () => immersiveToggles++,
+            onNextChapter: () async => nextChapterCalls++,
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final touch = await tester.startGesture(
+      const Offset(400, 45),
+      kind: PointerDeviceKind.touch,
+    );
+    await touch.up();
+    await tester.pump();
+
+    final mouse = await tester.startGesture(
+      const Offset(400, 45),
+      kind: PointerDeviceKind.mouse,
+    );
+    await mouse.up();
+    await tester.pump();
+
+    expect(immersiveToggles, 2);
+    expect(nextChapterCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+    controller.dispose();
+  });
+
+  testWidgets('Escape exits immersive mode without turning an EPUB page',
+      (tester) async {
+    final controller = ScrollController();
+    var exitCalls = 0;
+    var nextChapterCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubPageTurnSurface(
+            controller: controller,
+            immersive: true,
+            onExitImmersive: () => exitCalls++,
+            onNextChapter: () async => nextChapterCalls++,
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+
+    expect(exitCalls, 1);
+    expect(nextChapterCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
 }
