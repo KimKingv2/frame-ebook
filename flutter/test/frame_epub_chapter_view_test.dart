@@ -49,7 +49,11 @@ class _MemoryFileSource implements FrameFileSource {
   }
 }
 
-Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) {
+Uint8List _fixture({
+  String additionalIntroText = '',
+  String additionalTableMarkup = '',
+  bool fixedLayout = false,
+}) {
   const container = '''
 <container><rootfiles>
   <rootfile full-path="OPS/book.opf"
@@ -87,6 +91,7 @@ Uint8List _fixture({String additionalIntroText = '', bool fixedLayout = false}) 
       : '''
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
+    $additionalTableMarkup
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
     <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
@@ -419,6 +424,125 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('renders EPUB table headers, cells and colspan without overflow',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%;border-color:#665577">
+        <thead>
+          <tr><th>書名</th><th>作者</th></tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="2">合併欄位內容</td></tr>
+          <tr><td>第一本書</td><td>作者甲</td></tr>
+          <tr><td>第二本書</td><td>作者乙</td></tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-layout-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table.epub',
+      'fileName': 'table.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(520, 720);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 480,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('書名'), findsOneWidget);
+      expect(find.text('作者'), findsOneWidget);
+      expect(find.text('合併欄位內容'), findsOneWidget);
+      expect(find.text('第一本書'), findsOneWidget);
+      expect(find.text('作者乙'), findsOneWidget);
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
+  testWidgets('keeps long EPUB tables bounded within a paginated page',
+      (tester) async {
+    final rowText = List.filled(24, '表格文字內容').join('、');
+    final rows = List.generate(
+      24,
+      (index) => '<tr><td>章節 $index</td><td>$rowText</td></tr>',
+    ).join();
+    final bytes = _fixture(additionalTableMarkup: '<table border="1">$rows</table>');
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-pagination-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-pagination.epub',
+      'fileName': 'table-pagination.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.byType(SingleChildScrollView), findsWidgets);
+      expect(find.text('章節 0'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('fixed-layout renderer supports fit-width and fit-page modes',
       (tester) async {
     final bytes = _fixture(fixedLayout: true);
