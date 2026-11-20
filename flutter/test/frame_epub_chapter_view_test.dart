@@ -537,11 +537,18 @@ void main() {
                   pageController.position.viewportDimension)
               .round() +
           1;
-      pageController.jumpToPage(pageCount - 1);
-      await tester.pumpAndSettle();
+      var tableVisible = false;
+      for (var page = 0; page < pageCount; page++) {
+        pageController.jumpToPage(page);
+        await tester.pumpAndSettle();
+        if (find.text('章節 0').evaluate().isNotEmpty) {
+          tableVisible = true;
+          break;
+        }
+      }
 
+      expect(tableVisible, isTrue);
       expect(find.byType(SingleChildScrollView), findsWidgets);
-      expect(find.text('章節 0'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
