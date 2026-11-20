@@ -130,6 +130,21 @@ class FrameCloudScanAllRunner {
       final resumePass = previousStates.values
           .any((state) => state != null && !state.completed);
 
+      // Persist a checkpoint for the library that has not started yet. This
+      // lets a pause between Books and Comics resume at the correct library
+      // instead of mistaking a completed first library for a fresh run.
+      for (final library in FrameCloudLibrary.values) {
+        if (previousStates[library] != null) continue;
+        final placeholder = FrameCloudScanState.initial(
+          provider: provider,
+          library: library,
+          rootPath: normalizedRoots[library]!,
+          scanId: 'scan_all_${DateTime.now().microsecondsSinceEpoch}_${library.apiValue}',
+        );
+        await _repository.saveScanState(placeholder);
+        previousStates[library] = placeholder;
+      }
+
       for (final library in FrameCloudLibrary.values) {
         if (_pauseRequested) {
           return FrameCloudScanAllResult(
