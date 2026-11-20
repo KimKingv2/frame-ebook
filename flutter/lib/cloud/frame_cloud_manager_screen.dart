@@ -128,6 +128,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   }
 
   Future<void> _loadDirectory({int page = 1}) async {
+    if (!mounted) return;
     final root = normalizeFrameCloudPath(_selectedRoot);
     final path = normalizeFrameCloudPath(_currentPath);
     if (root == null || path == null || !frameCloudPathIsWithinRoot(path, root)) {
@@ -165,6 +166,13 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         );
         totalItems = directory.total;
         items = directory.items
+            .where((item) {
+              if (item.isDirectory) return true;
+              final format = _formatForName(item.name);
+              return _library == FrameCloudLibrary.books
+                  ? format == 'EPUB'
+                  : format == 'EPUB' || format == 'CBZ';
+            })
             .map((item) => FrameCloudEntry(
                   name: item.name,
                   path: item.path,
@@ -226,6 +234,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     } catch (error) {
       _showMessage(error.toString());
     }
+    if (!mounted) return;
     await _loadDirectory();
   }
 
@@ -242,6 +251,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     } catch (error) {
       _showMessage(error.toString());
     }
+    if (!mounted) return;
     await _loadDirectory();
   }
 
@@ -292,6 +302,10 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       candidate = LocalOpenListClient(baseUrl: url);
       await candidate.login(username: username, password: password);
       await _localSettings.saveBaseUrl(candidate.baseUrl);
+      if (!mounted) {
+        candidate.close();
+        return;
+      }
       _localClient?.close();
       _localClient = candidate;
       candidate = null;
