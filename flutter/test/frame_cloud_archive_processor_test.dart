@@ -7,7 +7,6 @@ import 'package:frame_ebook/cloud/frame_cloud_archive_processor.dart';
 import 'package:frame_ebook/cloud/frame_cloud_models.dart';
 import 'package:frame_ebook/cloud/frame_cloud_repository.dart';
 import 'package:frame_ebook/core/frame_api_client.dart';
-import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
 
 class _MemoryFileSource implements FrameFileSource {
