@@ -201,7 +201,8 @@ class FrameCloudScanRunner {
             pendingFolders: activeState.pendingFolders,
           );
           await _repository.saveScanState(activeState);
-          _emit(onProgress, '進入資料夾：$nextFolder', state, scanned, indexed,
+          state = activeState;
+          _emit(onProgress, '進入資料夾：$nextFolder', activeState, scanned, indexed,
               skipped, folders);
         }
 
