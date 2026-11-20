@@ -58,6 +58,9 @@ class FrameWebViewApiClient implements FrameApiClient {
     required String method,
     required String path,
     Map<String, dynamic>? body,
+    Uint8List? bodyBytes,
+    String? contentType,
+    Map<String, String> extraHeaders = const {},
     bool asBytes = false,
   }) async {
     await _channelReady;
@@ -78,6 +81,9 @@ class FrameWebViewApiClient implements FrameApiClient {
     final completer = Completer<Map<String, dynamic>>();
     _pending[requestId] = completer;
     final bodyLiteral = body == null ? 'null' : jsonEncode(jsonEncode(body));
+    final binaryLiteral = bodyBytes == null ? 'null' : jsonEncode(base64Encode(bodyBytes));
+    final contentTypeLiteral = contentType == null ? 'null' : jsonEncode(contentType);
+    final headersLiteral = jsonEncode(extraHeaders);
     final script = '''
 (() => {
   const requestId = ${jsonEncode(requestId)};
@@ -99,15 +105,26 @@ class FrameWebViewApiClient implements FrameApiClient {
         return;
       }
       const body = $bodyLiteral;
+      const binaryBodyBase64 = $binaryLiteral;
+      const binaryContentType = $contentTypeLiteral;
       const headers = {Accept: ${asBytes ? "'*/*'" : "'application/json'"}};
       if (body !== null) headers['Content-Type'] = 'application/json';
+      Object.assign(headers, $headersLiteral);
+      let requestBody = body;
+      if (binaryBodyBase64 !== null) {
+        const raw = atob(binaryBodyBase64);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        requestBody = bytes;
+        headers['Content-Type'] = binaryContentType || 'application/octet-stream';
+      }
       const response = await fetch(url.href, {
         method: ${jsonEncode(method)},
         credentials: 'include',
         cache: 'no-store',
         redirect: 'follow',
         headers,
-        body
+        body:requestBody
       });
       if (new URL(response.url).origin !== origin) {
         deliver({id:requestId,ok:false,error:'FRAME API 被重新導向至非正式站網域，已停止請求。'});
@@ -193,6 +210,21 @@ class FrameWebViewApiClient implements FrameApiClient {
     Map<String, dynamic> body,
   ) async =>
       _decodeJson(await _request(method: 'POST', path: path, body: body));
+
+  @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async =>
+      _decodeJson(await _request(
+        method: 'POST',
+        path: path,
+        bodyBytes: body,
+        contentType: contentType,
+        extraHeaders: headers,
+      ));
 
   @override
   Future<Map<String, dynamic>> deleteJson(

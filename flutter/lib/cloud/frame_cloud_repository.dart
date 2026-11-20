@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../core/frame_api_client.dart';
 import 'frame_cloud_models.dart';
 
@@ -102,7 +104,7 @@ class FrameCloudRepository {
     return FrameCloudDirectoryPage.fromJson(data);
   }
 
-  Future<List<FrameCloudEntry>> listServerDirectory({
+  Future<FrameCloudDirectoryPage> loadServerDirectoryPage({
     required FrameCloudProvider provider,
     required FrameCloudLibrary library,
     required String rootPath,
@@ -115,7 +117,9 @@ class FrameCloudRepository {
     }
     final root = normalizeFrameCloudPath(rootPath);
     final current = normalizeFrameCloudPath(path);
-    if (root == null || current == null || !frameCloudPathIsWithinRoot(current, root)) {
+    if (root == null ||
+        current == null ||
+        !frameCloudPathIsWithinRoot(current, root)) {
       throw const FormatException('掃描目錄無效或超出目前書庫根目錄。');
     }
     final query = {
@@ -126,14 +130,28 @@ class FrameCloudRepository {
       'page': page.clamp(1, 100000).toString(),
       'per_page': perPage.clamp(1, 100).toString(),
     };
-    final data = await api.getJson('/api/cloud/scan-list?${Uri(queryParameters: query).query}');
-    final raw = data['items'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((item) => FrameCloudEntry.fromJson(Map<String, dynamic>.from(item)))
-        .where((item) => item.path.isNotEmpty && item.name.isNotEmpty)
-        .toList(growable: false);
+    final data =
+        await api.getJson('/api/cloud/scan-list?${Uri(queryParameters: query).query}');
+    return FrameCloudDirectoryPage.fromJson(data);
+  }
+
+  Future<List<FrameCloudEntry>> listServerDirectory({
+    required FrameCloudProvider provider,
+    required FrameCloudLibrary library,
+    required String rootPath,
+    required String path,
+    int page = 1,
+    int perPage = 100,
+  }) async {
+    final directory = await loadServerDirectoryPage(
+      provider: provider,
+      library: library,
+      rootPath: rootPath,
+      path: path,
+      page: page,
+      perPage: perPage,
+    );
+    return directory.items;
   }
 
   Future<FrameCloudScanState?> loadScanState({
@@ -238,6 +256,40 @@ class FrameCloudRepository {
               .map((item) => FrameCloudEntry.fromJson(Map<String, dynamic>.from(item)))
               .toList(growable: false)
           : const [],
+    );
+  }
+
+  Future<void> uploadCover({
+    required FrameCloudProvider provider,
+    required FrameCloudLibrary library,
+    required String rootPath,
+    required String path,
+    required String sha256,
+    required Uint8List bytes,
+    String contentType = 'image/png',
+  }) async {
+    final root = normalizeFrameCloudPath(rootPath);
+    final file = normalizeFrameCloudPath(path);
+    if (root == null ||
+        file == null ||
+        !frameCloudPathIsWithinRoot(file, root) ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(sha256) ||
+        bytes.isEmpty ||
+        bytes.length > 2 * 1024 * 1024 ||
+        !const {'image/jpeg', 'image/webp', 'image/png'}.contains(contentType)) {
+      throw const FormatException('封面上傳參數無效。');
+    }
+    final query = Uri(queryParameters: {
+      'provider': provider.apiValue,
+      'library': library.apiValue,
+      'root_path': root,
+      'path': file,
+    }).query;
+    await api.postBytes(
+      '/api/cloud/covers?$query',
+      bytes,
+      contentType: contentType,
+      headers: {'X-Cover-Hash': sha256},
     );
   }
 

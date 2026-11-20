@@ -3,7 +3,7 @@ import { json, requireAuth, getDatabase, isSameOrigin, normalizePath, isWithinRo
 const PROVIDERS = new Set(["vps", "worker", "mobile", "local"]);
 const LIBRARIES = new Set(["books", "comics"]);
 const HASH_RE = /^[a-f0-9]{64}$/i;
-const MIME_TYPES = new Set(["image/webp", "image/jpeg"]);
+const MIME_TYPES = new Set(["image/webp", "image/jpeg", "image/png"]);
 const MAX_COVER_BYTES = 2 * 1024 * 1024;
 const CATALOG_PROVIDER = "vps";
 

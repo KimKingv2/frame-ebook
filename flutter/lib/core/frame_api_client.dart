@@ -8,6 +8,13 @@ abstract interface class FrameApiClient {
     Map<String, dynamic> body,
   );
 
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  });
+
   Future<Map<String, dynamic>> deleteJson(
     String path,
     Map<String, dynamic> body,

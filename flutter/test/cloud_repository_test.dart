@@ -9,10 +9,33 @@ import 'package:frame_ebook/core/frame_api_client.dart';
 class _FakeApi implements FrameApiClient {
   final List<String> getRequests = [];
   final List<MapEntry<String, Map<String, dynamic>>> postRequests = [];
+  final List<(String, Uint8List, String, Map<String, String>)> binaryPosts = [];
 
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
     getRequests.add(path);
+    if (path.startsWith('/api/cloud/scan-list?')) {
+      return {
+        'ok': true,
+        'provider': 'worker',
+        'library': 'books',
+        'rootPath': '/books',
+        'path': '/books/Novel',
+        'page': 2,
+        'perPage': 2,
+        'total': 5,
+        'items': [
+          {
+            'name': 'Volume 03.epub',
+            'path': '/books/Novel/Volume 03.epub',
+            'parentPath': '/books/Novel',
+            'isDir': false,
+            'format': 'EPUB',
+            'size': 4096,
+          },
+        ],
+      };
+    }
     if (path.startsWith('/api/cloud/books?')) {
       return {
         'ok': true,
@@ -90,6 +113,17 @@ class _FakeApi implements FrameApiClient {
       return {'ok': true, 'updated': (body['entries'] as List).length};
     }
     return {'ok': true, 'value': body['value']};
+  }
+
+  @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async {
+    binaryPosts.add((path, body, contentType, Map.from(headers)));
+    return {'ok': true};
   }
 
   @override
@@ -181,6 +215,26 @@ void main() {
     }
   });
 
+  test('loads paginated live directory results from the existing scan-list API', () async {
+    final api = _FakeApi();
+    final page = await FrameCloudRepository(api).loadServerDirectoryPage(
+      provider: FrameCloudProvider.worker,
+      library: FrameCloudLibrary.books,
+      rootPath: '/books',
+      path: '/books/Novel',
+      page: 2,
+      perPage: 2,
+    );
+
+    expect(page.page, 2);
+    expect(page.perPage, 2);
+    expect(page.total, 5);
+    expect(page.pageCount, 3);
+    expect(page.items.single.name, 'Volume 03.epub');
+    expect(api.getRequests.single, contains('page=2'));
+    expect(api.getRequests.single, contains('per_page=2'));
+  });
+
   test('loads indexed pages from the existing D1 bookshelf API', () async {
     final api = _FakeApi();
     final repository = FrameCloudRepository(api);
@@ -267,6 +321,62 @@ void main() {
 
     expect(removed, 4);
     expect(api.postRequests.single.key, '/api/cloud/index/complete');
+  });
+
+  test('uploads a bounded PNG cover using the existing private R2 endpoint', () async {
+    final api = _FakeApi();
+    final repository = FrameCloudRepository(api);
+    final bytes = Uint8List.fromList([1, 2, 3, 4]);
+
+    await repository.uploadCover(
+      provider: FrameCloudProvider.worker,
+      library: FrameCloudLibrary.books,
+      rootPath: '/Books',
+      path: '/Books/Novel.epub',
+      sha256: List.filled(64, 'a').join(),
+      bytes: bytes,
+    );
+
+    expect(api.binaryPosts, hasLength(1));
+    final upload = api.binaryPosts.single;
+    final uri = Uri.parse('https://frame.test${upload.$1}');
+    expect(uri.path, '/api/cloud/covers');
+    expect(uri.queryParameters['provider'], 'worker');
+    expect(uri.queryParameters['library'], 'books');
+    expect(uri.queryParameters['root_path'], '/Books');
+    expect(uri.queryParameters['path'], '/Books/Novel.epub');
+    expect(upload.$2, bytes);
+    expect(upload.$3, 'image/png');
+    expect(upload.$4['X-Cover-Hash'], List.filled(64, 'a').join());
+  });
+
+  test('rejects out-of-root and oversized cover uploads before sending', () async {
+    final api = _FakeApi();
+    final repository = FrameCloudRepository(api);
+
+    await expectLater(
+      repository.uploadCover(
+        provider: FrameCloudProvider.vps,
+        library: FrameCloudLibrary.books,
+        rootPath: '/Books',
+        path: '/Elsewhere/Novel.epub',
+        sha256: List.filled(64, 'b').join(),
+        bytes: Uint8List.fromList([1]),
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      repository.uploadCover(
+        provider: FrameCloudProvider.vps,
+        library: FrameCloudLibrary.books,
+        rootPath: '/Books',
+        path: '/Books/Novel.epub',
+        sha256: List.filled(64, 'b').join(),
+        bytes: Uint8List(2 * 1024 * 1024 + 1),
+      ),
+      throwsFormatException,
+    );
+    expect(api.binaryPosts, isEmpty);
   });
 
   test('keeps local provider selection out of the unsupported D1 preference value', () async {

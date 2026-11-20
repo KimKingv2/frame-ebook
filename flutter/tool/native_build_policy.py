@@ -41,6 +41,7 @@ DART_ONLY_DEPENDENCIES = {
     "petitparser",
     "xml",
     "web",
+    "crypto",
 }
 PUBSPEC_SECTIONS = {"dependencies", "dev_dependencies", "dependency_overrides"}
 

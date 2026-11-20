@@ -206,6 +206,15 @@ class _UnusedApi implements FrameApiClient {
       throw StateError('Unexpected POST $path');
 
   @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async =>
+      throw StateError('Unexpected binary POST $path');
+
+  @override
   Future<Map<String, dynamic>> deleteJson(
     String path,
     Map<String, dynamic> body,
