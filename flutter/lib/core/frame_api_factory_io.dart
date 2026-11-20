@@ -54,12 +54,21 @@ class _NativeFrameApiClient implements FrameApiClient {
     required String method,
     required String path,
     Map<String, dynamic>? body,
+    List<int>? bodyBytes,
+    String? contentType,
+    Map<String, String> headers = const {},
   }) async {
     final uri = _resolve(path);
     final request = http.Request(method, uri)
       ..followRedirects = false
-      ..headers.addAll(await _headers(jsonBody: body != null));
-    if (body != null) request.body = jsonEncode(body);
+      ..headers.addAll(await _headers(jsonBody: body != null))
+      ..headers.addAll(headers);
+    if (body != null) {
+      request.body = jsonEncode(body);
+    } else if (bodyBytes != null) {
+      request.headers['Content-Type'] = contentType ?? 'application/octet-stream';
+      request.bodyBytes = bodyBytes;
+    }
 
     try {
       final streamed = await _client.send(request).timeout(
@@ -116,6 +125,21 @@ class _NativeFrameApiClient implements FrameApiClient {
     Map<String, dynamic> body,
   ) async =>
       _decodeJson(await _send(method: 'POST', path: path, body: body));
+
+  @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async =>
+      _decodeJson(await _send(
+        method: 'POST',
+        path: path,
+        bodyBytes: body,
+        contentType: contentType,
+        headers: headers,
+      ));
 
   @override
   Future<Map<String, dynamic>> deleteJson(
