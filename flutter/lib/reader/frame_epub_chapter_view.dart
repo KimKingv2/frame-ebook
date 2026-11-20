@@ -1854,8 +1854,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final gridRows = <List<({XmlElement? element, int span, bool header})>>[];
     for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       final cells = rawRows[rowIndex];
-      final rowStyle = _computedStyle(rows[rowIndex].element, cascade, tableStyle);
-      final rowBackground = _cssColor(rowStyle['background-color']);
       final placements =
           <({XmlElement? element, int span, bool header})>[];
       final nextCarry = List<int>.from(carryRows);
@@ -1910,11 +1908,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       for (var index = 0; index < columnCount; index++) {
         carryRows[index] = nextCarry[index];
       }
-      // Use the row's computed background on its individual cells. Empty
-      // placeholders are kept so later cells line up with active row spans.
-      if (rowBackground != null) {
-        // The background is applied below while each row is built.
-      }
     }
 
     final requestedWidth = paginationWidth ?? widget.contentMaxWidth;
@@ -1960,10 +1953,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           'bottom' => Alignment.bottomLeft,
           _ => Alignment.topLeft,
         };
+        final cellTextWidth = (tableWidth * placement.span / columnCount -
+                cellPadding.horizontal)
+            .clamp(1.0, tableWidth)
+            .toDouble();
         final contents = _flowChildren(
           cell,
           cellStyle,
           cascade,
+          paginationWidth: cellTextWidth,
           paginationTextScaler: paginationTextScaler,
         );
         Widget cellContent = Column(
@@ -2027,7 +2025,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       // push later page items beyond the page's measured bounds.
       content = ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: paginationMaxHeight.clamp(1.0, double.infinity),
+          maxHeight: paginationMaxHeight.clamp(1.0, double.infinity).toDouble(),
         ),
         child: SingleChildScrollView(
           child: content,
