@@ -118,12 +118,16 @@ class FrameReadingTimeTracker {
     final now = at ?? _clock();
     final previous = _lastTickAt;
     if (_tickWasActive && previous != null && now.isAfter(previous)) {
-      final elapsed = now.difference(previous);
-      final counted = elapsed > maxTickInterval ? maxTickInterval : elapsed;
-      if (counted > Duration.zero) {
-        _sessionMilliseconds += counted.inMilliseconds;
-        _queueInterval(previous, previous.add(counted));
-        onUpdate?.call(sessionSeconds);
+      final idleDeadline = _lastActivityAt?.add(idleLimit) ?? now;
+      final activeEnd = now.isBefore(idleDeadline) ? now : idleDeadline;
+      if (activeEnd.isAfter(previous)) {
+        final elapsed = activeEnd.difference(previous);
+        final counted = elapsed > maxTickInterval ? maxTickInterval : elapsed;
+        if (counted > Duration.zero) {
+          _sessionMilliseconds += counted.inMilliseconds;
+          _queueInterval(previous, previous.add(counted));
+          onUpdate?.call(sessionSeconds);
+        }
       }
     }
 
