@@ -275,7 +275,7 @@ void main() {
     expect(result.processed, 1);
     expect(result.uploaded, 1);
     expect(result.missing, 0);
-    expect(result.failed, 0);
+    expect(result.failed, 0, reason: result.state?.errors.toString() ?? 'No scanner error details');
     expect(result.metadataProcessed, 1);
     expect(result.pending, 0);
 
