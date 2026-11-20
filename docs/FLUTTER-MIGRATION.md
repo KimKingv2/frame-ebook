@@ -123,3 +123,6 @@ These items must still pass CI and device verification before being treated as c
 
 ### EPUB annotation rendering verification
 - Added a chapter-renderer widget regression test proving that yellow, violet, mint and rose highlights, plus the underline style, are restored from CFI-backed annotation records into the reflowable EPUB text layer. The test exercises actual rendered TextSpans rather than only checking saved JSON.
+
+### Cross-chapter annotation restoration verification
+- Added a two-spine EPUB widget test that creates a CFI annotation in chapter two, verifies it is not painted in chapter one, then navigates to chapter two and verifies the correct highlight is restored. This checks chapter scoping and text-layer rendering together.

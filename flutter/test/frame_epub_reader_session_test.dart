@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 import 'package:frame_ebook/core/frame_api_client.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_epub_cfi.dart';
+import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_reader_session.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
@@ -646,6 +648,110 @@ void main() {
       expect(savedProgress['index'], 1);
 
       await session.close();
+    });
+
+    testWidgets(
+        'restores a chapter-two annotation only in its own spine item',
+        (tester) async {
+      final fixture = _zipFixture();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.currentSpineIndex, 0);
+      expect(await session.goToSpineIndex(1), isTrue);
+
+      final chapterTwo = session.currentChapter!;
+      final targetNode = chapterTwo.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == '章節二內容。');
+      final targetCfi = FrameEpubCfi.createRange(
+        book: session.epub!,
+        spineIndex: 1,
+        startNode: targetNode,
+        startOffset: 0,
+        endNode: targetNode,
+        endOffset: targetNode.value.length,
+      )!;
+
+      final annotation = FrameReaderAnnotation(
+        id: 'chapter-two-highlight',
+        bookId: session.book.id,
+        type: 'highlight',
+        cfi: targetCfi,
+        quote: targetNode.value,
+        color: 'mint',
+        createdAt: 20,
+      );
+      final annotations = [annotation];
+
+      Widget chapterView() {
+        final index = session.currentSpineIndex!;
+        return MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                key: ValueKey(index),
+                chapter: session.currentChapter!,
+                resourceLoader: session.resourceLoader!,
+                annotations: annotations,
+                spineIndex: index,
+              ),
+            ),
+          ),
+        );
+      }
+
+      List<TextSpan> renderedSpans(WidgetTester tester) {
+        final spans = <TextSpan>[];
+        void collect(InlineSpan span) {
+          if (span is! TextSpan) return;
+          spans.add(span);
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collect(child);
+          }
+        }
+
+        for (final selectable
+            in tester.widgetList<SelectableText>(find.byType(SelectableText))) {
+          final span = selectable.textSpan;
+          if (span != null) collect(span);
+        }
+        return spans;
+      }
+
+      try {
+        expect(await session.goToSpineIndex(0), isTrue);
+        await tester.pumpWidget(chapterView());
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('章節一內容。'), findsOneWidget);
+        expect(
+          renderedSpans(tester).where(
+            (span) =>
+                span.style?.backgroundColor != null ||
+                span.style?.decoration != null,
+          ),
+          isEmpty,
+        );
+
+        expect(await session.goToSpineIndex(1), isTrue);
+        await tester.pumpWidget(chapterView());
+        await tester.pumpAndSettle();
+
+        final restored = renderedSpans(tester).firstWhere(
+          (span) => span.text == '章節二內容。',
+        );
+        expect(
+          restored.style?.backgroundColor,
+          const Color(0x6665C9A5),
+        );
+      } finally {
+        await session.close();
+      }
     });
 
     test('does not fetch external links or route them into the archive',
