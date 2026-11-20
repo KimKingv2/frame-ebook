@@ -465,7 +465,10 @@ class FrameCloudScanState {
     bool? completed,
     List<Map<String, dynamic>>? errors,
     String? updatedAt,
+    bool clearLastError = false,
   }) {
+    final nextRaw = Map<String, dynamic>.from(raw);
+    if (clearLastError) nextRaw.remove('lastError');
     return FrameCloudScanState(
       version: version,
       provider: provider,
@@ -494,7 +497,7 @@ class FrameCloudScanState {
       errors: errors ?? this.errors,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      raw: raw,
+      raw: nextRaw,
     );
   }
 
