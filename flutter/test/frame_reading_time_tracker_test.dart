@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -143,6 +144,29 @@ void main() {
 
     expect(tracker.sessionSeconds, 30);
     expect(events.fold<int>(0, (sum, event) => sum + event.seconds), 30);
+  });
+
+  test('stopping does not wait for a stalled event network request', () async {
+    final pendingWrite = Completer<bool>();
+    final tracker = FrameReadingTimeTracker(
+      book: _book(),
+      repository: FrameReaderRepository(_UnusedApi()),
+      autoHeartbeat: false,
+      writeEvent: (_) => pendingWrite.future,
+    );
+    final start = DateTime(2026, 11, 20, 12);
+
+    await tracker.start(at: start);
+    final pendingTick = tracker.tick(
+      at: start.add(const Duration(seconds: 30)),
+    );
+    await tracker.stop(at: start.add(const Duration(seconds: 30)));
+
+    expect(tracker.isRunning, isFalse);
+    expect(tracker.sessionSeconds, 30);
+
+    pendingWrite.complete(true);
+    await pendingTick;
   });
 
   test('rejects a non-cloud book before activating a timer', () async {
