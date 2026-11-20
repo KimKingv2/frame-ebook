@@ -98,8 +98,10 @@ class FrameReadingTimeTracker {
     if (!_running || _foreground == foreground) return;
     final now = at ?? _clock();
     if (!foreground) {
-      await tick(at: now);
+      // Mark the window inactive before awaiting network persistence so a
+      // second heartbeat cannot count time while the app is backgrounding.
       _foreground = false;
+      await tick(at: now);
       _tickWasActive = false;
       return;
     }
@@ -139,12 +141,15 @@ class FrameReadingTimeTracker {
   Future<void> stop({DateTime? at}) async {
     if (!_running) return;
     final now = at ?? _clock();
+    _timer?.cancel();
+    _timer = null;
     if (_tickWasActive && _foreground) {
+      // tick() uses the previously active interval once, then observes the
+      // foreground flag as false and will not admit another interval.
+      _foreground = false;
       await tick(at: now);
     }
 
-    _timer?.cancel();
-    _timer = null;
     _tickWasActive = false;
     _foreground = false;
     _running = false;
