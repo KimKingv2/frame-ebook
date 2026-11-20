@@ -43,7 +43,9 @@ class _MemoryFileSource implements FrameFileSource {
 }
 
 class _ArchiveApi implements FrameApiClient {
-  _ArchiveApi();
+  _ArchiveApi(this.archiveSize);
+
+  final int archiveSize;
 
   int queueReads = 0;
   Map<String, dynamic>? metadataBody;
@@ -67,7 +69,7 @@ class _ArchiveApi implements FrameApiClient {
               'parentPath': '/Books',
               'isDir': false,
               'format': 'EPUB',
-              'size': _fixtureSize,
+              'size': archiveSize,
               'modified': '2026-11-20T00:00:00Z',
               'coverStatus': 'pending',
             },
@@ -156,8 +158,6 @@ const _package = '''
 
 const _onePixelPng =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
-const _fixtureSize = 72000;
-
 Uint8List _zipFixture() {
   final items = <(String, Uint8List)>[
     ('mimetype', Uint8List.fromList(utf8.encode('application/epub+zip'))),
@@ -252,9 +252,8 @@ void _write32(List<int> output, int value) {
 void main() {
   test('reads EPUB OPF and cover through bounded ranges, then uploads a PNG thumbnail', () async {
     final archiveBytes = _zipFixture();
-    expect(archiveBytes.length, _fixtureSize);
     final source = _MemoryFileSource(archiveBytes);
-    final api = _ArchiveApi();
+    final api = _ArchiveApi(archiveBytes.length);
     final repository = FrameCloudRepository(api);
     final state = FrameCloudScanState.initial(
       provider: FrameCloudProvider.vps,
