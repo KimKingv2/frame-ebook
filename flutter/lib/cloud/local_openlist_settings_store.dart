@@ -7,7 +7,19 @@ class LocalOpenListSettingsStore {
       : _preferences = preferences ?? SharedPreferencesAsync();
 
   static const _baseUrlKey = 'frame-reader-local-openlist-base-url';
+  static const _localSelectedKey = 'frame-reader-local-openlist-selected';
   final SharedPreferencesAsync _preferences;
+
+  Future<bool> loadLocalSelected() async =>
+      await _preferences.getBool(_localSelectedKey) ?? false;
+
+  Future<void> saveLocalSelected(bool selected) async {
+    if (selected) {
+      await _preferences.setBool(_localSelectedKey, true);
+    } else {
+      await _preferences.remove(_localSelectedKey);
+    }
+  }
 
   Future<String?> loadBaseUrl() async {
     final saved = await _preferences.getString(_baseUrlKey);
