@@ -115,6 +115,15 @@ class _ScanApi implements FrameApiClient {
   }
 
   @override
+  Future<Map<String, dynamic>> postBytes(
+    String path,
+    Uint8List body, {
+    required String contentType,
+    Map<String, String> headers = const {},
+  }) async =>
+      {'ok': true};
+
+  @override
   Future<Map<String, dynamic>> deleteJson(
     String path,
     Map<String, dynamic> body,
