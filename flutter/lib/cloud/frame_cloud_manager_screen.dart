@@ -583,7 +583,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                       textAlign: TextAlign.center),
                   const SizedBox(height: 18),
                   FilledButton.icon(
-                    onPressed: _load,
+                    onPressed: _scanRunning ? null : _load,
                     icon: const Icon(Icons.refresh),
                     label: const Text('重新載入'),
                   ),
@@ -686,7 +686,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                     ),
                 ],
               ),
-              onTap: () => _selectProvider(provider),
+              onTap: _scanRunning ? null : () => _selectProvider(provider),
             ),
           );
         }),
@@ -719,7 +719,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
             hint: '/path/to/comics'),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: _savingRoots ? null : _saveRoots,
+          onPressed: _savingRoots || _scanRunning ? null : _saveRoots,
           icon: _savingRoots
               ? const SizedBox(
                   width: 16,
@@ -731,7 +731,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         ),
         const SizedBox(height: 22),
         OutlinedButton.icon(
-          onPressed: _openLegacyManager,
+          onPressed: _scanRunning ? null : _openLegacyManager,
           icon: const Icon(Icons.settings_suggest_outlined),
           label: const Text('開啟完整連接與掃描管理器'),
         ),
@@ -836,7 +836,9 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                   ),
                 ],
                 selected: {_library},
-                onSelectionChanged: (value) => _selectLibrary(value.first),
+                onSelectionChanged: _scanRunning
+                    ? null
+                    : (value) => _selectLibrary(value.first),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1028,7 +1030,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                       icon: const Icon(Icons.chevron_right),
                     ),
                     TextButton.icon(
-                      onPressed: _openLegacyManager,
+                      onPressed: _scanRunning ? null : _openLegacyManager,
                       icon: const Icon(Icons.tune, size: 16),
                       label: const Text('完整管理器'),
                     ),
@@ -1191,6 +1193,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       TextField(
         controller: controller,
         autocorrect: false,
+        enabled: !_scanRunning,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
