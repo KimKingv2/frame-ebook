@@ -323,6 +323,62 @@ void main() {
     expect(api.postRequests.single.key, '/api/cloud/index/complete');
   });
 
+  test('uploads a bounded PNG cover using the existing private R2 endpoint', () async {
+    final api = _FakeApi();
+    final repository = FrameCloudRepository(api);
+    final bytes = Uint8List.fromList([1, 2, 3, 4]);
+
+    await repository.uploadCover(
+      provider: FrameCloudProvider.worker,
+      library: FrameCloudLibrary.books,
+      rootPath: '/Books',
+      path: '/Books/Novel.epub',
+      sha256: List.filled(64, 'a').join(),
+      bytes: bytes,
+    );
+
+    expect(api.binaryPosts, hasLength(1));
+    final upload = api.binaryPosts.single;
+    final uri = Uri.parse('https://frame.test${upload.$1}');
+    expect(uri.path, '/api/cloud/covers');
+    expect(uri.queryParameters['provider'], 'worker');
+    expect(uri.queryParameters['library'], 'books');
+    expect(uri.queryParameters['root_path'], '/Books');
+    expect(uri.queryParameters['path'], '/Books/Novel.epub');
+    expect(upload.$2, bytes);
+    expect(upload.$3, 'image/png');
+    expect(upload.$4['X-Cover-Hash'], List.filled(64, 'a').join());
+  });
+
+  test('rejects out-of-root and oversized cover uploads before sending', () async {
+    final api = _FakeApi();
+    final repository = FrameCloudRepository(api);
+
+    await expectLater(
+      repository.uploadCover(
+        provider: FrameCloudProvider.vps,
+        library: FrameCloudLibrary.books,
+        rootPath: '/Books',
+        path: '/Elsewhere/Novel.epub',
+        sha256: List.filled(64, 'b').join(),
+        bytes: Uint8List.fromList([1]),
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      repository.uploadCover(
+        provider: FrameCloudProvider.vps,
+        library: FrameCloudLibrary.books,
+        rootPath: '/Books',
+        path: '/Books/Novel.epub',
+        sha256: List.filled(64, 'b').join(),
+        bytes: Uint8List(2 * 1024 * 1024 + 1),
+      ),
+      throwsFormatException,
+    );
+    expect(api.binaryPosts, isEmpty);
+  });
+
   test('keeps local provider selection out of the unsupported D1 preference value', () async {
     final api = _FakeApi();
     await FrameCloudRepository(api).saveActiveProvider(FrameCloudProvider.local);
