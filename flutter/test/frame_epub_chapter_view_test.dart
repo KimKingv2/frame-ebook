@@ -537,7 +537,7 @@ void main() {
                   pageController.position.viewportDimension)
               .round() +
           1;
-      await pageController.jumpToPage(pageCount - 1);
+      pageController.jumpToPage(pageCount - 1);
       await tester.pumpAndSettle();
 
       expect(find.byType(SingleChildScrollView), findsWidgets);
