@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter_svg/svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
@@ -52,6 +53,8 @@ class _MemoryFileSource implements FrameFileSource {
 Uint8List _fixture({
   String additionalIntroText = '',
   String additionalTableMarkup = '',
+  String additionalSvgMarkup = '',
+  bool includeExternalSvg = false,
   bool fixedLayout = false,
 }) {
   const container = '''
@@ -65,6 +68,9 @@ Uint8List _fixture({
       : '';
   final imageManifest = fixedLayout
       ? '<item id="page-image" href="Images/page.png" media-type="image/png"/>'
+      : '';
+  final svgManifest = includeExternalSvg
+      ? '<item id="diagram" href="Images/diagram.svg" media-type="image/svg+xml"/>'
       : '';
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
@@ -82,6 +88,7 @@ Uint8List _fixture({
     <item id="notes" href="Text/notes.xhtml"
       media-type="application/xhtml+xml"/>
     $imageManifest
+    $svgManifest
   </manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
@@ -92,6 +99,8 @@ Uint8List _fixture({
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
     $additionalTableMarkup
+    $additionalSvgMarkup
+    ${includeExternalSvg ? '<img src="../Images/diagram.svg" alt="外部 SVG 圖形"/>' : ''}
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
     <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
@@ -131,6 +140,13 @@ Uint8List _fixture({
         'OPS/Images/page.png',
         base64Decode(
           'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      ),
+    if (includeExternalSvg)
+      _ZipItem(
+        'OPS/Images/diagram.svg',
+        utf8.encode(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48"><rect width="96" height="48" rx="6" fill="#7654B9"/><circle cx="48" cy="24" r="12" fill="#FFFFFF"/></svg>',
         ),
       ),
   ]);
@@ -424,6 +440,74 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('renders inline and archive SVG resources without external fetches',
+      (tester) async {
+    const inlineSvg = '''
+      <svg width="120" height="60" viewBox="0 0 120 60"
+          onload="javascript:alert(1)">
+        <title>Inline diagram</title>
+        <rect x="2" y="2" width="116" height="56" rx="6" fill="#7654B9"/>
+        <circle cx="60" cy="30" r="12" fill="#FFFFFF"/>
+        <image href="https://example.invalid/remote.png" width="1" height="1"/>
+        <script>window.location = 'https://example.invalid/';</script>
+      </svg>
+    ''';
+    final bytes = _fixture(
+      additionalSvgMarkup: inlineSvg,
+      includeExternalSvg: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-svg-render-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/svg.epub',
+      'fileName': 'svg.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      expect(
+        loader.resource('OPS/Images/diagram.svg')?.kind,
+        FrameEpubResourceKind.svg,
+      );
+      expect(
+        loader.resource('OPS/Images/diagram.svg')?.size,
+        lessThanOrEqualTo(loader.maxSvgBytes),
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              contentMaxWidth: 480,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SvgPicture), findsNWidgets(2));
+      expect(find.text('SVG 圖形暫未支援'), findsNothing);
+      expect(tester.takeException(), isNull);
+      expect(find.byType(NetworkImage), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('renders EPUB table headers, cells and colspan without overflow',
       (tester) async {
     const table = '''
