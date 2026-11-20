@@ -18,6 +18,7 @@ import 'frame_epub_chapter_view.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
+import 'frame_reading_time_tracker.dart';
 import 'frame_epub_reader_sidebar.dart';
 
 const _readerChrome = Color(0xFF171420);
@@ -51,7 +52,8 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
 }
 
 class _FrameEpubReaderPreviewScreenState
-    extends State<FrameEpubReaderPreviewScreen> {
+    extends State<FrameEpubReaderPreviewScreen>
+    with WidgetsBindingObserver {
   bool _initialized = false;
   bool _appearanceInitialized = false;
   String? _setupError;
@@ -84,12 +86,67 @@ class _FrameEpubReaderPreviewScreenState
   String _comicImageFit = 'fit-page';
   String _comicBackdrop = 'wood';
   Timer? _comicSpineNavigationTimer;
+  FrameReadingTimeTracker? _readingTimeTracker;
+  int _readingSeconds = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _chapterScrollController = ScrollController();
     _chapterPageController = PageController();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final tracker = _readingTimeTracker;
+    if (tracker == null) return;
+    unawaited(tracker.setForeground(state == AppLifecycleState.resumed));
+  }
+
+  void _startReadingTimeTracking(FrameEpubReaderSession session) {
+    if (_readingTimeTracker != null) return;
+    final tracker = FrameReadingTimeTracker(
+      book: widget.book,
+      repository: session.repository,
+      onUpdate: (seconds) {
+        if (!mounted) return;
+        setState(() => _readingSeconds = seconds);
+      },
+      onError: (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('閱讀時光尚未同步：$error')),
+        );
+      },
+    );
+    _readingTimeTracker = tracker;
+    unawaited(
+      tracker.start().catchError((Object error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('無法啟動閱讀時光記錄：$error')),
+        );
+      }),
+    );
+  }
+
+  void _recordReadingActivity() {
+    _readingTimeTracker?.activity();
+  }
+
+  String _readingDurationLabel(int seconds) {
+    final safe = seconds < 0 ? 0 : seconds;
+    final hours = safe ~/ 3600;
+    final minutes = (safe % 3600) ~/ 60;
+    final remainder = safe % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:'
+          '${minutes.toString().padLeft(2, '0')}:'
+          '${remainder.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${remainder.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -143,10 +200,12 @@ class _FrameEpubReaderPreviewScreenState
         });
       }
     }
-    if (session?.status == FrameEpubReaderStatus.ready &&
-        !_appearanceInitialized) {
-      _restoreAppearance(session!.readerState.appearance);
-      _appearanceInitialized = true;
+    if (session?.status == FrameEpubReaderStatus.ready) {
+      _startReadingTimeTracking(session!);
+      if (!_appearanceInitialized) {
+        _restoreAppearance(session.readerState.appearance);
+        _appearanceInitialized = true;
+      }
     }
     if (mounted) setState(() {});
   }
@@ -236,11 +295,15 @@ class _FrameEpubReaderPreviewScreenState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_releaseResources());
     super.dispose();
   }
 
   Future<void> _releaseResources() async {
+    final readingTracker = _readingTimeTracker;
+    _readingTimeTracker = null;
+    if (readingTracker != null) await readingTracker.stop();
     await _flushReadingPosition();
     _progressSaveTimer?.cancel();
     _comicSpineNavigationTimer?.cancel();
@@ -515,7 +578,9 @@ class _FrameEpubReaderPreviewScreenState
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             Text(
-              'Flutter EPUB 預覽',
+              _readingTimeTracker == null
+                  ? 'Flutter EPUB 預覽'
+                  : '本次閱讀 ${_readingDurationLabel(_readingSeconds)}',
               style: TextStyle(color: _readerMuted, fontSize: 10),
             ),
           ],
@@ -548,7 +613,26 @@ class _FrameEpubReaderPreviewScreenState
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(session),
+        child: Focus(
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent) _recordReadingActivity();
+            return KeyEventResult.ignored;
+          },
+          child: Listener(
+            onPointerDown: (_) => _recordReadingActivity(),
+            onPointerSignal: (_) => _recordReadingActivity(),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollStartNotification ||
+                    notification is ScrollUpdateNotification) {
+                  _recordReadingActivity();
+                }
+                return false;
+              },
+              child: _buildBody(session),
+            ),
+          ),
+        ),
       ),
     );
   }
