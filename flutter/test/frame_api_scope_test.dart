@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/core/frame_api_client.dart';
 import 'package:frame_ebook/core/frame_api_scope.dart';
