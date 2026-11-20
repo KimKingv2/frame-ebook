@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -571,7 +572,10 @@ class _FrameEpubReaderPreviewScreenState
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    return Scaffold(
+    return Listener(
+      onPointerDown: (_) => _recordReadingActivity(),
+      onPointerSignal: (_) => _recordReadingActivity(),
+      child: Scaffold(
       backgroundColor: _readerChrome,
       appBar: AppBar(
         backgroundColor: _readerChrome,
@@ -623,20 +627,17 @@ class _FrameEpubReaderPreviewScreenState
       ),
       body: SafeArea(
         top: false,
-        child: Listener(
-          onPointerDown: (_) => _recordReadingActivity(),
-          onPointerSignal: (_) => _recordReadingActivity(),
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollStartNotification ||
-                  notification is ScrollUpdateNotification) {
-                _recordReadingActivity();
-              }
-              return false;
-            },
-            child: _buildBody(session),
-          ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollStartNotification ||
+                notification is ScrollUpdateNotification) {
+              _recordReadingActivity();
+            }
+            return false;
+          },
+          child: _buildBody(session),
         ),
+      ),
       ),
     );
   }
