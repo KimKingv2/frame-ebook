@@ -1,101 +1,103 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frame_ebook/library/frame_reader_repository.dart';
-import 'package:frame_ebook/reader/frame_epub_parser.dart';
-import 'package:frame_ebook/reader/frame_epub_reader_sidebar.dart';
 import 'package:material_ui/material_ui.dart';
 
-FrameEpubTocEntry _tocEntry(String label, String path) => FrameEpubTocEntry(
-      label: label,
-      reference: FrameEpubResourceReference(
-        originalHref: path,
-        path: path,
-        fragment: '',
-        query: '',
-        isExternal: false,
-      ),
-      children: const [],
-    );
+import 'package:frame_ebook/library/frame_reader_repository.dart';
+import 'package:frame_ebook/reader/frame_epub_reader_sidebar.dart';
 
 void main() {
-  testWidgets('shows TOC, bookmarks and notes in separate tabs',
+  testWidgets('cancel keeps a bookmark and does not call the delete handler',
       (tester) async {
-    final bookmark = FrameReaderAnnotation(
-      id: 'bookmark-1',
-      bookId: 'book-1',
+    var deleteCalls = 0;
+    const bookmark = FrameReaderAnnotation(
+      id: 'bookmark-one',
+      bookId: 'book-one',
       type: 'bookmark',
-      cfi: 'epubcfi(/6/2!/4/1:0)',
-      quote: '第一章的書籤位置',
-    );
-    final note = FrameReaderAnnotation(
-      id: 'note-1',
-      bookId: 'book-1',
-      type: 'note',
-      cfi: 'epubcfi(/6/2!/4/1:5)',
-      quote: '被選取的原文',
-      text: '這是我的閱讀筆記',
+      cfi: 'epubcfi(/6/2!/4/2:3)',
+      createdAt: 10,
     );
 
+    await tester.binding.setSurfaceSize(const Size(420, 760));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            height: 680,
-            width: 420,
-            child: FrameEpubReaderSidebar(
-              toc: [_tocEntry('第一章', 'chapter-one.xhtml')],
-              currentPath: 'chapter-one.xhtml',
-              annotations: [bookmark, note],
-              initialTabIndex: 0,
-              onSelectToc: (_) {},
-              onOpenAnnotation: (_) {},
-              onEditNote: (_) {},
-              onDeleteAnnotation: (_) async => true,
-              onClose: () {},
-            ),
+          body: FrameEpubReaderSidebar(
+            toc: const [],
+            currentPath: null,
+            annotations: const [bookmark],
+            initialTabIndex: 1,
+            onSelectToc: (_) {},
+            onOpenAnnotation: (_) {},
+            onEditNote: (_) {},
+            onDeleteAnnotation: (_) async {
+              deleteCalls++;
+              return true;
+            },
+            onClose: () {},
           ),
         ),
       ),
     );
-
-    expect(find.text('第一章'), findsOneWidget);
-    await tester.tap(find.text('書籤 1'));
     await tester.pumpAndSettle();
-    expect(find.text('第一章的書籤位置'), findsOneWidget);
 
-    await tester.tap(find.text('筆記 1'));
+    await tester.tap(find.byTooltip('刪除書籤'));
     await tester.pumpAndSettle();
-    expect(find.text('這是我的閱讀筆記'), findsOneWidget);
-    expect(find.text('被選取的原文'), findsNothing);
+    expect(find.text('確定刪除這個書籤嗎？'), findsOneWidget);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(deleteCalls, 0);
+    expect(find.text('目前沒有已保存的書籤。'), findsNothing);
+    expect(find.byTooltip('刪除書籤'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('selecting a TOC entry invokes navigation callback',
+  testWidgets('confirms a note deletion before calling the delete handler',
       (tester) async {
-    final entry = _tocEntry('第二章', 'chapter-two.xhtml');
-    FrameEpubTocEntry? selected;
+    var deleteCalls = 0;
+    const note = FrameReaderAnnotation(
+      id: 'note-one',
+      bookId: 'book-one',
+      type: 'note',
+      cfi: 'epubcfi(/6/2!/4/2:3)',
+      quote: '原文摘錄',
+      text: '我的閱讀筆記',
+      createdAt: 10,
+    );
 
+    await tester.binding.setSurfaceSize(const Size(420, 760));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            height: 500,
-            width: 400,
-            child: FrameEpubReaderSidebar(
-              toc: [entry],
-              currentPath: null,
-              annotations: const [],
-              initialTabIndex: 0,
-              onSelectToc: (value) => selected = value,
-              onOpenAnnotation: (_) {},
-              onEditNote: (_) {},
-              onDeleteAnnotation: (_) async => true,
-              onClose: () {},
-            ),
+          body: FrameEpubReaderSidebar(
+            toc: const [],
+            currentPath: null,
+            annotations: const [note],
+            initialTabIndex: 2,
+            onSelectToc: (_) {},
+            onOpenAnnotation: (_) {},
+            onEditNote: (_) {},
+            onDeleteAnnotation: (_) async {
+              deleteCalls++;
+              return true;
+            },
+            onClose: () {},
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('第二章'));
-    expect(selected, same(entry));
+    await tester.tap(find.byTooltip('刪除筆記'));
+    await tester.pumpAndSettle();
+    expect(find.text('確定刪除這筆標註嗎？'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.pumpAndSettle();
+
+    expect(deleteCalls, 1);
+    expect(find.text('目前沒有筆記或劃線。'), findsOneWidget);
+    await tester.binding.setSurfaceSize(null);
   });
 }

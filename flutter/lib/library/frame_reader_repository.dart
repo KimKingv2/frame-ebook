@@ -111,6 +111,21 @@ class FrameReaderAnnotation {
       };
 }
 
+/// Returns the bookmark saved at an exact EPUB CFI, ignoring notes/highlights.
+FrameReaderAnnotation? findFrameBookmarkAtCfi(
+  Iterable<FrameReaderAnnotation> annotations,
+  String? cfi,
+) {
+  final target = cfi?.trim() ?? '';
+  if (target.isEmpty) return null;
+  for (final annotation in annotations) {
+    if (annotation.type == 'bookmark' && annotation.cfi.trim() == target) {
+      return annotation;
+    }
+  }
+  return null;
+}
+
 class FrameReadingEvent {
   const FrameReadingEvent({
     required this.id,

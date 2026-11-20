@@ -92,6 +92,7 @@ class _FrameEpubReaderPreviewScreenState
   FrameReadingTimeTracker? _readingTimeTracker;
   int _readingSeconds = 0;
   bool _isImmersive = false;
+  bool _bookmarkBusy = false;
   bool _fullScreenListenerRegistered = false;
 
   @override
@@ -469,8 +470,18 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   void _queueReadingPosition(String cfi, double chapterFraction) {
-    _lastVisibleCfi = cfi;
     final session = _session;
+    final previousCfi =
+        _lastVisibleCfi ?? _pendingCfi ?? _lastSavedCfi ?? session?.initialCfi;
+    final wasBookmarked =
+        findFrameBookmarkAtCfi(session?.annotations ?? const [], previousCfi) !=
+            null;
+    _lastVisibleCfi = cfi;
+    final isBookmarked =
+        findFrameBookmarkAtCfi(session?.annotations ?? const [], cfi) != null;
+    if (wasBookmarked != isBookmarked && mounted) {
+      setState(() {});
+    }
     final index = session?.currentSpineIndex;
     final count = session?.epub?.spine.length ?? 0;
     if (session == null || index == null || count <= 0 ||
@@ -640,6 +651,18 @@ class _FrameEpubReaderPreviewScreenState
   @override
   Widget build(BuildContext context) {
     final session = _session;
+    final currentBookmarkCfi =
+        session != null && session.status == FrameEpubReaderStatus.ready
+            ? _bookmarkCfi(
+                session,
+                preferred: _pendingCfi ?? _lastVisibleCfi,
+              )
+            : null;
+    final isCurrentPositionBookmarked = findFrameBookmarkAtCfi(
+          session?.annotations ?? const [],
+          currentBookmarkCfi,
+        ) !=
+        null;
     return PopScope<Object?>(
       canPop: !_isImmersive,
       onPopInvokedWithResult: (didPop, result) {
@@ -679,12 +702,19 @@ class _FrameEpubReaderPreviewScreenState
             icon: const Icon(Icons.menu_book_outlined),
           ),
           IconButton(
-            tooltip: '加入書籤',
+            tooltip: isCurrentPositionBookmarked
+                ? '移除目前位置的書籤'
+                : '加入目前位置的書籤',
             onPressed: session == null ||
-                    session.status != FrameEpubReaderStatus.ready
+                    session.status != FrameEpubReaderStatus.ready ||
+                    _bookmarkBusy
                 ? null
-                : _createBookmark,
-            icon: const Icon(Icons.bookmark_add_outlined),
+                : _toggleBookmark,
+            icon: Icon(
+              isCurrentPositionBookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_add_outlined,
+            ),
           ),
           IconButton(
             tooltip: '閱讀導覽',
@@ -1576,43 +1606,48 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
-  Future<void> _createBookmark() async {
+  Future<void> _toggleBookmark() async {
     final session = _session;
     if (session == null ||
-        session.status != FrameEpubReaderStatus.ready) {
+        session.status != FrameEpubReaderStatus.ready ||
+        _bookmarkBusy) {
       return;
     }
 
-    final pendingCfi = _pendingCfi;
-    await _flushReadingPosition();
-    if (!mounted) return;
-
-    final cfi = _bookmarkCfi(session, preferred: pendingCfi);
-    if (cfi == null || cfi.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('目前 EPUB 頁面無法建立書籤。')),
-      );
-      return;
-    }
-    if (session.annotations.any(
-      (item) => item.type == 'bookmark' && item.cfi == cfi,
-    )) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('這個位置已經有書籤。')),
-      );
-      return;
-    }
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final annotation = FrameReaderAnnotation(
-      id: 'flutter-bookmark-${DateTime.now().microsecondsSinceEpoch}',
-      bookId: widget.book.id,
-      type: 'bookmark',
-      cfi: cfi,
-      color: 'violet',
-      createdAt: now,
-    );
+    final preferredCfi = _pendingCfi ?? _lastVisibleCfi;
+    setState(() => _bookmarkBusy = true);
     try {
+      await _flushReadingPosition();
+      if (!mounted || session.status != FrameEpubReaderStatus.ready) return;
+
+      final cfi = _bookmarkCfi(session, preferred: preferredCfi);
+      if (cfi == null || cfi.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('目前 EPUB 頁面無法建立書籤。')),
+        );
+        return;
+      }
+
+      final existing = findFrameBookmarkAtCfi(session.annotations, cfi);
+      if (existing != null) {
+        await session.deleteAnnotation(existing.id);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已移除目前位置的書籤。')),
+        );
+        return;
+      }
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final annotation = FrameReaderAnnotation(
+        id: 'flutter-bookmark-${DateTime.now().microsecondsSinceEpoch}',
+        bookId: widget.book.id,
+        type: 'bookmark',
+        cfi: cfi,
+        color: 'violet',
+        createdAt: now,
+        updatedAt: now,
+      );
       await session.saveAnnotation(annotation);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1621,8 +1656,11 @@ class _FrameEpubReaderPreviewScreenState
     } on Object catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('書籤儲存失敗：$error')),
+        SnackBar(content: Text('書籤更新失敗：$error')),
       );
+    } finally {
+      _bookmarkBusy = false;
+      if (mounted) setState(() {});
     }
   }
 

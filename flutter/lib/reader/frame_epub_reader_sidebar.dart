@@ -100,6 +100,28 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   }
 
   Future<void> _deleteAnnotation(FrameReaderAnnotation annotation) async {
+    final isBookmark = annotation.type == 'bookmark';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isBookmark ? '刪除書籤' : '刪除標註'),
+        content: Text(
+          isBookmark ? '確定刪除這個書籤嗎？' : '確定刪除這筆標註嗎？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
     final deleted = await widget.onDeleteAnnotation(annotation);
     if (!mounted || !deleted) return;
     setState(() {
@@ -247,7 +269,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     final items = _annotations
         .where((item) =>
             bookmarksOnly ? item.type == 'bookmark' : item.type != 'bookmark')
-        .toList(growable: false);
+        .toList()
+      ..sort((a, b) {
+        final created = b.createdAt.compareTo(a.createdAt);
+        return created != 0 ? created : b.updatedAt.compareTo(a.updatedAt);
+      });
     if (items.isEmpty) {
       return _SidebarEmptyState(
         message: bookmarksOnly ? '目前沒有已保存的書籤。' : '目前沒有筆記或劃線。',
@@ -263,13 +289,30 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         final annotation = items[index];
         final title = switch (annotation.type) {
           'bookmark' => '書籤',
-          'highlight' => '劃線',
-          _ => '筆記',
+          'highlight' =>
+            annotation.color == 'underline' ? '下劃線' : '高亮',
+          'note' => '筆記',
+          _ => '標註',
+        };
+        final markerColor = switch (annotation.color) {
+          'yellow' => const Color(0xFFF2C94C),
+          'violet' => const Color(0xFFA78BFA),
+          'mint' => const Color(0xFF65C9A5),
+          'rose' => const Color(0xFFE88EAF),
+          _ => _sidebarAccent,
         };
         final detail = annotation.text.trim().isNotEmpty
             ? annotation.text.trim()
             : annotation.quote.trim();
         return ListTile(
+          leading: Container(
+            width: 4,
+            height: 34,
+            decoration: BoxDecoration(
+              color: markerColor,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
           onTap: annotation.cfi.trim().isEmpty
               ? null
               : () => widget.onOpenAnnotation(annotation),

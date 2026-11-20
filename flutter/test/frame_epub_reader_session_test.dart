@@ -280,6 +280,39 @@ void _write32(List<int> output, int value) {
 }
 
 void main() {
+  test('bookmark lookup matches only the exact CFI and bookmark type', () {
+    const annotations = [
+      FrameReaderAnnotation(
+        id: 'bookmark-one',
+        bookId: 'book-one',
+        type: 'bookmark',
+        cfi: 'epubcfi(/6/2!/4/2:3)',
+      ),
+      FrameReaderAnnotation(
+        id: 'highlight-one',
+        bookId: 'book-one',
+        type: 'highlight',
+        cfi: 'epubcfi(/6/2!/4/2:3)',
+      ),
+      FrameReaderAnnotation(
+        id: 'bookmark-other',
+        bookId: 'book-one',
+        type: 'bookmark',
+        cfi: 'epubcfi(/6/2!/4/2:8)',
+      ),
+    ];
+
+    expect(
+      findFrameBookmarkAtCfi(annotations, 'epubcfi(/6/2!/4/2:3)')?.id,
+      'bookmark-one',
+    );
+    expect(
+      findFrameBookmarkAtCfi(annotations, 'epubcfi(/6/2!/4/2:8)')?.id,
+      'bookmark-other',
+    );
+    expect(findFrameBookmarkAtCfi(annotations, 'epubcfi(/6/2!/4/2:4)'), isNull);
+    expect(findFrameBookmarkAtCfi(annotations, '  '), isNull);
+  });
   group('FrameEpubReaderSession', () {
     test('opens through bounded ranges and restores the saved spine index',
         () async {
