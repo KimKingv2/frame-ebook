@@ -342,7 +342,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       }
       final sharedSession = _localOpenListSession;
       if (sharedSession != null) {
-        sharedSession.replaceClient(candidate!);
+        sharedSession.replaceClient(candidate);
       } else {
         _localClient?.close();
       }

@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import '../cloud/local_openlist_client.dart';
-import '../library/frame_book.dart';
 import 'frame_file_source.dart';
 
 /// Opens local OpenList EPUBs through bounded Range reads.
