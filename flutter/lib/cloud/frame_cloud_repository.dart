@@ -102,7 +102,7 @@ class FrameCloudRepository {
     return FrameCloudDirectoryPage.fromJson(data);
   }
 
-  Future<List<FrameCloudEntry>> listServerDirectory({
+  Future<FrameCloudDirectoryPage> loadServerDirectoryPage({
     required FrameCloudProvider provider,
     required FrameCloudLibrary library,
     required String rootPath,
@@ -115,7 +115,9 @@ class FrameCloudRepository {
     }
     final root = normalizeFrameCloudPath(rootPath);
     final current = normalizeFrameCloudPath(path);
-    if (root == null || current == null || !frameCloudPathIsWithinRoot(current, root)) {
+    if (root == null ||
+        current == null ||
+        !frameCloudPathIsWithinRoot(current, root)) {
       throw const FormatException('掃描目錄無效或超出目前書庫根目錄。');
     }
     final query = {
@@ -126,14 +128,28 @@ class FrameCloudRepository {
       'page': page.clamp(1, 100000).toString(),
       'per_page': perPage.clamp(1, 100).toString(),
     };
-    final data = await api.getJson('/api/cloud/scan-list?${Uri(queryParameters: query).query}');
-    final raw = data['items'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((item) => FrameCloudEntry.fromJson(Map<String, dynamic>.from(item)))
-        .where((item) => item.path.isNotEmpty && item.name.isNotEmpty)
-        .toList(growable: false);
+    final data =
+        await api.getJson('/api/cloud/scan-list?${Uri(queryParameters: query).query}');
+    return FrameCloudDirectoryPage.fromJson(data);
+  }
+
+  Future<List<FrameCloudEntry>> listServerDirectory({
+    required FrameCloudProvider provider,
+    required FrameCloudLibrary library,
+    required String rootPath,
+    required String path,
+    int page = 1,
+    int perPage = 100,
+  }) async {
+    final directory = await loadServerDirectoryPage(
+      provider: provider,
+      library: library,
+      rootPath: rootPath,
+      path: path,
+      page: page,
+      perPage: perPage,
+    );
+    return directory.items;
   }
 
   Future<FrameCloudScanState?> loadScanState({
