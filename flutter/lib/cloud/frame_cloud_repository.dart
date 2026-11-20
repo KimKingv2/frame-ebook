@@ -273,76 +273,7 @@ class FrameCloudRepository {
     if (root == null ||
         file == null ||
         !frameCloudPathIsWithinRoot(file, root) ||
-        !RegExp(r'^[a-f0-9]{64}
-    required FrameCloudProvider provider,
-    required FrameCloudLibrary library,
-    required String rootPath,
-  }) async {
-    final root = normalizeFrameCloudPath(rootPath);
-    if (root == null) throw const FormatException('封面佇列根目錄無效。');
-    final data = await api.postJson('/api/cloud/covers', {
-      'action': 'retry-errors',
-      'provider': provider.apiValue,
-      'library': library.apiValue,
-      'rootPath': root,
-    });
-    return _safeInt(data['retried']);
-  }
-
-  Future<void> updateCoverStatus({
-    required FrameCloudProvider provider,
-    required FrameCloudLibrary library,
-    required String rootPath,
-    required String path,
-    required String status,
-    String? error,
-  }) async {
-    final root = normalizeFrameCloudPath(rootPath);
-    final file = normalizeFrameCloudPath(path);
-    if (root == null ||
-        file == null ||
-        !frameCloudPathIsWithinRoot(file, root) ||
-        !['missing', 'error'].contains(status)) {
-      throw const FormatException('封面索引更新參數無效。');
-    }
-    await api.postJson('/api/cloud/covers', {
-      'provider': provider.apiValue,
-      'library': library.apiValue,
-      'rootPath': root,
-      'path': file,
-      'status': status,
-      if (error != null) 'error': error,
-    });
-  }
-
-  Future<int> saveEpubMetadataBatch({
-    required FrameCloudProvider provider,
-    required FrameCloudLibrary library,
-    required String rootPath,
-    required List<Map<String, dynamic>> entries,
-  }) async {
-    if (entries.isEmpty) return 0;
-    if (entries.length > 50) {
-      throw ArgumentError('EPUB metadata 每批最多 50 筆。');
-    }
-    final root = normalizeFrameCloudPath(rootPath);
-    if (root == null) throw const FormatException('EPUB metadata 根目錄無效。');
-    final data = await api.postJson('/api/cloud/index/metadata', {
-      'provider': provider.apiValue,
-      'library': library.apiValue,
-      'rootPath': root,
-      'entries': entries,
-    });
-    return _safeInt(data['updated']);
-  }
-
-  static int _safeInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num && value.isFinite) return value.round();
-    return int.tryParse(value?.toString() ?? '') ?? 0;
-  }
-}
-).hasMatch(sha256) ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(sha256) ||
         bytes.isEmpty ||
         bytes.length > 2 * 1024 * 1024 ||
         !const {'image/jpeg', 'image/webp', 'image/png'}.contains(contentType)) {
