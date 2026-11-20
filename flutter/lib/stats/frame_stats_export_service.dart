@@ -1,54 +1,41 @@
 import 'dart:typed_data';
 
-import 'package:public_file_saver/public_file_saver.dart';
+import 'package:file_picker/file_picker.dart';
 
-typedef FrameStatsSaveBytes = Future<bool?> Function({
+typedef FrameStatsSaveFile = Future<Uri?> Function({
   required Uint8List bytes,
   required String fileName,
-  required String mimeType,
 });
 
 class FrameStatsExportService {
-  FrameStatsExportService({FrameStatsSaveBytes? saveBytes})
-      : _saveBytes = saveBytes ?? _saveWithSystemDialog;
+  FrameStatsExportService({FrameStatsSaveFile? saveFile})
+      : _saveFile = saveFile ?? _saveWithSystemDialog;
 
-  final FrameStatsSaveBytes _saveBytes;
+  final FrameStatsSaveFile _saveFile;
 
   Future<bool> save({
     required Uint8List bytes,
     required String fileName,
-    required String mimeType,
   }) async {
     if (bytes.isEmpty) {
       throw ArgumentError.value(bytes, 'bytes', '匯出內容不可為空。');
     }
     if (fileName.trim().isEmpty ||
         fileName.contains('/') ||
-        fileName.contains('\\')) {
+        fileName.contains('\\') ||
+        !(fileName.endsWith('.json') || fileName.endsWith('.csv'))) {
       throw ArgumentError.value(fileName, 'fileName', '匯出檔名無效。');
     }
-    if (!const {'application/json', 'text/csv'}.contains(mimeType)) {
-      throw ArgumentError.value(mimeType, 'mimeType', '不支援的統計匯出格式。');
-    }
-    return await _saveBytes(
-          bytes: bytes,
-          fileName: fileName,
-          mimeType: mimeType,
-        ) ??
-        false;
+    return await _saveFile(bytes: bytes, fileName: fileName) != null;
   }
 
-  static Future<bool?> _saveWithSystemDialog({
+  static Future<Uri?> _saveWithSystemDialog({
     required Uint8List bytes,
     required String fileName,
-    required String mimeType,
-  }) async {
-    final result = await PublicFileSaver().save(
-      useDialog: true,
-      bytes: bytes,
+  }) {
+    return FilePicker.saveFile(
       fileName: fileName,
-      mimeType: mimeType,
+      bytes: bytes,
     );
-    return result?.isSuccess == true;
   }
 }
