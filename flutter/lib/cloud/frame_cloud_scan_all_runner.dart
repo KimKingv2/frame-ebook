@@ -61,11 +61,16 @@ class FrameCloudScanAllRunner {
   final FrameCloudRepository _repository;
   final LocalOpenListClient? _localClient;
   bool _running = false;
+  bool _pauseRequested = false;
   FrameCloudScanRunner? _activeRunner;
 
   bool get isRunning => _running;
 
-  void requestPause() => _activeRunner?.requestPause();
+  void requestPause() {
+    if (!_running) return;
+    _pauseRequested = true;
+    _activeRunner?.requestPause();
+  }
 
   Future<FrameCloudScanAllResult> run({
     required FrameCloudProvider provider,
@@ -106,6 +111,7 @@ class FrameCloudScanAllRunner {
     }
 
     _running = true;
+    _pauseRequested = false;
     final completedLibraries = <FrameCloudScanAllLibraryResult>[];
     try {
       final previousStates = <FrameCloudLibrary, FrameCloudScanState?>{};
@@ -125,6 +131,12 @@ class FrameCloudScanAllRunner {
           .any((state) => state != null && !state.completed);
 
       for (final library in FrameCloudLibrary.values) {
+        if (_pauseRequested) {
+          return FrameCloudScanAllResult(
+            libraries: List.unmodifiable(completedLibraries),
+            paused: true,
+          );
+        }
         final root = normalizedRoots[library]!;
         var state = previousStates[library];
 
@@ -163,6 +175,17 @@ class FrameCloudScanAllRunner {
         String? failure;
 
         while (true) {
+          if (_pauseRequested) {
+            paused = true;
+            if (state != null) {
+              state = state.copyWith(
+                pausedByUser: true,
+                resumeOnNextOpen: false,
+              );
+              await _repository.saveScanState(state);
+            }
+            break;
+          }
           final batch = await runner.run(
             provider: provider,
             library: library,
@@ -227,6 +250,7 @@ class FrameCloudScanAllRunner {
       );
     } finally {
       _activeRunner = null;
+      _pauseRequested = false;
       _running = false;
     }
   }
