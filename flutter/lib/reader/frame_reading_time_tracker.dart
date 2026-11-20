@@ -204,13 +204,13 @@ class FrameReadingTimeTracker {
 
   String _nextEventId(DateTime timestamp) {
     _eventSequence++;
-    return 'flutter-\${timestamp.microsecondsSinceEpoch}-$_eventSequence';
+    return 'flutter-${timestamp.microsecondsSinceEpoch}-$_eventSequence';
   }
 
   static String _localDayKey(DateTime value) =>
-      '\${value.year.toString().padLeft(4, '0')}-'
-      '\${value.month.toString().padLeft(2, '0')}-'
-      '\${value.day.toString().padLeft(2, '0')}';
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
 
   static DateTime _minimumDate(DateTime a, DateTime b) =>
       a.isBefore(b) ? a : b;
