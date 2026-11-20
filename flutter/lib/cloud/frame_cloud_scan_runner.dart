@@ -142,7 +142,7 @@ class FrameCloudScanRunner {
         library: library,
         rootPath: root,
       );
-            if (loadedState == null ||
+      if (loadedState == null ||
           loadedState.version != 1 ||
           loadedState.provider != provider ||
           loadedState.library != library ||
@@ -158,6 +158,7 @@ class FrameCloudScanRunner {
           'scanMode': forceRescan ? '完整重掃' : '首次完整掃描',
         });
         await _repository.saveScanState(activeState);
+        state = activeState;
       } else if (loadedState.completed) {
         return FrameCloudScanRunResult(
           state: loadedState,
@@ -172,6 +173,7 @@ class FrameCloudScanRunner {
       } else {
         activeState = loadedState.copyWith(pausedByUser: false, resumeOnNextOpen: false);
         await _repository.saveScanState(activeState);
+        state = activeState;
       }
       state = activeState;
 
@@ -216,7 +218,6 @@ class FrameCloudScanRunner {
 
         final entries = <Map<String, dynamic>>[];
         final seen = activeState.seenFolders.toSet();
-        var foundFolders = 0;
         for (final item in listing.items) {
           final path = normalizeFrameCloudPath(item.path);
           if (path == null ||
@@ -227,7 +228,6 @@ class FrameCloudScanRunner {
           }
           if (item.isDirectory) {
             entries.add(_entryJson(item, folder));
-            foundFolders++;
             if (seen.add(path)) {
               activeState.seenFolders.add(path);
               activeState.pendingFolders.add(path);
@@ -280,6 +280,7 @@ class FrameCloudScanRunner {
           folders++;
         }
         await _repository.saveScanState(activeState);
+        state = activeState;
         _emit(
           onProgress,
           '已保存 $folder 第 $page 頁：新增／更新 $saved 筆索引',
@@ -310,7 +311,8 @@ class FrameCloudScanRunner {
           resumeOnNextOpen: false,
         );
         await _repository.saveScanState(activeState);
-        _emit(onProgress, '目錄索引完成', state, scanned, indexed, skipped,
+        state = activeState;
+        _emit(onProgress, '目錄索引完成', activeState, scanned, indexed, skipped,
             folders);
       } else {
         activeState = activeState.copyWith(
@@ -318,6 +320,7 @@ class FrameCloudScanRunner {
           resumeOnNextOpen: false,
         );
         await _repository.saveScanState(activeState);
+        state = activeState;
         _emit(
           onProgress,
           _pauseRequested ? '已暫停，掃描游標已保存' : '本批已結束，掃描游標已保存',
