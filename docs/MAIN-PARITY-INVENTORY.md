@@ -97,8 +97,8 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 
 Source: pages/reading-stats/index.html, pages/assets/reading-stats.js, pages/assets/reading-stats.css and pages/assets/reading-tracker.js.
 
-- [ ] Preserve foreground-only reading-time tracking, including heartbeat, idle timeout, visibility, blur and focus handling.
-- [ ] Preserve session persistence and aggregation from the existing reading events API.
+- [ ] Preserve foreground-only reading-time tracking, including heartbeat, idle timeout, visibility, blur and focus handling. Flutter EPUB Preview now starts a 30-second heartbeat when a cloud EPUB is ready, counts foreground activity only, pauses after five minutes idle or when the app leaves the foreground, and shows the live session duration; Web/macOS/Android lifecycle behavior still requires device acceptance.
+- [ ] Preserve session persistence and aggregation from the existing reading events API. Flutter Preview writes bounded event records to the existing `/api/reading/events` endpoint, splits intervals at local midnight, and does not add a local event database or disk queue.
 - [ ] Preserve period selection and period summary.
 - [ ] Preserve total reading time, reading days, daily average and books opened.
 - [ ] Preserve daily goal selector, goal percentage/ring, today's time, goal-target label and goal-days count.
