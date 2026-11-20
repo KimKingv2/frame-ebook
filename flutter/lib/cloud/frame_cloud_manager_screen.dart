@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
@@ -8,6 +9,7 @@ import '../legacy/frame_legacy_page.dart';
 import 'frame_cloud_models.dart';
 import 'frame_cloud_repository.dart';
 import 'frame_cloud_archive_processor.dart';
+import 'frame_cloud_scan_all_runner.dart';
 import 'frame_cloud_scan_runner.dart';
 import 'local_openlist_client.dart';
 import 'local_openlist_settings_store.dart';
@@ -60,6 +62,8 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   int _pendingCovers = 0;
   FrameCloudScanState? _scanState;
   FrameCloudScanRunner? _activeScanRunner;
+  FrameCloudScanAllRunner? _activeScanAllRunner;
+  final Map<FrameCloudLibrary, FrameCloudScanState?> _libraryScanStates = {};
   String _scanMessage = '尚無索引掃描紀錄';
 
   int get _pageCount => _totalItems == 0 ? 1 : (_totalItems + 99) ~/ 100;
@@ -83,6 +87,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   @override
   void dispose() {
     _activeScanRunner?.requestPause();
+    _activeScanAllRunner?.requestPause();
     _tabs.dispose();
     _booksRoot.dispose();
     _comicsRoot.dispose();
@@ -234,6 +239,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   }
 
   Future<void> _selectProvider(FrameCloudProvider? value) async {
+    if (_scanRunning || _archiveProcessing) return;
     if (value == null || value == _provider) return;
     setState(() {
       _provider = value;
@@ -250,6 +256,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
   }
 
   Future<void> _selectLibrary(FrameCloudLibrary value) async {
+    if (_scanRunning || _archiveProcessing) return;
     if (value == _library) return;
     setState(() {
       _library = value;
@@ -360,6 +367,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
       if (!mounted) return;
       setState(() {
         _scanState = state;
+        _libraryScanStates[_library] = state;
         _scanMessage = state == null
             ? '目前沒有 D1 掃描紀錄。'
             : state.completed
@@ -530,6 +538,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         if (!mounted) return;
         setState(() {
           _scanState = progress.state;
+          _libraryScanStates[_library] = progress.state;
           _scanMessage = progress.phase;
         });
       },
@@ -555,8 +564,396 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
     if (result.error != null) _showMessage('索引掃描失敗：${result.error}');
   }
 
+  Future<void> _startFullLibraryScan() async {
+    if (_scanRunning || _archiveProcessing) return;
+    if (_provider == FrameCloudProvider.local &&
+        !(_localClient?.isAuthenticated ?? false)) {
+      _showMessage('請先登入本地 OpenList。');
+      return;
+    }
+    if (_provider.isServerSide &&
+        !(_session?.providers[_provider]?.configured ?? false)) {
+      _showMessage('目前來源尚未在 Cloudflare Pages 設定完成。');
+      return;
+    }
+
+    final roots = <FrameCloudLibrary, String>{
+      FrameCloudLibrary.books: _booksRoot.text.trim(),
+      FrameCloudLibrary.comics: _comicsRoot.text.trim(),
+    };
+    for (final library in FrameCloudLibrary.values) {
+      if (normalizeFrameCloudPath(roots[library] ?? '') == null) {
+        _showMessage('${library.label}根目錄尚未設定為有效的絕對路徑。');
+        return;
+      }
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('開始全庫掃描？'),
+        content: Text(
+          '將依序完整掃描 Books：${roots[FrameCloudLibrary.books]}，'
+          '以及 Comics：${roots[FrameCloudLibrary.comics]}。'
+          '每個分類都會逐頁保存 D1 游標；若中斷，可再次執行全庫掃描續接。'
+          '已完成的索引只會在該分類完整掃描結束後清理失效項目。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('開始全庫掃描'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final runner = FrameCloudScanAllRunner(
+      repository: _repository,
+      localClient: _localClient,
+    );
+    _activeScanAllRunner = runner;
+    setState(() {
+      _scanRunning = true;
+      _scanMessage = '正在依序掃描 Books 與 Comics…';
+    });
+
+    final result = await runner.run(
+      provider: _provider,
+      rootPaths: roots,
+      onProgress: (library, progress) {
+        if (!mounted) return;
+        setState(() {
+          _libraryScanStates[library] = progress.state;
+          if (_library == library) _scanState = progress.state;
+          _scanMessage = '${library.label} · ${progress.phase}';
+        });
+      },
+    );
+
+    if (!mounted) return;
+    for (final libraryResult in result.libraries) {
+      _libraryScanStates[libraryResult.library] = libraryResult.state;
+    }
+    final summary = result.libraries.map((item) {
+      final status = item.skippedExisting
+          ? '沿用已完成'
+          : item.paused
+              ? '已暫停'
+              : item.completed
+                  ? '完成'
+                  : '未完成';
+      return '${item.library.label}：$status，掃描 ${item.scannedCount}，'
+          '索引 ${item.indexedCount}，略過 ${item.skippedCount}，'
+          '移除過期索引 ${item.removedCount}';
+    }).join('；');
+
+    final finalMessage = result.error != null
+        ? '全庫流程中止：${result.error}（$summary）'
+        : result.paused
+            ? '全庫掃描已暫停，可再次執行全庫掃描續接。（$summary）'
+            : result.completed
+                ? 'Books 與 Comics 全部掃描完成。（$summary）'
+                : '全庫掃描尚未全部完成。（$summary）';
+    setState(() {
+      _scanRunning = false;
+      _activeScanAllRunner = null;
+      _scanState = _libraryScanStates[_library];
+      _scanMessage = finalMessage;
+    });
+
+    await _loadScanState();
+    await _loadDirectory();
+    if (mounted) setState(() => _scanMessage = finalMessage);
+    if (result.error != null) {
+      _showMessage('全庫掃描中止：${result.error}');
+    } else if (result.completed) {
+      _showMessage('Books 與 Comics 全庫掃描已完成。');
+    }
+  }
+
+  Future<void> _showScanLog() async {
+    final state = _scanState;
+    if (state == null) {
+      _showMessage('目前沒有可檢視的掃描日誌。');
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _cloudBg,
+      builder: (sheetContext) {
+        final errors = state.errors.reversed.toList(growable: false);
+        return SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.86,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 10, 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '掃描日誌',
+                          style: TextStyle(
+                            color: _cloudInk,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${state.library.label} · ${state.provider.label}',
+                        style: const TextStyle(
+                          color: _cloudMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '關閉',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: _cloudLine),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                    children: [
+                      _scanLogInfo('狀態', state.completed
+                          ? '已完成'
+                          : state.pausedByUser
+                              ? '手動暫停'
+                              : '尚未完成'),
+                      _scanLogInfo('根目錄', state.rootPath),
+                      _scanLogInfo('掃描識別碼', state.scanId),
+                      _scanLogInfo('開始時間', _formatScanTime(state.createdAt)),
+                      _scanLogInfo('最近更新', _formatScanTime(state.updatedAt)),
+                      _scanLogInfo('目前資料夾', state.currentFolder ?? '目前沒有進行中的資料夾'),
+                      _scanLogInfo('下一頁', state.page.toString()),
+                      _scanLogInfo('待處理資料夾', state.pendingFolders.length.toString()),
+                      _scanLogInfo('已讀取項目', state.scannedCount.toString()),
+                      _scanLogInfo('已寫入索引', state.indexedCount.toString()),
+                      _scanLogInfo('略過項目', state.skippedCount.toString()),
+                      _scanLogInfo('失敗累計', state.failedCount.toString()),
+                      _scanLogInfo('封面已完成／缺失／失敗',
+                          '${state.coverReadyCount}／${state.coverMissingCount}／${state.coverFailedCount}'),
+                      _scanLogInfo('元資料成功／失敗',
+                          '${state.metadataProcessedCount}／${state.metadataFailedCount}'),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '錯誤明細',
+                              style: TextStyle(
+                                color: _cloudInk,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${errors.length} 筆（最多保留最近 20 筆）',
+                            style: const TextStyle(
+                              color: _cloudMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (errors.isEmpty)
+                        const Card(
+                          color: _cloudPanel,
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              '目前沒有保存的錯誤明細。',
+                              style: TextStyle(color: _cloudMuted),
+                            ),
+                          ),
+                        ),
+                      for (var index = 0; index < errors.length; index++)
+                        Card(
+                          color: _cloudPanel,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '錯誤 ${errors.length - index}',
+                                  style: const TextStyle(
+                                    color: _cloudAccent,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                SelectableText(
+                                  errors[index]['path']?.toString() ?? state.rootPath,
+                                  style: const TextStyle(
+                                    color: _cloudInk,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                SelectableText(
+                                  errors[index]['message']?.toString() ?? '未提供錯誤訊息',
+                                  style: const TextStyle(
+                                    color: _cloudMuted,
+                                    fontSize: 12,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  _formatScanTime(errors[index]['at']?.toString()),
+                                  style: const TextStyle(
+                                    color: _cloudMuted,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: errors.isEmpty ? null : () => _copyScanLog(state),
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('複製日誌'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: errors.isEmpty || _scanRunning
+                            ? null
+                            : () {
+                                Navigator.of(sheetContext).pop();
+                                unawaited(_clearScanErrors());
+                              },
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: const Text('清除錯誤明細'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: state.completed || _scanRunning
+                            ? null
+                            : () {
+                                Navigator.of(sheetContext).pop();
+                                unawaited(_startScan());
+                              },
+                        icon: const Icon(Icons.play_arrow, size: 16),
+                        label: const Text('從保存位置續掃'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _copyScanLog(FrameCloudScanState state) async {
+    final lines = <String>[
+      'FRAME Ebook 掃描日誌',
+      '分類：${state.library.label}',
+      '來源：${state.provider.label}',
+      '根目錄：${state.rootPath}',
+      '掃描識別碼：${state.scanId}',
+      '已讀取：${state.scannedCount}',
+      '已索引：${state.indexedCount}',
+      '略過：${state.skippedCount}',
+      '失敗累計：${state.failedCount}',
+      '',
+      for (final error in state.errors.reversed) ...[
+        '[${error['at'] ?? ''}]',
+        '路徑：${error['path'] ?? state.rootPath}',
+        '錯誤：${error['message'] ?? ''}',
+        '',
+      ],
+    ];
+    try {
+      await Clipboard.setData(ClipboardData(text: lines.join('\n')));
+      _showMessage('掃描日誌已複製。');
+    } catch (error) {
+      _showMessage('無法複製掃描日誌：$error');
+    }
+  }
+
+  Future<void> _clearScanErrors() async {
+    final state = _scanState;
+    if (state == null || state.errors.isEmpty || _scanRunning) return;
+    try {
+      final cleared = state.copyWith(
+        errors: const [],
+        clearLastError: true,
+        updatedAt: DateTime.now().toIso8601String(),
+      );
+      await _repository.saveScanState(cleared);
+      if (!mounted) return;
+      setState(() {
+        _scanState = cleared;
+        _libraryScanStates[_library] = cleared;
+      });
+      _showMessage('已清除錯誤明細；掃描游標、書目索引與累計統計均保留。');
+    } catch (error) {
+      _showMessage('清除錯誤明細失敗：$error');
+    }
+  }
+
+  String _formatScanTime(String? value) {
+    if (value == null || value.isEmpty) return '未記錄';
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    final local = parsed.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
+  }
+
+  Widget _scanLogInfo(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 116,
+              child: Text(
+                label,
+                style: const TextStyle(color: _cloudMuted, fontSize: 11),
+              ),
+            ),
+            Expanded(
+              child: SelectableText(
+                value,
+                style: const TextStyle(color: _cloudInk, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      );
+
   void _pauseScan() {
     _activeScanRunner?.requestPause();
+    _activeScanAllRunner?.requestPause();
     if (mounted && _scanRunning) {
       setState(() => _scanMessage = '已要求暫停，待目前目錄頁完成並保存游標…');
     }
@@ -843,7 +1240,7 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
         ),
         const SizedBox(height: 8),
         const Text(
-          '完整掃描、續傳檢查點、封面重試與掃描日誌目前仍由原版管理器執行；Flutter 原生介面正逐步接手。',
+          'Flutter 原生介面已支援 Books／Comics 全庫掃描、續掃、封面佇列與掃描日誌；仍可開啟原版管理器使用完整連接診斷與其他進階操作。',
           style: TextStyle(color: _cloudMuted, fontSize: 12, height: 1.5),
         ),
       ],
@@ -1085,6 +1482,18 @@ class _FrameCloudManagerScreenState extends State<FrameCloudManagerScreen>
                                     ? '索引已完成'
                                     : '開始／續掃',
                               ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _scanRunning || _archiveProcessing
+                                  ? null
+                                  : _startFullLibraryScan,
+                              icon: const Icon(Icons.library_books_outlined, size: 18),
+                              label: const Text('全庫掃描'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _scanState == null ? null : _showScanLog,
+                              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                              label: Text('掃描日誌 (${_scanState?.errors.length ?? 0})'),
                             ),
                             OutlinedButton.icon(
                               onPressed: (_scanRunning || _archiveProcessing || _pendingCovers == 0)
