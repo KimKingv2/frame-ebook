@@ -840,9 +840,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ),
           ),
           const SizedBox(width: 4),
-          TextButton(
-            onPressed: () => _deleteAnnotation(annotation),
-            style: TextButton.styleFrom(
+          Tooltip(
+            message: '刪除$title',
+            child: TextButton(
+              onPressed: () => _deleteAnnotation(annotation),
+              style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFC99AAA),
               padding: EdgeInsets.symmetric(
                 horizontal: desktop ? 5 : 7,
@@ -852,10 +854,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
-            child: Text(
-              '刪除',
-              style: TextStyle(fontSize: desktop ? 8 : 10),
-            ),
+                child: Text(
+                  '刪除',
+                  style: TextStyle(fontSize: desktop ? 8 : 10),
+                ),
+              ),
           ),
         ],
       ),
