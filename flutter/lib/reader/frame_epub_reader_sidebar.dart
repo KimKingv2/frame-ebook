@@ -771,7 +771,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       ),
       decoration: BoxDecoration(
         color: const Color(0x07FFFFFF),
-        border: Border.all(color: const Color(0x1CB EA6E5).withValues(alpha: 1)),
+        border: Border.all(color: const Color(0x1CBEA6E5)),
         borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
