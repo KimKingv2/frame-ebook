@@ -6,6 +6,168 @@ import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_reader_sidebar.dart';
 
 void main() {
+  testWidgets('TOC nodes expand and collapse like the legacy tree',
+      (tester) async {
+    var selectedPath = '';
+    final toc = <FrameEpubTocEntry>[
+      FrameEpubTocEntry(
+        label: '第一章',
+        reference: null,
+        children: [
+          FrameEpubTocEntry(
+            label: '第一節',
+            reference: const FrameEpubResourceReference(
+              originalHref: 'Text/section01.xhtml',
+              path: 'OPS/Text/section01.xhtml',
+              fragment: '',
+              query: '',
+              isExternal: false,
+            ),
+            children: [
+              FrameEpubTocEntry(
+                label: '第一小節',
+                reference: const FrameEpubResourceReference(
+                  originalHref: 'Text/section01.xhtml#part-a',
+                  path: 'OPS/Text/section01.xhtml',
+                  fragment: 'part-a',
+                  query: '',
+                  isExternal: false,
+                ),
+                children: const [],
+              ),
+            ],
+          ),
+        ],
+      ),
+      FrameEpubTocEntry(
+        label: '第二章',
+        reference: const FrameEpubResourceReference(
+          originalHref: 'Text/chapter02.xhtml',
+          path: 'OPS/Text/chapter02.xhtml',
+          fragment: '',
+          query: '',
+          isExternal: false,
+        ),
+        children: const [],
+      ),
+    ];
+
+    await tester.binding.setSurfaceSize(const Size(1100, 850));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 250,
+            child: FrameEpubReaderSidebar(
+              toc: toc,
+              currentPath: null,
+              annotations: const [],
+              initialTabIndex: 0,
+              desktopLayout: true,
+              onSelectToc: (entry) => selectedPath = entry.path ?? '',
+              onOpenAnnotation: (_) {},
+              onEditNote: (_) {},
+              onRefreshAnnotations: () async {},
+              onDeleteAnnotation: (_) async => true,
+              onClose: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('第一章'), findsOneWidget);
+    expect(find.text('第二章'), findsOneWidget);
+    expect(find.text('第一節'), findsNothing);
+    expect(find.text('第一小節'), findsNothing);
+
+    await tester.tap(find.byTooltip('展開「第一章」子目錄'));
+    await tester.pumpAndSettle();
+    expect(find.text('第一節'), findsOneWidget);
+    expect(find.text('第一小節'), findsNothing);
+
+    await tester.tap(find.byTooltip('展開「第一節」子目錄'));
+    await tester.pumpAndSettle();
+    expect(find.text('第一小節'), findsOneWidget);
+
+    await tester.tap(find.text('第一小節'));
+    await tester.pumpAndSettle();
+    expect(selectedPath, 'OPS/Text/section01.xhtml');
+
+    await tester.tap(find.byTooltip('收合「第一章」子目錄'));
+    await tester.pumpAndSettle();
+    expect(find.text('第一節'), findsNothing);
+    expect(find.text('第一小節'), findsNothing);
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('TOC automatically expands ancestors of the current chapter',
+      (tester) async {
+    final toc = <FrameEpubTocEntry>[
+      FrameEpubTocEntry(
+        label: '第一章',
+        reference: null,
+        children: [
+          FrameEpubTocEntry(
+            label: '第一節',
+            reference: null,
+            children: [
+              FrameEpubTocEntry(
+                label: '目前所在的小節',
+                reference: const FrameEpubResourceReference(
+                  originalHref: 'Text/section01.xhtml#current',
+                  path: 'OPS/Text/section01.xhtml',
+                  fragment: 'current',
+                  query: '',
+                  isExternal: false,
+                ),
+                children: const [],
+              ),
+            ],
+          ),
+        ],
+      ),
+      FrameEpubTocEntry(
+        label: '第二章',
+        reference: null,
+        children: const [],
+      ),
+    ];
+
+    await tester.binding.setSurfaceSize(const Size(1100, 850));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 250,
+            child: FrameEpubReaderSidebar(
+              toc: toc,
+              currentPath: 'OPS/Text/section01.xhtml',
+              annotations: const [],
+              initialTabIndex: 0,
+              desktopLayout: true,
+              onSelectToc: (_) {},
+              onOpenAnnotation: (_) {},
+              onEditNote: (_) {},
+              onRefreshAnnotations: () async {},
+              onDeleteAnnotation: (_) async => true,
+              onClose: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('第一節'), findsOneWidget);
+    expect(find.text('目前所在的小節'), findsOneWidget);
+    expect(find.text('第二章'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
 
   testWidgets('desktop sidebar keeps TOC, notes and bookmarks in one column',
       (tester) async {

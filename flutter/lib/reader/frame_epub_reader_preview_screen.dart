@@ -2176,12 +2176,8 @@ class _FrameEpubReaderPreviewScreenState
     var comicImageFit = _comicImageFit;
     var comicBackdrop = _comicBackdrop;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: _readerPanel,
-      builder: (sheetContext) => StatefulBuilder(
+    Widget buildSettingsPanel(BuildContext closeContext) =>
+        StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
             20,
@@ -2198,13 +2194,42 @@ class _FrameEpubReaderPreviewScreenState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              const Text(
-                '閱讀外觀',
-                style: TextStyle(
-                  color: _readerText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '閱讀外觀',
+                          style: TextStyle(
+                            color: _readerText,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'PERSONALIZE YOUR PAGE',
+                          style: TextStyle(
+                            color: Color(0xFF887A9C),
+                            fontSize: 8,
+                            letterSpacing: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '關閉閱讀設定',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(closeContext).pop(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: _readerMuted,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               Row(
@@ -2564,7 +2589,7 @@ class _FrameEpubReaderPreviewScreenState
                     _comicImageFit = comicImageFit;
                     _comicBackdrop = comicBackdrop;
                   });
-                  Navigator.of(sheetContext).pop();
+                  Navigator.of(closeContext).pop();
                   try {
                     await session.saveAppearance({
                       // Legacy D1 keys keep Flutter and the existing reader in sync.
@@ -2602,8 +2627,62 @@ class _FrameEpubReaderPreviewScreenState
             ),
           ),
         ),
+      );
+
+    final screenSize = MediaQuery.sizeOf(context);
+    final panelWidth = (screenSize.width - 32).clamp(280.0, 470.0).toDouble();
+    final panelMaxHeight = (screenSize.height - 104).clamp(320.0, 900.0).toDouble();
+
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '關閉閱讀設定',
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
+        alignment: screenSize.width >= 840
+            ? Alignment.topRight
+            : Alignment.topCenter,
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: screenSize.width >= 840 ? 12 : 8,
+              right: screenSize.width >= 840 ? 20 : 8,
+              left: 8,
+            ),
+            child: Material(
+              color: _readerPanel,
+              elevation: 24,
+              borderRadius: BorderRadius.circular(15),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: panelWidth,
+                  maxHeight: panelMaxHeight,
+                ),
+                child: SizedBox(
+                  width: panelWidth,
+                  child: buildSettingsPanel(dialogContext),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final offset = Tween<Offset>(
+          begin: const Offset(0, -0.025),
+          end: Offset.zero,
+        ).chain(
+          CurveTween(curve: Curves.easeOutCubic),
+        ).animate(animation);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offset, child: child),
+        );
+      },
     );
+
   }
 }
 

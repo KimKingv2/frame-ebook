@@ -52,6 +52,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   late List<FrameReaderAnnotation> _annotations;
   bool _refreshingAnnotations = false;
   bool _showDesktopAnnotations = false;
+  final Set<String> _expandedTocKeys = <String>{};
 
   @override
   void initState() {
@@ -59,6 +60,10 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     _annotations = List<FrameReaderAnnotation>.of(widget.annotations);
     _activeTab = widget.initialTabIndex.clamp(0, 2).toInt();
     _pageController = PageController(initialPage: _activeTab);
+    if (widget.toc.length == 1 && widget.toc.first.children.isNotEmpty) {
+      _expandedTocKeys.add('0');
+    }
+    _expandAncestorsForPath(widget.toc, widget.currentPath);
   }
 
   void _selectTab(int index) {
@@ -95,6 +100,9 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     if (oldWidget.annotations != widget.annotations) {
       _annotations = List<FrameReaderAnnotation>.of(widget.annotations);
     }
+    if (oldWidget.currentPath != widget.currentPath) {
+      _expandAncestorsForPath(widget.toc, widget.currentPath);
+    }
   }
 
   @override
@@ -103,16 +111,155 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     super.dispose();
   }
 
-  List<_SidebarTocEntry> _flattenToc(
+  bool _expandAncestorsForPath(
+    List<FrameEpubTocEntry> entries,
+    String? currentPath, {
+    String prefix = '',
+  }) {
+    if (currentPath == null || currentPath.isEmpty) return false;
+    var found = false;
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      final key = prefix.isEmpty ? '$index' : '$prefix.$index';
+      final isCurrent = entry.path == currentPath;
+      final containsCurrent = _expandAncestorsForPath(
+        entry.children,
+        currentPath,
+        prefix: key,
+      );
+      if (containsCurrent) {
+        _expandedTocKeys.add(key);
+        found = true;
+      } else if (isCurrent) {
+        found = true;
+      }
+    }
+    return found;
+  }
+
+  List<Widget> _buildTocTree(
     List<FrameEpubTocEntry> entries, {
     int depth = 0,
+    String prefix = '',
   }) {
-    final flattened = <_SidebarTocEntry>[];
-    for (final entry in entries) {
-      flattened.add(_SidebarTocEntry(entry, depth));
-      flattened.addAll(_flattenToc(entry.children, depth: depth + 1));
+    final widgets = <Widget>[];
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      final key = prefix.isEmpty ? '$index' : '$prefix.$index';
+      final hasChildren = entry.children.isNotEmpty;
+      final expanded = _expandedTocKeys.contains(key);
+      final selected = entry.path != null && entry.path == widget.currentPath;
+      final available = !entry.isExternal && entry.reference?.path != null;
+      final label =
+          entry.label.trim().isEmpty ? '未命名項目' : entry.label.trim();
+
+      widgets.add(
+        Padding(
+          padding: EdgeInsets.only(left: depth * 10, top: 1, bottom: 1),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: selected
+                  ? const Color(0x332A213B)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(7),
+              border: selected
+                  ? Border.all(color: const Color(0x55A78BFA))
+                  : null,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 30),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 28,
+                    child: hasChildren
+                        ? IconButton(
+                            tooltip: expanded
+                                ? '收合「$label」子目錄'
+                                : '展開「$label」子目錄',
+                            onPressed: () {
+                              setState(() {
+                                if (expanded) {
+                                  _expandedTocKeys.remove(key);
+                                } else {
+                                  _expandedTocKeys.add(key);
+                                }
+                              });
+                            },
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              expanded
+                                  ? Icons.expand_more_rounded
+                                  : Icons.chevron_right_rounded,
+                              color: const Color(0xFFA99ABF),
+                              size: 18,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  Expanded(
+                    child: TextButton(
+                      onPressed:
+                          available ? () => widget.onSelectToc(entry) : null,
+                      style: TextButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        foregroundColor: selected
+                            ? const Color(0xFFF6F0FF)
+                            : depth == 0
+                                ? const Color(0xFFE1D7EF)
+                                : _sidebarText,
+                        disabledForegroundColor: _sidebarText,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 5,
+                        ),
+                        minimumSize: const Size(0, 29),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        backgroundColor: selected
+                            ? const Color(0x221A1328)
+                            : Colors.transparent,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: widget.desktopLayout ? 10 : 12,
+                            height: 1.45,
+                            fontWeight: depth == 0
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      if (hasChildren && expanded) {
+        widgets.addAll(
+          _buildTocTree(
+            entry.children,
+            depth: depth + 1,
+            prefix: key,
+          ),
+        );
+      }
     }
-    return flattened;
+    return widgets;
   }
 
   Future<void> _deleteAnnotation(FrameReaderAnnotation annotation) async {
@@ -283,7 +430,6 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       );
 
   Widget _buildDesktopLayout(int bookmarkCount, int noteCount) {
-    final tocEntries = _flattenToc(widget.toc);
     final notes = _annotations
         .where((item) => item.type != 'bookmark')
         .toList()
@@ -357,7 +503,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             children: [
               _desktopSectionHeading('章節目錄', 'CONTENTS'),
               const SizedBox(height: 7),
-              if (tocEntries.isEmpty)
+              if (widget.toc.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 14, horizontal: 7),
                   child: Text(
@@ -370,41 +516,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                   ),
                 )
               else
-                ...tocEntries.map((item) {
-                  final entry = item.entry;
-                  final available =
-                      !entry.isExternal && entry.reference?.path != null;
-                  final selected = entry.path == widget.currentPath;
-                  return Padding(
-                    padding: EdgeInsets.only(left: item.depth * 9),
-                    child: ListTile(
-                      dense: true,
-                      minVerticalPadding: 3,
-                      visualDensity: const VisualDensity(vertical: -2),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 8),
-                      selected: selected,
-                      selectedTileColor: const Color(0x332A213B),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      title: Text(
-                        entry.label.isEmpty ? '未命名項目' : entry.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color:
-                              selected ? _sidebarAccent : _sidebarText,
-                          fontSize: 11,
-                          height: 1.45,
-                        ),
-                      ),
-                      onTap: available
-                          ? () => widget.onSelectToc(entry)
-                          : null,
-                    ),
-                  );
-                }),
+                ..._buildTocTree(widget.toc),
               const SizedBox(height: 14),
               _desktopSectionHeading('個人筆記', 'MY NOTES'),
               const SizedBox(height: 6),
@@ -649,39 +761,13 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   }
 
   Widget _buildToc() {
-    final entries = _flattenToc(widget.toc);
-    if (entries.isEmpty) {
+    if (widget.toc.isEmpty) {
       return const _SidebarEmptyState(message: '這本 EPUB 沒有提供可用目錄。');
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final item = entries[index];
-        final entry = item.entry;
-        final available = !entry.isExternal && entry.reference?.path != null;
-        final selected = entry.path == widget.currentPath;
-        return Padding(
-          padding: EdgeInsets.only(left: item.depth * 12),
-          child: ListTile(
-            dense: true,
-            enabled: available,
-            selected: selected,
-            selectedTileColor: const Color(0x332A213B),
-            title: Text(
-              entry.label.isEmpty ? '未命名項目' : entry.label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected ? _sidebarAccent : _sidebarText,
-                fontSize: 13,
-              ),
-            ),
-            onTap: available ? () => widget.onSelectToc(entry) : null,
-          ),
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      children: _buildTocTree(widget.toc),
     );
   }
 
@@ -800,9 +886,4 @@ class _SidebarEmptyState extends StatelessWidget {
       );
 }
 
-class _SidebarTocEntry {
-  const _SidebarTocEntry(this.entry, this.depth);
 
-  final FrameEpubTocEntry entry;
-  final int depth;
-}

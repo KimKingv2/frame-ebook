@@ -143,3 +143,10 @@ These items must still pass CI and device verification before being treated as c
 - EPUB 3 navigation parsing now accepts common real-world variations: explicitly marked TOC navigation, `role="doc-toc"`, `id="toc"`, nested ordered lists, and a generic navigation element when no TOC marker is present.
 - When both EPUB 3 navigation and EPUB 2 NCX are absent or unusable, the reader synthesizes a usable chapter list from the OPF spine. These entries navigate to the original archive resources and do not modify or extract the EPUB.
 - Parser and sidebar regression tests cover missing-TOC fallback, non-standard nested EPUB 3 navigation, and the desktop TOC/notes/bookmarks layout. Actual visual parity still requires Web, macOS and Android acceptance using the same books and viewport sizes as the legacy Reader.
+
+### Reading Room interaction parity follow-up
+
+- Both desktop and compact Flutter navigation now render the EPUB TOC as a recursive tree instead of a flattened list. Each node with children has its own disclosure control, independent of chapter selection, and can be expanded or collapsed.
+- A single-root TOC opens its first level by default, matching the legacy Reading Room. When a saved/current reading path is nested in the tree, its ancestor nodes are opened automatically so the current chapter remains discoverable.
+- Reading appearance settings now use a floating panel aligned to the upper-right on wide layouts, with a top-centered compact presentation on narrow layouts, rather than a bottom sheet. Existing font, layout, theme, comic and backdrop options, and all legacy D1 appearance keys remain intact.
+- Regression coverage checks nested TOC expansion/collapse, selecting a nested entry, and automatically opening ancestors of the current chapter.
