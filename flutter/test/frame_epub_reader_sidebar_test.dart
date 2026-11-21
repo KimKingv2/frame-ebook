@@ -429,7 +429,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(deleteCalls, 1);
-    expect(find.text('目前沒有筆記或劃線。'), findsOneWidget);
+    expect(
+      find.text('這本書還沒有筆記或高亮。選取正文中的文字即可新增。'),
+      findsOneWidget,
+    );
     await tester.binding.setSurfaceSize(null);
   });
 }
