@@ -48,7 +48,7 @@ class FrameEpubAppearancePreferences {
 
   static String readingMode(Map<String, dynamic> appearance) {
     final legacy = appearance['readingMode']?.toString();
-    if (legacy == 'paginated' || legacy == 'scrolled') return legacy;
+    if (legacy == 'paginated' || legacy == 'scrolled') return legacy!;
 
     return appearance['frameFlutterLayoutMode'] == 'continuous'
         ? 'scrolled'
@@ -57,7 +57,7 @@ class FrameEpubAppearancePreferences {
 
   static String pageLayout(Map<String, dynamic> appearance) {
     final legacy = appearance['pageLayout']?.toString();
-    if (legacy == '1' || legacy == '2') return legacy;
+    if (legacy == '1' || legacy == '2') return legacy!;
 
     return switch (appearance['frameFlutterLayoutMode']) {
       'paginated' => '1',
