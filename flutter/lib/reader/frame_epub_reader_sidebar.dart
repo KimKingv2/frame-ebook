@@ -229,10 +229,10 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           label,
-                          maxLines: 2,
+                          maxLines: widget.desktopLayout ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: widget.desktopLayout ? 10 : 12,
+                            fontSize: widget.desktopLayout ? 9 : 12,
                             height: 1.45,
                             fontWeight: depth == 0
                                 ? FontWeight.w600
@@ -448,30 +448,73 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(13, 14, 8, 12),
+          padding: const EdgeInsets.fromLTRB(14, 13, 8, 11),
           child: Row(
             children: [
-              const Icon(Icons.menu_book_outlined, color: _sidebarAccent),
-              const SizedBox(width: 9),
               const Expanded(
-                child: Text(
-                  '閱讀導覽',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'IN THIS BOOK',
+                      style: TextStyle(
+                        color: Color(0xFF887A9C),
+                        fontSize: 8,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '閱讀導覽',
+                      style: TextStyle(
+                        color: Color(0xFFEEE7F8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 31,
+                height: 31,
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0x4DB397ED)),
+                  borderRadius: BorderRadius.circular(9),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0x527F5DBE), Color(0xB8362A4B)],
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  'F',
                   style: TextStyle(
-                    color: _sidebarText,
-                    fontSize: 15,
+                    color: Color(0xFFD8C6FF),
+                    fontFamily: 'Georgia',
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              const SizedBox(width: 3),
               IconButton(
                 tooltip: '重新整理標註',
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 31,
+                  height: 34,
+                ),
                 onPressed:
                     _refreshingAnnotations ? null : _refreshAnnotations,
                 icon: _refreshingAnnotations
                     ? const SizedBox(
-                        width: 17,
-                        height: 17,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: _sidebarAccent,
@@ -480,17 +523,22 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                     : const Icon(
                         Icons.refresh_rounded,
                         color: _sidebarMuted,
-                        size: 19,
+                        size: 18,
                       ),
               ),
               IconButton(
                 tooltip: '隱藏閱讀導覽',
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 34,
+                ),
                 onPressed: widget.onClose,
                 icon: const Icon(
                   Icons.close_rounded,
                   color: _sidebarMuted,
-                  size: 19,
+                  size: 18,
                 ),
               ),
             ],
@@ -624,7 +672,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             title,
             style: const TextStyle(
               color: Color(0xFFD8CDEA),
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -632,8 +680,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             english,
             style: const TextStyle(
               color: Color(0xFF766C85),
-              fontSize: 8,
-              letterSpacing: 1,
+              fontSize: 7,
+              letterSpacing: 1.25,
             ),
           ),
         ],

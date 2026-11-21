@@ -227,6 +227,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('IN THIS BOOK'), findsOneWidget);
+    expect(find.text('閱讀導覽'), findsOneWidget);
+    expect(find.text('F'), findsOneWidget);
     expect(find.text('章節目錄'), findsOneWidget);
     expect(find.text('第一章：開始'), findsOneWidget);
     expect(find.text('個人筆記'), findsOneWidget);

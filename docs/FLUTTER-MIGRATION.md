@@ -150,3 +150,10 @@ These items must still pass CI and device verification before being treated as c
 - A single-root TOC opens its first level by default, matching the legacy Reading Room. When a saved/current reading path is nested in the tree, its ancestor nodes are opened automatically so the current chapter remains discoverable.
 - Reading appearance settings now use a floating panel aligned to the upper-right on wide layouts, with a top-centered compact presentation on narrow layouts, rather than a bottom sheet. Existing font, layout, theme, comic and backdrop options, and all legacy D1 appearance keys remain intact.
 - Regression coverage checks nested TOC expansion/collapse, selecting a nested entry, and automatically opening ancestors of the current chapter.
+
+
+### Desktop Reading Room sidebar visual parity
+
+- The Flutter desktop navigation column now uses the legacy `IN THIS BOOK` kicker and FRAME `F` mark, while retaining annotation refresh and sidebar visibility controls.
+- Desktop TOC labels now follow the legacy compact single-line treatment and 9 px typography; section headings and English labels use the original sizing and tracking.
+- Sidebar widget tests verify the restored brand header and preserve the existing TOC, notes, bookmark and selection interactions.
