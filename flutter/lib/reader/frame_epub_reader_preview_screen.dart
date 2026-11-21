@@ -2098,7 +2098,7 @@ class _FrameEpubReaderPreviewScreenState
       );
       return false;
     } on Object catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('無法跳轉至標註位置：$error')),
       );
