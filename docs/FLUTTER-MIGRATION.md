@@ -135,3 +135,11 @@ These items must still pass CI and device verification before being treated as c
 ### Navigator API scope propagation fix
 - The legacy reading room's optional Flutter EPUB Preview route now explicitly inherits the current `FrameApiScope` and in-memory Local OpenList session. This fixes the route boundary where a newly pushed Navigator page did not inherit the old route's provider.
 - The legacy EPUB/CBZ HTML reader itself remains unchanged. A widget regression test verifies that the API scope is available after pushing a nested route and that a missing scope produces a clear setup error.
+
+### Reader UI parity and resilient TOC navigation
+
+- The Flutter EPUB reader now follows the original Reading Room's main layout: book/title and progress header, quick actions, a persistent left navigation column on wide screens, a framed reading viewport, and bottom previous/next page controls with separate chapter and whole-book progress indicators.
+- The desktop navigation column keeps the chapter TOC, expandable personal notes, and bookmarks visible together, matching the original Reading Room's information hierarchy. Compact layouts retain a left-side navigation drawer with separate TOC, notes, and bookmark tabs.
+- EPUB 3 navigation parsing now accepts common real-world variations: explicitly marked TOC navigation, `role="doc-toc"`, `id="toc"`, nested ordered lists, and a generic navigation element when no TOC marker is present.
+- When both EPUB 3 navigation and EPUB 2 NCX are absent or unusable, the reader synthesizes a usable chapter list from the OPF spine. These entries navigate to the original archive resources and do not modify or extract the EPUB.
+- Parser and sidebar regression tests cover missing-TOC fallback, non-standard nested EPUB 3 navigation, and the desktop TOC/notes/bookmarks layout. Actual visual parity still requires Web, macOS and Android acceptance using the same books and viewport sizes as the legacy Reader.

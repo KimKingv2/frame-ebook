@@ -10,9 +10,9 @@ const _sidebarAccent = Color(0xFFC5ADFF);
 
 /// Shared TOC, bookmark and note navigation for the Flutter EPUB reader.
 ///
-/// The host presents this widget as a bottom sheet on compact layouts and as
-/// a right-side drawer on wide layouts. Annotation changes remain delegated to
-/// the reader session so the existing D1 contract is unchanged.
+/// The host presents this widget as a persistent left column on wide layouts
+/// and as a slide-in drawer on compact layouts. Annotation changes remain
+/// delegated to the reader session so the existing D1 contract is unchanged.
 class FrameEpubReaderSidebar extends StatefulWidget {
   const FrameEpubReaderSidebar({
     required this.toc,
@@ -25,6 +25,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
     required this.onDeleteAnnotation,
     required this.onRefreshAnnotations,
     required this.onClose,
+    this.desktopLayout = false,
     super.key,
   });
 
@@ -38,6 +39,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
   final Future<bool> Function(FrameReaderAnnotation) onDeleteAnnotation;
   final Future<void> Function() onRefreshAnnotations;
   final VoidCallback onClose;
+  final bool desktopLayout;
 
   @override
   State<FrameEpubReaderSidebar> createState() =>
@@ -49,6 +51,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   late int _activeTab;
   late List<FrameReaderAnnotation> _annotations;
   bool _refreshingAnnotations = false;
+  bool _showDesktopAnnotations = false;
 
   @override
   void initState() {
@@ -194,7 +197,13 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
 
     return Material(
       color: _sidebarPanel,
-      child: Column(
+      child: widget.desktopLayout
+          ? _buildDesktopLayout(bookmarkCount, noteCount)
+          : _buildCompactLayout(bookmarkCount),
+    );
+  }
+
+  Widget _buildCompactLayout(int bookmarkCount) => Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 10, 10),
@@ -250,7 +259,10 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
               children: [
                 _buildTabButton('目錄', 0),
                 _buildTabButton('書籤 $bookmarkCount', 1),
-                _buildTabButton('筆記 $noteCount', 2),
+                _buildTabButton(
+                  '筆記 ${_annotations.where((item) => item.type != 'bookmark').length}',
+                  2,
+                ),
               ],
             ),
           ),
@@ -268,6 +280,339 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ),
           ),
         ],
+      );
+
+  Widget _buildDesktopLayout(int bookmarkCount, int noteCount) {
+    final tocEntries = _flattenToc(widget.toc);
+    final notes = _annotations
+        .where((item) => item.type != 'bookmark')
+        .toList()
+      ..sort((a, b) {
+        final created = b.createdAt.compareTo(a.createdAt);
+        return created != 0 ? created : b.updatedAt.compareTo(a.updatedAt);
+      });
+    final bookmarks = _annotations
+        .where((item) => item.type == 'bookmark')
+        .toList()
+      ..sort((a, b) {
+        final created = b.createdAt.compareTo(a.createdAt);
+        return created != 0 ? created : b.updatedAt.compareTo(a.updatedAt);
+      });
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(13, 14, 8, 12),
+          child: Row(
+            children: [
+              const Icon(Icons.menu_book_outlined, color: _sidebarAccent),
+              const SizedBox(width: 9),
+              const Expanded(
+                child: Text(
+                  '閱讀導覽',
+                  style: TextStyle(
+                    color: _sidebarText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: '重新整理標註',
+                visualDensity: VisualDensity.compact,
+                onPressed:
+                    _refreshingAnnotations ? null : _refreshAnnotations,
+                icon: _refreshingAnnotations
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _sidebarAccent,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.refresh_rounded,
+                        color: _sidebarMuted,
+                        size: 19,
+                      ),
+              ),
+              IconButton(
+                tooltip: '隱藏閱讀導覽',
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.onClose,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: _sidebarMuted,
+                  size: 19,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0x55393247)),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(11, 13, 11, 14),
+            children: [
+              _desktopSectionHeading('章節目錄', 'CONTENTS'),
+              const SizedBox(height: 7),
+              if (tocEntries.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14, horizontal: 7),
+                  child: Text(
+                    '正在等待 EPUB 章節資料。',
+                    style: TextStyle(
+                      color: _sidebarMuted,
+                      fontSize: 11,
+                      height: 1.6,
+                    ),
+                  ),
+                )
+              else
+                ...tocEntries.map((item) {
+                  final entry = item.entry;
+                  final available =
+                      !entry.isExternal && entry.reference?.path != null;
+                  final selected = entry.path == widget.currentPath;
+                  return Padding(
+                    padding: EdgeInsets.only(left: item.depth * 9),
+                    child: ListTile(
+                      dense: true,
+                      minVerticalPadding: 3,
+                      visualDensity: const VisualDensity(vertical: -2),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 8),
+                      selected: selected,
+                      selectedTileColor: const Color(0x332A213B),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      title: Text(
+                        entry.label.isEmpty ? '未命名項目' : entry.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color:
+                              selected ? _sidebarAccent : _sidebarText,
+                          fontSize: 11,
+                          height: 1.45,
+                        ),
+                      ),
+                      onTap: available
+                          ? () => widget.onSelectToc(entry)
+                          : null,
+                    ),
+                  );
+                }),
+              const SizedBox(height: 14),
+              _desktopSectionHeading('個人筆記', 'MY NOTES'),
+              const SizedBox(height: 6),
+              OutlinedButton(
+                onPressed: () => setState(
+                  () => _showDesktopAnnotations = !_showDesktopAnnotations,
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _sidebarText,
+                  side: const BorderSide(color: Color(0x443F3552)),
+                  backgroundColor: const Color(0x332A213B),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '筆記與標註',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                    Text(
+                      '$noteCount',
+                      style: const TextStyle(
+                        color: _sidebarMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Icon(
+                      _showDesktopAnnotations
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: _sidebarMuted,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+              if (_showDesktopAnnotations) ...[
+                const SizedBox(height: 5),
+                if (notes.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 9, horizontal: 7),
+                    child: Text(
+                      '目前沒有筆記或劃線。',
+                      style: TextStyle(
+                        color: _sidebarMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  )
+                else
+                  ...notes.map(_buildDesktopAnnotationTile),
+              ],
+              const SizedBox(height: 15),
+              _desktopSectionHeading('我的書籤', 'BOOKMARKS · $bookmarkCount'),
+              const SizedBox(height: 5),
+              if (bookmarks.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 9, horizontal: 7),
+                  child: Text(
+                    '目前沒有已保存的書籤。',
+                    style: TextStyle(
+                      color: _sidebarMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                )
+              else
+                ...bookmarks.map(_buildDesktopAnnotationTile),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0x55393247)),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(13, 9, 13, 11),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '閱讀位置、筆記與書籤都會同步保存至雲端',
+              style: TextStyle(
+                color: Color(0xFF8B8198),
+                fontSize: 9,
+                height: 1.6,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _desktopSectionHeading(String title, String english) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFFD8CDEA),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            english,
+            style: const TextStyle(
+              color: Color(0xFF766C85),
+              fontSize: 8,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      );
+
+  Widget _buildDesktopAnnotationTile(FrameReaderAnnotation annotation) {
+    final title = switch (annotation.type) {
+      'bookmark' => '書籤',
+      'highlight' =>
+        annotation.color == 'underline' ? '下劃線' : '高亮',
+      'note' => '筆記',
+      _ => '標註',
+    };
+    final markerColor = switch (annotation.color) {
+      'yellow' => const Color(0xFFF2C94C),
+      'violet' => const Color(0xFFA78BFA),
+      'mint' => const Color(0xFF65C9A5),
+      'rose' => const Color(0xFFE88EAF),
+      _ => _sidebarAccent,
+    };
+    final detail = annotation.text.trim().isNotEmpty
+        ? annotation.text.trim()
+        : annotation.quote.trim();
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: ListTile(
+        dense: true,
+        minVerticalPadding: 3,
+        visualDensity: const VisualDensity(vertical: -2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 5),
+        leading: Container(
+          width: 3,
+          height: 30,
+          decoration: BoxDecoration(
+            color: markerColor,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        onTap: annotation.cfi.trim().isEmpty
+            ? null
+            : () => widget.onOpenAnnotation(annotation),
+        title: Text(
+          title,
+          style: const TextStyle(color: _sidebarText, fontSize: 10),
+        ),
+        subtitle: Text(
+          detail.isEmpty ? '尚無文字內容' : detail,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: _sidebarMuted,
+            fontSize: 9,
+            height: 1.4,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (annotation.type == 'note')
+              IconButton(
+                tooltip: '編輯筆記',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: () => widget.onEditNote(annotation),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  color: _sidebarAccent,
+                  size: 16,
+                ),
+              ),
+            IconButton(
+              tooltip: '刪除$title',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(
+                width: 28,
+                height: 32,
+              ),
+              padding: EdgeInsets.zero,
+              onPressed: () => _deleteAnnotation(annotation),
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFBBAFCB),
+                size: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

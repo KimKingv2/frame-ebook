@@ -369,6 +369,69 @@ void main() {
       }
     });
 
+    test('creates usable chapter navigation when the EPUB has no TOC', () async {
+      final packageWithoutNavigation = _epub3Package.replace(
+        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+        '',
+      );
+      final fixture = _zipFixture([
+        const _ZipItem('mimetype', 'application/epub+zip'),
+        const _ZipItem('META-INF/container.xml', _container),
+        _ZipItem('OPS/package.opf', packageWithoutNavigation),
+        const _ZipItem('OPS/Text/chapter01.xhtml', '<html/>'),
+        const _ZipItem('OPS/Text/chapter02.xhtml', '<html/>'),
+        const _ZipItem('OPS/Images/cover art.png', 'image-bytes'),
+      ]);
+      final archive = await FrameZipArchive.open(
+        source: _MemoryFrameFileSource(fixture),
+        book: _book(fixture.length),
+      );
+
+      try {
+        final epub = await const FrameEpubParser().parse(archive);
+        expect(epub.toc, hasLength(2));
+        expect(epub.toc.first.label, '第1章');
+        expect(epub.toc.first.path, 'OPS/Text/chapter01.xhtml');
+        expect(epub.toc.last.label, '第2章');
+        expect(epub.toc.last.path, 'OPS/Text/chapter02.xhtml');
+      } finally {
+        await archive.close();
+      }
+    });
+
+    test('accepts a nested EPUB 3 nav list when toc type is omitted',
+        () async {
+      const navigation = '''
+        <html xmlns="http://www.w3.org/1999/xhtml">
+          <body><nav id="toc"><div><ol>
+            <li><a href="Text/chapter01.xhtml">Chapter One</a></li>
+          </ol></div></nav></body>
+        </html>
+      ''';
+      final packageWithNav = _epub3Package;
+      final fixture = _zipFixture([
+        const _ZipItem('mimetype', 'application/epub+zip'),
+        const _ZipItem('META-INF/container.xml', _container),
+        _ZipItem('OPS/package.opf', packageWithNav),
+        const _ZipItem('OPS/nav.xhtml', navigation),
+        const _ZipItem('OPS/Text/chapter01.xhtml', '<html/>'),
+        const _ZipItem('OPS/Text/chapter02.xhtml', '<html/>'),
+        const _ZipItem('OPS/Images/cover art.png', 'image-bytes'),
+      ]);
+      final archive = await FrameZipArchive.open(
+        source: _MemoryFrameFileSource(fixture),
+        book: _book(fixture.length),
+      );
+
+      try {
+        final epub = await const FrameEpubParser().parse(archive);
+        expect(epub.toc.first.label, 'Chapter One');
+        expect(epub.toc.first.path, 'OPS/Text/chapter01.xhtml');
+      } finally {
+        await archive.close();
+      }
+    });
+
     test('rejects malformed mimetype', () async {
       final fixture = _zipFixture([
         const _ZipItem('mimetype', 'application/zip'),

@@ -320,6 +320,12 @@ class FrameEpubParser {
       }
     }
 
+    // Some older or hand-produced EPUB files omit a usable nav/NCX document.
+    // Keep chapter navigation available by synthesizing entries from the spine.
+    if (toc.isEmpty) {
+      toc = _createSpineFallbackToc(spine);
+    }
+
     final coverImage = _findCoverImage(metadataElement, manifest);
     final layoutValue =
         _globalMetaValue(metadataElement, 'rendition:layout').toLowerCase();
@@ -583,14 +589,29 @@ List<FrameEpubTocEntry> _parseEpub3Toc(
   String navigationPath,
   List<String> warnings,
 ) {
+  XmlElement? tocNavigation;
+  XmlElement? fallbackNavigation;
   for (final nav in document.descendants.whereType<XmlElement>()) {
     if (nav.name.local != 'nav') continue;
-    if (!_tokens(_attribute(nav, 'type') ?? '').contains('toc')) continue;
-    final list = _firstChild(nav, 'ol');
-    if (list == null) continue;
-    return _parseNavList(list, navigationPath, warnings);
+    final types = _tokens(_attribute(nav, 'type') ?? '');
+    final roles = _tokens(_attribute(nav, 'role') ?? '');
+    final id = (_attribute(nav, 'id') ?? '').toLowerCase();
+    if (types.contains('toc') ||
+        roles.contains('doc-toc') ||
+        id == 'toc' ||
+        id == 'table-of-contents') {
+      tocNavigation = nav;
+      break;
+    }
+    // Some real-world EPUBs omit epub:type="toc"; remember a generic nav.
+    fallbackNavigation ??= nav;
   }
-  return [];
+
+  final navigation = tocNavigation ?? fallbackNavigation;
+  if (navigation == null) return [];
+  final list = _firstDescendant(navigation, 'ol');
+  if (list == null) return [];
+  return _parseNavList(list, navigationPath, warnings);
 }
 
 List<FrameEpubTocEntry> _parseNavList(
@@ -693,6 +714,45 @@ List<FrameEpubTocEntry> _parseNcxPoints(
     }
   }
   return result;
+}
+
+
+List<FrameEpubTocEntry> _createSpineFallbackToc(
+  List<FrameEpubSpineItem> spine,
+) {
+  return List<FrameEpubTocEntry>.generate(spine.length, (index) {
+    final item = spine[index].item;
+    final parts = item.href.split('/');
+    final rawName = parts.isEmpty ? item.href : parts.last;
+    String label;
+    try {
+      label = Uri.decodeComponent(rawName);
+    } on FormatException {
+      label = rawName;
+    }
+
+    final extension = label.lastIndexOf('.');
+    if (extension > 0) {
+      label = label.substring(0, extension);
+    }
+    label = label.replaceAll('_', ' ').replaceAll('-', ' ').trim();
+    final normalized = label.toLowerCase().replaceAll(' ', '');
+    if (label.isEmpty ||
+        int.tryParse(normalized) != null ||
+        normalized.startsWith('chapter') ||
+        normalized.startsWith('ch') ||
+        normalized.startsWith('part') ||
+        normalized.startsWith('section') ||
+        normalized.startsWith('page')) {
+      label = '第' + (index + 1).toString() + '章';
+    }
+
+    return FrameEpubTocEntry(
+      label: label,
+      reference: item.reference,
+      children: const [],
+    );
+  }, growable: false);
 }
 
 String _globalMetaValue(XmlElement metadata, String property) {
