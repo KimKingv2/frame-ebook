@@ -687,11 +687,20 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         ],
       );
 
-  Widget _buildDesktopAnnotationTile(FrameReaderAnnotation annotation) {
+  Widget _buildDesktopAnnotationTile(FrameReaderAnnotation annotation) =>
+      _buildAnnotationCard(annotation, desktop: true);
+
+  Widget _buildAnnotationCard(
+    FrameReaderAnnotation annotation, {
+    required bool desktop,
+  }) {
+    final isBookmark = annotation.type == 'bookmark';
+    final isNote = annotation.type == 'note';
+    final isUnderline =
+        annotation.type == 'highlight' && annotation.color == 'underline';
     final title = switch (annotation.type) {
       'bookmark' => '書籤',
-      'highlight' =>
-        annotation.color == 'underline' ? '下劃線' : '高亮',
+      'highlight' => isUnderline ? '下劃線' : '高亮',
       'note' => '筆記',
       _ => '標註',
     };
@@ -702,77 +711,153 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       'rose' => const Color(0xFFE88EAF),
       _ => _sidebarAccent,
     };
-    final detail = annotation.text.trim().isNotEmpty
-        ? annotation.text.trim()
-        : annotation.quote.trim();
-    return Padding(
-      padding: const EdgeInsets.only(top: 3),
-      child: ListTile(
-        dense: true,
-        minVerticalPadding: 3,
-        visualDensity: const VisualDensity(vertical: -2),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 5),
-        leading: Container(
-          width: 3,
-          height: 30,
-          decoration: BoxDecoration(
-            color: markerColor,
-            borderRadius: BorderRadius.circular(3),
+    final quote = annotation.quote.trim();
+    final note = annotation.text.trim();
+    final quoteFallback = isBookmark ? '已保存的閱讀位置' : '未附選取文字';
+
+    Widget marker;
+    if (isBookmark) {
+      marker = Icon(
+        Icons.star_rounded,
+        color: const Color(0xFFC5A6FF),
+        size: desktop ? 13 : 16,
+      );
+    } else if (isNote) {
+      marker = Container(
+        width: 3,
+        height: desktop ? 34 : 42,
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: markerColor,
+              width: 2,
+              style: BorderStyle.solid,
+            ),
           ),
         ),
-        onTap: annotation.cfi.trim().isEmpty
-            ? null
-            : () => widget.onOpenAnnotation(annotation),
-        title: Text(
-          title,
-          style: const TextStyle(color: _sidebarText, fontSize: 10),
-        ),
-        subtitle: Text(
-          detail.isEmpty ? '尚無文字內容' : detail,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: _sidebarMuted,
-            fontSize: 9,
-            height: 1.4,
+      );
+    } else if (isUnderline) {
+      marker = Container(
+        width: 6,
+        height: 34,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: markerColor, width: 3),
           ),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (annotation.type == 'note')
-              IconButton(
-                tooltip: '編輯筆記',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(
-                  width: 28,
-                  height: 32,
-                ),
-                padding: EdgeInsets.zero,
-                onPressed: () => widget.onEditNote(annotation),
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  color: _sidebarAccent,
-                  size: 16,
-                ),
-              ),
-            IconButton(
-              tooltip: '刪除$title',
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(
-                width: 28,
-                height: 32,
-              ),
-              padding: EdgeInsets.zero,
-              onPressed: () => _deleteAnnotation(annotation),
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: Color(0xFFBBAFCB),
-                size: 16,
-              ),
+      );
+    } else {
+      marker = Container(
+        width: 6,
+        height: desktop ? 34 : 42,
+        decoration: BoxDecoration(
+          color: markerColor,
+          borderRadius: BorderRadius.circular(5),
+          boxShadow: [
+            BoxShadow(
+              color: markerColor.withValues(alpha: .18),
+              blurRadius: 8,
             ),
           ],
         ),
+      );
+    }
+
+    return Container(
+      margin: EdgeInsets.only(bottom: desktop ? 3 : 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: desktop ? 7 : 9,
+        vertical: desktop ? 7 : 10,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0x07FFFFFF),
+        border: Border.all(color: const Color(0x1CB EA6E5).withValues(alpha: 1)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: desktop ? 12 : 16,
+            child: Padding(
+              padding: EdgeInsets.only(top: isBookmark ? 2 : 1),
+              child: marker,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: TextButton(
+              onPressed: annotation.cfi.trim().isEmpty
+                  ? null
+                  : () => widget.onOpenAnnotation(annotation),
+              style: TextButton.styleFrom(
+                alignment: Alignment.topLeft,
+                foregroundColor: _sidebarText,
+                disabledForegroundColor: _sidebarMuted,
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const RoundedRectangleBorder(),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: const Color(0xFFBCA8E9),
+                      fontSize: desktop ? 8 : 10,
+                      letterSpacing: .35,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    quote.isEmpty ? quoteFallback : quote,
+                    maxLines: desktop ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFFE4DDEC),
+                      fontSize: desktop ? 9 : 12,
+                      height: 1.55,
+                    ),
+                  ),
+                  if (isNote && note.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      note,
+                      maxLines: desktop ? 2 : 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFF9F94AD),
+                        fontSize: desktop ? 8 : 11,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          TextButton(
+            onPressed: () => _deleteAnnotation(annotation),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFC99AAA),
+              padding: EdgeInsets.symmetric(
+                horizontal: desktop ? 5 : 7,
+                vertical: desktop ? 3 : 5,
+              ),
+              minimumSize: const Size(0, 27),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              '刪除',
+              style: TextStyle(fontSize: desktop ? 8 : 10),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -830,88 +915,18 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       });
     if (items.isEmpty) {
       return _SidebarEmptyState(
-        message: bookmarksOnly ? '目前沒有已保存的書籤。' : '目前沒有筆記或劃線。',
+        message: bookmarksOnly
+            ? '尚無書籤。閱讀到想記住的位置時，點擊書頁右上角的書籤按鈕。'
+            : '這本書還沒有筆記或高亮。選取正文中的文字即可新增。',
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: items.length,
-      separatorBuilder: (_, __) =>
-          const Divider(height: 1, color: Color(0x33393247)),
-      itemBuilder: (context, index) {
-        final annotation = items[index];
-        final title = switch (annotation.type) {
-          'bookmark' => '書籤',
-          'highlight' =>
-            annotation.color == 'underline' ? '下劃線' : '高亮',
-          'note' => '筆記',
-          _ => '標註',
-        };
-        final markerColor = switch (annotation.color) {
-          'yellow' => const Color(0xFFF2C94C),
-          'violet' => const Color(0xFFA78BFA),
-          'mint' => const Color(0xFF65C9A5),
-          'rose' => const Color(0xFFE88EAF),
-          _ => _sidebarAccent,
-        };
-        final detail = annotation.text.trim().isNotEmpty
-            ? annotation.text.trim()
-            : annotation.quote.trim();
-        return ListTile(
-          leading: Container(
-            width: 4,
-            height: 34,
-            decoration: BoxDecoration(
-              color: markerColor,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          onTap: annotation.cfi.trim().isEmpty
-              ? null
-              : () => widget.onOpenAnnotation(annotation),
-          title: Text(
-            title,
-            style: const TextStyle(color: _sidebarText, fontSize: 13),
-          ),
-          subtitle: Text(
-            detail.isEmpty ? '尚無文字內容' : detail,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _sidebarMuted,
-              fontSize: 12,
-              height: 1.5,
-            ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (annotation.type == 'note')
-                IconButton(
-                  tooltip: '編輯筆記',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => widget.onEditNote(annotation),
-                  icon: const Icon(
-                    Icons.edit_outlined,
-                    color: _sidebarAccent,
-                    size: 18,
-                  ),
-                ),
-              IconButton(
-                tooltip: '刪除$title',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _deleteAnnotation(annotation),
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xFFBBAFCB),
-                  size: 19,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(9, 10, 9, 12),
+      children: [
+        for (final annotation in items)
+          _buildAnnotationCard(annotation, desktop: false),
+      ],
     );
   }
 }

@@ -1639,7 +1639,12 @@ class _FrameEpubReaderPreviewScreenState
       },
       onOpenAnnotation: (annotation) {
         if (!desktopLayout) onClose();
-        unawaited(_goToAnnotation(annotation));
+        unawaited(() async {
+          final moved = await _goToAnnotation(annotation);
+          if (moved && annotation.type == 'note' && mounted) {
+            await _editNote(annotation: annotation);
+          }
+        }());
       },
       onEditNote: (annotation) {
         if (!desktopLayout) onClose();
@@ -2080,21 +2085,24 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
-  Future<void> _goToAnnotation(FrameReaderAnnotation annotation) async {
+  Future<bool> _goToAnnotation(FrameReaderAnnotation annotation) async {
     final session = _session;
-    if (session == null) return;
+    if (session == null) return false;
     await _flushReadingPosition();
     try {
       final moved = await session.goToCfi(annotation.cfi);
-      if (!mounted || moved) return;
+      if (!mounted) return false;
+      if (moved) return true;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('這筆標註的位置無法在目前 EPUB 中定位。')),
       );
+      return false;
     } on Object catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('無法跳轉至標註位置：$error')),
       );
+      return false;
     }
   }
 
@@ -2425,9 +2433,22 @@ class _FrameEpubReaderPreviewScreenState
                   ),
                 ),
               const SizedBox(height: 14),
-              const Text(
-                '漫畫與圖像',
-                style: TextStyle(color: _readerMuted),
+              Row(
+                children: [
+                  const Text(
+                    '漫畫與圖像',
+                    style: TextStyle(color: _readerMuted),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'COMIC READING',
+                    style: TextStyle(
+                      color: Color(0xFF887A9C),
+                      fontSize: 8,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -2514,31 +2535,57 @@ class _FrameEpubReaderPreviewScreenState
                 ],
               ),
               const SizedBox(height: 14),
-              const Text(
-                '閱讀主題',
-                style: TextStyle(color: _readerMuted),
+              Row(
+                children: [
+                  const Text(
+                    '紙張主題',
+                    style: TextStyle(color: _readerMuted),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'PAGE TONE',
+                    style: TextStyle(
+                      color: Color(0xFF887A9C),
+                      fontSize: 8,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 9),
               Wrap(
-                spacing: 8,
+                spacing: 7,
+                runSpacing: 7,
                 children: [
                   ChoiceChip(
-                    label: const Text('夜間'),
-                    selected: theme == 'dark',
+                    avatar: const CircleAvatar(
+                      radius: 6,
+                      backgroundColor: Color(0xFFFFFEFA),
+                    ),
+                    label: const Text('紙白'),
+                    selected: theme == 'light',
                     onSelected: (_) =>
-                        setSheetState(() => theme = 'dark'),
+                        setSheetState(() => theme = 'light'),
                   ),
                   ChoiceChip(
+                    avatar: const CircleAvatar(
+                      radius: 6,
+                      backgroundColor: Color(0xFFF1E7D5),
+                    ),
                     label: const Text('暖紙'),
                     selected: theme == 'sepia',
                     onSelected: (_) =>
                         setSheetState(() => theme = 'sepia'),
                   ),
                   ChoiceChip(
-                    label: const Text('紙白'),
-                    selected: theme == 'light',
+                    avatar: const CircleAvatar(
+                      radius: 6,
+                      backgroundColor: Color(0xFF191821),
+                    ),
+                    label: const Text('夜讀'),
+                    selected: theme == 'dark',
                     onSelected: (_) =>
-                        setSheetState(() => theme = 'light'),
+                        setSheetState(() => theme = 'dark'),
                   ),
                 ],
               ),

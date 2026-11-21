@@ -165,3 +165,11 @@ These items must still pass CI and device verification before being treated as c
 - The appearance panel now uses the Legacy line-height choices and keeps reading mode separate from the single-/double-page preference. The page-layout preference remains saved while continuous scrolling is active.
 - Saving appearance writes the established shared keys instead of refreshing duplicate Flutter-only values that could become stale when the Legacy reader changes a setting.
 - Unit tests cover Legacy-value precedence, supported line-height normalization, theme mapping and independent reading-mode/page-layout restoration.
+
+
+### Annotation list parity refinement
+
+- Flutter note, highlight, underline and bookmark rows now present the original selected quotation separately from the saved note preview, with the matching annotation marker and a text delete action.
+- Bookmark rows use the Legacy star marker and the original empty-state guidance. Existing notes open their editor after the reader successfully returns to the saved CFI.
+- The appearance panel now uses the Legacy paper-tone labels and visual swatches, and labels the comic settings group with its original `COMIC READING` kicker.
+- Sidebar widget coverage checks separate quotation/note rendering, bookmark markers and the existing jump/delete interactions.

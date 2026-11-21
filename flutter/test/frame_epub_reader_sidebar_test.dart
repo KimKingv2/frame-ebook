@@ -248,6 +248,59 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
+  testWidgets('annotation cards keep selected quote and note preview separate',
+      (tester) async {
+    const note = FrameReaderAnnotation(
+      id: 'note-quote-preview',
+      bookId: 'book-one',
+      type: 'note',
+      cfi: 'epubcfi(/6/2!/4/2:3)',
+      quote: '這是原文摘錄',
+      text: '這是另外保存的筆記內容',
+      color: 'violet',
+      createdAt: 30,
+    );
+    const bookmark = FrameReaderAnnotation(
+      id: 'bookmark-preview',
+      bookId: 'book-one',
+      type: 'bookmark',
+      cfi: 'epubcfi(/6/2!/4/2:5)',
+      quote: '這是書籤所在位置',
+      createdAt: 20,
+    );
+
+    await tester.binding.setSurfaceSize(const Size(420, 760));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubReaderSidebar(
+            toc: const [],
+            currentPath: null,
+            annotations: const [note, bookmark],
+            initialTabIndex: 2,
+            onSelectToc: (_) {},
+            onOpenAnnotation: (_) {},
+            onEditNote: (_) {},
+            onRefreshAnnotations: () async {},
+            onDeleteAnnotation: (_) async => true,
+            onClose: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('這是原文摘錄'), findsOneWidget);
+    expect(find.text('這是另外保存的筆記內容'), findsOneWidget);
+
+    await tester.tap(find.text('書籤 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('這是書籤所在位置'), findsOneWidget);
+    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
   testWidgets('cancel keeps a bookmark and does not call the delete handler',
       (tester) async {
     var deleteCalls = 0;

@@ -71,7 +71,7 @@ Source: pages/epub-lab/index.html, pages/assets/epub-lab-comics-20261112.js, pag
 - [ ] Preserve text selection and annotation toolbar.
 - [ ] Preserve highlight colors: yellow, violet, mint and rose.
 - [ ] Preserve underline annotations.
-- [ ] Preserve note creation, editing, quotation context, save and deletion.
+- [ ] Preserve note creation, editing, quotation context, save and deletion. Flutter Preview now displays quote and note text separately in the annotation list and opens an existing note editor when returning to its saved CFI; full interaction parity remains subject to platform acceptance.
 - [ ] Preserve annotation list, count, type labels, jump-to-annotation, refresh and deletion.
 - [ ] Preserve annotation restoration and drawing in the text layer after chapter/page rendering.
 - [ ] Preserve EPUB CFI progress restoration and CBZ/fixed-layout page-index restoration.
