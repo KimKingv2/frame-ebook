@@ -370,7 +370,7 @@ void main() {
     });
 
     test('creates usable chapter navigation when the EPUB has no TOC', () async {
-      final packageWithoutNavigation = _epub3Package.replace(
+      final packageWithoutNavigation = _epub3Package.replaceAll(
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
         '',
       );
