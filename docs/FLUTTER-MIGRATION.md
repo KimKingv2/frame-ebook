@@ -157,3 +157,11 @@ These items must still pass CI and device verification before being treated as c
 - The Flutter desktop navigation column now uses the legacy `IN THIS BOOK` kicker and FRAME `F` mark, while retaining annotation refresh and sidebar visibility controls.
 - Desktop TOC labels now follow the legacy compact single-line treatment and 9 px typography; section headings and English labels use the original sizing and tracking.
 - Sidebar widget tests verify the restored brand header and preserve the existing TOC, notes, bookmark and selection interactions.
+
+
+### Legacy appearance setting compatibility
+
+- Flutter treats the shared Legacy `lineHeight`, `theme`, `readingMode` and `pageLayout` fields as authoritative when restoring reader appearance. Older Flutter-only duplicate fields are fallback-only for settings saved by earlier preview builds.
+- The appearance panel now uses the Legacy line-height choices and keeps reading mode separate from the single-/double-page preference. The page-layout preference remains saved while continuous scrolling is active.
+- Saving appearance writes the established shared keys instead of refreshing duplicate Flutter-only values that could become stale when the Legacy reader changes a setting.
+- Unit tests cover Legacy-value precedence, supported line-height normalization, theme mapping and independent reading-mode/page-layout restoration.
