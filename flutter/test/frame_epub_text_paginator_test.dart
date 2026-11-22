@@ -57,8 +57,8 @@ void main() {
     final text = TextSpan(
       style: const TextStyle(fontSize: 18, height: 1.5),
       children: [
-        TextSpan(text: List.filled(18, '長い本文の行です。').join('\n')),
-        const TextSpan(text: '\n漢字'),
+        TextSpan(text: List.filled(18, '長い本文の行です。').join()),
+        const TextSpan(text: '漢字'),
         WidgetSpan(
           alignment: PlaceholderAlignment.aboveBaseline,
           baseline: TextBaseline.alphabetic,
