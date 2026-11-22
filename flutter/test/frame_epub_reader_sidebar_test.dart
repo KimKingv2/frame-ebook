@@ -277,7 +277,7 @@ void main() {
             toc: const [],
             currentPath: null,
             annotations: const [note, bookmark],
-            initialTabIndex: 2,
+            initialTabIndex: 1,
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},
@@ -290,6 +290,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('個人筆記'), findsOneWidget);
+    expect(find.text('MY NOTES'), findsOneWidget);
+    expect(find.text('筆記與標註'), findsOneWidget);
     expect(find.text('這是原文摘錄'), findsOneWidget);
     expect(find.text('這是另外保存的筆記內容'), findsOneWidget);
 
@@ -322,7 +325,7 @@ void main() {
             toc: const [],
             currentPath: null,
             annotations: const [bookmark],
-            initialTabIndex: 1,
+            initialTabIndex: 2,
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},
@@ -407,7 +410,7 @@ void main() {
             toc: const [],
             currentPath: null,
             annotations: const [note],
-            initialTabIndex: 2,
+            initialTabIndex: 1,
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},
