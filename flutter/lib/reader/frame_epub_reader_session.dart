@@ -317,13 +317,43 @@ class FrameEpubReaderSession extends ChangeNotifier {
     );
   }
 
+  String _normalizeArchivePathForLookup(String path) {
+    final decoded = <String>[];
+    for (final rawSegment in path.replaceAll('\\', '/').split('/')) {
+      if (rawSegment.isEmpty || rawSegment == '.') continue;
+      String segment;
+      try {
+        segment = Uri.decodeComponent(rawSegment);
+      } on FormatException {
+        segment = rawSegment;
+      }
+      if (segment == '..') {
+        if (decoded.isNotEmpty) decoded.removeLast();
+      } else {
+        decoded.add(segment);
+      }
+    }
+    return decoded.join('/');
+  }
+
   Future<bool> _goToArchivePath(
     String path, {
     required String fragment,
   }) async {
     final spine = _epub?.spine;
     if (spine == null) return false;
-    final index = spine.indexWhere((item) => item.item.path == path);
+    var index = spine.indexWhere((item) => item.item.path == path);
+    if (index < 0) {
+      final target = _normalizeArchivePathForLookup(path).toLowerCase();
+      final matches = <int>[
+        for (var i = 0; i < spine.length; i++)
+          if (_normalizeArchivePathForLookup(spine[i].item.path)
+                  .toLowerCase() ==
+              target)
+            i,
+      ];
+      if (matches.length == 1) index = matches.single;
+    }
     if (index < 0) return false;
     return _loadSpineIndex(
       index,

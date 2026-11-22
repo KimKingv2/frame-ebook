@@ -134,6 +134,7 @@ FrameBook _book(int size) => FrameBook.fromJson({
 
 Uint8List _zipFixture({
   bool fixedLayout = false,
+  bool tocPathCaseMismatch = false,
 }) {
   const container = '''
 <container>
@@ -170,14 +171,20 @@ Uint8List _zipFixture({
   </spine>
 </package>
 ''';
-  const navigation = '''
+  final chapterOneHref = tocPathCaseMismatch
+      ? 'text/chapter-one.xhtml#start'
+      : 'Text/chapter-one.xhtml#start';
+  final chapterTwoHref = tocPathCaseMismatch
+      ? 'text/chapter-two.xhtml#part-two'
+      : 'Text/chapter-two.xhtml#part-two';
+  final navigation = '''
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:epub="http://www.idpf.org/2007/ops">
   <body>
     <nav epub:type="toc">
       <ol>
-        <li><a href="Text/chapter-one.xhtml#start">第一章</a></li>
-        <li><a href="Text/chapter-two.xhtml#part-two">第二章</a></li>
+        <li><a href="$chapterOneHref">第一章</a></li>
+        <li><a href="$chapterTwoHref">第二章</a></li>
       </ol>
     </nav>
   </body>
@@ -532,6 +539,29 @@ void main() {
       await olderRefresh;
 
       expect(session.annotations.map((item) => item.id), ['newest-note']);
+      await session.close();
+    });
+
+    test('TOC navigation resolves case-only aliases to the spine file',
+        () async {
+      final fixture = _zipFixture(tocPathCaseMismatch: true);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(
+        session.toc[1].reference?.path,
+        'OPS/text/chapter-two.xhtml',
+      );
+      expect(await session.goToTocEntry(session.toc[1]), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/chapter-two.xhtml',
+      );
       await session.close();
     });
 

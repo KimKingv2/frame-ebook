@@ -206,8 +206,19 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                   ),
                   Expanded(
                     child: TextButton(
-                      onPressed:
-                          available ? () => widget.onSelectToc(entry) : null,
+                      onPressed: available
+                          ? () => widget.onSelectToc(entry)
+                          : hasChildren
+                              ? () {
+                                  setState(() {
+                                    if (expanded) {
+                                      _expandedTocKeys.remove(key);
+                                    } else {
+                                      _expandedTocKeys.add(key);
+                                    }
+                                  });
+                                }
+                              : null,
                       style: TextButton.styleFrom(
                         alignment: Alignment.centerLeft,
                         foregroundColor: selected

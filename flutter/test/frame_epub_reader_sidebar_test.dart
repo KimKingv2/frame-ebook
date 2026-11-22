@@ -85,6 +85,13 @@ void main() {
     expect(find.text('第一節'), findsNothing);
     expect(find.text('第一小節'), findsNothing);
 
+    await tester.tap(find.text('第一章'));
+    await tester.pumpAndSettle();
+    expect(find.text('第一節'), findsOneWidget);
+    await tester.tap(find.text('第一章'));
+    await tester.pumpAndSettle();
+    expect(find.text('第一節'), findsNothing);
+
     await tester.tap(find.byTooltip('展開「第一章」子目錄'));
     await tester.pumpAndSettle();
     expect(find.text('第一節'), findsOneWidget);

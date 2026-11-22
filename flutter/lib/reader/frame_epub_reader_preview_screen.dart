@@ -84,7 +84,7 @@ class _FrameEpubReaderPreviewScreenState
   _SelectedEpubText? _selectedText;
   bool _isFixedPageZoomed = false;
 
-  double _fontSize = 18;
+  double _fontSize = 16;
   double _lineHeight = 1.65;
   double _fontScale = 1;
   String _fontFamilyPreference = 'original';
@@ -520,9 +520,9 @@ class _FrameEpubReaderPreviewScreenState
   Color get _pageBackground {
     switch (_theme) {
       case 'sepia':
-        return const Color(0xFFF1E6D0);
+        return const Color(0xFFF1E7D5);
       case 'light':
-        return const Color(0xFFFAF9FC);
+        return const Color(0xFFFFFEFA);
       case 'dark':
       default:
         return _readerChrome;
@@ -613,12 +613,12 @@ class _FrameEpubReaderPreviewScreenState
   Color get _pageText {
     switch (_theme) {
       case 'sepia':
-        return const Color(0xFF3F3529);
+        return const Color(0xFF40362B);
       case 'light':
-        return const Color(0xFF27232D);
+        return const Color(0xFF29262D);
       case 'dark':
       default:
-        return const Color(0xFFECE7F4);
+        return const Color(0xFFE5DFED);
     }
   }
 
@@ -784,45 +784,12 @@ class _FrameEpubReaderPreviewScreenState
     required VoidCallback? onPressed,
     required bool selected,
     bool compact = false,
-    bool mobileDock = false,
   }) {
     final iconColor = onPressed == null
         ? const Color(0xFF746C80)
         : selected
             ? _readerAccent
             : const Color(0xFFDCD2ED);
-    if (mobileDock) {
-      return Expanded(
-        child: Container(
-          height: 34,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: selected
-                ? const Color(0xFF30263F)
-                : const Color(0xFF2D253C),
-            border: Border.all(
-              color: selected
-                  ? const Color(0x887F68AA)
-                  : const Color(0x443F3552),
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SizedBox.expand(
-            child: IconButton(
-              tooltip: tooltip,
-              onPressed: onPressed,
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(
-                minWidth: 34,
-                minHeight: 34,
-              ),
-              icon: Icon(icon, size: 18, color: iconColor),
-            ),
-          ),
-        ),
-      );
-    }
 
     final width = compact ? 32.0 : 36.0;
     final height = compact ? 27.0 : 31.0;
@@ -980,88 +947,10 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Widget _buildMobileQuickActions(
-    FrameEpubReaderSession session,
-  ) {
-    final ready = session.status == FrameEpubReaderStatus.ready;
-    final cfi = ready
-        ? _bookmarkCfi(
-            session,
-            preferred: _pendingCfi ?? _lastVisibleCfi,
-          )
-        : null;
-    final bookmarked =
-        findFrameBookmarkAtCfi(session.annotations, cfi) != null;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(13),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: const Color(0xF213101C),
-            border: Border.all(color: const Color(0x47C1AAEE)),
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 30,
-                offset: Offset(0, 10),
-              ),
-              BoxShadow(
-                color: Color(0x0DFFFFFF),
-                blurRadius: 0,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              _readerQuickAction(
-                tooltip: bookmarked ? '移除目前位置的書籤' : '加入目前位置的書籤',
-                icon: bookmarked
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_add_outlined,
-                selected: bookmarked,
-                mobileDock: true,
-                onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
-              ),
-              _readerQuickAction(
-                tooltip: '目錄、筆記與書籤',
-                icon: Icons.menu_book_outlined,
-                selected: false,
-                mobileDock: true,
-                onPressed:
-                    ready ? () => unawaited(_showTableOfContents()) : null,
-              ),
-              _readerQuickAction(
-                tooltip: '閱讀設定',
-                icon: Icons.tune_rounded,
-                selected: false,
-                mobileDock: true,
-                onPressed: ready ? _showAppearance : null,
-              ),
-              _readerQuickAction(
-                tooltip: '切換全螢幕閱讀',
-                icon: Icons.fullscreen_rounded,
-                selected: false,
-                mobileDock: true,
-                onPressed: ready ? _toggleImmersiveMode : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBookHeading(
     FrameEpubReaderSession? session, {
     required double viewportWidth,
     required bool wide,
-    bool showQuickActions = true,
   }) {
     final compact = viewportWidth <= 560;
     final ready = session?.status == FrameEpubReaderStatus.ready;
@@ -1195,15 +1084,13 @@ class _FrameEpubReaderPreviewScreenState
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      if (showQuickActions) ...[
-                        const SizedBox(height: 5),
-                        Wrap(
-                          alignment: WrapAlignment.end,
-                          spacing: 0,
-                          runSpacing: 4,
-                          children: actions,
-                        ),
-                      ],
+                      const SizedBox(height: 5),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 0,
+                        runSpacing: 4,
+                        children: actions,
+                      ),
                     ],
                   ),
                 ),
@@ -1317,8 +1204,6 @@ class _FrameEpubReaderPreviewScreenState
                             session,
                             viewportWidth: viewportWidth - shellInset * 2,
                             wide: wide,
-                            showQuickActions:
-                                !frameEpubUsesMobileQuickActions(viewportWidth),
                           ),
                           Expanded(
                             child: Padding(
@@ -1379,19 +1264,6 @@ class _FrameEpubReaderPreviewScreenState
                         ),
                       ),
                     ),
-                    if (frameEpubUsesMobileQuickActions(viewportWidth) &&
-                        session?.status == FrameEpubReaderStatus.ready)
-                      Positioned(
-                        left: 10,
-                        right: 10,
-                        bottom: 10,
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 360),
-                            child: _buildMobileQuickActions(session!),
-                          ),
-                        ),
-                      ),
                   ],
                 );
               },
@@ -1969,6 +1841,30 @@ class _FrameEpubReaderPreviewScreenState
   Future<void> _showTableOfContents() =>
       _showReaderSidebar(initialTabIndex: 0);
 
+  Future<void> _selectTocEntry(
+    FrameEpubReaderSession session,
+    FrameEpubTocEntry entry, {
+    required bool closeSidebar,
+    required VoidCallback onClose,
+  }) async {
+    if (closeSidebar) onClose();
+    await _flushReadingPosition();
+    try {
+      final moved = await session.goToTocEntry(entry);
+      if (!mounted || moved) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('這個目錄項目沒有對應到可閱讀的 EPUB 章節。'),
+        ),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('無法開啟目錄章節：$error')),
+      );
+    }
+  }
+
   Widget _buildReaderSidebar(
     FrameEpubReaderSession session, {
     required int initialTabIndex,
@@ -1985,8 +1881,14 @@ class _FrameEpubReaderPreviewScreenState
       desktopLayout: desktopLayout,
       onClose: onClose,
       onSelectToc: (entry) {
-        if (!desktopLayout) onClose();
-        unawaited(_runNavigation(() => session.goToTocEntry(entry)));
+        unawaited(
+          _selectTocEntry(
+            session,
+            entry,
+            closeSidebar: !desktopLayout,
+            onClose: onClose,
+          ),
+        );
       },
       onOpenAnnotation: (annotation) {
         if (!desktopLayout) onClose();

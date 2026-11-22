@@ -194,7 +194,7 @@ class FrameEpubChapterView extends StatefulWidget {
     this.textColor = const Color(0xFFECE7F4),
     this.linkColor = const Color(0xFFBFA4FF),
     this.fontFamily = 'NotoSansTC',
-    this.fontSize = 18,
+    this.fontSize = 16,
     this.lineHeight = 1.65,
     this.fontScale = 1,
     this.fontFamilyPreference = 'original',
