@@ -173,6 +173,12 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Immersive state chrome parity correction
+
+- The legacy immersive state collapses the book heading to zero height and hides the sidebar, quick actions, reading-session indicator and page controls. Flutter now expands only the reader viewport to the full immersive surface and removes those controls, instead of keeping the title row, sidebar and mobile action dock visible.
+- This is distinct from ordinary browser fullscreen, which may retain the regular reader chrome. Escape / system-back and the existing top-zone listener remain the exit paths.
+- The immersive state is source-aligned; same-viewport visual comparison and cross-platform exit/restore acceptance remain pending.
+
 ### Compact left navigation drawer geometry
 
 - The compact Flutter navigation now matches the legacy left drawer: maximum 390 px, 91vw with an 18 px minimum outer-width reserve, 8 px top/bottom insets in normal mode, and 6 px in fullscreen.

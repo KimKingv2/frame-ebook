@@ -1248,88 +1248,16 @@ class _FrameEpubReaderPreviewScreenState
         child: child,
       );
 
-  Widget _buildImmersiveLayout(
-    FrameEpubReaderSession? session, {
-    required bool wide,
-  }) {
-    final ready = session?.status == FrameEpubReaderStatus.ready;
-    final showSidebar = wide && _isSidebarVisible && ready;
-    final viewportWidth = MediaQuery.sizeOf(context).width;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
-            child: Column(
-              children: [
-                _buildBookHeading(
-                  session,
-                  viewportWidth: viewportWidth - 34,
-                  wide: wide,
-                  showQuickActions: false,
-                ),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (showSidebar) ...[
-                        SizedBox(
-                          width: 220,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _readerPanel,
-                              border: Border.all(
-                                color: const Color(0x33C1AAEE),
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: _buildReaderSidebar(
-                              session!,
-                              initialTabIndex: 0,
-                              desktopLayout: true,
-                              onClose: () =>
-                                  setState(() => _isSidebarVisible = false),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                      ],
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: _buildReaderFrame(
-                                _buildBody(session),
-                                wide: wide,
-                                immersive: true,
-                              ),
-                            ),
-                            if (ready) _chapterControls(session!),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Widget _buildImmersiveLayout(FrameEpubReaderSession? session) {
+    return ColoredBox(
+      color: const Color(0xFF12101A),
+      child: SizedBox.expand(
+        child: _buildReaderFrame(
+          _buildBody(session),
+          wide: true,
+          immersive: true,
         ),
-        if (!wide && ready)
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: _buildMobileQuickActions(session!),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 
@@ -1352,7 +1280,7 @@ class _FrameEpubReaderPreviewScreenState
                 final viewportWidth = constraints.maxWidth;
                 final wide = viewportWidth > 820;
                 if (_isImmersive) {
-                  return _buildImmersiveLayout(session, wide: wide);
+                  return _buildImmersiveLayout(session);
                 }
 
                 final shellInset = viewportWidth <= 420
@@ -3229,52 +3157,53 @@ _appearanceDropdown(
       barrierLabel: '關閉閱讀設定',
       barrierColor: const Color(0x9407060B),
       transitionDuration: const Duration(milliseconds: 480),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) => Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: const ColoredBox(color: Colors.transparent),
-            ),
-          ),
-          Align(
-            alignment: panelLayout.alignment,
-            child: Padding(
-              padding: panelLayout.outerPadding,
-              child: Container(
-                width: panelLayout.width,
-                height: panelLayout.height,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B1726),
-                  border: const Border(
-                    top: BorderSide(color: Color(0x47C1AAEE)),
-                    left: BorderSide(color: Color(0x47C1AAEE)),
-                    bottom: BorderSide(color: Color(0x47C1AAEE)),
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    bottomLeft: Radius.circular(18),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x75000000),
-                      blurRadius: 72,
-                      offset: Offset(-24, 0),
-                    ),
-                    BoxShadow(
-                      color: Color(0x0DFFFFFF),
-                      blurRadius: 0,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
+        alignment: panelLayout.alignment,
+        child: Padding(
+          padding: panelLayout.outerPadding,
+          child: Container(
+            width: panelLayout.width,
+            height: panelLayout.height,
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x75000000),
+                  blurRadius: 72,
+                  offset: Offset(-24, 0),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: buildSettingsPanel(dialogContext),
+              ],
+            ),
+            clipBehavior: Clip.none,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFC1B1726),
+                    border: Border(
+                      top: BorderSide(color: Color(0x47C1AAEE)),
+                      left: BorderSide(color: Color(0x47C1AAEE)),
+                      bottom: BorderSide(color: Color(0x47C1AAEE)),
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                    ),
+                  ),
+                  child: buildSettingsPanel(dialogContext),
+                ),
               ),
             ),
           ),
-        ],
+        ),
       ),
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
         final offset = Tween<Offset>(
