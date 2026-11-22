@@ -9,6 +9,7 @@ import 'package:frame_ebook/reader/frame_epub_cfi.dart';
 import 'package:frame_ebook/reader/frame_epub_footnote.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
+import 'package:frame_ebook/reader/frame_epub_ruby_annotation.dart';
 import 'package:frame_ebook/reader/frame_zip_archive.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
 import 'package:material_ui/material_ui.dart';
@@ -573,6 +574,112 @@ void main() {
       expect(subscriptText.style?.backgroundColor, const Color(0x6665C9A5));
       expect(root.toPlainText(), contains('Water H2O and x3'));
       expect(find.byType(SelectableText), findsWidgets);
+    } finally {
+      await archive.close();
+    }
+  });
+
+  testWidgets('renders ruby annotations without polluting selectable text',
+      (tester) async {
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <p>Ruby：<ruby>漢字<rp>（</rp><rt>かんじ</rt><rp>）</rp></ruby>。</p>
+        <p>分段：<ruby>漢<rt>かん</rt>字<rt>じ</rt></ruby>。</p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-ruby-annotation-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/ruby.epub',
+      'fileName': 'ruby.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final rubyBase = chapter.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == '漢字');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final rubySelectable = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .firstWhere(
+            (widget) =>
+                widget.textSpan?.toPlainText().contains('Ruby：漢字') ?? false,
+          );
+      final renderedText = rubySelectable.textSpan!;
+      expect(
+        renderedText.toPlainText(includePlaceholders: false),
+        contains('Ruby：漢字。'),
+      );
+      expect(
+        renderedText.toPlainText(includePlaceholders: false),
+        isNot(contains('かんじ')),
+      );
+      expect(find.text('（'), findsNothing);
+      expect(find.text('）'), findsNothing);
+
+      final annotations = <FrameEpubRubyAnnotation>[];
+      void collect(InlineSpan span) {
+        if (span is! TextSpan) return;
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          if (child is WidgetSpan &&
+              child.child is FrameEpubRubyAnnotation) {
+            annotations.add(child.child as FrameEpubRubyAnnotation);
+          } else {
+            collect(child);
+          }
+        }
+      }
+
+      collect(renderedText);
+      expect(annotations, hasLength(1));
+      expect(annotations.single.annotation.toPlainText(), 'かんじ');
+      expect(
+        annotations.single.placeholderDimensions.alignment,
+        PlaceholderAlignment.aboveBaseline,
+      );
+
+      final selection = FrameEpubTextSelectionMapper.map(
+        selection: const TextSelection(baseOffset: 0, extentOffset: 3),
+        displayedText: '漢字\uFFFC',
+        sources: [
+          FrameEpubTextRangeSource(
+            start: 0,
+            end: 2,
+            node: rubyBase,
+            sourceOffsets: const [0, 1, 2],
+          ),
+        ],
+      );
+      expect(selection?.startNode, same(rubyBase));
+      expect(selection?.startOffset, 0);
+      expect(selection?.endNode, same(rubyBase));
+      expect(selection?.endOffset, 2);
+      expect(selection?.quote, '漢字');
     } finally {
       await archive.close();
     }

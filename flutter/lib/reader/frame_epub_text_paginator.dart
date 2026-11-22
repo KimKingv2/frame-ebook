@@ -1,6 +1,8 @@
 import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 
+import 'frame_epub_ruby_annotation.dart';
+
 /// Splits rich text into line-aligned fragments that fit a page's height.
 ///
 /// Placeholder widgets (images, SVG placeholders, and interactive link
@@ -27,10 +29,11 @@ class FrameEpubTextPaginator {
         !maxWidth.isFinite ||
         !maxHeight.isFinite ||
         maxWidth <= 0 ||
-        maxHeight <= 0 ||
-        _containsPlaceholder(text)) {
+        maxHeight <= 0) {
       return [whole];
     }
+    final placeholderDimensions = _rubyPlaceholderDimensions(text);
+    if (placeholderDimensions == null) return [whole];
 
     final painter = TextPainter(
       text: text,
@@ -39,6 +42,9 @@ class FrameEpubTextPaginator {
       textScaler: textScaler,
     );
     try {
+      if (placeholderDimensions.isNotEmpty) {
+        painter.setPlaceholderDimensions(placeholderDimensions);
+      }
       painter.layout(maxWidth: maxWidth);
       if (painter.height <= maxHeight + 0.5) return [whole];
 
@@ -102,9 +108,24 @@ class FrameEpubTextPaginator {
     }
   }
 
-  static bool _containsPlaceholder(InlineSpan span) {
-    if (span is WidgetSpan) return true;
-    if (span is! TextSpan) return false;
-    return span.children?.any(_containsPlaceholder) ?? false;
+  static List<PlaceholderDimensions>? _rubyPlaceholderDimensions(
+    InlineSpan span,
+  ) {
+    final dimensions = <PlaceholderDimensions>[];
+    var hasUnsupportedPlaceholder = false;
+    span.visitChildren((child) {
+      if (child is WidgetSpan) {
+        final widget = child.child;
+        if (widget is FrameEpubRubyAnnotation) {
+          dimensions.add(widget.placeholderDimensions);
+        } else {
+          // Images and interactive widgets still need their real render-box
+          // dimensions, so keep those paragraphs in one intact fragment.
+          hasUnsupportedPlaceholder = true;
+        }
+      }
+      return true;
+    });
+    return hasUnsupportedPlaceholder ? null : dimensions;
   }
 }

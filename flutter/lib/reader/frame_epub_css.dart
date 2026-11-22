@@ -233,6 +233,12 @@ class FrameEpubCssCascade {
           'font-variant-position': 'sub',
         });
         break;
+      case 'rt':
+        result.addAll({
+          'font-size': '50%',
+          'line-height': 'normal',
+        });
+        break;
       case 'ul':
       case 'ol':
         result.addAll({

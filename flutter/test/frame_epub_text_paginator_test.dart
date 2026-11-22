@@ -2,6 +2,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/reader/frame_epub_text_paginator.dart';
+import 'package:frame_ebook/reader/frame_epub_ruby_annotation.dart';
 
 void main() {
   test('splits long rich text only at rendered line boundaries', () {
@@ -37,6 +38,55 @@ void main() {
       ranges.map((range) => plainText.substring(range.start, range.end)).join(),
       plainText,
     );
+  });
+
+  test('paginates ruby placeholders while keeping their annotation run intact',
+      () {
+    final marker = FrameEpubRubyAnnotation(
+      annotation: const TextSpan(
+        text: 'かんじ',
+        style: TextStyle(fontSize: 9),
+      ),
+      textScaler: TextScaler.noScaling,
+      annotationWidth: 22,
+      annotationHeight: 12,
+      placeholderHeight: 28,
+      horizontalOffset: -18,
+      verticalOffset: 0,
+    );
+    final text = TextSpan(
+      style: const TextStyle(fontSize: 18, height: 1.5),
+      children: [
+        TextSpan(text: List.filled(18, '長い本文の行です。').join('\n')),
+        const TextSpan(text: '\n漢字'),
+        WidgetSpan(
+          alignment: PlaceholderAlignment.aboveBaseline,
+          baseline: TextBaseline.alphabetic,
+          child: marker,
+        ),
+        TextSpan(text: List.filled(30, '後續內容也需要分頁。').join()),
+      ],
+    );
+    final plainText = text.toPlainText(
+      includeSemanticsLabels: false,
+      includePlaceholders: true,
+    );
+
+    final ranges = FrameEpubTextPaginator.paginate(
+      text: text,
+      maxWidth: 120,
+      maxHeight: 90,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      textScaler: TextScaler.noScaling,
+    );
+
+    expect(ranges.length, greaterThan(1));
+    expect(ranges.first.start, 0);
+    expect(ranges.last.end, plainText.length);
+    for (var index = 1; index < ranges.length; index++) {
+      expect(ranges[index].start, ranges[index - 1].end);
+    }
   });
 
   test('keeps inline widget placeholders in one intact fragment', () {

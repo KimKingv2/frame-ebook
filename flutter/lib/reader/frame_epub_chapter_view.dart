@@ -11,6 +11,7 @@ import 'frame_epub_footnote.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 import 'frame_epub_page_layout.dart';
+import 'frame_epub_ruby_annotation.dart';
 import 'frame_epub_text_paginator.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
@@ -2198,6 +2199,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         FrameEpubFootnoteResolver.isFootnoteTarget(element)) {
       return const TextSpan();
     }
+    if (tag == 'ruby') {
+      return _rubyInlineSpan(element, style, cascade, sourceSpans);
+    }
     if (tag == 'br') return const TextSpan(text: '\n');
     if (tag == 'img') {
       return WidgetSpan(
@@ -2284,6 +2288,166 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     );
   }
 
+  InlineSpan _rubyInlineSpan(
+    XmlElement element,
+    Map<String, String> style,
+    FrameEpubCssCascade cascade,
+    Map<TextSpan, _TextSpanSource> sourceSpans,
+  ) {
+    final children = <InlineSpan>[];
+    final pendingBase = <InlineSpan>[];
+    final textDirection = Directionality.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+
+    void appendPendingBase() {
+      children.addAll(pendingBase);
+      pendingBase.clear();
+    }
+
+    for (final child in element.children) {
+      if (child is XmlText) {
+        final prepared = _prepareText(
+          child,
+          style['white-space'],
+          style['text-transform'],
+        );
+        if (prepared.text.isNotEmpty) {
+          pendingBase.addAll(_sourceTextSpans(child, prepared, sourceSpans));
+        }
+        continue;
+      }
+      if (child is! XmlElement) continue;
+
+      final childTag = child.name.local.toLowerCase();
+      if (childTag == 'rp') {
+        // Ruby parentheses are only a fallback for user agents without ruby
+        // support. This renderer supports the annotation, so they stay hidden.
+        continue;
+      }
+      if (childTag == 'rt') {
+        if (pendingBase.isEmpty) continue;
+        final annotationText =
+            child.innerText.replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (annotationText.isEmpty) continue;
+
+        final annotationStyle = _computedStyle(child, cascade, style);
+        if (annotationStyle['display'] == 'none' ||
+            annotationStyle['visibility'] == 'hidden') {
+          appendPendingBase();
+          continue;
+        }
+
+        final annotation = TextSpan(
+          text: annotationText,
+          style: _textStyle(annotationStyle),
+        );
+        final base = TextSpan(
+          style: _textStyle(style),
+          children: List<InlineSpan>.unmodifiable(pendingBase),
+        );
+        final baseForMeasurement = _rubyMeasurementSpan(base);
+        final basePainter = TextPainter(
+          text: baseForMeasurement,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          maxLines: 1,
+        );
+        final annotationPainter = TextPainter(
+          text: annotation,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          maxLines: 1,
+        );
+
+        try {
+          basePainter.layout();
+          annotationPainter.layout();
+          final baseWidth = basePainter.width;
+          final annotationWidth = annotationPainter.width;
+          if (baseWidth <= 0 || annotationWidth <= 0) {
+            appendPendingBase();
+            continue;
+          }
+
+          final baseAscent = basePainter
+              .computeDistanceToActualBaseline(TextBaseline.alphabetic)
+              .clamp(0.0, basePainter.height)
+              .toDouble();
+          final baseDescent =
+              (basePainter.height - baseAscent).clamp(0.0, basePainter.height);
+          final annotationHeight = annotationPainter.height;
+          final below = const {'under', 'below'}.contains(
+            style['ruby-position']?.trim().toLowerCase(),
+          );
+          final parentFontSize = _length(style['font-size'], widget.fontSize);
+          final gap = (parentFontSize * 0.08).clamp(1.0, 3.0).toDouble();
+          final verticalExtent = below ? baseDescent : baseAscent;
+          final placeholderHeight =
+              verticalExtent + gap + annotationHeight;
+          final horizontalOffset = textDirection == TextDirection.rtl
+              ? (baseWidth - annotationWidth) / 2
+              : -(baseWidth + annotationWidth) / 2;
+          final annotationWidget = FrameEpubRubyAnnotation(
+            annotation: annotation,
+            textScaler: textScaler,
+            annotationWidth: annotationWidth,
+            annotationHeight: annotationHeight,
+            placeholderHeight: placeholderHeight,
+            horizontalOffset: horizontalOffset,
+            verticalOffset: below ? baseDescent + gap : 0,
+          );
+
+          children.addAll(pendingBase);
+          children.add(WidgetSpan(
+            alignment: annotationWidget.placeholderDimensions.alignment,
+            baseline: TextBaseline.alphabetic,
+            child: annotationWidget,
+          ));
+          pendingBase.clear();
+        } finally {
+          basePainter.dispose();
+          annotationPainter.dispose();
+        }
+        continue;
+      }
+
+      final childStyle = _computedStyle(child, cascade, style);
+      if (childStyle['display'] == 'none' ||
+          childStyle['visibility'] == 'hidden' ||
+          _isNonVisualTag(childTag) ||
+          FrameEpubFootnoteResolver.isFootnoteTarget(child)) {
+        continue;
+      }
+      pendingBase.add(_inlineSpan(
+        child,
+        childStyle,
+        cascade,
+        sourceSpans,
+      ));
+    }
+
+    appendPendingBase();
+    return TextSpan(
+      style: _textStyle(style),
+      children: children,
+    );
+  }
+
+  TextSpan _rubyMeasurementSpan(TextSpan span) {
+    bool containsWidget(InlineSpan current) {
+      if (current is WidgetSpan) return true;
+      if (current is! TextSpan) return false;
+      return current.children?.any(containsWidget) ?? false;
+    }
+
+    if (!containsWidget(span)) return span;
+    return TextSpan(
+      style: span.style,
+      text: span.toPlainText(includePlaceholders: false),
+    );
+  }
+
+  Widget _buildImage(
   Widget _buildImage(
     XmlElement element,
     Map<String, String> style, {

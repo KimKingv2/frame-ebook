@@ -147,6 +147,26 @@ void main() {
       expect(superscriptStyle['color'], 'purple');
     });
 
+    test('uses a compact default font size for ruby annotations', () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([
+        'rt { color: purple; }',
+      ]);
+      final document = XmlDocument.parse(
+        '<ruby>漢字<rt>かんじ</rt></ruby>',
+      );
+      final ruby = document.rootElement;
+      final rt = ruby.children.whereType<XmlElement>().firstWhere(
+            (element) => element.name.local == 'rt',
+          );
+
+      final rubyStyle = cascade.resolve(ruby);
+      final annotationStyle = cascade.resolve(rt, parentStyle: rubyStyle);
+
+      expect(annotationStyle['font-size'], '50%');
+      expect(annotationStyle['line-height'], 'normal');
+      expect(annotationStyle['color'], 'purple');
+    });
+
     test('inherits list-style-type from the parent list', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         'ol { list-style-type: upper-alpha; }',
