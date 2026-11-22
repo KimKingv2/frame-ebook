@@ -39,6 +39,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
   final Future<bool> Function(FrameReaderAnnotation) onDeleteAnnotation;
   final Future<void> Function() onRefreshAnnotations;
   final VoidCallback onClose;
+  final bool Function(FrameEpubTocEntry entry)? canNavigateTocEntry;
   final bool desktopLayout;
 
   @override
@@ -151,6 +152,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       final expanded = _expandedTocKeys.contains(key);
       final selected = entry.path != null && entry.path == widget.currentPath;
       final available = !entry.isExternal && entry.reference?.path != null;
+      final canNavigate = available &&
+          (widget.canNavigateTocEntry?.call(entry) ?? true);
       final label =
           entry.label.trim().isEmpty ? '未命名項目' : entry.label.trim();
 
@@ -174,7 +177,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: available
+              onTap: canNavigate
                   ? () => widget.onSelectToc(entry)
                   : hasChildren
                       ? () {

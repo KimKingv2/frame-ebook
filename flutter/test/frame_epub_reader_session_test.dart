@@ -76,6 +76,8 @@ class _FakeApi implements FrameApiClient {
   List<dynamic> annotations;
   Future<Map<String, dynamic>> Function()? annotationsLoader;
   Map<String, dynamic>? postedState;
+  Completer<void>? stateSaveStarted;
+  Completer<void>? stateSaveGate;
 
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
@@ -96,6 +98,11 @@ class _FakeApi implements FrameApiClient {
     Map<String, dynamic> body,
   ) async {
     if (path == '/api/reading/state') {
+      final started = stateSaveStarted;
+      stateSaveStarted = null;
+      if (started != null && !started.isCompleted) started.complete();
+      final gate = stateSaveGate;
+      if (gate != null) await gate.future;
       postedState = Map<String, dynamic>.from(body['state'] as Map);
       state = postedState!;
       return {'state': state};
@@ -143,6 +150,7 @@ FrameBook _book(int size) => FrameBook.fromJson({
 Uint8List _zipFixture({
   bool fixedLayout = false,
   bool tocPathCaseMismatch = false,
+  bool includeNonSpineTocEntry = false,
 }) {
   const container = '''
 <container>
@@ -154,6 +162,14 @@ Uint8List _zipFixture({
 ''';
   final fixedMeta = fixedLayout
       ? '<meta property="rendition:layout">pre-paginated</meta>'
+      : '';
+  final supplementManifest = includeNonSpineTocEntry
+      ? '<item id="supplement" href="Text/supplement.xhtml" '
+          'media-type="application/xhtml+xml"/>'
+      : '';
+  final supplementNavigation = includeNonSpineTocEntry
+      ? '<li><a href="Text/supplement.xhtml">附錄索引</a>'
+          '<ol><li><a href="Text/chapter-one.xhtml#start">附錄章節</a></li></ol></li>'
       : '';
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
@@ -172,6 +188,7 @@ Uint8List _zipFixture({
       media-type="application/xhtml+xml"/>
     <item id="two" href="Text/chapter-two.xhtml"
       media-type="application/xhtml+xml"/>
+    $supplementManifest
   </manifest>
   <spine>
     <itemref id="ref-one" idref="one"/>
@@ -193,6 +210,7 @@ Uint8List _zipFixture({
       <ol>
         <li><a href="$chapterOneHref">第一章</a></li>
         <li><a href="$chapterTwoHref">第二章</a></li>
+        $supplementNavigation
       </ol>
     </nav>
   </body>
@@ -216,6 +234,11 @@ Uint8List _zipFixture({
     _ZipItem('OPS/nav.xhtml', utf8.encode(navigation)),
     _ZipItem('OPS/Text/chapter-one.xhtml', utf8.encode(chapterOne)),
     _ZipItem('OPS/Text/chapter-two.xhtml', utf8.encode(chapterTwo)),
+    if (includeNonSpineTocEntry)
+      _ZipItem(
+        'OPS/Text/supplement.xhtml',
+        utf8.encode('<html><body>不在閱讀順序中的附錄索引</body></html>'),
+      ),
     // Keep the archive larger than its ZIP tail metadata window so the test
     // can prove that opening never requests the complete small fixture.
     _ZipItem('OPS/unused-padding.bin', List<int>.filled(100000, 0x5a)),
@@ -577,7 +600,365 @@ void main() {
       await session.close();
     });
 
+    test('recognizes TOC links outside the spine as non-navigable',
+        () async {
+      final fixture = _zipFixture(includeNonSpineTocEntry: true);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.toc, hasLength(3));
+      expect(session.canNavigateTocEntry(session.toc.first), isTrue);
+      expect(session.canNavigateTocEntry(session.toc.last), isFalse);
+      expect(await session.goToTocEntry(session.toc.last), isFalse);
+      await session.close();
+    });
+
+    test('TOC navigation returns before cloud progress sync finishes',
+        () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi();
+      final saveStarted = Completer<void>();
+      final saveGate = Completer<void>();
+      api
+        ..stateSaveStarted = saveStarted
+        ..stateSaveGate = saveGate;
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+
+      await session.open();
+      final navigation = session.goToTocEntry(session.toc[1]);
+      try {
+        await saveStarted.future.timeout(const Duration(seconds: 2));
+        final completedWithoutCloudResponse = await Future.any<bool>([
+          navigation,
+          Future<bool>.delayed(
+            const Duration(milliseconds: 250),
+            () => false,
+          ),
+        ]);
+        expect(completedWithoutCloudResponse, isTrue);
+        expect(session.currentSpineIndex, 1);
+      } finally {
+        if (!saveGate.isCompleted) saveGate.complete();
+        await navigation;
+        await session.close();
+      }
+    });
+
     test('TOC navigation resolves case-only aliases to the spine file',
+        () async {
+      final fixture = _zipFixture(tocPathCaseMismatch: true);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(
+        session.toc[1].reference?.path,
+        'OPS/text/chapter-two.xhtml',
+      );
+      expect(await session.goToTocEntry(session.toc[1]), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/chapter-two.xhtml',
+      );
+      await session.close();
+    });
+
+    test('superseded TOC navigation does not report a missing chapter',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      final gate = Completer<void>();
+      final started = Completer<void>();
+      source
+        ..nextOpenGate = gate
+        ..nextOpenStarted = started;
+
+      final olderNavigation = session.goToTocEntry(session.toc[1]);
+      await started.future;
+
+      final latestNavigation = session.goToTocEntry(session.toc[0]);
+      expect(await latestNavigation, isTrue);
+      expect(session.currentSpineIndex, 0);
+
+      gate.complete();
+      expect(await olderNavigation, isTrue);
+      expect(session.currentSpineIndex, 0);
+      await session.close();
+    });
+
+    test('TOC navigation loads the target chapter and saves compatible progress',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final api = _FakeApi();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(api),
+      );
+
+      await session.open();
+      expect(session.toc, hasLength(2));
+      expect(await session.goToTocEntry(session.toc[1]), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(session.currentFragment, 'part-two');
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/chapter-two.xhtml',
+      );
+
+      final progress = api.postedState!['progress'] as Map;
+      expect(progress['index'], 1);
+      expect(progress['label'], '第二章');
+      expect(progress['percent'], 50);
+      expect(progress['cfi'], '');
+      await session.close();
+    });
+
+    test('restores a saved CFI before falling back to the chapter index',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final initialApi = _FakeApi();
+      final initialSession = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(initialApi),
+      );
+
+      await initialSession.open();
+      expect(await initialSession.goToTocEntry(initialSession.toc[1]), isTrue);
+      final heading = initialSession.currentChapter!.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'h1');
+      final textNode = heading.descendants.whereType<XmlText>().first;
+      final cfi = FrameEpubCfi.create(
+        book: initialSession.epub!,
+        spineIndex: 1,
+        textNode: textNode,
+        offset: 2,
+      );
+      expect(cfi, isNotNull);
+      await initialSession.close();
+
+      final restoredApi = _FakeApi(
+        state: {
+          'progress': {
+            'percent': 48,
+            'label': '第二章',
+            'index': 0,
+            'cfi': cfi,
+          },
+        },
+      );
+      final restoredSession = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(restoredApi),
+      );
+
+      await restoredSession.open();
+      expect(restoredSession.currentSpineIndex, 1);
+      expect(restoredSession.initialCfi, cfi);
+      expect(restoredSession.initialAnchor?.name.local, 'h1');
+      expect(restoredSession.initialScrollFraction, isNotNull);
+      expect(restoredSession.initialScrollFraction, greaterThan(0));
+      await restoredSession.close();
+    });
+
+    test('jumps to a saved annotation CFI in another spine item', () async {
+      final fixture = _zipFixture();
+      final api = _FakeApi();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(api),
+      );
+
+      await session.open();
+      expect(await session.goToSpineIndex(1), isTrue);
+      final chapter = session.currentChapter!;
+      final paragraph = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final textNode = paragraph.descendants.whereType<XmlText>().first;
+      final targetCfi = FrameEpubCfi.create(
+        book: session.epub!,
+        spineIndex: 1,
+        textNode: textNode,
+        offset: 2,
+      )!;
+      expect(await session.goToSpineIndex(0), isTrue);
+
+      expect(await session.goToCfi(targetCfi), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(session.initialCfi, targetCfi);
+      expect(session.initialAnchor?.name.local, 'p');
+      final savedProgress = api.postedState!['progress'] as Map;
+      expect(savedProgress['cfi'], targetCfi);
+      expect(savedProgress['index'], 1);
+
+      await session.close();
+    });
+
+    testWidgets(
+        'restores a chapter-two annotation only in its own spine item',
+        (tester) async {
+      final fixture = _zipFixture();
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.currentSpineIndex, 0);
+      expect(await session.goToSpineIndex(1), isTrue);
+
+      final chapterTwo = session.currentChapter!;
+      final targetNode = chapterTwo.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == '章節二內容。');
+      final targetCfi = FrameEpubCfi.createRange(
+        book: session.epub!,
+        spineIndex: 1,
+        startNode: targetNode,
+        startOffset: 0,
+        endNode: targetNode,
+        endOffset: targetNode.value.length,
+      )!;
+
+      final annotation = FrameReaderAnnotation(
+        id: 'chapter-two-highlight',
+        bookId: session.book.id,
+        type: 'highlight',
+        cfi: targetCfi,
+        quote: targetNode.value,
+        color: 'mint',
+        createdAt: 20,
+      );
+      final annotations = [annotation];
+
+      Widget chapterView() {
+        final index = session.currentSpineIndex!;
+        return MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                key: ValueKey(index),
+                chapter: session.currentChapter!,
+                resourceLoader: session.resourceLoader!,
+                annotations: annotations,
+                spineIndex: index,
+              ),
+            ),
+          ),
+        );
+      }
+
+      List<TextSpan> renderedSpans(WidgetTester tester) {
+        final spans = <TextSpan>[];
+        void collect(InlineSpan span) {
+          if (span is! TextSpan) return;
+          spans.add(span);
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collect(child);
+          }
+        }
+
+        for (final selectable
+            in tester.widgetList<SelectableText>(find.byType(SelectableText))) {
+          final span = selectable.textSpan;
+          if (span != null) collect(span);
+        }
+        return spans;
+      }
+
+      try {
+        expect(await session.goToSpineIndex(0), isTrue);
+        await tester.pumpWidget(chapterView());
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('章節一內容。'), findsOneWidget);
+        final chapterOneText = renderedSpans(tester).firstWhere(
+          (span) => span.text == '章節一內容。',
+        );
+        expect(chapterOneText.style?.backgroundColor, isNull);
+        expect(
+          chapterOneText.style?.decoration,
+          isNot(TextDecoration.underline),
+        );
+
+        expect(await session.goToSpineIndex(1), isTrue);
+        await tester.pumpWidget(chapterView());
+        await tester.pumpAndSettle();
+
+        final restored = renderedSpans(tester).firstWhere(
+          (span) => span.text == '章節二內容。',
+        );
+        expect(
+          restored.style?.backgroundColor,
+          const Color(0x6665C9A5),
+        );
+      } finally {
+        await session.close();
+      }
+    });
+
+    test('does not fetch external links or route them into the archive',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(
+        await session.goToHref('https://example.com/remote.xhtml'),
+        isFalse,
+      );
+      expect(session.currentSpineIndex, 0);
+      await session.close();
+    });
+
+    test('uses EPUB rendition metadata for fixed-layout comics', () async {
+      final fixture = _zipFixture(fixedLayout: true);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.isFixedLayout, isTrue);
+      expect(session.epub?.layout, FrameEpubLayout.prePaginated);
+      await session.close();
+    });
+  });
+}
+
         () async {
       final fixture = _zipFixture(tocPathCaseMismatch: true);
       final session = FrameEpubReaderSession(

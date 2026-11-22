@@ -1869,6 +1869,7 @@ class _FrameEpubReaderPreviewScreenState
       initialTabIndex: initialTabIndex,
       desktopLayout: desktopLayout,
       onClose: onClose,
+      canNavigateTocEntry: session.canNavigateTocEntry,
       onSelectToc: (entry) {
         unawaited(
           _selectTocEntry(

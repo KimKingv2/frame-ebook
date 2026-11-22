@@ -297,6 +297,19 @@ class FrameEpubReaderSession extends ChangeNotifier {
     return goToSpineIndex(index + 1);
   }
 
+  /// Returns whether a TOC entry points to a document in the reading order.
+  ///
+  /// Navigation documents may contain links to indexes, auxiliary pages or
+  /// other XHTML resources that are present in the archive but omitted from
+  /// the spine. Those entries must not be presented as readable chapters.
+  bool canNavigateTocEntry(FrameEpubTocEntry entry) {
+    final reference = entry.reference;
+    return reference != null &&
+        !reference.isExternal &&
+        reference.path != null &&
+        _spineIndexForArchivePath(reference.path!) != null;
+  }
+
   Future<bool> goToTocEntry(FrameEpubTocEntry entry) {
     final reference = entry.reference;
     if (reference == null || reference.isExternal || reference.path == null) {
@@ -348,27 +361,33 @@ class FrameEpubReaderSession extends ChangeNotifier {
     return decoded.join('/');
   }
 
+  int? _spineIndexForArchivePath(String path) {
+    final spine = _epub?.spine;
+    if (spine == null) return null;
+
+    final exactIndex = spine.indexWhere((item) => item.item.path == path);
+    if (exactIndex >= 0) return exactIndex;
+
+    final target = _normalizeArchivePathForLookup(path).toLowerCase();
+    int? match;
+    for (var index = 0; index < spine.length; index++) {
+      final itemPath = spine[index].item.path;
+      if (itemPath == null ||
+          _normalizeArchivePathForLookup(itemPath).toLowerCase() != target) {
+        continue;
+      }
+      if (match != null) return null;
+      match = index;
+    }
+    return match;
+  }
+
   Future<bool> _goToArchivePath(
     String path, {
     required String fragment,
   }) async {
-    final spine = _epub?.spine;
-    if (spine == null) return false;
-    var index = spine.indexWhere((item) => item.item.path == path);
-    if (index < 0) {
-      final target = _normalizeArchivePathForLookup(path).toLowerCase();
-      final matches = <int>[];
-      for (var i = 0; i < spine.length; i++) {
-        final itemPath = spine[i].item.path;
-        if (itemPath == null) continue;
-        if (_normalizeArchivePathForLookup(itemPath).toLowerCase() ==
-            target) {
-          matches.add(i);
-        }
-      }
-      if (matches.length == 1) index = matches.single;
-    }
-    if (index < 0) return false;
+    final index = _spineIndexForArchivePath(path);
+    if (index == null) return false;
     return _loadSpineIndex(
       index,
       fragment: fragment,
@@ -424,19 +443,32 @@ class FrameEpubReaderSession extends ChangeNotifier {
     _scheduleNextChapterPreload();
 
     if (saveProgress) {
-      try {
-        await _queueProgressSave(
+      unawaited(
+        _saveNavigationProgress(
           index: index,
           label: currentChapterLabel,
           percent: chapterProgressPercent,
-          cfi: '',
-        );
-      } on Object {
-        // The new chapter remains available offline in memory for this
-        // session. The warning already exposes the failed cloud sync.
-      }
+        ),
+      );
     }
     return true;
+  }
+
+  Future<void> _saveNavigationProgress({
+    required int index,
+    required String label,
+    required int percent,
+  }) async {
+    try {
+      await _queueProgressSave(
+        index: index,
+        label: label,
+        percent: percent,
+        cfi: '',
+      );
+    } on Object {
+      // The session warning already exposes the failed cloud sync.
+    }
   }
 
   void _scheduleNextChapterPreload() {
@@ -521,7 +553,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
     required String cfi,
   }) async {
     try {
-      _readerState = await repository.saveState(
+      final readerState = await repository.saveState(
         book,
         progress: {
           'percent': percent,
@@ -531,9 +563,12 @@ class FrameEpubReaderSession extends ChangeNotifier {
         },
         lastOpenedAt: DateTime.now().millisecondsSinceEpoch,
       );
+      if (_closed) return;
+      _readerState = readerState;
       _warning = null;
       notifyListeners();
     } on Object catch (error) {
+      if (_closed) return;
       _warning = '閱讀進度尚未同步至雲端：$error';
       notifyListeners();
       rethrow;
