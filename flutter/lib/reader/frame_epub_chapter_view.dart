@@ -2450,7 +2450,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   }
 
   Widget _buildImage(
-  Widget _buildImage(
     XmlElement element,
     Map<String, String> style, {
     bool block = false,
