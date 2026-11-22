@@ -317,6 +317,43 @@ void main() {
       }
     });
 
+    test('caches parsed chapters in bounded memory and reuses range reads',
+        () async {
+      final (archive, loader, source) = await _openFixture();
+      try {
+        final first = await loader.loadChapter(loader.book.spine.single);
+        final requestCount = source.requests.length;
+        final cached = await loader.loadChapter(loader.book.spine.single);
+
+        expect(identical(cached, first), isTrue);
+        expect(source.requests, hasLength(requestCount));
+
+        loader.clearChapterCache();
+        final reloaded = await loader.loadChapter(loader.book.spine.single);
+        expect(identical(reloaded, first), isFalse);
+        expect(source.requests.length, greaterThan(requestCount));
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
+    test('preloads a small chapter for later navigation without duplicate reads',
+        () async {
+      final (archive, loader, source) = await _openFixture();
+      try {
+        await loader.preloadChapter(loader.book.spine.single);
+        final requestCount = source.requests.length;
+        final chapter = await loader.loadChapter(loader.book.spine.single);
+
+        expect(chapter.document.rootElement.name.local, 'html');
+        expect(source.requests, hasLength(requestCount));
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
     test('resolves CSS imports, images and fonts with cycle protection',
         () async {
       final (archive, loader, _) = await _openFixture();

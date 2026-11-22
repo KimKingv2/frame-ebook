@@ -31,12 +31,14 @@ class FrameEpubReaderSession extends ChangeNotifier {
     required this.fileSource,
     required this.repository,
     this.parser = const FrameEpubParser(),
+    this.chapterPreloadDelay = const Duration(milliseconds: 650),
   });
 
   final FrameBook book;
   final FrameFileSource fileSource;
   final FrameReaderRepository repository;
   final FrameEpubParser parser;
+  final Duration chapterPreloadDelay;
 
   FrameEpubReaderStatus _status = FrameEpubReaderStatus.idle;
   FrameEpubReaderStatus get status => _status;
@@ -96,6 +98,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
   bool _closed = false;
   int _navigationRevision = 0;
   Future<void> _progressSaveQueue = Future<void>.value();
+  Timer? _chapterPreloadTimer;
   int _annotationMutationRevision = 0;
   int _annotationRefreshRequest = 0;
 
@@ -209,10 +212,13 @@ class FrameEpubReaderSession extends ChangeNotifier {
       _currentFragment = '';
       _status = FrameEpubReaderStatus.ready;
       notifyListeners();
+      _scheduleNextChapterPreload();
     } on Object catch (error) {
       final archive = _archive;
+      final loader = _loader;
       _archive = null;
       _loader = null;
+      loader?.dispose();
       if (archive != null) await archive.close();
       if (_closed) return;
       _status = FrameEpubReaderStatus.error;
@@ -385,6 +391,8 @@ class FrameEpubReaderSession extends ChangeNotifier {
       return false;
     }
 
+    _chapterPreloadTimer?.cancel();
+    _chapterPreloadTimer = null;
     final revision = ++_navigationRevision;
     _chapterLoading = true;
     _error = null;
@@ -413,6 +421,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
     _chapter = chapter;
     _chapterLoading = false;
     notifyListeners();
+    _scheduleNextChapterPreload();
 
     if (saveProgress) {
       try {
@@ -428,6 +437,36 @@ class FrameEpubReaderSession extends ChangeNotifier {
       }
     }
     return true;
+  }
+
+  void _scheduleNextChapterPreload() {
+    _chapterPreloadTimer?.cancel();
+    _chapterPreloadTimer = null;
+
+    final epub = _epub;
+    final loader = _loader;
+    final index = _currentSpineIndex;
+    if (_closed ||
+        epub == null ||
+        loader == null ||
+        index == null ||
+        index + 1 >= epub.spine.length) {
+      return;
+    }
+
+    final nextChapter = epub.spine[index + 1];
+    if (nextChapter.item.path == null) return;
+    final revision = _navigationRevision;
+    _chapterPreloadTimer = Timer(chapterPreloadDelay, () {
+      _chapterPreloadTimer = null;
+      if (_closed ||
+          _navigationRevision != revision ||
+          _currentSpineIndex != index ||
+          !identical(_loader, loader)) {
+        return;
+      }
+      unawaited(loader.preloadChapter(nextChapter));
+    });
   }
 
   /// Saves a real renderer position without changing the existing D1 schema.
@@ -553,12 +592,16 @@ class FrameEpubReaderSession extends ChangeNotifier {
     if (_closed) return;
     _closed = true;
     _navigationRevision++;
+    _chapterPreloadTimer?.cancel();
+    _chapterPreloadTimer = null;
     _status = FrameEpubReaderStatus.closed;
     _chapterLoading = false;
     final archive = _archive;
+    final loader = _loader;
     _archive = null;
     _loader = null;
     _chapter = null;
+    loader?.dispose();
     if (archive != null) await archive.close();
     notifyListeners();
   }
@@ -568,8 +611,13 @@ class FrameEpubReaderSession extends ChangeNotifier {
     if (!_closed) {
       _closed = true;
       _navigationRevision++;
+      _chapterPreloadTimer?.cancel();
+      _chapterPreloadTimer = null;
       final archive = _archive;
+      final loader = _loader;
       _archive = null;
+      _loader = null;
+      loader?.dispose();
       if (archive != null) unawaited(archive.close());
     }
     super.dispose();

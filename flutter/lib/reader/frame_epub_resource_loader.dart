@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -162,8 +163,9 @@ class FrameEpubStylesheetGraph {
 /// Resolves and loads EPUB documents and their embedded resources.
 ///
 /// All archive access stays behind FrameZipArchive. XML/XHTML, CSS, images and
-/// fonts are read as individual entries with independent size limits. This
-/// loader does not fetch external network URLs or create persistent caches.
+/// fonts are read as individual entries with independent size limits. A small,
+/// bounded in-memory cache avoids reparsing recently opened chapters; nothing
+/// is persisted to disk and external network URLs are never fetched.
 class FrameEpubResourceLoader {
   FrameEpubResourceLoader({
     required this.archive,
@@ -175,7 +177,18 @@ class FrameEpubResourceLoader {
     this.maxTotalStylesheetBytes = 16 * 1024 * 1024,
     this.maxFontBytes = 32 * 1024 * 1024,
     this.maxOtherResourceBytes = 16 * 1024 * 1024,
+    this.maxCachedChapterBytes = 2 * 1024 * 1024,
+    this.maxCachedChapterCount = 2,
+    this.maxCachedChapterTotalBytes = 4 * 1024 * 1024,
+    this.maxPrefetchChapterBytes = 1024 * 1024,
   }) {
+    if (maxCachedChapterBytes <= 0 ||
+        maxCachedChapterCount <= 0 ||
+        maxCachedChapterTotalBytes <= 0 ||
+        maxPrefetchChapterBytes < 0 ||
+        maxPrefetchChapterBytes > maxCachedChapterBytes) {
+      throw ArgumentError('EPUB 章節快取上限設定無效。');
+    }
     for (final entry in archive.files) {
       final item = _manifestByPath[entry.path];
       _resources[entry.path] = FrameEpubResource._(
@@ -197,8 +210,17 @@ class FrameEpubResourceLoader {
   final int maxTotalStylesheetBytes;
   final int maxFontBytes;
   final int maxOtherResourceBytes;
+  final int maxCachedChapterBytes;
+  final int maxCachedChapterCount;
+  final int maxCachedChapterTotalBytes;
+  final int maxPrefetchChapterBytes;
 
   final Map<String, FrameEpubResource> _resources = {};
+  final LinkedHashMap<String, FrameEpubChapterDocument> _chapterCache =
+      LinkedHashMap<String, FrameEpubChapterDocument>();
+  final Map<String, Future<FrameEpubChapterDocument>> _chapterLoads = {};
+  int _cachedChapterBytes = 0;
+  bool _disposed = false;
   late final Map<String, FrameEpubManifestItem> _manifestByPath = {
     for (final item in book.manifest.values)
       if (item.path != null && !item.isExternal) item.path!: item,
@@ -265,6 +287,37 @@ class FrameEpubResourceLoader {
   Future<FrameEpubChapterDocument> loadChapter(
     FrameEpubSpineItem spineItem,
   ) async {
+    if (_disposed) {
+      throw StateError('EPUB 資源載入器已關閉。');
+    }
+    final path = spineItem.item.path;
+    if (path == null) return _loadChapterUncached(spineItem);
+
+    final cached = _chapterCache.remove(path);
+    if (cached != null) {
+      _chapterCache[path] = cached;
+      return cached;
+    }
+
+    final pending = _chapterLoads[path];
+    if (pending != null) return pending;
+
+    final load = _loadChapterUncached(spineItem);
+    _chapterLoads[path] = load;
+    try {
+      final chapter = await load;
+      _cacheChapter(path, chapter);
+      return chapter;
+    } finally {
+      if (identical(_chapterLoads[path], load)) {
+        _chapterLoads.remove(path);
+      }
+    }
+  }
+
+  Future<FrameEpubChapterDocument> _loadChapterUncached(
+    FrameEpubSpineItem spineItem,
+  ) async {
     final path = spineItem.item.path;
     if (path == null) {
       throw const FrameEpubResourceException(
@@ -323,7 +376,7 @@ class FrameEpubResourceLoader {
               break;
             }
           }
-          if (!rel.split(RegExp(r'\s+')).contains('stylesheet')) continue;
+          if (!rel.split(RegExp(r'\\s+')).contains('stylesheet')) continue;
         }
         final role = _documentAttributeRole(name, attributeName);
         if (role == null) continue;
@@ -371,6 +424,55 @@ class FrameEpubResourceLoader {
       references: references,
       warnings: warnings,
     );
+  }
+
+  /// Loads a small adjacent chapter in the background. Failures are ignored
+  /// because speculative reads must never turn into reader error states.
+  Future<void> preloadChapter(FrameEpubSpineItem spineItem) async {
+    if (_disposed || maxPrefetchChapterBytes == 0) return;
+    final path = spineItem.item.path;
+    if (path == null) return;
+    final resource = _resources[path];
+    if (resource == null ||
+        resource.kind != FrameEpubResourceKind.document ||
+        resource.size > maxPrefetchChapterBytes) {
+      return;
+    }
+    try {
+      await loadChapter(spineItem);
+    } on Object {
+      // A background prefetch is best-effort. Navigation will retry normally.
+    }
+  }
+
+  void _cacheChapter(String path, FrameEpubChapterDocument chapter) {
+    if (_disposed || chapter.resource.size > maxCachedChapterBytes) return;
+    final previous = _chapterCache.remove(path);
+    if (previous != null) {
+      _cachedChapterBytes -= previous.resource.size;
+    }
+    _chapterCache[path] = chapter;
+    _cachedChapterBytes += chapter.resource.size;
+
+    while (_chapterCache.isNotEmpty &&
+        (_chapterCache.length > maxCachedChapterCount ||
+            _cachedChapterBytes > maxCachedChapterTotalBytes)) {
+      final oldestPath = _chapterCache.keys.first;
+      final oldest = _chapterCache.remove(oldestPath)!;
+      _cachedChapterBytes -= oldest.resource.size;
+    }
+  }
+
+  /// Drops parsed chapters held in memory. No data is persisted to disk.
+  void clearChapterCache() {
+    _chapterCache.clear();
+    _cachedChapterBytes = 0;
+  }
+
+  void dispose() {
+    _disposed = true;
+    _chapterLoads.clear();
+    clearChapterCache();
   }
 
   Future<FrameEpubStylesheetGraph> loadStylesheetGraph(

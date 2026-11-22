@@ -550,6 +550,33 @@ void main() {
       await session.close();
     });
 
+    test('preloads the next small chapter for faster TOC navigation',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(_FakeApi()),
+        chapterPreloadDelay: Duration.zero,
+      );
+
+      await session.open();
+      final beforePreload = source.requests.length;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      final afterPreload = source.requests.length;
+      expect(afterPreload, greaterThan(beforePreload));
+
+      expect(await session.goToTocEntry(session.toc[1]), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(
+        source.requests,
+        hasLength(afterPreload),
+        reason: 'The prefetched XHTML should be served from the memory cache.',
+      );
+      await session.close();
+    });
+
     test('TOC navigation resolves case-only aliases to the spine file',
         () async {
       final fixture = _zipFixture(tocPathCaseMismatch: true);
