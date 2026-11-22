@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../library/frame_reader_repository.dart';
 import 'frame_epub_parser.dart';
@@ -237,6 +237,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                           maxLines: widget.desktopLayout ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
+                            color: selected
+                                ? const Color(0xFFF6F0FF)
+                                : depth == 0
+                                    ? const Color(0xFFE1D7EF)
+                                    : _sidebarText,
+                            fontFamily: 'NotoSansTC',
                             fontSize: widget.desktopLayout ? 9 : 12,
                             height: 1.45,
                             fontWeight: depth == 0
@@ -556,7 +562,14 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                               color: _sidebarAccent,
                             ),
                           )
-                        : const Text('重新整理'),
+                        : const Text(
+                            '重新整理',
+                            style: TextStyle(
+                              color: _sidebarText,
+                              fontFamily: 'NotoSansTC',
+                              fontSize: 9,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -1065,6 +1078,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                 color: selected
                     ? const Color(0xFFF2EBFF)
                     : const Color(0xFF9E93AD),
+                fontFamily: 'NotoSansTC',
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               ),

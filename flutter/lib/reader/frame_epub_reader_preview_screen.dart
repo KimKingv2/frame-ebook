@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'frame_epub_reader_overlay_layout.dart';
 import 'frame_epub_reader_chrome_layout.dart';
 import 'frame_epub_reader_sidebar_layout.dart';
+import 'frame_epub_reader_option_label.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
@@ -2532,7 +2533,11 @@ class _FrameEpubReaderPreviewScreenState
             ),
             const SizedBox(width: 6),
           ],
-          Text(label),
+          FrameEpubReaderOptionLabel(
+            label: label,
+            color: foreground,
+            fontSize: compact ? 10 : 9,
+          ),
         ],
       ),
     );
@@ -2582,6 +2587,7 @@ class _FrameEpubReaderPreviewScreenState
               dropdownColor: const Color(0xFF211C2C),
               style: TextStyle(
                 color: const Color(0xFFE9E2F4),
+                fontFamily: 'NotoSansTC',
                 fontSize: compact ? 11 : 10,
               ),
               underline: const SizedBox.shrink(),
@@ -2589,9 +2595,10 @@ class _FrameEpubReaderPreviewScreenState
                 for (final option in options)
                   DropdownMenuItem<String>(
                     value: option.value,
-                    child: Text(
-                      option.label,
-                      overflow: TextOverflow.ellipsis,
+                    child: FrameEpubReaderOptionLabel(
+                      label: option.label,
+                      color: const Color(0xFFE9E2F4),
+                      fontSize: compact ? 11 : 10,
                     ),
                   ),
               ],

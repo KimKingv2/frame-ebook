@@ -78,6 +78,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('第一章'), findsOneWidget);
+    final chapterLabel = tester.widget<Text>(find.text('第一章'));
+    expect(chapterLabel.style?.color, const Color(0xFFE1D7EF));
+    expect(chapterLabel.style?.fontFamily, 'NotoSansTC');
     expect(find.text('第二章'), findsOneWidget);
     expect(find.text('第一節'), findsNothing);
     expect(find.text('第一小節'), findsNothing);
@@ -232,6 +235,9 @@ void main() {
     expect(find.text('F'), findsOneWidget);
     expect(find.text('章節目錄'), findsOneWidget);
     expect(find.text('第一章：開始'), findsOneWidget);
+    final selectedChapter = tester.widget<Text>(find.text('第一章：開始'));
+    expect(selectedChapter.style?.color, const Color(0xFFF6F0FF));
+    expect(selectedChapter.style?.fontFamily, 'NotoSansTC');
     expect(find.text('個人筆記'), findsOneWidget);
     expect(find.text('我的書籤'), findsOneWidget);
     expect(find.text('桌面筆記內容'), findsNothing);
