@@ -171,6 +171,12 @@ These items must still pass CI and device verification before being treated as c
 - Unit tests cover Legacy-value precedence, supported line-height normalization, theme mapping and independent reading-mode/page-layout restoration.
 
 
+### Reader responsive geometry correction
+
+- Flutter now uses the legacy 820 px breakpoint for the persistent desktop sidebar, and the legacy 220 px sidebar width through 1050 px before returning to 250 px on wider layouts.
+- The appearance panel now follows the original CSS placement rules: top-right from 561 px upward (82 px top offset and the centered 1500 px shell's right inset), and bottom-right at 560 px and below (8 px outer inset, viewport width minus 16 px, and an 84% viewport-height ceiling).
+- Pure layout tests pin the desktop, compact and ultra-wide geometry to the legacy CSS values. This is a targeted responsive correction, not pixel-level acceptance of the full Reader.
+
 ### Annotation list parity refinement
 
 - Flutter note, highlight, underline and bookmark rows now present the original selected quotation separately from the saved note preview, with the matching annotation marker and a text delete action.

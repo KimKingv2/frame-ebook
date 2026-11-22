@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'frame_epub_reader_overlay_layout.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -1043,7 +1045,8 @@ class _FrameEpubReaderPreviewScreenState
               builder: (context, constraints) {
                 if (_isImmersive) return _buildBody(session);
 
-                final wide = constraints.maxWidth >= 960;
+                final wide = constraints.maxWidth > 820;
+                final sidebarWidth = constraints.maxWidth <= 1050 ? 220.0 : 250.0;
                 final showDesktopSidebar = wide &&
                     _isSidebarVisible &&
                     session?.status == FrameEpubReaderStatus.ready;
@@ -1063,7 +1066,7 @@ class _FrameEpubReaderPreviewScreenState
                           children: [
                             if (showDesktopSidebar) ...[
                               SizedBox(
-                                width: 250,
+                                width: sidebarWidth,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: _readerPanel,
@@ -2145,6 +2148,9 @@ class _FrameEpubReaderPreviewScreenState
   Future<void> _showAppearance() async {
     final session = _session;
     if (session == null) return;
+    final panelLayout = FrameEpubAppearancePanelLayout.fromViewport(
+      MediaQuery.sizeOf(context),
+    );
     var lineHeight = _lineHeight;
     var fontScale = _fontScale;
     var fontFamilyPreference = _fontFamilyPreference;
@@ -2166,10 +2172,10 @@ class _FrameEpubReaderPreviewScreenState
         StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            18 + MediaQuery.of(context).viewInsets.bottom,
+            panelLayout.contentHorizontalPadding,
+            5,
+            panelLayout.contentHorizontalPadding,
+            14 + MediaQuery.of(context).viewInsets.bottom,
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -2217,7 +2223,7 @@ class _FrameEpubReaderPreviewScreenState
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   const Text(
@@ -2660,10 +2666,6 @@ class _FrameEpubReaderPreviewScreenState
         ),
       );
 
-    final screenSize = MediaQuery.sizeOf(context);
-    final panelWidth = (screenSize.width - 32).clamp(280.0, 470.0).toDouble();
-    final panelMaxHeight = (screenSize.height - 104).clamp(320.0, 900.0).toDouble();
-
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -2671,16 +2673,10 @@ class _FrameEpubReaderPreviewScreenState
       barrierColor: Colors.black45,
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
-        alignment: screenSize.width >= 840
-            ? Alignment.topRight
-            : Alignment.topCenter,
+        alignment: panelLayout.alignment,
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.only(
-              top: screenSize.width >= 840 ? 12 : 8,
-              right: screenSize.width >= 840 ? 20 : 8,
-              left: 8,
-            ),
+            padding: panelLayout.outerPadding,
             child: Material(
               color: _readerPanel,
               elevation: 24,
@@ -2688,11 +2684,11 @@ class _FrameEpubReaderPreviewScreenState
               clipBehavior: Clip.antiAlias,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: panelWidth,
-                  maxHeight: panelMaxHeight,
+                  maxWidth: panelLayout.width,
+                  maxHeight: panelLayout.maxHeight,
                 ),
                 child: SizedBox(
-                  width: panelWidth,
+                  width: panelLayout.width,
                   child: buildSettingsPanel(dialogContext),
                 ),
               ),
