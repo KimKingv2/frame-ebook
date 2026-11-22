@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
+import 'package:flutter/painting.dart' show TextPainter;
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -2373,8 +2374,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               .computeDistanceToActualBaseline(TextBaseline.alphabetic)
               .clamp(0.0, basePainter.height)
               .toDouble();
-          final baseDescent =
-              (basePainter.height - baseAscent).clamp(0.0, basePainter.height);
+          final baseDescent = (basePainter.height - baseAscent)
+              .clamp(0.0, basePainter.height)
+              .toDouble();
           final annotationHeight = annotationPainter.height;
           final below = const {'under', 'below'}.contains(
             style['ruby-position']?.trim().toLowerCase(),
