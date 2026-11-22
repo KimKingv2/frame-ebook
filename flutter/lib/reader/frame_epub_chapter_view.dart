@@ -2297,7 +2297,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   ) {
     final children = <InlineSpan>[];
     final pendingBase = <InlineSpan>[];
-    final textDirection = Directionality.of(context);
+    final textDirection = _textDirection(style['direction']);
     final textScaler = MediaQuery.textScalerOf(context);
 
     void appendPendingBase() {
@@ -2387,8 +2387,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           final placeholderHeight =
               verticalExtent + gap + annotationHeight;
           final horizontalOffset = textDirection == TextDirection.rtl
-              ? (baseWidth - annotationWidth) / 2
-              : -(baseWidth + annotationWidth) / 2;
+              ? baseWidth / 2
+              : -baseWidth / 2;
           final annotationWidget = FrameEpubRubyAnnotation(
             annotation: annotation,
             textScaler: textScaler,

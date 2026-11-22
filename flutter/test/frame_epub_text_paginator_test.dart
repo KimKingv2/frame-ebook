@@ -72,6 +72,33 @@ void main() {
       includePlaceholders: true,
     );
 
+    final painter = TextPainter(
+      text: text,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      textScaler: TextScaler.noScaling,
+    );
+    painter.setPlaceholderDimensions([marker.placeholderDimensions]);
+    painter.layout(maxWidth: 120);
+    final metrics = painter.computeLineMetrics();
+    var boundaryCursor = 0;
+    for (var index = 0; index < metrics.length; index++) {
+      if (boundaryCursor >= plainText.length) break;
+      final boundary = painter.getLineBoundary(
+        TextPosition(offset: boundaryCursor),
+      );
+      if (boundary.end <= boundaryCursor) break;
+      boundaryCursor = boundary.end;
+    }
+    expect(painter.height, greaterThan(90));
+    expect(metrics.length, greaterThan(1));
+    expect(
+      boundaryCursor,
+      plainText.length,
+      reason: 'TextPainter line boundaries must cover the ruby placeholder',
+    );
+    painter.dispose();
+
     final ranges = FrameEpubTextPaginator.paginate(
       text: text,
       maxWidth: 120,
