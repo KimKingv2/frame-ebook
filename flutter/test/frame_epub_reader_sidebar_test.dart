@@ -285,7 +285,7 @@ void main() {
       createdAt: 10,
     );
 
-    await tester.binding.setSurfaceSize(const Size(1100, 850));
+    await tester.binding.setSurfaceSize(const Size(1440, 850));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
