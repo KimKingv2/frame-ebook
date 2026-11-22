@@ -214,6 +214,7 @@ class FrameEpubChapterView extends StatefulWidget {
     this.initialTextNode,
     this.initialTextOffset,
     this.initialScrollFraction,
+    this.restoreRevision = 0,
     this.scrollController,
     this.onReadingPosition,
     this.onTextSelection,
@@ -258,6 +259,11 @@ class FrameEpubChapterView extends StatefulWidget {
   final XmlText? initialTextNode;
   final int? initialTextOffset;
   final double? initialScrollFraction;
+
+  /// Increment only when an explicit CFI/fragment navigation requests a
+  /// different location. Live visible-position updates must not increment it.
+  final int restoreRevision;
+
   final ScrollController? scrollController;
   final void Function(String cfi, double chapterFraction)? onReadingPosition;
   final ValueChanged<FrameEpubTextSelection?>? onTextSelection;
@@ -336,7 +342,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         !identical(oldWidget.resourceLoader, widget.resourceLoader)) {
       _stylesFuture = _loadStylesheets();
       _elementKeys.clear();
-      _restoreScheduled = false;
+      _paginationTextPositions.clear();
+      _paginationTextKeyCursor = 0;
+      _lastVisibleTextNode = null;
+      _lastVisibleTextOffset = null;
+      _resetPaginationMeasurement();
     } else {
       if (oldWidget.paginated != widget.paginated ||
           oldWidget.doublePageSpread != widget.doublePageSpread ||
@@ -355,8 +365,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           oldWidget.horizontalPadding != widget.horizontalPadding) {
         _resetPaginationMeasurement();
       }
-      if (oldWidget.initialAnchor != widget.initialAnchor ||
-          oldWidget.initialScrollFraction != widget.initialScrollFraction) {
+      if (oldWidget.restoreRevision != widget.restoreRevision) {
+        _lastVisibleTextNode = null;
+        _lastVisibleTextOffset = null;
         _restoreScheduled = false;
       }
     }
@@ -1002,10 +1013,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return;
     }
     _restoreScheduled = true;
+    final paginationRevision = _paginationRevision;
+    final restoreRevision = widget.restoreRevision;
+    final chapter = widget.chapter;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted ||
+          paginationRevision != _paginationRevision ||
+          restoreRevision != widget.restoreRevision ||
+          !identical(chapter, widget.chapter)) {
+        return;
+      }
       if (widget.paginated && widget.pageController?.hasClients == true) {
         final controller = widget.pageController!;
+        final measuredTargetPage = _measureInitialAnchorPage(_paginationPages);
+        if (measuredTargetPage != null) {
+          _initialPageForRestore = measuredTargetPage;
+        }
         final restoredSinglePage = _initialPageForRestore ??
             (widget.initialScrollFraction != null && _paginationPages.length > 1
                 ? (widget.initialScrollFraction! *
@@ -1035,7 +1058,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         }
       }
       WidgetsBinding.instance.addPostFrameCallback((__) {
-        if (!mounted || widget.initialAnchor == null) return;
+        if (!mounted ||
+            paginationRevision != _paginationRevision ||
+            restoreRevision != widget.restoreRevision ||
+            !identical(chapter, widget.chapter) ||
+            widget.initialAnchor == null) {
+          return;
+        }
         final targetContext =
             _elementKeys[widget.initialAnchor]?.currentContext;
         if (targetContext == null) return;
@@ -1050,8 +1079,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   void _scheduleVisiblePosition() {
     if (widget.fixedLayout || widget.onReadingPosition == null) return;
+    final chapter = widget.chapter;
+    final paginationRevision = _paginationRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.onReadingPosition == null) return;
+      if (!mounted ||
+          widget.onReadingPosition == null ||
+          !identical(chapter, widget.chapter) ||
+          paginationRevision != _paginationRevision) {
+        return;
+      }
       final viewportObject = _viewportKey.currentContext?.findRenderObject();
       if (viewportObject is! RenderBox || !viewportObject.hasSize) return;
       final viewportOrigin = viewportObject.localToGlobal(Offset.zero);

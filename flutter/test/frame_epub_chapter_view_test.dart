@@ -1358,6 +1358,100 @@ void main() {
   });
 
 
+  testWidgets(
+      'does not snap back when a live anchor changes after turning a page',
+      (tester) async {
+    final longText = List.filled(
+      80,
+      '用來測試 EPUB 分頁位置穩定性的長篇內容。每次翻頁後，閱讀位置會更新，但不應將閱讀器拉回第一頁。',
+    ).join();
+    final bytes = _fixture(additionalParagraphMarkup: '<p>$longText</p>');
+    final book = FrameBook.fromJson({
+      'id': 'chapter-pagination-anchor-stability-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/anchor-stability.epub',
+      'fileName': 'anchor-stability.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final initialAnchor = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'h1');
+      final laterAnchor = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.getAttribute('id') == 'inside');
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Widget buildReader({
+        required XmlElement anchor,
+        int restoreRevision = 0,
+      }) =>
+          MaterialApp(
+            home: Scaffold(
+              body: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                paginated: true,
+                pageController: pageController,
+                initialAnchor: anchor,
+                restoreRevision: restoreRevision,
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(buildReader(anchor: initialAnchor));
+      await tester.pumpAndSettle();
+      expect(pageController.hasClients, isTrue);
+      expect(pageController.position.maxScrollExtent, greaterThan(0));
+
+      final nextPage = pageController.nextPage(
+        duration: const Duration(milliseconds: 1),
+        curve: Curves.linear,
+      );
+      await tester.pumpAndSettle();
+      await nextPage;
+      expect(pageController.page, 1);
+
+      // A live CFI update changes the anchor prop, but does not represent a
+      // navigation request and must not jump to the old measured page.
+      await tester.pumpWidget(buildReader(anchor: laterAnchor));
+      await tester.pumpAndSettle();
+      expect(pageController.page, 1);
+
+      // An explicit navigation increments restoreRevision; the target page is
+      // re-measured from the new anchor and is expected to move forward.
+      await tester.pumpWidget(
+        buildReader(anchor: laterAnchor, restoreRevision: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(pageController.page, greaterThan(1));
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('long paragraphs are split into separate paginated text fragments', (tester) async {
     final longText = List.filled(
       900,

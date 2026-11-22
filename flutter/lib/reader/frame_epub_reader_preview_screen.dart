@@ -73,7 +73,10 @@ class _FrameEpubReaderPreviewScreenState
   String _layoutMode = 'doublePage';
   String _pageLayoutPreference = '2';
   String? _lastVisibleCfi;
-  String? _activeChapterPath;
+  FrameEpubChapterDocument? _activeChapter;
+  String? _activeInitialCfi;
+  String? _activeFragment;
+  int _restoreRevision = 0;
   Timer? _progressSaveTimer;
   String? _pendingCfi;
   int? _pendingPercent;
@@ -261,13 +264,23 @@ class _FrameEpubReaderPreviewScreenState
 
   void _handleSessionChanged() {
     final session = _session;
-    final chapterPath = session?.currentChapter?.resource.path;
-    if (chapterPath != null && chapterPath != _activeChapterPath) {
-      _activeChapterPath = chapterPath;
+    final chapter = session?.currentChapter;
+    final chapterChanged =
+        chapter != null && !identical(chapter, _activeChapter);
+    final initialCfi = session?.initialCfi;
+    final fragment = session?.currentFragment ?? '';
+
+    if (chapterChanged) {
+      _activeChapter = chapter;
       _lastSavedCfi = null;
       _lastVisibleCfi = null;
+      _progressSaveTimer?.cancel();
+      _progressSaveTimer = null;
+      _pendingCfi = null;
+      _pendingPercent = null;
       _selectedText = null;
       _isFixedPageZoomed = false;
+      _restoreRevision++;
       final isLongStrip =
           session?.isFixedLayout == true && _comicReadingMode == 'scrolled';
       if (!isLongStrip) {
@@ -280,6 +293,17 @@ class _FrameEpubReaderPreviewScreenState
           previousPageController.dispose();
         });
       }
+    } else if (chapter != null &&
+        (initialCfi != _activeInitialCfi || fragment != _activeFragment)) {
+      // Same-spine annotation/fragment navigation: the XHTML document stays
+      // mounted, but its requested reading target has changed.
+      _lastVisibleCfi = null;
+      _restoreRevision++;
+    }
+
+    if (chapter != null) {
+      _activeInitialCfi = initialCfi;
+      _activeFragment = fragment;
     }
     if (session?.status == FrameEpubReaderStatus.ready) {
       _startReadingTimeTracking(session!);
@@ -1627,6 +1651,7 @@ class _FrameEpubReaderPreviewScreenState
       initialTextNode: initialTextPoint?.node,
       initialTextOffset: initialTextPoint?.offset,
       initialScrollFraction: _initialScrollFractionFor(session),
+      restoreRevision: _restoreRevision,
       scrollController: _chapterScrollController,
       onReadingPosition: _queueReadingPosition,
       onTextSelection: _handleTextSelection,
