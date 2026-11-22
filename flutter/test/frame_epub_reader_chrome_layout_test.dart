@@ -12,6 +12,27 @@ void main() {
     expect(frameEpubUsesMobileQuickActions(1440), isFalse);
   });
 
+  group('Legacy reader quick-action geometry', () {
+    test('uses the 72px bookmark button at every breakpoint', () {
+      expect(frameEpubReaderQuickActionWidth(1440, bookmark: true), 72);
+      expect(frameEpubReaderQuickActionWidth(820, bookmark: true), 72);
+      expect(frameEpubReaderQuickActionWidth(380, bookmark: true), 72);
+    });
+
+    test('restores 104px, 92px and 86px action widths', () {
+      expect(frameEpubReaderQuickActionWidth(1440, bookmark: false), 104);
+      expect(frameEpubReaderQuickActionWidth(821, bookmark: false), 104);
+      expect(frameEpubReaderQuickActionWidth(820, bookmark: false), 92);
+      expect(frameEpubReaderQuickActionWidth(390, bookmark: false), 92);
+      expect(frameEpubReaderQuickActionWidth(380, bookmark: false), 86);
+    });
+
+    test('restores the legacy action heights', () {
+      expect(frameEpubReaderQuickActionHeight(1440), 34);
+      expect(frameEpubReaderQuickActionHeight(820), 33);
+    });
+  });
+
   group('FrameEpubReaderWorkspaceLayout', () {
     test('uses the legacy 250px sidebar and 16px gap on wide desktop', () {
       final layout = FrameEpubReaderWorkspaceLayout.fromViewport(

@@ -117,6 +117,37 @@ void main() {
     expect(find.text('FRAME READER'), findsNothing);
     expect(find.text('NOW READING'), findsOneWidget);
     expect(find.text('Preview test book'), findsOneWidget);
+    expect(find.byKey(const ValueKey('reader-status-line')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('reading-session-indicator')),
+      findsNothing,
+    );
+
+    final bookmarkAction = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-action-bookmark')),
+    );
+    expect(bookmarkAction.width, 72);
+    final sidebarAction = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-action-sidebar')),
+    );
+    expect(sidebarAction.width, 104);
+    final appearanceAction = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-action-appearance')),
+    );
+    expect(appearanceAction.width, 104);
+    final fullscreenAction = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-action-fullscreen')),
+    );
+    expect(fullscreenAction.width, 104);
+
+    final toolbarRect = tester.getRect(
+      find.byKey(const ValueKey('reader-desktop-toolbar')),
+    );
+    final fullscreenRect = tester.getRect(
+      find.byKey(const ValueKey('reader-action-fullscreen')),
+    );
+    expect(toolbarRect.right - fullscreenRect.right, lessThan(10));
+
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
@@ -132,6 +163,13 @@ void main() {
     );
     expect(workspace.left, 0);
     expect(workspace.width, 1440);
+    final statusRect = tester.getRect(
+      find.byKey(const ValueKey('reader-status-line')),
+    );
+    final frameRect = tester.getRect(
+      find.byKey(const ValueKey('reader-rounded-frame')),
+    );
+    expect(statusRect.top, greaterThanOrEqualTo(frameRect.bottom));
   });
 
   testWidgets('restores the true immersive reading-only layout with rounded page',

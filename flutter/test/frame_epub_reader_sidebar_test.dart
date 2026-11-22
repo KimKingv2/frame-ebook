@@ -323,6 +323,24 @@ void main() {
     expect(find.text('桌面筆記內容'), findsNothing);
     expect(find.text('書籤摘錄'), findsOneWidget);
 
+    final sidebarSurface = tester.widget<Material>(
+      find.descendant(
+        of: find.byType(FrameEpubReaderSidebar),
+        matching: find.byType(Material),
+      ).first,
+    );
+    expect(sidebarSurface.color, Colors.transparent);
+
+    final tocHeadingRect = tester.getRect(find.text('章節目錄'));
+    expect(tocHeadingRect.left, 14);
+
+    final cloudFootnote = tester.widget<Text>(
+      find.text('閱讀位置、筆記與書籤都會同步保存至雲端'),
+    );
+    expect(cloudFootnote.style?.color, const Color(0xFF776D85));
+    expect(cloudFootnote.style?.fontSize, 8);
+    expect(cloudFootnote.style?.height, 1.7);
+
     await tester.tap(find.text('筆記與標註'));
     await tester.pumpAndSettle();
     expect(find.text('桌面筆記內容'), findsOneWidget);

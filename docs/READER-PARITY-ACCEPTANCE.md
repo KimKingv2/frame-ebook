@@ -71,3 +71,32 @@ Confirmed desktop differences and corrections in this revision:
 Remaining source-level differences to review in a subsequent pass include the exact chapter-progress panel composition, the original topbar/engine-status row, typography and row density inside the annotation cards, and the text-flow renderer (Foliate.js versus the Flutter-native renderer). These areas cannot be certified as pixel-identical from CSS inspection alone.
 
 No pixel-parity acceptance is claimed. A valid image-diff still requires fresh legacy and Flutter captures using the same EPUB fixture, CFI/page, preferences, annotations, viewport, device-pixel ratio, browser zoom and loaded fonts. The previous acceptance note already records that a historical screenshot pair did not meet this controlled-capture requirement.
+
+
+## Visual correction follow-up · 2026-11-22
+
+Compared the sidebar, progress controls, status region and quick-action
+dimensions against the legacy Reading Room HTML, CSS and JavaScript.
+
+- Desktop sidebar Material is now transparent, allowing the parent’s original
+  dark violet-black gradient to show through instead of an opaque lighter
+  panel. The TOC content restores 14px horizontal inset above 1050px and 11px
+  at/below that breakpoint. The sync footnote retains its bottom position and
+  restores the legacy subtle top rule, muted `#776d85` colour, 8px font and
+  1.7 line-height.
+- The reading-position save status and dynamic reading-time status now appear
+  below the entire sidebar-plus-reader row. The timer text switches between
+  `正在記錄本次閱讀` and `本次閱讀已暫停`; the idle hint remains at the far right.
+- Previous/next controls now use the original text labels `← 上一頁` and
+  `下一頁 →`, natural button widths, 37px height and 14px horizontal padding.
+  The centre progress panel restores the 220–300px width and 10px inner inset.
+- The four top-right actions restore the 72px bookmark width and responsive
+  104px / 92px / 86px widths for the remaining controls. The group has enough
+  width to remain in one row on desktop and is right-aligned close to the
+  reading viewport.
+
+Widget and geometry regressions now cover the sidebar background, TOC inset,
+footnote palette, action dimensions and status placement. These are source and
+automated-widget corrections, not pixel-level acceptance. Screenshot evidence
+still requires controlled legacy and Flutter captures using the same viewport,
+DPR, EPUB CFI, appearance settings and loaded fonts.
