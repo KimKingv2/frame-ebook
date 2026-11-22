@@ -22,8 +22,8 @@ class FrameEpubAppearancePanelLayout {
     final widthCap = isCompact ? 420.0 : 440.0;
     final width = math.min(
       math.min(widthCap, viewport.width * .91),
-      math.max(0, viewport.width - 16),
-    );
+      math.max(0.0, viewport.width - 16),
+    ).toDouble();
     final verticalInset = fullscreen ? 0.0 : 8.0;
 
     return FrameEpubAppearancePanelLayout(
