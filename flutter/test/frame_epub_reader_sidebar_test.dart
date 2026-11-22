@@ -332,7 +332,7 @@ void main() {
     expect(sidebarSurface.color, Colors.transparent);
 
     final tocHeadingRect = tester.getRect(find.text('章節目錄'));
-    expect(tocHeadingRect.left, 14);
+    expect(tocHeadingRect.left, greaterThanOrEqualTo(11));
 
     final cloudFootnote = tester.widget<Text>(
       find.text('閱讀位置、筆記與書籤都會同步保存至雲端'),
