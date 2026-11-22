@@ -2756,7 +2756,8 @@ class _FrameEpubReaderPreviewScreenState
                 panelLayout.contentHorizontalPadding,
                 0,
                 panelLayout.contentHorizontalPadding,
-                14 + MediaQuery.of(context).viewInsets.bottom,
+                (panelLayout.isCompact ? 14.0 : 18.0) +
+                    MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2823,7 +2824,11 @@ class _FrameEpubReaderPreviewScreenState
                 children: [
                   const Text(
                     '文字排版',
-                    style: TextStyle(color: _readerMuted),
+                    style: const TextStyle(
+                      color: Color(0xFFD8CDEB),
+                      fontSize: 10,
+                      letterSpacing: .4,
+                    ),
                   ),
                   const Spacer(),
                   const Text(
@@ -2836,7 +2841,7 @@ class _FrameEpubReaderPreviewScreenState
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               settingsGrid(
                 children: [
 _appearanceDropdown(
@@ -2914,11 +2919,16 @@ _appearanceDropdown(
                 desktopColumns: 3,
                 runSpacing: 10,
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   const Text(
                     '頁面佈局',
-                    style: TextStyle(color: _readerMuted),
+                    style: const TextStyle(
+                      color: Color(0xFFD8CDEB),
+                      fontSize: 10,
+                      letterSpacing: .4,
+                    ),
                   ),
                   const Spacer(),
                   const Text(
@@ -2931,7 +2941,7 @@ _appearanceDropdown(
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               settingsGrid(
                 children: [
 _appearanceDropdown(
@@ -3003,7 +3013,7 @@ _appearanceDropdown(
               ),
               if (!session.isFixedLayout)
                 Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.only(top: 10),
                   child: Text(
                     readingMode == 'scrolled'
                         ? '目前為連續捲動；分頁版面偏好會保留，切回分頁時套用。'
@@ -3011,8 +3021,9 @@ _appearanceDropdown(
                             ? '雙頁優先會在寬螢幕並排顯示；窄螢幕會自動退回單頁。'
                             : '單頁翻頁模式，每次顯示一個頁面。',
                     style: const TextStyle(
-                      color: _readerMuted,
-                      fontSize: 11,
+                      color: Color(0xFF777083),
+                      fontSize: 8,
+                      height: 1.7,
                     ),
                   ),
                 ),
@@ -3021,7 +3032,11 @@ _appearanceDropdown(
                   padding: EdgeInsets.only(top: 6),
                   child: Text(
                     '固定版面 EPUB 會使用下方漫畫版面選項，文字頁面設定暫不適用。',
-                    style: TextStyle(color: _readerMuted, fontSize: 11),
+                    style: TextStyle(
+                      color: Color(0xFF777083),
+                      fontSize: 8,
+                      height: 1.7,
+                    ),
                   ),
                 ),
               const SizedBox(height: 14),
@@ -3029,7 +3044,11 @@ _appearanceDropdown(
                 children: [
                   const Text(
                     '漫畫與圖像',
-                    style: TextStyle(color: _readerMuted),
+                    style: const TextStyle(
+                      color: Color(0xFFD8CDEB),
+                      fontSize: 10,
+                      letterSpacing: .4,
+                    ),
                   ),
                   const Spacer(),
                   const Text(
@@ -3085,7 +3104,7 @@ _appearanceDropdown(
                 runSpacing: 8,
               ),
               Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: 9),
                 child: Text(
                   !session.isFixedLayout
                       ? '固定版面 EPUB 載入後才會啟用漫畫排版選項。'
@@ -3094,7 +3113,11 @@ _appearanceDropdown(
                           : comicPageLayout == '2'
                               ? '雙頁優先會在寬度足夠時並排，窄螢幕自動切回單頁。'
                               : '單頁翻頁模式，每次顯示一個固定版面。',
-                  style: const TextStyle(color: _readerMuted, fontSize: 11),
+                  style: const TextStyle(
+                    color: Color(0xFF777083),
+                    fontSize: 8,
+                    height: 1.7,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),

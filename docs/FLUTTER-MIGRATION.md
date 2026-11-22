@@ -192,6 +192,12 @@ These items must still pass CI and device verification before being treated as c
 - Dropdowns now use the legacy dark field surface, 6 px radius, #4c425d border, 34 px desktop / 39 px compact control height, and 9/10 px label/value typography.
 - These source-level measurements are based on the final legacy CSS declarations. Golden screenshot comparisons are still required to establish actual pixel parity.
 
+### Appearance typography and section spacing
+
+- Appearance group headings now use the legacy 10 px / 0.4 tracking treatment; English kickers use 7 px / 1.3 tracking and the original muted lavender colour.
+- Layout/comic helper notes now use the legacy 8 px size, muted colour and 1.7 line height. Section spacing and the desktop drawer's bottom inset were aligned with the final CSS values.
+- The autosave status retains visible feedback but uses the legacy 8 px text scale so it does not visually dominate the controls.
+
 ### Appearance button geometry and ordering
 
 - Theme and backdrop choices now use the legacy outlined-button treatment rather than Material ChoiceChips: 6 px corner radius, matching selected/unselected border and fill colours, 34 px desktop / 37 px compact targets, 9/10 px text and 10 px theme swatches.
