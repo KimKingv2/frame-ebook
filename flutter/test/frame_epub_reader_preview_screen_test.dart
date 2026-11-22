@@ -187,7 +187,7 @@ void main() {
     expect(statusRect.top, greaterThanOrEqualTo(frameRect.bottom));
   });
 
-  testWidgets('restores the legacy compact heading and 44px icon row',
+  testWidgets('restores the compact rectangular 32px action row',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

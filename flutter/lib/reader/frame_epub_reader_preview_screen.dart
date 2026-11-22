@@ -1220,6 +1220,7 @@ class _FrameEpubReaderPreviewScreenState
     }
 
     return ConstrainedBox(
+      key: const ValueKey('reader-mobile-toolbar'),
       constraints: const BoxConstraints(minHeight: 84),
       child: Padding(
         padding: EdgeInsets.fromLTRB(2, 11, 2, compact ? 8 : 10),
