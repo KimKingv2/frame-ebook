@@ -297,12 +297,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('目錄'), findsOneWidget);
-    expect(find.text('筆記'), findsOneWidget);
+    expect(find.text('筆記').first, findsOneWidget);
     expect(find.text('書籤 1'), findsOneWidget);
     final inactiveTocTab = tester.widget<Text>(find.text('目錄'));
     expect(inactiveTocTab.style?.color, const Color(0xFF9E93AD));
     expect(inactiveTocTab.style?.fontFamily, 'NotoSansTC');
-    final activeNotesTab = tester.widget<Text>(find.text('筆記'));
+    final activeNotesTab = tester.widget<Text>(find.text('筆記').first);
     expect(activeNotesTab.style?.color, const Color(0xFFF2EBFF));
     expect(activeNotesTab.style?.fontFamily, 'NotoSansTC');
 
