@@ -2490,13 +2490,64 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
+  Widget _appearanceOptionButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onPressed,
+    Color? swatch,
+  }) {
+    final compact = MediaQuery.sizeOf(context).width <= 820;
+    final foreground = selected
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFFE3DCEC);
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: foreground,
+        backgroundColor:
+            selected ? const Color(0xFF35294A) : const Color(0xFF211C2C),
+        side: BorderSide(
+          color: selected
+              ? const Color(0xFFA88BE4)
+              : const Color(0xFF4C425D),
+        ),
+        minimumSize: Size(0, compact ? 37 : 34),
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        textStyle: TextStyle(fontSize: compact ? 10 : 9),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (swatch != null) ...[
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: swatch,
+                border: Border.all(color: const Color(0x66FFFFFF)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Text(label),
+        ],
+      ),
+    );
+  }
+
   Widget _appearanceDropdown({
     required String label,
     required String value,
     required List<({String value, String label})> options,
     required ValueChanged<String> onChanged,
     bool enabled = true,
-    double width = 148,
+    double width = double.infinity,
   }) {
     final compact = MediaQuery.sizeOf(context).width <= 820;
     return SizedBox(
@@ -3047,86 +3098,73 @@ _appearanceDropdown(
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
-                '閱讀背景',
-                style: TextStyle(color: _readerMuted),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('木質桌面'),
-                    selected: comicBackdrop == 'wood',
-                    onSelected: (_) =>
-                        updateSetting(() => comicBackdrop = 'wood'),
-                  ),
-                  ChoiceChip(
-                    label: const Text('亞麻暖灰'),
-                    selected: comicBackdrop == 'linen',
-                    onSelected: (_) =>
-                        updateSetting(() => comicBackdrop = 'linen'),
-                  ),
-                  ChoiceChip(
-                    label: const Text('深色石板'),
-                    selected: comicBackdrop == 'slate',
-                    onSelected: (_) =>
-                        updateSetting(() => comicBackdrop = 'slate'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
                     '紙張主題',
-                    style: TextStyle(color: _readerMuted),
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'PAGE TONE',
                     style: TextStyle(
-                      color: Color(0xFF887A9C),
-                      fontSize: 8,
-                      letterSpacing: 1.2,
+                      color: Color(0xFF9C93A9),
+                      fontSize: 9,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 9),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  ChoiceChip(
-                    avatar: const CircleAvatar(
-                      radius: 6,
-                      backgroundColor: Color(0xFFFFFEFA),
-                    ),
-                    label: const Text('紙白'),
-                    selected: theme == 'light',
-                    onSelected: (_) =>
-                        updateSetting(() => theme = 'light'),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _appearanceOptionButton(
+                        label: '紙白',
+                        selected: theme == 'light',
+                        swatch: const Color(0xFFFFFEFA),
+                        onPressed: () => updateSetting(() => theme = 'light'),
+                      ),
+                      _appearanceOptionButton(
+                        label: '暖紙',
+                        selected: theme == 'sepia',
+                        swatch: const Color(0xFFF1E7D5),
+                        onPressed: () => updateSetting(() => theme = 'sepia'),
+                      ),
+                      _appearanceOptionButton(
+                        label: '夜讀',
+                        selected: theme == 'dark',
+                        swatch: const Color(0xFF191821),
+                        onPressed: () => updateSetting(() => theme = 'dark'),
+                      ),
+                    ],
                   ),
-                  ChoiceChip(
-                    avatar: const CircleAvatar(
-                      radius: 6,
-                      backgroundColor: Color(0xFFF1E7D5),
+                  const SizedBox(height: 14),
+                  const Text(
+                    '閱讀背景',
+                    style: TextStyle(
+                      color: Color(0xFF9C93A9),
+                      fontSize: 9,
                     ),
-                    label: const Text('暖紙'),
-                    selected: theme == 'sepia',
-                    onSelected: (_) =>
-                        updateSetting(() => theme = 'sepia'),
                   ),
-                  ChoiceChip(
-                    avatar: const CircleAvatar(
-                      radius: 6,
-                      backgroundColor: Color(0xFF191821),
-                    ),
-                    label: const Text('夜讀'),
-                    selected: theme == 'dark',
-                    onSelected: (_) =>
-                        updateSetting(() => theme = 'dark'),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _appearanceOptionButton(
+                        label: '木質桌面',
+                        selected: comicBackdrop == 'wood',
+                        onPressed: () =>
+                            updateSetting(() => comicBackdrop = 'wood'),
+                      ),
+                      _appearanceOptionButton(
+                        label: '亞麻暖灰',
+                        selected: comicBackdrop == 'linen',
+                        onPressed: () =>
+                            updateSetting(() => comicBackdrop = 'linen'),
+                      ),
+                      _appearanceOptionButton(
+                        label: '深色石板',
+                        selected: comicBackdrop == 'slate',
+                        onPressed: () =>
+                            updateSetting(() => comicBackdrop = 'slate'),
+                      ),
+                    ],
                   ),
                 ],
               ),

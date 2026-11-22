@@ -192,6 +192,12 @@ These items must still pass CI and device verification before being treated as c
 - Dropdowns now use the legacy dark field surface, 6 px radius, #4c425d border, 34 px desktop / 39 px compact control height, and 9/10 px label/value typography.
 - These source-level measurements are based on the final legacy CSS declarations. Golden screenshot comparisons are still required to establish actual pixel parity.
 
+### Appearance button geometry and ordering
+
+- Theme and backdrop choices now use the legacy outlined-button treatment rather than Material ChoiceChips: 6 px corner radius, matching selected/unselected border and fill colours, 34 px desktop / 37 px compact targets, 9/10 px text and 10 px theme swatches.
+- The legacy order is restored: paper tone first, reading backdrop second. Select controls now stretch to the full width of their grid cell, including the three-column desktop typography grid.
+- This corrects control geometry and interaction affordance; golden screenshot comparison is still required.
+
 ### Appearance drawer corrected against the final legacy CSS cascade
 
 - The final legacy CSS rules define the appearance panel as a right-side full-height drawer: 440 px maximum on wide layouts, 420 px on compact layouts, a 91vw width cap, 8 px vertical inset, left-only rounded corners and a sticky 58 px header.
