@@ -1101,8 +1101,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
           child: Text(
             bookmarksOnly
-                ? '載入書籍後顯示書籤。'
-                : '載入書籍後顯示本書的筆記與高亮。',
+                ? '目前沒有已保存的書籤。'
+                : '這本書還沒有筆記或高亮。選取正文中的文字即可新增。',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(0xFF90869E),
