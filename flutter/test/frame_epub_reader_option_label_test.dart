@@ -110,5 +110,4 @@ void main() {
     expect(popupOption.style?.fontFamily, 'NotoSansTC');
     expect(tester.getSize(find.text('稍大')).height, greaterThan(0));
   });
-  });
 }
