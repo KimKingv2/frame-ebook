@@ -245,7 +245,10 @@ List<_ZipItem> _items() => [
     ];
 
 Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
-    _openFixture() async {
+    _openFixture({
+  int maxCachedChapterBytes = 2 * 1024 * 1024,
+  int maxPrefetchChapterBytes = 1024 * 1024,
+}) async {
   final fixture = _zipFixture(_items());
   final source = _MemoryFrameFileSource(fixture);
   final archive = await FrameZipArchive.open(
@@ -255,7 +258,12 @@ Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
   final epub = await const FrameEpubParser().parse(archive);
   return (
     archive,
-    FrameEpubResourceLoader(archive: archive, book: epub),
+    FrameEpubResourceLoader(
+      archive: archive,
+      book: epub,
+      maxCachedChapterBytes: maxCachedChapterBytes,
+      maxPrefetchChapterBytes: maxPrefetchChapterBytes,
+    ),
     source,
   );
 }
@@ -332,6 +340,58 @@ void main() {
         final reloaded = await loader.loadChapter(loader.book.spine.single);
         expect(identical(reloaded, first), isFalse);
         expect(source.requests.length, greaterThan(requestCount));
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
+    test('coalesces concurrent reads of the same chapter', () async {
+      final (archive, loader, source) = await _openFixture();
+      try {
+        final beforeConcurrent = source.requests.length;
+        final concurrent = await Future.wait([
+          loader.loadChapter(loader.book.spine.single),
+          loader.loadChapter(loader.book.spine.single),
+        ]);
+        final concurrentReadCount =
+            source.requests.length - beforeConcurrent;
+
+        expect(identical(concurrent[0], concurrent[1]), isTrue);
+
+        loader.clearChapterCache();
+        final beforeSingle = source.requests.length;
+        await loader.loadChapter(loader.book.spine.single);
+        final singleReadCount = source.requests.length - beforeSingle;
+
+        expect(
+          concurrentReadCount,
+          singleReadCount,
+          reason: 'Simultaneous chapter requests should share one parse and read.',
+        );
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
+    test('does not retain a chapter larger than the cache entry limit',
+        () async {
+      final (archive, loader, source) = await _openFixture(
+        maxCachedChapterBytes: 1,
+        maxPrefetchChapterBytes: 0,
+      );
+      try {
+        final first = await loader.loadChapter(loader.book.spine.single);
+        final beforeSecond = source.requests.length;
+        final second = await loader.loadChapter(loader.book.spine.single);
+
+        expect(identical(first, second), isFalse);
+        expect(
+          source.requests.length,
+          greaterThan(beforeSecond),
+          reason: 'An oversized chapter must be reparsed, not retained.',
+        );
       } finally {
         loader.dispose();
         await archive.close();
