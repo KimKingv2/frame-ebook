@@ -13,23 +13,25 @@ void main() {
   });
 
   group('Legacy reader quick-action geometry', () {
-    test('uses the 72px bookmark button at every breakpoint', () {
-      expect(frameEpubReaderQuickActionWidth(1440, bookmark: true), 72);
-      expect(frameEpubReaderQuickActionWidth(820, bookmark: true), 72);
-      expect(frameEpubReaderQuickActionWidth(380, bookmark: true), 72);
+    test('uses 48px desktop and 44px compact circular targets', () {
+      expect(frameEpubReaderQuickActionSize(1440), 48);
+      expect(frameEpubReaderQuickActionSize(821), 48);
+      expect(frameEpubReaderQuickActionSize(820), 44);
+      expect(frameEpubReaderQuickActionSize(390), 44);
     });
 
-    test('restores 104px, 92px and 86px action widths', () {
-      expect(frameEpubReaderQuickActionWidth(1440, bookmark: false), 104);
-      expect(frameEpubReaderQuickActionWidth(821, bookmark: false), 104);
-      expect(frameEpubReaderQuickActionWidth(820, bookmark: false), 92);
-      expect(frameEpubReaderQuickActionWidth(390, bookmark: false), 92);
-      expect(frameEpubReaderQuickActionWidth(380, bookmark: false), 86);
+    test('restores the exact desktop and compact row gaps', () {
+      expect(frameEpubReaderQuickActionGap(1440), 2);
+      expect(frameEpubReaderQuickActionGap(821), 2);
+      expect(frameEpubReaderQuickActionGap(820), 0);
+      expect(frameEpubReaderQuickActionGap(390), 0);
     });
 
-    test('restores the legacy action heights', () {
-      expect(frameEpubReaderQuickActionHeight(1440), 34);
-      expect(frameEpubReaderQuickActionHeight(820), 33);
+    test('restores progress-label spacing and four-button group widths', () {
+      expect(frameEpubReaderQuickActionStackGap(1440), 10);
+      expect(frameEpubReaderQuickActionStackGap(820), 6);
+      expect(frameEpubReaderQuickActionsWidth(1440), 198);
+      expect(frameEpubReaderQuickActionsWidth(390), 176);
     });
   });
 

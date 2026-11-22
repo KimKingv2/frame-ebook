@@ -123,30 +123,36 @@ void main() {
       findsNothing,
     );
 
-    expect(
-      tester.getSize(find.byKey(const ValueKey('reader-action-bookmark'))).width,
-      72,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('reader-action-sidebar'))).width,
-      104,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('reader-action-appearance'))).width,
-      104,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('reader-action-fullscreen'))).width,
-      104,
-    );
+    final actionKeys = [
+      const ValueKey('reader-action-bookmark'),
+      const ValueKey('reader-action-sidebar'),
+      const ValueKey('reader-action-appearance'),
+      const ValueKey('reader-action-fullscreen'),
+    ];
+    final actionRects = actionKeys.map(tester.getRect).toList();
+    for (final rect in actionRects) {
+      expect(rect.width, 48);
+      expect(rect.height, 48);
+    }
+    expect(actionRects[1].left - actionRects[0].right, 2);
+    expect(actionRects[2].left - actionRects[1].right, 2);
+    expect(actionRects[3].left - actionRects[2].right, 2);
 
+    final actionRowRect = tester.getRect(
+      find.byKey(const ValueKey('reader-quick-actions-row')),
+    );
+    expect(actionRowRect.width, 198);
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('reader-desktop-toolbar')),
     );
-    final fullscreenRect = tester.getRect(
-      find.byKey(const ValueKey('reader-action-fullscreen')),
-    );
+    final fullscreenRect = actionRects.last;
     expect(toolbarRect.right - fullscreenRect.right, lessThan(10));
+    expect(
+      actionRowRect.top - tester.getRect(
+        find.text('等待閱讀'),
+      ).bottom,
+      10,
+    );
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
@@ -170,6 +176,51 @@ void main() {
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
     expect(statusRect.top, greaterThanOrEqualTo(frameRect.bottom));
+  });
+
+  testWidgets('restores the legacy compact heading and 44px icon row',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FrameEpubReaderPreviewScreen(
+          book: _testBook(),
+          fileSource: _FailingFileSource(),
+          repository: FrameReaderRepository(_PreviewApi()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('reader-mobile-toolbar')),
+      findsOneWidget,
+    );
+    final actionKeys = [
+      const ValueKey('reader-action-bookmark'),
+      const ValueKey('reader-action-sidebar'),
+      const ValueKey('reader-action-appearance'),
+      const ValueKey('reader-action-fullscreen'),
+    ];
+    final actionRects = actionKeys.map(tester.getRect).toList();
+    for (final rect in actionRects) {
+      expect(rect.width, 44);
+      expect(rect.height, 44);
+    }
+    expect(actionRects[1].left - actionRects[0].right, 0);
+    expect(actionRects[2].left - actionRects[1].right, 0);
+    expect(actionRects[3].left - actionRects[2].right, 0);
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('reader-quick-actions-row')),
+      ).width,
+      176,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('restores the true immersive reading-only layout with rounded page',

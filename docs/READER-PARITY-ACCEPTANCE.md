@@ -100,3 +100,26 @@ footnote palette, action dimensions and status placement. These are source and
 automated-widget corrections, not pixel-level acceptance. Screenshot evidence
 still requires controlled legacy and Flutter captures using the same viewport,
 DPR, EPUB CFI, appearance settings and loaded fonts.
+
+
+## Legacy action toolbar restoration · 2026-11-23
+
+Re-read the final effective rules in `pages/assets/epub-lab.css` (including
+the late icon-only override at the end of the file) and the original SVG paths
+in `pages/epub-lab/index.html`. The effective action row is four circular,
+icon-only controls, not the earlier rectangular 72/104px interpretation:
+
+- Desktop: 48 × 48px targets, 24 × 24px SVG glyphs, 2px horizontal gaps.
+- At 820px and below: 44 × 44px targets, zero horizontal gap.
+- The visual gap below the chapter label is 10px on desktop and 6px in compact
+  layout after combining the parent column gap with the action row top margin.
+- Controls are transparent and borderless by default. The active bookmark alone
+  receives the legacy translucent violet circle; the appearance glyph uses
+  `#eee6ff`; hover uses the legacy translucent violet wash.
+- The four SVG path geometries are reproduced in the Flutter painter. The
+  compact heading returns to the legacy left-identity/right-progress split.
+
+Widget and geometry tests assert target sizes, gaps, row width, and progress
+spacing at desktop and compact widths. This is source-level and automated
+layout evidence, not final pixel-diff acceptance. A controlled screenshot pair
+at identical viewport/DPR/zoom and reader state is still required for that gate.
