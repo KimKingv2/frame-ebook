@@ -14,6 +14,8 @@ class FrameEpubRubyAnnotation extends StatelessWidget {
     required this.placeholderHeight,
     required this.horizontalOffset,
     required this.verticalOffset,
+    required this.rubyAlign,
+    required this.rubyPosition,
     super.key,
   });
 
@@ -24,6 +26,8 @@ class FrameEpubRubyAnnotation extends StatelessWidget {
   final double placeholderHeight;
   final double horizontalOffset;
   final double verticalOffset;
+  final String rubyAlign;
+  final String rubyPosition;
 
   PlaceholderDimensions get placeholderDimensions => PlaceholderDimensions(
         size: Size(0, placeholderHeight),

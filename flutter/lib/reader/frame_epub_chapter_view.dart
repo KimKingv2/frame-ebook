@@ -2338,9 +2338,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           continue;
         }
 
-        final annotation = TextSpan(
-          text: annotationText,
-          style: _textStyle(annotationStyle),
+        final annotation = _rubyAnnotationSpan(
+          child,
+          annotationStyle,
+          cascade,
         );
         final base = TextSpan(
           style: _textStyle(style),
@@ -2364,11 +2365,59 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           basePainter.layout();
           annotationPainter.layout();
           final baseWidth = basePainter.width;
-          final annotationWidth = annotationPainter.width;
-          if (baseWidth <= 0 || annotationWidth <= 0) {
+          final naturalAnnotationWidth = annotationPainter.width;
+          if (baseWidth <= 0 || naturalAnnotationWidth <= 0) {
             appendPendingBase();
             continue;
           }
+
+          final rubyAlign = switch (
+            style['ruby-align']?.trim().toLowerCase()
+          ) {
+            'start' => 'start',
+            'center' => 'center',
+            'space-between' => 'space-between',
+            _ => 'space-around',
+          };
+          final annotationRuneCount =
+              annotation.toPlainText().runes.length.clamp(1, 10000);
+          final additionalSpacing = switch (rubyAlign) {
+            'space-between' when annotationRuneCount > 1 =>
+              ((baseWidth - naturalAnnotationWidth) /
+                      (annotationRuneCount - 1))
+                  .clamp(0.0, 100.0)
+                  .toDouble(),
+            'space-around' when annotationRuneCount > 0 =>
+              ((baseWidth - naturalAnnotationWidth) /
+                      annotationRuneCount)
+                  .clamp(0.0, 100.0)
+                  .toDouble(),
+            _ => 0.0,
+          };
+          final annotationFontSize =
+              _length(annotationStyle['font-size'], widget.fontSize);
+          final existingLetterSpacing =
+              _cssDimension(annotationStyle['letter-spacing'], annotationFontSize) ??
+                  0;
+          final alignedAnnotation = additionalSpacing > 0
+              ? annotation.copyWith(
+                  style: annotation.style?.copyWith(
+                    letterSpacing: existingLetterSpacing + additionalSpacing,
+                  ),
+                )
+              : annotation;
+          final alignedAnnotationPainter = additionalSpacing > 0
+              ? TextPainter(
+                  text: alignedAnnotation,
+                  textDirection: textDirection,
+                  textScaler: textScaler,
+                  maxLines: 1,
+                )
+              : annotationPainter;
+          if (additionalSpacing > 0) {
+            alignedAnnotationPainter.layout();
+          }
+          final annotationWidth = alignedAnnotationPainter.width;
 
           final baseAscent = basePainter
               .computeDistanceToActualBaseline(TextBaseline.alphabetic)
@@ -2377,26 +2426,36 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           final baseDescent = (basePainter.height - baseAscent)
               .clamp(0.0, basePainter.height)
               .toDouble();
-          final annotationHeight = annotationPainter.height;
-          final below = const {'under', 'below'}.contains(
-            style['ruby-position']?.trim().toLowerCase(),
-          );
+          final annotationHeight = alignedAnnotationPainter.height;
+          final rubyPosition = (style['ruby-position'] ?? 'alternate')
+              .trim()
+              .toLowerCase()
+              .split(RegExp(r'\\s+'));
+          final below =
+              rubyPosition.contains('under') || rubyPosition.contains('below');
           final parentFontSize = _length(style['font-size'], widget.fontSize);
           final gap = (parentFontSize * 0.08).clamp(1.0, 3.0).toDouble();
           final verticalExtent = below ? baseDescent : baseAscent;
           final placeholderHeight =
               verticalExtent + gap + annotationHeight;
-          final horizontalOffset = textDirection == TextDirection.rtl
-              ? baseWidth / 2
-              : -baseWidth / 2;
+          final horizontalOffset = switch (rubyAlign) {
+            'start' => textDirection == TextDirection.rtl
+                ? baseWidth - annotationWidth / 2
+                : annotationWidth / 2 - baseWidth,
+            _ => textDirection == TextDirection.rtl
+                ? baseWidth / 2
+                : -baseWidth / 2,
+          };
           final annotationWidget = FrameEpubRubyAnnotation(
-            annotation: annotation,
+            annotation: alignedAnnotation,
             textScaler: textScaler,
             annotationWidth: annotationWidth,
             annotationHeight: annotationHeight,
             placeholderHeight: placeholderHeight,
             horizontalOffset: horizontalOffset,
             verticalOffset: below ? baseDescent + gap : 0,
+            rubyAlign: rubyAlign,
+            rubyPosition: rubyPosition.join(' '),
           );
 
           children.addAll(pendingBase);
@@ -2409,6 +2468,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         } finally {
           basePainter.dispose();
           annotationPainter.dispose();
+          if (!identical(alignedAnnotationPainter, annotationPainter)) {
+            alignedAnnotationPainter.dispose();
+          }
         }
         continue;
       }
@@ -2429,6 +2491,55 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
 
     appendPendingBase();
+    return TextSpan(
+      style: _textStyle(style),
+      children: children,
+    );
+  }
+
+  TextSpan _rubyAnnotationSpan(
+    XmlElement element,
+    Map<String, String> style,
+    FrameEpubCssCascade cascade,
+  ) {
+    InlineSpan? build(XmlNode node, Map<String, String> parentStyle) {
+      if (node is XmlText) {
+        final prepared = _prepareText(
+          node,
+          parentStyle['white-space'],
+          parentStyle['text-transform'],
+        );
+        return prepared.text.isEmpty ? null : TextSpan(text: prepared.text);
+      }
+      if (node is! XmlElement) return null;
+
+      final tag = node.name.local.toLowerCase();
+      if (_isNonVisualTag(tag) || tag == 'rp' ||
+          FrameEpubFootnoteResolver.isFootnoteTarget(node)) {
+        return null;
+      }
+      final childStyle = _computedStyle(node, cascade, parentStyle);
+      if (childStyle['display'] == 'none' ||
+          childStyle['visibility'] == 'hidden') {
+        return null;
+      }
+      if (tag == 'br') return const TextSpan(text: ' ');
+      final children = <InlineSpan>[];
+      for (final child in node.children) {
+        final span = build(child, childStyle);
+        if (span != null) children.add(span);
+      }
+      return TextSpan(
+        style: _textStyle(childStyle),
+        children: children,
+      );
+    }
+
+    final children = <InlineSpan>[];
+    for (final child in element.children) {
+      final span = build(child, style);
+      if (span != null) children.add(span);
+    }
     return TextSpan(
       style: _textStyle(style),
       children: children,

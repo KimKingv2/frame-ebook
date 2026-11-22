@@ -685,6 +685,99 @@ void main() {
     }
   });
 
+  testWidgets('supports ruby alignment, nested annotation styles and under-position',
+      (tester) async {
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <p><ruby style="ruby-align: start">
+          <rb>漢字</rb>
+          <rt><span style="color: purple; font-weight: bold">かんじ</span></rt>
+        </ruby></p>
+        <p><ruby style="ruby-position: under">
+          <rb>東</rb><rt>ひがし</rt>
+        </ruby></p>
+        <p><ruby>漢<rt>かん</rt>字<rt>じ</rt></ruby></p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-ruby-layout-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/ruby-layout.epub',
+      'fileName': 'ruby-layout.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final rubyWidgets = <FrameEpubRubyAnnotation>[];
+      final annotationSpans = <TextSpan>[];
+      void collect(InlineSpan span) {
+        if (span is! TextSpan) return;
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          if (child is WidgetSpan &&
+              child.child is FrameEpubRubyAnnotation) {
+            rubyWidgets.add(child.child as FrameEpubRubyAnnotation);
+          } else {
+            collect(child);
+          }
+        }
+      }
+
+      for (final selectable
+          in tester.widgetList<SelectableText>(find.byType(SelectableText))) {
+        final root = selectable.textSpan;
+        if (root != null) collect(root);
+      }
+      expect(rubyWidgets, hasLength(4));
+
+      final aligned = rubyWidgets.first;
+      expect(aligned.rubyAlign, 'start');
+      final nested = aligned.annotation.children!.single as TextSpan;
+      expect(nested.toPlainText(), 'かんじ');
+      expect(nested.style?.color, const Color(0xFF800080));
+      expect(nested.style?.fontWeight, FontWeight.bold);
+
+      final under = rubyWidgets[1];
+      expect(under.rubyPosition, 'under');
+      expect(
+        under.placeholderDimensions.alignment,
+        PlaceholderAlignment.belowBaseline,
+      );
+      expect(under.verticalOffset, greaterThan(0));
+
+      final segmented = rubyWidgets.skip(2).toList();
+      expect(segmented.map((item) => item.annotation.toPlainText()).toList(),
+          ['かん', 'じ']);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('preserves EPUB ordered and unordered list markers',
       (tester) async {
     tester.view.physicalSize = const Size(1440, 2200);

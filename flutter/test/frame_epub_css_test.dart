@@ -167,6 +167,40 @@ void main() {
       expect(annotationStyle['color'], 'purple');
     });
 
+    test('inherits ruby layout properties and applies ruby defaults', () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([
+        'ruby { ruby-align: start; ruby-position: under; ruby-overhang: none; }',
+      ]);
+      final document = XmlDocument.parse(
+        '<ruby><rb>漢字</rb><rt>かんじ</rt></ruby>',
+      );
+      final ruby = document.rootElement;
+      final rt = ruby.descendants.whereType<XmlElement>().firstWhere(
+            (element) => element.name.local == 'rt',
+          );
+
+      final rubyStyle = cascade.resolve(ruby);
+      final annotationStyle = cascade.resolve(rt, parentStyle: rubyStyle);
+
+      expect(rubyStyle['ruby-align'], 'start');
+      expect(rubyStyle['ruby-position'], 'under');
+      expect(rubyStyle['ruby-overhang'], 'none');
+      expect(annotationStyle['ruby-align'], 'start');
+      expect(annotationStyle['ruby-position'], 'under');
+      expect(annotationStyle['ruby-overhang'], 'none');
+    });
+
+    test('uses CSS Ruby initial values when no declaration is supplied', () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([]);
+      final ruby = XmlDocument.parse('<ruby>漢<rt>かん</rt></ruby>')
+          .rootElement;
+      final style = cascade.resolve(ruby);
+
+      expect(style['ruby-align'], 'space-around');
+      expect(style['ruby-position'], 'alternate');
+      expect(style['ruby-overhang'], 'auto');
+    });
+
     test('inherits list-style-type from the parent list', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         'ol { list-style-type: upper-alpha; }',

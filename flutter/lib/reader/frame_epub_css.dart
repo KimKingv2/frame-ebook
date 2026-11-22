@@ -41,6 +41,9 @@ class FrameEpubCssCascade {
     'word-spacing',
     'direction',
     'list-style-type',
+    'ruby-align',
+    'ruby-position',
+    'ruby-overhang',
   };
 
   /// Resolves a computed declaration map for [element].
@@ -220,6 +223,13 @@ class FrameEpubCssCascade {
         break;
       case 'a':
         result['text-decoration'] = 'underline';
+        break;
+      case 'ruby':
+        result.addAll({
+          'ruby-align': 'space-around',
+          'ruby-position': 'alternate',
+          'ruby-overhang': 'auto',
+        });
         break;
       case 'sup':
         result.addAll({
