@@ -321,24 +321,8 @@ void main() {
 
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
     final bytes = _fixture(
-      additionalParagraphMarkup: '''
-        <p style="text-indent: 2em">首行縮排回歸</p>
-        <ol style="list-style-type: upper-alpha" start="26">
-          <li>字母編號甲</li><li>字母編號乙</li>
-        </ol>
-        <ol style="list-style-type: lower-roman" start="4">
-          <li>羅馬編號</li>
-        </ol>
-        <ol reversed>
-          <li>倒序編號二</li><li>倒序編號一</li>
-        </ol>
-        <ol><li value="7">指定起點</li><li>接續編號</li></ol>
-        <ol type="A" start="28"><li>HTML 型別編號</li></ol>
-        <ol style="list-style-type: decimal-leading-zero" start="3">
-          <li>補零編號</li>
-        </ol>
-        <ul style="list-style-type: square"><li>方形項目</li></ul>
-      ''',
+      additionalParagraphMarkup:
+          '<p style="text-indent: 2em">首行縮排回歸</p>',
     );
     final book = FrameBook.fromJson({
       'id': 'chapter-widget-test',
@@ -425,17 +409,6 @@ void main() {
       expect(indent.width, 32);
       expect(indent.height, 0);
 
-      expect(find.text('Z.'), findsOneWidget);
-      expect(find.text('AA.'), findsOneWidget);
-      expect(find.text('iv.'), findsOneWidget);
-      expect(find.text('2.'), findsOneWidget);
-      expect(find.text('1.'), findsOneWidget);
-      expect(find.text('7.'), findsOneWidget);
-      expect(find.text('8.'), findsOneWidget);
-      expect(find.text('AB.'), findsOneWidget);
-      expect(find.text('03.'), findsOneWidget);
-      expect(find.text('▪'), findsOneWidget);
-
       final paragraph = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
           .firstWhere(
@@ -490,6 +463,79 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('preserves EPUB ordered and unordered list markers',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <ol style="list-style-type: upper-alpha" start="26">
+          <li>字母編號甲</li><li>字母編號乙</li>
+        </ol>
+        <ol style="list-style-type: lower-roman" start="4">
+          <li>羅馬編號</li>
+        </ol>
+        <ol reversed>
+          <li>倒序編號二</li><li>倒序編號一</li>
+        </ol>
+        <ol><li value="7">指定起點</li><li>接續編號</li></ol>
+        <ol type="A" start="28"><li>HTML 型別編號</li></ol>
+        <ol style="list-style-type: decimal-leading-zero" start="3">
+          <li>補零編號</li>
+        </ol>
+        <ul style="list-style-type: square"><li>方形項目</li></ul>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-list-marker-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/list-markers.epub',
+      'fileName': 'list-markers.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Z.'), findsOneWidget);
+      expect(find.text('AA.'), findsOneWidget);
+      expect(find.text('iv.'), findsOneWidget);
+      expect(find.text('2.'), findsOneWidget);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.text('7.'), findsOneWidget);
+      expect(find.text('8.'), findsOneWidget);
+      expect(find.text('AB.'), findsOneWidget);
+      expect(find.text('03.'), findsOneWidget);
+      expect(find.text('▪'), findsOneWidget);
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('restores all highlight colors and underline annotations',
       (tester) async {
     final bytes = _fixture(
