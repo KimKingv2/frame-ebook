@@ -2,6 +2,8 @@
 
 This inventory is derived from the actual main-branch source. It is the migration checklist for the Flutter Web, macOS and Android clients. The existing main-branch Pages application remains the reference implementation until all checklist items have been reproduced and tested.
 
+**Mandatory Reader release gate:** the Flutter Reader must pass [pixel-level visual and full interaction acceptance](READER-PARITY-ACCEPTANCE.md). A similar layout or a passing CI run is not sufficient. Do not mark Reader parity complete until screenshot-diff and Web/macOS/Android interaction evidence has been recorded.
+
 ## 1. Home bookshelf
 
 Source: pages/index.html, pages/assets/library.js, pages/assets/library-store.js and pages/assets/site.css.

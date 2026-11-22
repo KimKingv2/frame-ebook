@@ -2,6 +2,10 @@
 
 Status: Flutter Web/macOS/Android shell, D1-backed bookshelf and Flutter-native reading statistics are implemented. The full legacy Reading Room and Cloud Manager remain available through embedded compatibility views while their Flutter-native replacements are built.
 
+## Hard acceptance gate: pixel-level Reader parity
+
+The Flutter Reader is not considered complete until it passes the mandatory visual and behavioural gate in [Reader parity acceptance](READER-PARITY-ACCEPTANCE.md). The legacy Reading Room is the single source of truth. Matching the broad layout is not enough: same-size screenshots must be compared, and every visible control and user flow must match. No cutover or "complete" status may be claimed before Web, macOS and Android acceptance. See the full viewport/state matrix and evidence requirements in that document.
+
 ## Non-negotiable parity rule
 
 Reproduce the complete main-branch application across one Flutter codebase targeting Web, macOS and Android. Do not simplify or redesign established user flows, remove controls, replace data models, or add features taken only from the frozen Tauri development branch. When a behaviour is unclear, inspect the main-branch source and preserve it.
