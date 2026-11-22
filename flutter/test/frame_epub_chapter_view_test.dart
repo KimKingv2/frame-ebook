@@ -1392,6 +1392,8 @@ void main() {
       final laterAnchor = chapter.document.descendants
           .whereType<XmlElement>()
           .firstWhere((element) => element.getAttribute('id') == 'inside');
+      final laterPoint = FrameEpubCfi.firstTextPoint(laterAnchor);
+      expect(laterPoint, isNotNull);
 
       tester.view.physicalSize = const Size(320, 220);
       tester.view.devicePixelRatio = 1;
@@ -1400,6 +1402,7 @@ void main() {
 
       Widget buildReader({
         required XmlElement anchor,
+        FrameEpubCfiPoint? textPoint,
         int restoreRevision = 0,
       }) =>
           MaterialApp(
@@ -1410,6 +1413,8 @@ void main() {
                 paginated: true,
                 pageController: pageController,
                 initialAnchor: anchor,
+                initialTextNode: textPoint?.node,
+                initialTextOffset: textPoint?.offset,
                 restoreRevision: restoreRevision,
               ),
             ),
@@ -1437,7 +1442,11 @@ void main() {
       // An explicit navigation increments restoreRevision; the target page is
       // re-measured from the new anchor and is expected to move forward.
       await tester.pumpWidget(
-        buildReader(anchor: laterAnchor, restoreRevision: 1),
+        buildReader(
+          anchor: laterAnchor,
+          textPoint: laterPoint,
+          restoreRevision: 1,
+        ),
       );
       await tester.pumpAndSettle();
       expect(pageController.page, greaterThan(1));

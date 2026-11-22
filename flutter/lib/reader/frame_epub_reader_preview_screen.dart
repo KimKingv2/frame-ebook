@@ -2476,6 +2476,11 @@ class _FrameEpubReaderPreviewScreenState
     final session = _session;
     if (session == null) return false;
     await _flushReadingPosition();
+    // A bookmark can target the same CFI that was used when the book opened.
+    // Treat the user's explicit jump as a fresh restore even when the CFI
+    // string itself is unchanged.
+    _lastVisibleCfi = null;
+    _restoreRevision++;
     try {
       final moved = await session.goToCfi(annotation.cfi);
       if (!mounted) return false;
