@@ -345,13 +345,15 @@ class FrameEpubReaderSession extends ChangeNotifier {
     var index = spine.indexWhere((item) => item.item.path == path);
     if (index < 0) {
       final target = _normalizeArchivePathForLookup(path).toLowerCase();
-      final matches = <int>[
-        for (var i = 0; i < spine.length; i++)
-          if (_normalizeArchivePathForLookup(spine[i].item.path)
-                  .toLowerCase() ==
-              target)
-            i,
-      ];
+      final matches = <int>[];
+      for (var i = 0; i < spine.length; i++) {
+        final itemPath = spine[i].item.path;
+        if (itemPath == null) continue;
+        if (_normalizeArchivePathForLookup(itemPath).toLowerCase() ==
+            target) {
+          matches.add(i);
+        }
+      }
       if (matches.length == 1) index = matches.single;
     }
     if (index < 0) return false;

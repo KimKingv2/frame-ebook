@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'frame_epub_reader_overlay_layout.dart';
-import 'frame_epub_reader_chrome_layout.dart';
 import 'frame_epub_reader_sidebar_layout.dart';
 import 'frame_epub_reader_option_label.dart';
 
