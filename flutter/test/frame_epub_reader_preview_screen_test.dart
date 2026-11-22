@@ -129,7 +129,9 @@ void main() {
       const ValueKey('reader-action-appearance'),
       const ValueKey('reader-action-fullscreen'),
     ];
-    final actionRects = actionKeys.map(tester.getRect).toList();
+    final actionRects = actionKeys
+        .map((key) => tester.getRect(find.byKey(key)))
+        .toList();
     for (final rect in actionRects) {
       expect(rect.width, 48);
       expect(rect.height, 48);
@@ -206,7 +208,9 @@ void main() {
       const ValueKey('reader-action-appearance'),
       const ValueKey('reader-action-fullscreen'),
     ];
-    final actionRects = actionKeys.map(tester.getRect).toList();
+    final actionRects = actionKeys
+        .map((key) => tester.getRect(find.byKey(key)))
+        .toList();
     for (final rect in actionRects) {
       expect(rect.width, 44);
       expect(rect.height, 44);
