@@ -141,6 +141,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     List<FrameEpubTocEntry> entries, {
     int depth = 0,
     String prefix = '',
+    bool compact = false,
   }) {
     final widgets = <Widget>[];
     for (var index = 0; index < entries.length; index++) {
@@ -155,7 +156,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
 
       widgets.add(
         Padding(
-          padding: EdgeInsets.only(left: depth * 10, top: 1, bottom: 1),
+          padding: EdgeInsets.only(
+            left: depth * (compact ? 13 : 10),
+            top: 1,
+            bottom: 1,
+          ),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: selected
@@ -167,12 +172,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                   : null,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 30),
+              constraints: BoxConstraints(minHeight: compact ? 40 : 30),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 24,
-                    height: 28,
+                    width: compact ? 30 : 24,
+                    height: compact ? 36 : 28,
                     child: hasChildren
                         ? IconButton(
                             tooltip: expanded
@@ -211,11 +216,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                                 ? const Color(0xFFE1D7EF)
                                 : _sidebarText,
                         disabledForegroundColor: _sidebarText,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 5,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 10 : 7,
+                          vertical: compact ? 9 : 5,
                         ),
-                        minimumSize: const Size(0, 29),
+                        minimumSize: Size(0, compact ? 40 : 29),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         visualDensity: VisualDensity.compact,
                         shape: RoundedRectangleBorder(
@@ -255,6 +260,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             entry.children,
             depth: depth + 1,
             prefix: key,
+            compact: compact,
           ),
         );
       }
@@ -358,6 +364,30 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     );
   }
 
+  Widget _buildCompactSectionHeading(String title, String kicker) =>
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFFD8CDEA),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            kicker,
+            style: const TextStyle(
+              color: Color(0xFF766C85),
+              fontSize: 8,
+              letterSpacing: 1.25,
+            ),
+          ),
+        ],
+      );
+
   Widget _buildCompactLayout(int bookmarkCount) => Column(
         children: [
           Padding(
@@ -371,37 +401,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                       '閱讀導覽',
                       style: TextStyle(
                         color: _sidebarText,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 34,
-                    height: 34,
-                    child: IconButton(
-                      tooltip: '重新整理標註',
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed:
-                          _refreshingAnnotations ? null : _refreshAnnotations,
-                      icon: _refreshingAnnotations
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: _sidebarAccent,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.refresh_rounded,
-                              color: _sidebarMuted,
-                              size: 19,
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 5),
                   Container(
                     width: 42,
                     height: 42,
@@ -426,33 +430,149 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0x55393247)),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+          Container(
+            margin: const EdgeInsets.fromLTRB(2, 2, 2, 4),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0x6B0B0910),
+              border: Border.all(color: const Color(0x24C1AAEE)),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 _buildTabButton('目錄', 0),
-                _buildTabButton('書籤 $bookmarkCount', 1),
-                _buildTabButton(
-                  '筆記 ${_annotations.where((item) => item.type != 'bookmark').length}',
-                  2,
-                ),
+                _buildTabButton('筆記', 1),
+                _buildTabButton('書籤 $bookmarkCount', 2),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0x33393247)),
           Expanded(
             child: PageView(
               controller: _pageController,
               onPageChanged: _handlePageChanged,
               physics: const PageScrollPhysics(),
               children: [
-                _buildToc(),
-                _buildAnnotations(bookmarksOnly: true),
-                _buildAnnotations(bookmarksOnly: false),
+                _buildCompactTocPane(),
+                _buildCompactNotesPane(),
+                _buildCompactBookmarksPane(bookmarkCount),
               ],
             ),
           ),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 11),
+            padding: const EdgeInsets.only(top: 11),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Color(0x1AC1AAEE)),
+              ),
+            ),
+            child: const Text(
+              '閱讀位置、筆記與書籤都會同步保存至雲端',
+              style: TextStyle(
+                color: Color(0xFF94899F),
+                fontSize: 9,
+              ),
+            ),
+          ),
+        ],
+      );
+
+  Widget _buildCompactTocPane() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildCompactSectionHeading('章節目錄', 'CONTENTS'),
+          const SizedBox(height: 12),
+          Expanded(
+            child: widget.toc.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 8,
+                      ),
+                      child: Text(
+                        '這本 EPUB 沒有提供可用目錄。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _sidebarMuted,
+                          fontSize: 10,
+                          height: 1.8,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.only(right: 2),
+                    children: _buildTocTree(widget.toc, compact: true),
+                  ),
+          ),
+        ],
+      );
+
+  Widget _buildCompactNotesPane() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildCompactSectionHeading('個人筆記', 'MY NOTES'),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 38,
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '筆記與標註',
+                    style: TextStyle(
+                      color: Color(0xFFECE4F8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Tooltip(
+                  message: '重新整理標註',
+                  child: OutlinedButton(
+                    onPressed:
+                        _refreshingAnnotations ? null : _refreshAnnotations,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _sidebarText,
+                      backgroundColor: const Color(0x332A213B),
+                      side: const BorderSide(color: Color(0x443F3552)),
+                      minimumSize: const Size(0, 27),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      textStyle: const TextStyle(fontSize: 9),
+                    ),
+                    child: _refreshingAnnotations
+                        ? const SizedBox(
+                            width: 13,
+                            height: 13,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.6,
+                              color: _sidebarAccent,
+                            ),
+                          )
+                        : const Text('重新整理'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(child: _buildAnnotations(bookmarksOnly: false)),
+        ],
+      );
+
+  Widget _buildCompactBookmarksPane(int bookmarkCount) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildCompactSectionHeading('我的書籤 $bookmarkCount', 'BOOKMARKS'),
+          const SizedBox(height: 12),
+          Expanded(child: _buildAnnotations(bookmarksOnly: true)),
         ],
       );
 
@@ -627,7 +747,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                         fontSize: 10,
                       ),
                     ),
-                    const SizedBox(width: 7),
+                    SizedBox(width: desktop ? 7 : 9),
                     Icon(
                       _showDesktopAnnotations
                           ? Icons.expand_less_rounded
@@ -791,21 +911,25 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: desktop ? 3 : 7),
+      margin: EdgeInsets.only(bottom: desktop ? 3 : 9),
       padding: EdgeInsets.symmetric(
-        horizontal: desktop ? 7 : 9,
-        vertical: desktop ? 7 : 10,
+        horizontal: desktop ? 7 : 10,
+        vertical: desktop ? 7 : 12,
       ),
       decoration: BoxDecoration(
         color: const Color(0x07FFFFFF),
-        border: Border.all(color: const Color(0x1CBEA6E5)),
-        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: desktop
+              ? const Color(0x1CBEA6E5)
+              : const Color(0x17BEA6E5),
+        ),
+        borderRadius: BorderRadius.circular(desktop ? 8 : 11),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: desktop ? 12 : 16,
+            width: desktop ? 12 : 6,
             child: Padding(
               padding: EdgeInsets.only(top: isBookmark ? 2 : 1),
               child: marker,
@@ -845,8 +969,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: const Color(0xFFE4DDEC),
-                      fontSize: desktop ? 9 : 12,
-                      height: 1.55,
+                      fontSize: desktop ? 9 : 11,
+                      height: desktop ? 1.55 : 1.65,
                     ),
                   ),
                   if (isNote && note.isNotEmpty) ...[
@@ -857,8 +981,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: const Color(0xFF9F94AD),
-                        fontSize: desktop ? 8 : 11,
-                        height: 1.5,
+                        fontSize: desktop ? 8 : 10,
+                        height: desktop ? 1.5 : 1.6,
                       ),
                     ),
                   ],
@@ -874,10 +998,10 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
               style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFC99AAA),
               padding: EdgeInsets.symmetric(
-                horizontal: desktop ? 5 : 7,
-                vertical: desktop ? 3 : 5,
+                horizontal: desktop ? 5 : 9,
+                vertical: desktop ? 3 : 0,
               ),
-              minimumSize: const Size(0, 27),
+              minimumSize: Size(0, desktop ? 27 : 34),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
@@ -897,25 +1021,53 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: TextButton(
-          onPressed: () => _selectTab(index),
-          style: TextButton.styleFrom(
-            foregroundColor: selected ? _sidebarAccent : _sidebarMuted,
-            backgroundColor:
-                selected ? const Color(0x332A213B) : Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: () => _selectTab(index),
+          borderRadius: BorderRadius.circular(9),
+          child: Container(
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? const Color(0x5C49346F) : Colors.transparent,
+              gradient: selected
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0x5C8061D0),
+                        Color(0x614C3970),
+                      ],
+                    )
+                  : null,
+              border: Border.all(
+                color: selected
+                    ? const Color(0x59A78BFA)
+                    : Colors.transparent,
+              ),
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x0DFFFFFF),
+                        blurRadius: 0,
+                        offset: Offset(0, 1),
+                      ),
+                    ]
+                  : const [],
             ),
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: selected
+                    ? const Color(0xFFF2EBFF)
+                    : const Color(0xFF9E93AD),
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
           ),
         ),
@@ -944,21 +1096,33 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         return created != 0 ? created : b.updatedAt.compareTo(a.updatedAt);
       });
     if (items.isEmpty) {
-      return _SidebarEmptyState(
-        message: bookmarksOnly
-            ? '尚無書籤。閱讀到想記住的位置時，點擊書頁右上角的書籤按鈕。'
-            : '這本書還沒有筆記或高亮。選取正文中的文字即可新增。',
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          child: Text(
+            bookmarksOnly
+                ? '載入書籍後顯示書籤。'
+                : '載入書籍後顯示本書的筆記與高亮。',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF90869E),
+              fontSize: 10,
+              height: 1.8,
+            ),
+          ),
+        ),
       );
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(9, 10, 9, 12),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
       children: [
         for (final annotation in items)
           _buildAnnotationCard(annotation, desktop: false),
       ],
     );
   }
+
 }
 
 class _SidebarEmptyState extends StatelessWidget {

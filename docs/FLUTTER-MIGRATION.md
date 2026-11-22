@@ -179,6 +179,13 @@ These items must still pass CI and device verification before being treated as c
 - This is distinct from ordinary browser fullscreen, which may retain the regular reader chrome. Escape / system-back and the existing top-zone listener remain the exit paths.
 - The immersive state is source-aligned; same-viewport visual comparison and cross-platform exit/restore acceptance remain pending.
 
+### Compact navigation pane structure and sizing
+
+- The mobile drawer now follows the legacy pane order and layout: Contents, Notes, Bookmarks. Each pane restores its own section heading and kicker; Notes includes the annotation title and refresh control, while Bookmarks shows its count in the section heading.
+- The three tabs use the legacy 3-column pill container, 42 px targets, selected gradient/border treatment and 11 px labels. The drawer footer restores the cloud-sync statement and divider.
+- Compact TOC rows now use 40 px minimum targets, 30 px disclosure columns and 12 px text. Annotation cards use the legacy 9 px list gap, 12/10 px card padding, 11/10 px quote/note type and 34 px delete targets.
+- Regression tests now verify the mobile pane headings and their order alongside existing note/bookmark navigation and deletion behaviour.
+
 ### Compact sidebar inner padding parity
 
 - The compact left drawer now restores the legacy inner content padding: 15 px horizontally, 18 px at the top, and 16 px plus the bottom device safe-area inset at the bottom. This is in addition to the drawer's outer viewport positioning, matching the final legacy CSS box model.

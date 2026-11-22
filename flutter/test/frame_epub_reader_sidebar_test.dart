@@ -295,6 +295,8 @@ void main() {
 
     await tester.tap(find.text('書籤 1'));
     await tester.pumpAndSettle();
+    expect(find.text('我的書籤 1'), findsOneWidget);
+    expect(find.text('BOOKMARKS'), findsOneWidget);
     expect(find.text('這是書籤所在位置'), findsOneWidget);
     expect(find.byIcon(Icons.star_rounded), findsOneWidget);
 
@@ -362,7 +364,7 @@ void main() {
             toc: const [],
             currentPath: null,
             annotations: const [],
-            initialTabIndex: 2,
+            initialTabIndex: 1,
             onSelectToc: (_) {},
             onOpenAnnotation: (_) {},
             onEditNote: (_) {},

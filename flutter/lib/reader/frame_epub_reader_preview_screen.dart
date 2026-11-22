@@ -2059,31 +2059,32 @@ class _FrameEpubReaderPreviewScreenState
             bottom: drawerLayout.bottomInset,
           ),
           child: Container(
-              width: drawerLayout.width,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B1726),
-                border: const Border(
-                  top: BorderSide(color: Color(0x4DC1AAEE)),
-                  right: BorderSide(color: Color(0x4DC1AAEE)),
-                  bottom: BorderSide(color: Color(0x4DC1AAEE)),
-                ),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x9E000000),
-                    blurRadius: 70,
-                    offset: Offset(22, 0),
-                  ),
-                ],
+            width: drawerLayout.width,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1726),
+              border: const Border(
+                top: BorderSide(color: Color(0x4DC1AAEE)),
+                right: BorderSide(color: Color(0x4DC1AAEE)),
+                bottom: BorderSide(color: Color(0x4DC1AAEE)),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: _buildReaderSidebar(
-                session,
-                initialTabIndex: initialTabIndex,
-                onClose: () => Navigator.of(dialogContext).pop(),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x9E000000),
+                  blurRadius: 70,
+                  offset: Offset(22, 0),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _buildReaderSidebar(
+              session,
+              initialTabIndex: initialTabIndex,
+              onClose: () => Navigator.of(dialogContext).pop(),
+            ),
           ),
         ),
       ),
