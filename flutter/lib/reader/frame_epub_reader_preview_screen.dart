@@ -3,7 +3,6 @@ import 'frame_epub_reader_overlay_layout.dart';
 import 'frame_epub_reader_chrome_layout.dart';
 import 'frame_epub_reader_sidebar_layout.dart';
 import 'frame_epub_reader_option_label.dart';
-import 'frame_epub_reader_action_icon.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
@@ -848,47 +847,40 @@ class _FrameEpubReaderPreviewScreenState
   Widget _readerQuickAction({
     required Key key,
     required String tooltip,
-    required FrameEpubReaderActionIcon icon,
+    required IconData icon,
     required VoidCallback? onPressed,
-    bool selected = false,
-    Color iconColor = const Color(0xFFDCD2ED),
+    required bool selected,
+    required double width,
+    required double height,
   }) {
-    final size = frameEpubReaderQuickActionSize(
-      MediaQuery.sizeOf(context).width,
-    );
-    return Opacity(
-      opacity: onPressed == null ? .42 : 1,
-      child: SizedBox(
-        key: key,
-        width: size,
-        height: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: selected
-                ? const Color(0x33A78BFA)
-                : Colors.transparent,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            tooltip: tooltip,
-            onPressed: onPressed,
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.standard,
-            constraints: BoxConstraints.tightFor(
-              width: size,
-              height: size,
-            ),
-            iconSize: 24,
-            hoverColor: const Color(0x29B49AE1),
-            focusColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            splashColor: Colors.transparent,
-            icon: FrameEpubReaderActionGlyph(
-              icon: icon,
-              color: selected ? const Color(0xFFFFFFFF) : iconColor,
-            ),
-          ),
+    final iconColor = onPressed == null
+        ? const Color(0xFF746C80)
+        : selected
+            ? _readerAccent
+            : const Color(0xFFDCD2ED);
+
+    return Container(
+      key: key,
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: selected
+            ? const Color(0xFF30263F)
+            : const Color(0xFF2D253C),
+        border: Border.all(
+          color: selected
+              ? const Color(0x887F68AA)
+              : const Color(0x443F3552),
         ),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        constraints: BoxConstraints.tightFor(width: width, height: height),
+        icon: Icon(icon, size: 18, color: iconColor),
       ),
     );
   }
@@ -1026,6 +1018,7 @@ class _FrameEpubReaderPreviewScreenState
     required double viewportWidth,
     required bool wide,
   }) {
+    final compact = viewportWidth <= 560;
     final ready = session?.status == FrameEpubReaderStatus.ready;
     final currentBookmarkCfi = ready
         ? _bookmarkCfi(
@@ -1038,12 +1031,18 @@ class _FrameEpubReaderPreviewScreenState
           currentBookmarkCfi,
         ) !=
         null;
+    final actionWidth = frameEpubReaderQuickActionWidth(viewportWidth);
+    final actionHeight = frameEpubReaderQuickActionHeight(viewportWidth);
 
     final actions = <Widget>[
       _readerQuickAction(
         tooltip: bookmarked ? '移除目前位置的書籤' : '加入目前位置的書籤',
-        icon: FrameEpubReaderActionIcon.bookmark,
+        icon: bookmarked
+            ? Icons.bookmark_rounded
+            : Icons.bookmark_add_outlined,
         selected: bookmarked,
+        width: actionWidth,
+        height: actionHeight,
         key: const ValueKey('reader-action-bookmark'),
         onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
       ),
@@ -1051,7 +1050,10 @@ class _FrameEpubReaderPreviewScreenState
         tooltip: wide
             ? (_isSidebarVisible ? '隱藏閱讀導覽' : '顯示閱讀導覽')
             : '目錄、筆記與書籤',
-        icon: FrameEpubReaderActionIcon.sidebar,
+        icon: Icons.menu_book_outlined,
+        selected: wide && _isSidebarVisible,
+        width: actionWidth,
+        height: actionHeight,
         key: const ValueKey('reader-action-sidebar'),
         onPressed: !ready
             ? null
@@ -1065,51 +1067,46 @@ class _FrameEpubReaderPreviewScreenState
       ),
       _readerQuickAction(
         tooltip: '閱讀設定',
-        icon: FrameEpubReaderActionIcon.appearance,
-        iconColor: const Color(0xFFEEE6FF),
+        icon: Icons.tune_rounded,
+        selected: false,
+        width: actionWidth,
+        height: actionHeight,
         key: const ValueKey('reader-action-appearance'),
         onPressed: ready ? _showAppearance : null,
       ),
       _readerQuickAction(
-        tooltip: _isImmersive ? '退出沉浸式閱讀' : '進入沉浸式閱讀',
-        icon: _isImmersive
-            ? FrameEpubReaderActionIcon.fullscreenExit
-            : FrameEpubReaderActionIcon.fullscreenEnter,
+        tooltip: '進入沉浸式全螢幕',
+        icon: Icons.fullscreen_rounded,
+        selected: _isImmersive,
+        width: actionWidth,
+        height: actionHeight,
         key: const ValueKey('reader-action-fullscreen'),
         onPressed: ready ? _toggleImmersiveMode : null,
       ),
     ];
 
-    final actionGap = frameEpubReaderQuickActionGap(viewportWidth);
-    final actionStackGap =
-        frameEpubReaderQuickActionStackGap(viewportWidth);
-    final actionRow = Row(
-      key: const ValueKey('reader-quick-actions-row'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var index = 0; index < actions.length; index++) ...[
-          if (index > 0) SizedBox(width: actionGap),
-          actions[index],
-        ],
-      ],
-    );
-
     final author = widget.book.author.trim().isEmpty
         ? widget.book.fileName
         : widget.book.author.trim();
+
     final chapterLabel = session?.currentChapterLabel.trim() ?? '';
     final progressLabel = ready
         ? (chapterLabel.isEmpty ? '閱讀中' : chapterLabel)
         : '等待閱讀';
+    final actionRow = Wrap(
+      key: const ValueKey('reader-quick-actions-row'),
+      alignment: WrapAlignment.end,
+      spacing: frameEpubReaderQuickActionGap(viewportWidth),
+      runSpacing: 4,
+      children: actions,
+    );
 
     if (wide) {
-      final progressMaxWidth =
-          (viewportWidth * .38).clamp(0.0, 300.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
         constraints: const BoxConstraints(minHeight: 84),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 12, 4, 16),
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1193,7 +1190,7 @@ class _FrameEpubReaderPreviewScreenState
               ),
               const SizedBox(width: 8),
               ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: progressMaxWidth),
+                constraints: const BoxConstraints(maxWidth: 260),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1211,7 +1208,7 @@ class _FrameEpubReaderPreviewScreenState
                         height: 1,
                       ),
                     ),
-                    SizedBox(height: actionStackGap),
+                    const SizedBox(height: 5),
                     actionRow,
                   ],
                 ),
@@ -1222,85 +1219,72 @@ class _FrameEpubReaderPreviewScreenState
       );
     }
 
-    final titleFontSize =
-        (viewportWidth * .036).clamp(13.0, 16.0).toDouble();
-    return Padding(
-      key: const ValueKey('reader-mobile-toolbar'),
-      padding: const EdgeInsets.fromLTRB(2, 11, 2, 13),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = viewportWidth <= 420;
-          final rightColumnMaxWidth =
-              constraints.maxWidth * (compact ? .60 : .58);
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'NOW READING',
-                      style: TextStyle(
-                        color: Color(0xFF938AA1),
-                        fontSize: 9,
-                        letterSpacing: 1.7,
-                      ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 84),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(2, 11, 2, compact ? 8 : 10),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrowHeading = constraints.maxWidth <= 560;
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'NOW READING',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Color(0xFF938AA1),
+                      fontSize: 9,
+                      letterSpacing: 1.7,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _bookTitle,
-                      softWrap: true,
-                      style: TextStyle(
-                        color: _readerText,
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: .1,
-                        height: 1.4,
-                      ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _bookTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _readerText,
+                      fontSize: narrowHeading ? 15 : 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: .1,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      author,
-                      softWrap: true,
-                      style: const TextStyle(
-                        color: Color(0xFFAAA3B6),
-                        fontSize: 9,
-                        height: 1.5,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      color: Color(0xFFAAA3B6),
+                      fontSize: 10,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    progressLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: const Color(0xFFC7B5FB),
+                      fontFamily: 'Georgia',
+                      fontSize: narrowHeading ? 20 : 23,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  actionRow,
+                ],
               ),
-              SizedBox(width: compact ? 6 : 9),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: rightColumnMaxWidth),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      progressLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        color: Color(0xFFC7B5FB),
-                        fontFamily: 'Georgia',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w400,
-                        height: 1,
-                      ),
-                    ),
-                    SizedBox(height: actionStackGap),
-                    actionRow,
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -1394,7 +1378,7 @@ class _FrameEpubReaderPreviewScreenState
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+              padding: EdgeInsets.fromLTRB(0, wide ? 2 : 4, 0, 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

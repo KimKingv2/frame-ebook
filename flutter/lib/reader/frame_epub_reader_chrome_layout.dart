@@ -1,26 +1,22 @@
-/// Shared responsive breakpoint for the legacy Reading Room action row.
+/// Shared responsive breakpoint for the reader's compact quick-action row.
 bool frameEpubUsesMobileQuickActions(double viewportWidth) =>
     viewportWidth <= 820;
 
-/// The old reader uses four 48px circular icon buttons on desktop, then
-/// compact 44px targets at the 820px breakpoint.
-double frameEpubReaderQuickActionSize(double viewportWidth) =>
-    viewportWidth <= 820 ? 44 : 48;
+/// Normal-sized rectangular icon actions, matching the earlier reader style.
+/// The 560px breakpoint is used for the compact phone toolbar.
+double frameEpubReaderQuickActionWidth(double viewportWidth) =>
+    viewportWidth <= 560 ? 32 : 36;
 
-/// The legacy action row has a 2px desktop gap and no compact-screen gap.
-double frameEpubReaderQuickActionGap(double viewportWidth) =>
-    viewportWidth <= 820 ? 0 : 2;
+double frameEpubReaderQuickActionHeight(double viewportWidth) =>
+    viewportWidth <= 560 ? 27 : 31;
 
-/// Effective gap between the chapter label and icon row. The old CSS combines
-/// the parent column gap with the action row's own top margin.
-double frameEpubReaderQuickActionStackGap(double viewportWidth) =>
-    viewportWidth <= 820 ? 6 : 10;
+/// The action row uses a small, consistent gap rather than a wide dock.
+double frameEpubReaderQuickActionGap(double viewportWidth) => 4;
 
-/// Width of the four-button group, including the inter-button gaps.
+/// Width of the four-button group, including the gaps between buttons.
 double frameEpubReaderQuickActionsWidth(double viewportWidth) {
-  final size = frameEpubReaderQuickActionSize(viewportWidth);
-  final gap = frameEpubReaderQuickActionGap(viewportWidth);
-  return size * 4 + gap * 3;
+  final width = frameEpubReaderQuickActionWidth(viewportWidth);
+  return width * 4 + frameEpubReaderQuickActionGap(viewportWidth) * 3;
 }
 
 /// Desktop navigation-column geometry copied from the legacy Reading Room CSS.

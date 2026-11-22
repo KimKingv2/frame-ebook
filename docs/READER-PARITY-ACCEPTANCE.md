@@ -123,3 +123,24 @@ Widget and geometry tests assert target sizes, gaps, row width, and progress
 spacing at desktop and compact widths. This is source-level and automated
 layout evidence, not final pixel-diff acceptance. A controlled screenshot pair
 at identical viewport/DPR/zoom and reader state is still required for that gate.
+
+
+## Action button size and reader-frame spacing adjustment · 2026-11-23
+
+Following the user's visual feedback, the round 48/44px icon-only treatment
+introduced in the previous revision was rolled back. The reader now uses the
+earlier dark rectangular icon-button treatment, with narrower practical sizes:
+
+- Desktop buttons: 36 × 31px.
+- Compact phone buttons (<=560px): 32 × 27px.
+- Four-button row: 156px desktop / 140px compact, with 4px gaps.
+- Button row remains right-aligned, and the progress/action column is capped
+  at 260px instead of a wide 420px box.
+- Desktop heading bottom inset and reading-frame top inset were reduced, so the
+  button row sits close to the reading frame rather than floating far above it.
+- Compact heading bottom spacing was also reduced.
+
+The widget tests assert per-button dimensions, inter-button gaps, total row
+width, chapter-label spacing and desktop distance to the reading frame. This
+remains source/test geometry evidence; controlled screenshot comparison is
+still required for formal pixel-level acceptance.

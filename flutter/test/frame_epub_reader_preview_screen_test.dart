@@ -133,27 +133,34 @@ void main() {
         .map((key) => tester.getRect(find.byKey(key)))
         .toList();
     for (final rect in actionRects) {
-      expect(rect.width, 48);
-      expect(rect.height, 48);
+      expect(rect.width, 36);
+      expect(rect.height, 31);
     }
-    expect(actionRects[1].left - actionRects[0].right, 2);
-    expect(actionRects[2].left - actionRects[1].right, 2);
-    expect(actionRects[3].left - actionRects[2].right, 2);
+    expect(actionRects[1].left - actionRects[0].right, 4);
+    expect(actionRects[2].left - actionRects[1].right, 4);
+    expect(actionRects[3].left - actionRects[2].right, 4);
 
     final actionRowRect = tester.getRect(
       find.byKey(const ValueKey('reader-quick-actions-row')),
     );
-    expect(actionRowRect.width, 198);
+    expect(actionRowRect.width, 156);
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('reader-desktop-toolbar')),
     );
     final fullscreenRect = actionRects.last;
     expect(toolbarRect.right - fullscreenRect.right, lessThan(10));
+    final frameForGap = tester.getRect(
+      find.byKey(const ValueKey('reader-rounded-frame')),
+    );
+    expect(
+      frameForGap.top - actionRowRect.bottom,
+      lessThanOrEqualTo(16),
+    );
     expect(
       actionRowRect.top - tester.getRect(
         find.text('等待閱讀'),
       ).bottom,
-      10,
+      5,
     );
 
     final frame = tester.widget<Container>(
@@ -212,17 +219,17 @@ void main() {
         .map((key) => tester.getRect(find.byKey(key)))
         .toList();
     for (final rect in actionRects) {
-      expect(rect.width, 44);
-      expect(rect.height, 44);
+      expect(rect.width, 32);
+      expect(rect.height, 27);
     }
-    expect(actionRects[1].left - actionRects[0].right, 0);
-    expect(actionRects[2].left - actionRects[1].right, 0);
-    expect(actionRects[3].left - actionRects[2].right, 0);
+    expect(actionRects[1].left - actionRects[0].right, 4);
+    expect(actionRects[2].left - actionRects[1].right, 4);
+    expect(actionRects[3].left - actionRects[2].right, 4);
     expect(
       tester.getSize(
         find.byKey(const ValueKey('reader-quick-actions-row')),
       ).width,
-      176,
+      140,
     );
     expect(tester.takeException(), isNull);
   });

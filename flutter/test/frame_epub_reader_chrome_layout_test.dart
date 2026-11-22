@@ -12,26 +12,26 @@ void main() {
     expect(frameEpubUsesMobileQuickActions(1440), isFalse);
   });
 
-  group('Legacy reader quick-action geometry', () {
-    test('uses 48px desktop and 44px compact circular targets', () {
-      expect(frameEpubReaderQuickActionSize(1440), 48);
-      expect(frameEpubReaderQuickActionSize(821), 48);
-      expect(frameEpubReaderQuickActionSize(820), 44);
-      expect(frameEpubReaderQuickActionSize(390), 44);
+  group('Reader quick-action geometry', () {
+    test('uses normal 36px desktop and 32px compact widths', () {
+      expect(frameEpubReaderQuickActionWidth(1440), 36);
+      expect(frameEpubReaderQuickActionWidth(821), 36);
+      expect(frameEpubReaderQuickActionWidth(560), 32);
+      expect(frameEpubReaderQuickActionWidth(390), 32);
     });
 
-    test('restores the exact desktop and compact row gaps', () {
-      expect(frameEpubReaderQuickActionGap(1440), 2);
-      expect(frameEpubReaderQuickActionGap(821), 2);
-      expect(frameEpubReaderQuickActionGap(820), 0);
-      expect(frameEpubReaderQuickActionGap(390), 0);
+    test('uses 31px desktop and 27px compact heights', () {
+      expect(frameEpubReaderQuickActionHeight(1440), 31);
+      expect(frameEpubReaderQuickActionHeight(821), 31);
+      expect(frameEpubReaderQuickActionHeight(560), 27);
+      expect(frameEpubReaderQuickActionHeight(390), 27);
     });
 
-    test('restores progress-label spacing and four-button group widths', () {
-      expect(frameEpubReaderQuickActionStackGap(1440), 10);
-      expect(frameEpubReaderQuickActionStackGap(820), 6);
-      expect(frameEpubReaderQuickActionsWidth(1440), 198);
-      expect(frameEpubReaderQuickActionsWidth(390), 176);
+    test('keeps a small 4px gap and a compact four-button group', () {
+      expect(frameEpubReaderQuickActionGap(1440), 4);
+      expect(frameEpubReaderQuickActionGap(390), 4);
+      expect(frameEpubReaderQuickActionsWidth(1440), 156);
+      expect(frameEpubReaderQuickActionsWidth(390), 140);
     });
   });
 
