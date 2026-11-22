@@ -179,6 +179,11 @@ These items must still pass CI and device verification before being treated as c
 - This is distinct from ordinary browser fullscreen, which may retain the regular reader chrome. Escape / system-back and the existing top-zone listener remain the exit paths.
 - The immersive state is source-aligned; same-viewport visual comparison and cross-platform exit/restore acceptance remain pending.
 
+### Safe-area inset double-count prevention
+
+- The left navigation drawer no longer wraps its manually positioned safe-area padding in a second automatic SafeArea, preventing doubled top/bottom insets.
+- The appearance drawer ignores device safe-area insets in desktop fullscreen, where the final legacy CSS is edge-to-edge; compact fullscreen still keeps safe-area plus 6 px.
+
 ### Safe-area-aware reader drawers
 
 - Both right appearance and left navigation drawers now include the device's stable Safe Area insets, matching the legacy safe-area CSS. Normal panels add 8 px; compact immersive panels add 6 px, while desktop fullscreen remains edge-to-edge.

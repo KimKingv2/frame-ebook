@@ -2053,15 +2053,12 @@ class _FrameEpubReaderPreviewScreenState
       transitionDuration: const Duration(milliseconds: 440),
       pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
         alignment: Alignment.centerLeft,
-        child: SafeArea(
-          left: false,
-          right: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: drawerLayout.topInset,
-              bottom: drawerLayout.bottomInset,
-            ),
-            child: Container(
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: drawerLayout.topInset,
+            bottom: drawerLayout.bottomInset,
+          ),
+          child: Container(
               width: drawerLayout.width,
               decoration: BoxDecoration(
                 color: const Color(0xFF1B1726),
@@ -2087,8 +2084,6 @@ class _FrameEpubReaderPreviewScreenState
                 session,
                 initialTabIndex: initialTabIndex,
                 onClose: () => Navigator.of(dialogContext).pop(),
-              ),
-            ),
           ),
         ),
       ),

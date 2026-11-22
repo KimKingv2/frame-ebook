@@ -59,6 +59,18 @@ void main() {
       expect(layout.outerPadding.bottom, 0);
     });
 
+    test('ignores desktop safe-area insets in fullscreen', () {
+      final layout = FrameEpubAppearancePanelLayout.fromViewport(
+        const Size(1440, 900),
+        fullscreen: true,
+        safeArea: const EdgeInsets.only(top: 24, bottom: 20),
+      );
+
+      expect(layout.outerPadding.top, 0);
+      expect(layout.outerPadding.bottom, 0);
+      expect(layout.height, 900);
+    });
+
     test('keeps compact fullscreen drawer clear of safe areas', () {
       final layout = FrameEpubAppearancePanelLayout.fromViewport(
         const Size(390, 844),

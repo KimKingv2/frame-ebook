@@ -26,8 +26,10 @@ class FrameEpubAppearancePanelLayout {
       math.max(0.0, viewport.width - 16),
     ).toDouble();
     final edgeInset = fullscreen ? (isCompact ? 6.0 : 0.0) : 8.0;
-    final topInset = safeArea.top + edgeInset;
-    final bottomInset = safeArea.bottom + edgeInset;
+    final safeTopInset = fullscreen && !isCompact ? 0.0 : safeArea.top;
+    final safeBottomInset = fullscreen && !isCompact ? 0.0 : safeArea.bottom;
+    final topInset = safeTopInset + edgeInset;
+    final bottomInset = safeBottomInset + edgeInset;
 
     return FrameEpubAppearancePanelLayout(
       isCompact: isCompact,
