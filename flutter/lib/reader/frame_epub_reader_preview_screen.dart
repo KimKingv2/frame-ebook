@@ -2900,7 +2900,6 @@ _appearanceDropdown(
                 desktopColumns: 3,
                 runSpacing: 10,
               ),
-,
               Row(
                 children: [
                   const Text(
@@ -2954,8 +2953,8 @@ _appearanceDropdown(
                               : 'paginated';
                     }),
                     enabled: !session.isFixedLayout,
-                  ),,
-_appearanceDropdown(
+                  ),
+                  _appearanceDropdown(
                     label: '上下留白',
                     value: verticalMargin.round().toString(),
                     options: const [
