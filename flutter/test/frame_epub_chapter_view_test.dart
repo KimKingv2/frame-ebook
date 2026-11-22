@@ -1513,7 +1513,7 @@ void main() {
       expect(pageController.hasClients, isTrue);
       expect(pageController.position.maxScrollExtent, greaterThan(0));
 
-      await pageController.jumpToPage(1);
+      pageController.jumpToPage(1);
       await tester.pumpAndSettle();
       expect(pageController.page, 1);
 
