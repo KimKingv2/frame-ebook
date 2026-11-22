@@ -25,6 +25,7 @@ class FrameEpubReaderSidebar extends StatefulWidget {
     required this.onDeleteAnnotation,
     required this.onRefreshAnnotations,
     required this.onClose,
+    this.canNavigateTocEntry,
     this.desktopLayout = false,
     super.key,
   });
