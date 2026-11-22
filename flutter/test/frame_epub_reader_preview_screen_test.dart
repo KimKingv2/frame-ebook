@@ -123,22 +123,22 @@ void main() {
       findsNothing,
     );
 
-    final bookmarkAction = tester.widget<Container>(
-      find.byKey(const ValueKey('reader-action-bookmark')),
+    expect(
+      tester.getSize(find.byKey(const ValueKey('reader-action-bookmark'))).width,
+      72,
     );
-    expect(tester.getSize(find.byKey(const ValueKey('reader-action-bookmark'))).width, 72);
-    final sidebarAction = tester.widget<Container>(
-      find.byKey(const ValueKey('reader-action-sidebar')),
+    expect(
+      tester.getSize(find.byKey(const ValueKey('reader-action-sidebar'))).width,
+      104,
     );
-    expect(tester.getSize(find.byKey(const ValueKey('reader-action-sidebar'))).width, 104);
-    final appearanceAction = tester.widget<Container>(
-      find.byKey(const ValueKey('reader-action-appearance')),
+    expect(
+      tester.getSize(find.byKey(const ValueKey('reader-action-appearance'))).width,
+      104,
     );
-    expect(tester.getSize(find.byKey(const ValueKey('reader-action-appearance'))).width, 104);
-    final fullscreenAction = tester.widget<Container>(
-      find.byKey(const ValueKey('reader-action-fullscreen')),
+    expect(
+      tester.getSize(find.byKey(const ValueKey('reader-action-fullscreen'))).width,
+      104,
     );
-    expect(tester.getSize(find.byKey(const ValueKey('reader-action-fullscreen'))).width, 104);
 
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('reader-desktop-toolbar')),
