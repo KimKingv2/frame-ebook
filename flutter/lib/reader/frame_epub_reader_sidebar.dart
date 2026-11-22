@@ -346,7 +346,15 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       color: widget.desktopLayout ? _sidebarPanel : const Color(0xFF1B1726),
       child: widget.desktopLayout
           ? _buildDesktopLayout(bookmarkCount, noteCount)
-          : _buildCompactLayout(bookmarkCount),
+          : Padding(
+              padding: EdgeInsets.fromLTRB(
+                15,
+                18,
+                15,
+                16 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
+              child: _buildCompactLayout(bookmarkCount),
+            ),
     );
   }
 

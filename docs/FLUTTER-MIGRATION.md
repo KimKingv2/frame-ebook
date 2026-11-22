@@ -179,6 +179,10 @@ These items must still pass CI and device verification before being treated as c
 - This is distinct from ordinary browser fullscreen, which may retain the regular reader chrome. Escape / system-back and the existing top-zone listener remain the exit paths.
 - The immersive state is source-aligned; same-viewport visual comparison and cross-platform exit/restore acceptance remain pending.
 
+### Compact sidebar inner padding parity
+
+- The compact left drawer now restores the legacy inner content padding: 15 px horizontally, 18 px at the top, and 16 px plus the bottom device safe-area inset at the bottom. This is in addition to the drawer's outer viewport positioning, matching the final legacy CSS box model.
+
 ### Safe-area inset double-count prevention
 
 - The left navigation drawer no longer wraps its manually positioned safe-area padding in a second automatic SafeArea, preventing doubled top/bottom insets.
