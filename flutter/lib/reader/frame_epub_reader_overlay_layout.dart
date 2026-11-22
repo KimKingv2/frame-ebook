@@ -30,7 +30,7 @@ class FrameEpubAppearancePanelLayout {
       isCompact: isCompact,
       alignment: Alignment.centerRight,
       width: width,
-      height: math.max(0, viewport.height - verticalInset * 2),
+      height: math.max(0, viewport.height - verticalInset * 2).toDouble(),
       outerPadding: EdgeInsets.only(
         top: verticalInset,
         bottom: verticalInset,

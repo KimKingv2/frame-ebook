@@ -173,6 +173,12 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Appearance control grid and interaction styling
+
+- Typography controls now follow the legacy three-column desktop / two-column compact grid. Reading mode, page layout and both margin controls share the original two-column PAGE LAYOUT group; comic controls use the two-column grid.
+- Dropdowns now use the legacy dark field surface, 6 px radius, #4c425d border, 34 px desktop / 39 px compact control height, and 9/10 px label/value typography.
+- These source-level measurements are based on the final legacy CSS declarations. Golden screenshot comparisons are still required to establish actual pixel parity.
+
 ### Appearance drawer corrected against the final legacy CSS cascade
 
 - The final legacy CSS rules define the appearance panel as a right-side full-height drawer: 440 px maximum on wide layouts, 420 px on compact layouts, a 91vw width cap, 8 px vertical inset, left-only rounded corners and a sticky 58 px header.

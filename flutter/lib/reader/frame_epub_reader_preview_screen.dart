@@ -2533,30 +2533,58 @@ class _FrameEpubReaderPreviewScreenState
     required List<({String value, String label})> options,
     required ValueChanged<String> onChanged,
     bool enabled = true,
+    double width = 148,
   }) {
+    final compact = MediaQuery.sizeOf(context).width <= 820;
     return SizedBox(
-      width: 148,
+      width: width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(color: _readerMuted, fontSize: 11)),
-          DropdownButton<String>(
-            value: value,
-            onChanged: enabled ? (next) {
-              if (next != null) onChanged(next);
-            } : null,
-            isExpanded: true,
-            dropdownColor: _readerPanel,
-            style: const TextStyle(color: _readerText, fontSize: 12),
-            underline: const SizedBox.shrink(),
-            items: [
-              for (final option in options)
-                DropdownMenuItem<String>(
-                  value: option.value,
-                  child: Text(option.label, overflow: TextOverflow.ellipsis),
-                ),
-            ],
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF9C93A9),
+              fontSize: 9,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: compact ? 39 : 34,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF211C2C),
+              border: Border.all(color: const Color(0xFF4C425D)),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: DropdownButton<String>(
+              value: value,
+              onChanged: enabled
+                  ? (next) {
+                      if (next != null) onChanged(next);
+                    }
+                  : null,
+              isExpanded: true,
+              isDense: true,
+              iconSize: 15,
+              dropdownColor: const Color(0xFF211C2C),
+              style: TextStyle(
+                color: const Color(0xFFE9E2F4),
+                fontSize: compact ? 11 : 10,
+              ),
+              underline: const SizedBox.shrink(),
+              items: [
+                for (final option in options)
+                  DropdownMenuItem<String>(
+                    value: option.value,
+                    child: Text(
+                      option.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2684,6 +2712,26 @@ class _FrameEpubReaderPreviewScreenState
     Widget buildSettingsPanel(BuildContext closeContext) =>
         StatefulBuilder(
           builder: (context, setSheetState) {
+            Widget settingsGrid({
+              required List<Widget> children,
+              required int desktopColumns,
+              double runSpacing = 10,
+            }) {
+              final columns = panelLayout.isCompact ? 2 : desktopColumns;
+              final availableWidth = panelLayout.width -
+                  panelLayout.contentHorizontalPadding * 2;
+              final itemWidth =
+                  (availableWidth - 12 * (columns - 1)) / columns;
+              return Wrap(
+                spacing: 12,
+                runSpacing: panelLayout.isCompact ? 8 : runSpacing,
+                children: [
+                  for (final child in children)
+                    SizedBox(width: itemWidth, child: child),
+                ],
+              );
+            }
+
             void updateSetting(VoidCallback update) {
               setSheetState(update);
               unawaited(persistAppearance(setSheetState));
@@ -2775,11 +2823,9 @@ class _FrameEpubReaderPreviewScreenState
                 ],
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
+              settingsGrid(
                 children: [
-                  _appearanceDropdown(
+_appearanceDropdown(
                     label: '字級',
                     value: fontScale.toStringAsFixed(1),
                     options: const [
@@ -2851,45 +2897,10 @@ class _FrameEpubReaderPreviewScreenState
                         updateSetting(() => textAlignPreference = v),
                   ),
                 ],
+                desktopColumns: 3,
+                runSpacing: 10,
               ),
-              const SizedBox(height: 12),
-              const Text('頁面留白', style: TextStyle(color: _readerMuted)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 12,
-                runSpacing: 2,
-                children: [
-                  _appearanceDropdown(
-                    label: '上下留白',
-                    value: verticalMargin.round().toString(),
-                    options: const [
-                      (value: '8', label: '窄 8 px'),
-                      (value: '16', label: '標準 16 px'),
-                      (value: '24', label: '寬 24 px'),
-                      (value: '32', label: '更寬 32 px'),
-                      (value: '40', label: '寬裕 40 px'),
-                      (value: '48', label: '大留白 48 px'),
-                      (value: '64', label: '極寬 64 px'),
-                    ],
-                    onChanged: (v) => updateSetting(() => verticalMargin = double.parse(v)),
-                  ),
-                  _appearanceDropdown(
-                    label: '左右外側留白',
-                    value: horizontalMarginPercent.round().toString(),
-                    options: const [
-                      (value: '0', label: '0%'),
-                      (value: '2', label: '2%'),
-                      (value: '4', label: '4%'),
-                      (value: '7', label: '7%'),
-                      (value: '10', label: '10%'),
-                      (value: '13', label: '13%'),
-                      (value: '16', label: '16%'),
-                      (value: '20', label: '20%'),
-                    ],
-                    onChanged: (v) => updateSetting(() => horizontalMarginPercent = double.parse(v)),
-                  ),
-                ],
-              ),
+,
               Row(
                 children: [
                   const Text(
@@ -2908,11 +2919,9 @@ class _FrameEpubReaderPreviewScreenState
                 ],
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
+              settingsGrid(
                 children: [
-                  _appearanceDropdown(
+_appearanceDropdown(
                     label: '閱讀模式',
                     value: readingMode,
                     options: const [
@@ -2945,8 +2954,39 @@ class _FrameEpubReaderPreviewScreenState
                               : 'paginated';
                     }),
                     enabled: !session.isFixedLayout,
+                  ),,
+_appearanceDropdown(
+                    label: '上下留白',
+                    value: verticalMargin.round().toString(),
+                    options: const [
+                      (value: '8', label: '窄 8 px'),
+                      (value: '16', label: '標準 16 px'),
+                      (value: '24', label: '寬 24 px'),
+                      (value: '32', label: '更寬 32 px'),
+                      (value: '40', label: '寬裕 40 px'),
+                      (value: '48', label: '大留白 48 px'),
+                      (value: '64', label: '極寬 64 px'),
+                    ],
+                    onChanged: (v) => updateSetting(() => verticalMargin = double.parse(v)),
+                  ),
+                  _appearanceDropdown(
+                    label: '左右外側留白',
+                    value: horizontalMarginPercent.round().toString(),
+                    options: const [
+                      (value: '0', label: '0%'),
+                      (value: '2', label: '2%'),
+                      (value: '4', label: '4%'),
+                      (value: '7', label: '7%'),
+                      (value: '10', label: '10%'),
+                      (value: '13', label: '13%'),
+                      (value: '16', label: '16%'),
+                      (value: '20', label: '20%'),
+                    ],
+                    onChanged: (v) => updateSetting(() => horizontalMarginPercent = double.parse(v)),
                   ),
                 ],
+                desktopColumns: 2,
+                runSpacing: 8,
               ),
               if (!session.isFixedLayout)
                 Padding(
@@ -2990,11 +3030,9 @@ class _FrameEpubReaderPreviewScreenState
                 ],
               ),
               const SizedBox(height: 6),
-              Wrap(
-                spacing: 12,
-                runSpacing: 2,
+              settingsGrid(
                 children: [
-                  _appearanceDropdown(
+_appearanceDropdown(
                     label: '漫畫閱讀模式',
                     value: comicReadingMode,
                     options: const [
@@ -3030,6 +3068,8 @@ class _FrameEpubReaderPreviewScreenState
                         comicReadingMode == 'paginated',
                   ),
                 ],
+                desktopColumns: 2,
+                runSpacing: 8,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 6),
