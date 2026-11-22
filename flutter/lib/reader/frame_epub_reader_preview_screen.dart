@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'frame_epub_reader_overlay_layout.dart';
+import 'frame_epub_reader_chrome_layout.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
@@ -780,12 +782,46 @@ class _FrameEpubReaderPreviewScreenState
     required VoidCallback? onPressed,
     required bool selected,
     bool compact = false,
+    bool mobileDock = false,
   }) {
     final iconColor = onPressed == null
         ? const Color(0xFF746C80)
         : selected
             ? _readerAccent
             : const Color(0xFFDCD2ED);
+    if (mobileDock) {
+      return Expanded(
+        child: Container(
+          height: 34,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: selected
+                ? const Color(0xFF30263F)
+                : const Color(0xFF2D253C),
+            border: Border.all(
+              color: selected
+                  ? const Color(0x887F68AA)
+                  : const Color(0x443F3552),
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SizedBox.expand(
+            child: IconButton(
+              tooltip: tooltip,
+              onPressed: onPressed,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(
+                minWidth: 34,
+                minHeight: 34,
+              ),
+              icon: Icon(icon, size: 18, color: iconColor),
+            ),
+          ),
+        ),
+      );
+    }
+
     final width = compact ? 32.0 : 36.0;
     final height = compact ? 27.0 : 31.0;
     return Container(
@@ -902,23 +938,27 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
             const Spacer(),
-            if (!compact) ...[
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth:
-                      (viewportWidth * .34).clamp(120.0, 360.0).toDouble(),
-                ),
-                child: Text(
-                  engineStatus,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFA79BB8),
-                    fontSize: 9,
+            if (viewportWidth > 820) ...[
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth:
+                        (viewportWidth * .34).clamp(120.0, 360.0).toDouble(),
+                  ),
+                  child: Text(
+                    engineStatus,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFA79BB8),
+                      fontSize: 9,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 18),
+            ],
+            if (!compact) ...[
               const Text(
                 'READING ROOM · 0.6',
                 style: TextStyle(
@@ -933,6 +973,83 @@ class _FrameEpubReaderPreviewScreenState
             SizedBox(width: compact ? 10 : 18),
             textLink('← 我的書架', () => Navigator.of(context).maybePop()),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileQuickActions(
+    FrameEpubReaderSession session,
+  ) {
+    final ready = session.status == FrameEpubReaderStatus.ready;
+    final cfi = ready
+        ? _bookmarkCfi(
+            session,
+            preferred: _pendingCfi ?? _lastVisibleCfi,
+          )
+        : null;
+    final bookmarked =
+        findFrameBookmarkAtCfi(session.annotations, cfi) != null;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(13),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: const Color(0xF213101C),
+            border: Border.all(color: const Color(0x47C1AAEE)),
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 30,
+                offset: Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Color(0x0DFFFFFF),
+                blurRadius: 0,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              _readerQuickAction(
+                tooltip: bookmarked ? '移除目前位置的書籤' : '加入目前位置的書籤',
+                icon: bookmarked
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_add_outlined,
+                selected: bookmarked,
+                mobileDock: true,
+                onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
+              ),
+              _readerQuickAction(
+                tooltip: '目錄、筆記與書籤',
+                icon: Icons.menu_book_outlined,
+                selected: false,
+                mobileDock: true,
+                onPressed:
+                    ready ? () => unawaited(_showTableOfContents()) : null,
+              ),
+              _readerQuickAction(
+                tooltip: '閱讀設定',
+                icon: Icons.tune_rounded,
+                selected: false,
+                mobileDock: true,
+                onPressed: ready ? _showAppearance : null,
+              ),
+              _readerQuickAction(
+                tooltip: '切換全螢幕閱讀',
+                icon: Icons.fullscreen_rounded,
+                selected: false,
+                mobileDock: true,
+                onPressed: ready ? _toggleImmersiveMode : null,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1138,9 +1255,12 @@ class _FrameEpubReaderPreviewScreenState
     final showSidebar = wide && _isSidebarVisible && ready;
 
     final viewportWidth = MediaQuery.sizeOf(context).width;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
-      child: Column(
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
+            child: Column(
         children: [
           _buildBookHeading(
             session,
@@ -1189,8 +1309,22 @@ class _FrameEpubReaderPreviewScreenState
               ],
             ),
           ),
-        ],
-      ),
+            ),
+          ),
+        ),
+        if (!wide && ready)
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: _buildMobileQuickActions(session!),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1231,12 +1365,15 @@ class _FrameEpubReaderPreviewScreenState
                     _isSidebarVisible &&
                     session?.status == FrameEpubReaderStatus.ready;
 
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: shellInset),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1500),
-                      child: Column(
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: shellInset),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1500),
+                            child: Column(
                         children: [
                           _buildReaderTopBar(
                             session,
@@ -1246,6 +1383,8 @@ class _FrameEpubReaderPreviewScreenState
                             session,
                             viewportWidth: viewportWidth - shellInset * 2,
                             wide: wide,
+                            showQuickActions:
+                                !frameEpubUsesMobileQuickActions(viewportWidth),
                           ),
                           Expanded(
                             child: Padding(
@@ -1301,9 +1440,25 @@ class _FrameEpubReaderPreviewScreenState
                             ),
                           ),
                         ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    if (frameEpubUsesMobileQuickActions(viewportWidth) &&
+                        session?.status == FrameEpubReaderStatus.ready)
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: _buildMobileQuickActions(session!),
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),

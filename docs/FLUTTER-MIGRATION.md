@@ -173,7 +173,37 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Compact Reading Room quick-action dock
+
+- The four reader quick actions now move into a fixed bottom dock at the legacy 820 px breakpoint, both in normal and compact immersive layouts.
+- The dock mirrors the legacy 360 px maximum width, viewport-edge insets, 34 px action targets, translucent surface, border, rounded corners and blurred backdrop.
+- The normal book heading no longer duplicates mobile controls; wider layouts keep the controls beneath the chapter progress detail.
+- A pure regression test pins the 820 px breakpoint. Full pointer/touch acceptance and same-viewport screenshot comparison remain outstanding.
+
 ### Legacy header hierarchy and app-shell geometry
+
+- The Flutter preview now separates the legacy 72 px FRAME READER topbar from the 84 px NOW READING book heading instead of combining them into one toolbar.
+- The topbar restores the engine-status role, READING ROOM · 0.6 label, Reading Time navigation and bookshelf return link. The book heading restores the chapter progress detail at the right and places icon-only reader actions beneath it.
+- The full reader content now sits inside the legacy centred 1500 px shell with the original responsive horizontal insets at 1050, 820, 560 and 420 px.
+- The immersive layout keeps the book heading visible while hiding its quick-action row, matching the legacy fullscreen chrome hierarchy more closely.
+- Screenshot comparison and platform acceptance are still required before marking visual parity complete.
+
+
+- The normal reader now keeps page navigation outside the framed reading viewport, matching the legacy DOM hierarchy. Desktop navigation uses the legacy three-column layout; compact screens place previous/next controls above the full-width progress panel at the 720 px breakpoint.
+- Desktop immersive mode now retains the legacy left navigation column at 220 px when the sidebar is enabled. The reader frame drops its border, radius, padding and shadow while immersive, keeping the page surface flush with the fullscreen workspace.
+- The reading-time indicator has moved from the author line to the footer below page navigation, matching the legacy Reading Room information hierarchy. Compact immersive mode remains drawer-based and does not force-open the sidebar.
+
+
+- Flutter now uses the legacy 820 px breakpoint for the persistent desktop sidebar, and the legacy 220 px sidebar width through 1050 px before returning to 250 px on wider layouts.
+- The appearance panel now follows the original CSS placement rules: top-right from 561 px upward (82 px top offset and the centered 1500 px shell's right inset), and bottom-right at 560 px and below (8 px outer inset, viewport width minus 16 px, and an 84% viewport-height ceiling).
+- Pure layout tests pin the desktop, compact and ultra-wide geometry to the legacy CSS values. This is a targeted responsive correction, not pixel-level acceptance of the full Reader.
+
+### Annotation list parity refinement
+
+- Flutter note, highlight, underline and bookmark rows now present the original selected quotation separately from the saved note preview, with the matching annotation marker and a text delete action.
+- Bookmark rows use the Legacy star marker and the original empty-state guidance. Existing notes open their editor after the reader successfully returns to the saved CFI.
+- The appearance panel now uses the Legacy paper-tone labels and visual swatches, and labels the comic settings group with its original `COMIC READING` kicker.
+- Sidebar widget coverage checks separate quotation/note rendering, bookmark markers and the existing jump/delete interactions.
 
 - The Flutter preview now separates the legacy 72 px FRAME READER topbar from the 84 px NOW READING book heading instead of combining them into one toolbar.
 - The topbar restores the engine-status role, READING ROOM · 0.6 label, Reading Time navigation and bookshelf return link. The book heading restores the chapter progress detail at the right and places icon-only reader actions beneath it.
