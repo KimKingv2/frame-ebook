@@ -115,7 +115,7 @@ void main() {
     expect(find.byKey(const ValueKey('reader-desktop-toolbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('reader-workspace-root')), findsOneWidget);
     expect(find.text('FRAME READER'), findsNothing);
-    expect(find.text('NOW READING'), findsNothing);
+    expect(find.text('NOW READING'), findsOneWidget);
     expect(find.text('Preview test book'), findsOneWidget);
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),

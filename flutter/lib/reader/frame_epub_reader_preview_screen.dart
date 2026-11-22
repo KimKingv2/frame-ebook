@@ -1351,7 +1351,9 @@ class _FrameEpubReaderPreviewScreenState
                 children: [
                   SizedBox(
                     width: workspaceLayout.sidebarWidth,
-                    child: Visibility(
+                    child: session == null
+                        ? const SizedBox.shrink()
+                        : Visibility(
                       visible: showDesktopSidebar,
                       maintainState: true,
                       maintainAnimation: true,
@@ -1379,7 +1381,7 @@ class _FrameEpubReaderPreviewScreenState
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: _buildReaderSidebar(
-                          session!,
+                          session,
                           initialTabIndex: 0,
                           desktopLayout: true,
                           onClose: () => setState(
