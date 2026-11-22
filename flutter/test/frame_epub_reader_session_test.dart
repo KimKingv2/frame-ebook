@@ -26,9 +26,17 @@ class _MemoryFrameFileSource implements FrameFileSource {
 
   final Uint8List bytes;
   final List<(int, int)> requests = [];
+  Completer<void>? nextOpenGate;
+  Completer<void>? nextOpenStarted;
 
   @override
   Future<FrameFileResponse> open(FrameFileRequest request) async {
+    final gate = nextOpenGate;
+    if (gate != null) {
+      nextOpenGate = null;
+      nextOpenStarted?.complete();
+      await gate.future;
+    }
     final range = request.range;
     if (range == null) {
       throw StateError('EPUB must be read through explicit byte ranges.');
@@ -562,6 +570,36 @@ void main() {
         session.currentChapter?.resource.path,
         'OPS/Text/chapter-two.xhtml',
       );
+      await session.close();
+    });
+
+    test('superseded TOC navigation does not report a missing chapter',
+        () async {
+      final fixture = _zipFixture();
+      final source = _MemoryFrameFileSource(fixture);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: source,
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      final gate = Completer<void>();
+      final started = Completer<void>();
+      source
+        ..nextOpenGate = gate
+        ..nextOpenStarted = started;
+
+      final olderNavigation = session.goToTocEntry(session.toc[1]);
+      await started.future;
+
+      final latestNavigation = session.goToTocEntry(session.toc[0]);
+      expect(await latestNavigation, isTrue);
+      expect(session.currentSpineIndex, 0);
+
+      gate.complete();
+      expect(await olderNavigation, isTrue);
+      expect(session.currentSpineIndex, 0);
       await session.close();
     });
 

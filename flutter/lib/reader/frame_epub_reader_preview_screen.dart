@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
-
 import 'frame_epub_reader_overlay_layout.dart';
 import 'frame_epub_reader_sidebar_layout.dart';
 import 'frame_epub_reader_option_label.dart';
@@ -1020,80 +1018,70 @@ class _FrameEpubReaderPreviewScreenState
         child: LayoutBuilder(
           builder: (context, constraints) {
             final narrowHeading = constraints.maxWidth <= 560;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  flex: 7,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'NOW READING',
-                        style: TextStyle(
-                          color: Color(0xFF938AA1),
-                          fontSize: 9,
-                          letterSpacing: 1.7,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _bookTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _readerText,
-                          fontSize: narrowHeading ? 15 : 18,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: .1,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        widget.book.author.trim().isEmpty
-                            ? widget.book.fileName
-                            : widget.book.author.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFAAA3B6),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
+            final author = widget.book.author.trim().isEmpty
+                ? widget.book.fileName
+                : widget.book.author.trim();
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'NOW READING',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Color(0xFF938AA1),
+                      fontSize: 9,
+                      letterSpacing: 1.7,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  flex: 5,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        progressLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: const Color(0xFFC7B5FB),
-                          fontFamily: 'Georgia',
-                          fontSize: narrowHeading ? 20 : 23,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 0,
-                        runSpacing: 4,
-                        children: actions,
-                      ),
-                    ],
+                  const SizedBox(height: 5),
+                  Text(
+                    _bookTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _readerText,
+                      fontSize: narrowHeading ? 15 : 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: .1,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      color: Color(0xFFAAA3B6),
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    progressLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: const Color(0xFFC7B5FB),
+                      fontFamily: 'Georgia',
+                      fontSize: narrowHeading ? 20 : 23,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 0,
+                    runSpacing: 4,
+                    children: actions,
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -1847,7 +1835,9 @@ class _FrameEpubReaderPreviewScreenState
     required VoidCallback onClose,
   }) async {
     if (closeSidebar) onClose();
-    await _flushReadingPosition();
+    // Queue the previous location without blocking the target chapter's
+    // Range reads on a cloud round-trip.
+    unawaited(_flushReadingPosition());
     try {
       final moved = await session.goToTocEntry(entry);
       if (!mounted || moved) return;
@@ -2462,8 +2452,11 @@ class _FrameEpubReaderPreviewScreenState
           Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF9C93A9),
-              fontSize: 9,
+              color: Color(0xFFB8AEC7),
+              fontFamily: 'NotoSansTC',
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
             ),
           ),
           const SizedBox(height: 6),
@@ -2732,7 +2725,10 @@ class _FrameEpubReaderPreviewScreenState
                     '文字排版',
                     style: const TextStyle(
                       color: Color(0xFFD8CDEB),
-                      fontSize: 10,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
                       letterSpacing: .4,
                     ),
                   ),
@@ -2741,7 +2737,10 @@ class _FrameEpubReaderPreviewScreenState
                     'TYPE & RHYTHM',
                     style: TextStyle(
                       color: Color(0xFF887A9C),
-                      fontSize: 8,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -2832,7 +2831,10 @@ _appearanceDropdown(
                     '頁面佈局',
                     style: const TextStyle(
                       color: Color(0xFFD8CDEB),
-                      fontSize: 10,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
                       letterSpacing: .4,
                     ),
                   ),
@@ -2841,7 +2843,10 @@ _appearanceDropdown(
                     'PAGE LAYOUT',
                     style: TextStyle(
                       color: Color(0xFF887A9C),
-                      fontSize: 8,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -2952,7 +2957,10 @@ _appearanceDropdown(
                     '漫畫與圖像',
                     style: const TextStyle(
                       color: Color(0xFFD8CDEB),
-                      fontSize: 10,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
                       letterSpacing: .4,
                     ),
                   ),
@@ -2961,7 +2969,10 @@ _appearanceDropdown(
                     'COMIC READING',
                     style: TextStyle(
                       color: Color(0xFF887A9C),
-                      fontSize: 8,
+                      fontFamily: 'NotoSansTC',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -3150,11 +3161,9 @@ _appearanceDropdown(
                 topLeft: Radius.circular(18),
                 bottomLeft: Radius.circular(18),
               ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Container(
+              child: Container(
                   decoration: const BoxDecoration(
-                    color: Color(0xFC1B1726),
+                    color: Color(0xFF1B1726),
                     border: Border(
                       top: BorderSide(color: Color(0x47C1AAEE)),
                       left: BorderSide(color: Color(0x47C1AAEE)),
@@ -3165,9 +3174,15 @@ _appearanceDropdown(
                       bottomLeft: Radius.circular(18),
                     ),
                   ),
-                  child: buildSettingsPanel(dialogContext),
+                  child: DefaultTextStyle(
+                    style: const TextStyle(
+                      fontFamily: 'NotoSansTC',
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                    child: buildSettingsPanel(dialogContext),
+                  ),
                 ),
-              ),
             ),
           ),
         ),

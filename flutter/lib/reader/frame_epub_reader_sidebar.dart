@@ -161,55 +161,52 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             top: 1,
             bottom: 1,
           ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: selected
-                  ? const Color(0x332A213B)
-                  : Colors.transparent,
+          child: Material(
+            type: MaterialType.transparency,
+            color: selected
+                ? const Color(0x332A213B)
+                : Colors.transparent,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(7),
-              border: selected
-                  ? Border.all(color: const Color(0x55A78BFA))
-                  : null,
+              side: selected
+                  ? const BorderSide(color: Color(0x55A78BFA))
+                  : BorderSide.none,
             ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: compact ? 40 : 30),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: compact ? 30 : 24,
-                    height: compact ? 36 : 28,
-                    child: hasChildren
-                        ? IconButton(
-                            tooltip: expanded
-                                ? '收合「$label」子目錄'
-                                : '展開「$label」子目錄',
-                            onPressed: () {
-                              setState(() {
-                                if (expanded) {
-                                  _expandedTocKeys.remove(key);
-                                } else {
-                                  _expandedTocKeys.add(key);
-                                }
-                              });
-                            },
-                            padding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                            icon: Icon(
-                              expanded
-                                  ? Icons.expand_more_rounded
-                                  : Icons.chevron_right_rounded,
-                              color: const Color(0xFFA99ABF),
-                              size: 18,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: available
-                          ? () => widget.onSelectToc(entry)
-                          : hasChildren
-                              ? () {
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: available
+                  ? () => widget.onSelectToc(entry)
+                  : hasChildren
+                      ? () {
+                          setState(() {
+                            if (expanded) {
+                              _expandedTocKeys.remove(key);
+                            } else {
+                              _expandedTocKeys.add(key);
+                            }
+                          });
+                        }
+                      : null,
+              borderRadius: BorderRadius.circular(7),
+              hoverColor: const Color(0x332A213B),
+              focusColor: const Color(0x332A213B),
+              splashColor: const Color(0x443F315B),
+              highlightColor: const Color(0x332A213B),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: compact ? 40 : 30),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: compact ? 30 : 24,
+                      height: compact ? 36 : 28,
+                      child: hasChildren
+                          ? Tooltip(
+                              message: expanded
+                                  ? '收合「$label」子目錄'
+                                  : '展開「$label」子目錄',
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
                                   setState(() {
                                     if (expanded) {
                                       _expandedTocKeys.remove(key);
@@ -217,54 +214,51 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                                       _expandedTocKeys.add(key);
                                     }
                                   });
-                                }
-                              : null,
-                      style: TextButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        foregroundColor: selected
-                            ? const Color(0xFFF6F0FF)
-                            : depth == 0
-                                ? const Color(0xFFE1D7EF)
-                                : _sidebarText,
-                        disabledForegroundColor: _sidebarText,
+                                },
+                                child: Center(
+                                  child: Icon(
+                                    expanded
+                                        ? Icons.expand_more_rounded
+                                        : Icons.chevron_right_rounded,
+                                    color: const Color(0xFFA99ABF),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    Expanded(
+                      child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: compact ? 10 : 7,
                           vertical: compact ? 9 : 5,
                         ),
-                        minimumSize: Size(0, compact ? 40 : 29),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        backgroundColor: selected
-                            ? const Color(0x221A1328)
-                            : Colors.transparent,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          label,
-                          maxLines: widget.desktopLayout ? 1 : 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: selected
-                                ? const Color(0xFFF6F0FF)
-                                : depth == 0
-                                    ? const Color(0xFFE1D7EF)
-                                    : _sidebarText,
-                            fontFamily: 'NotoSansTC',
-                            fontSize: widget.desktopLayout ? 9 : 12,
-                            height: 1.45,
-                            fontWeight: depth == 0
-                                ? FontWeight.w600
-                                : FontWeight.w400,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            label,
+                            maxLines: widget.desktopLayout ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: selected
+                                  ? const Color(0xFFF6F0FF)
+                                  : depth == 0
+                                      ? const Color(0xFFE1D7EF)
+                                      : _sidebarText,
+                              fontFamily: 'NotoSansTC',
+                              fontSize: widget.desktopLayout ? 9 : 12,
+                              height: 1.45,
+                              fontWeight: depth == 0
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

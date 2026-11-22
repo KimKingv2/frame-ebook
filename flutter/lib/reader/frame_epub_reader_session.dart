@@ -95,6 +95,7 @@ class FrameEpubReaderSession extends ChangeNotifier {
   bool _started = false;
   bool _closed = false;
   int _navigationRevision = 0;
+  Future<void> _progressSaveQueue = Future<void>.value();
   int _annotationMutationRevision = 0;
   int _annotationRefreshRequest = 0;
 
@@ -268,7 +269,12 @@ class FrameEpubReaderSession extends ChangeNotifier {
         .round()
         .clamp(0, 100)
         .toInt();
-    await _saveProgress(percent: percent, cfi: cfi);
+    await _queueProgressSave(
+      index: spineIndex,
+      label: currentChapterLabel,
+      percent: percent,
+      cfi: cfi,
+    );
     return true;
   }
 
@@ -388,15 +394,18 @@ class FrameEpubReaderSession extends ChangeNotifier {
     try {
       chapter = await loader.loadChapter(epub.spine[index]);
     } on Object catch (error) {
-      if (!_closed && revision == _navigationRevision) {
-        _chapterLoading = false;
-        _error = '無法載入章節：$error';
-        notifyListeners();
-      }
+      if (_closed) return false;
+      if (revision != _navigationRevision) return true;
+      _chapterLoading = false;
+      _error = '無法載入章節：$error';
+      notifyListeners();
       return false;
     }
 
-    if (_closed || revision != _navigationRevision) return false;
+    if (_closed) return false;
+    // A newer click has taken over navigation. Treat this older request as
+    // handled so it cannot show a false "no readable chapter" message.
+    if (revision != _navigationRevision) return true;
     _currentSpineIndex = index;
     _currentFragment = fragment;
     _initialCfi = null;
@@ -407,7 +416,9 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
     if (saveProgress) {
       try {
-        await _saveProgress(
+        await _queueProgressSave(
+          index: index,
+          label: currentChapterLabel,
           percent: chapterProgressPercent,
           cfi: '',
         );
@@ -438,24 +449,44 @@ class FrameEpubReaderSession extends ChangeNotifier {
         FrameEpubCfi.spineIndexFromCfi(epub, cfi) != index) {
       throw ArgumentError('閱讀位置 CFI 與目前 EPUB 章節不一致。');
     }
-    await _saveProgress(
+    await _queueProgressSave(
+      index: index,
+      label: currentChapterLabel,
       percent: percent.clamp(0, 100).toInt(),
       cfi: cfi,
     );
   }
 
+  Future<void> _queueProgressSave({
+    required int index,
+    required String label,
+    required int percent,
+    required String cfi,
+  }) {
+    final nextSave = _progressSaveQueue
+        .catchError((Object _) {})
+        .then((_) => _saveProgress(
+              index: index,
+              label: label,
+              percent: percent,
+              cfi: cfi,
+            ));
+    _progressSaveQueue = nextSave;
+    return nextSave;
+  }
+
   Future<void> _saveProgress({
+    required int index,
+    required String label,
     required int percent,
     required String cfi,
   }) async {
-    final index = _currentSpineIndex;
-    if (index == null) return;
     try {
       _readerState = await repository.saveState(
         book,
         progress: {
           'percent': percent,
-          'label': currentChapterLabel,
+          'label': label,
           'cfi': cfi,
           'index': index,
         },
