@@ -747,7 +747,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                         fontSize: 10,
                       ),
                     ),
-                    SizedBox(width: desktop ? 7 : 9),
+                    const SizedBox(width: 7),
                     Icon(
                       _showDesktopAnnotations
                           ? Icons.expand_less_rounded
