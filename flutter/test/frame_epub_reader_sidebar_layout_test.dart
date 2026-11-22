@@ -9,7 +9,8 @@ void main() {
           FrameEpubReaderSidebarLayout.fromViewport(const Size(390, 844));
 
       expect(layout.width, closeTo(354.9, .001));
-      expect(layout.verticalInset, 8);
+      expect(layout.topInset, 8);
+      expect(layout.bottomInset, 8);
     });
 
     test('caps medium phones at the CSS max width', () {
@@ -17,7 +18,8 @@ void main() {
           FrameEpubReaderSidebarLayout.fromViewport(const Size(820, 1180));
 
       expect(layout.width, 390);
-      expect(layout.verticalInset, 8);
+      expect(layout.topInset, 8);
+      expect(layout.bottomInset, 8);
     });
 
     test('avoids overflow on narrow viewports', () {
@@ -33,7 +35,29 @@ void main() {
         fullscreen: true,
       );
 
-      expect(layout.verticalInset, 6);
+      expect(layout.topInset, 6);
+      expect(layout.bottomInset, 6);
+    });
+
+    test('includes phone safe-area insets', () {
+      final layout = FrameEpubReaderSidebarLayout.fromViewport(
+        const Size(390, 844),
+        safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+      );
+
+      expect(layout.topInset, 55);
+      expect(layout.bottomInset, 42);
+    });
+
+    test('includes safe-area plus compact fullscreen padding', () {
+      final layout = FrameEpubReaderSidebarLayout.fromViewport(
+        const Size(390, 844),
+        fullscreen: true,
+        safeArea: const EdgeInsets.only(top: 47, bottom: 34),
+      );
+
+      expect(layout.topInset, 53);
+      expect(layout.bottomInset, 40);
     });
   });
 }

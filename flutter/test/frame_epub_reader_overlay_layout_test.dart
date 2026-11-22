@@ -46,7 +46,7 @@ void main() {
       expect(desktop.contentHorizontalPadding, 18);
     });
 
-    test('uses edge-to-edge geometry in fullscreen', () {
+    test('uses desktop edge-to-edge geometry in fullscreen', () {
       final layout = FrameEpubAppearancePanelLayout.fromViewport(
         const Size(1440, 900),
         fullscreen: true,
@@ -57,6 +57,37 @@ void main() {
       expect(layout.height, 900);
       expect(layout.outerPadding.top, 0);
       expect(layout.outerPadding.bottom, 0);
+    });
+
+    test('keeps compact fullscreen drawer clear of safe areas', () {
+      final layout = FrameEpubAppearancePanelLayout.fromViewport(
+        const Size(390, 844),
+        fullscreen: true,
+      );
+
+      expect(layout.outerPadding.top, 6);
+      expect(layout.outerPadding.bottom, 6);
+      expect(layout.height, 832);
+    });
+
+    test('includes phone safe-area insets in normal and fullscreen modes', () {
+      const safeArea = EdgeInsets.only(top: 47, bottom: 34);
+      final normal = FrameEpubAppearancePanelLayout.fromViewport(
+        const Size(390, 844),
+        safeArea: safeArea,
+      );
+      final fullscreen = FrameEpubAppearancePanelLayout.fromViewport(
+        const Size(390, 844),
+        fullscreen: true,
+        safeArea: safeArea,
+      );
+
+      expect(normal.outerPadding.top, 55);
+      expect(normal.outerPadding.bottom, 42);
+      expect(normal.height, 747);
+      expect(fullscreen.outerPadding.top, 53);
+      expect(fullscreen.outerPadding.bottom, 40);
+      expect(fullscreen.height, 751);
     });
 
     test('caps the drawer to narrow viewports without overflow', () {

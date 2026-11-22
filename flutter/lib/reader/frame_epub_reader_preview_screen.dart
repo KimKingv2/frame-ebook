@@ -2042,6 +2042,7 @@ class _FrameEpubReaderPreviewScreenState
     final drawerLayout = FrameEpubReaderSidebarLayout.fromViewport(
       MediaQuery.sizeOf(context),
       fullscreen: _isImmersive,
+      safeArea: MediaQuery.viewPaddingOf(context),
     );
 
     await showGeneralDialog<void>(
@@ -2057,8 +2058,8 @@ class _FrameEpubReaderPreviewScreenState
           right: false,
           child: Padding(
             padding: EdgeInsets.only(
-              top: drawerLayout.verticalInset,
-              bottom: drawerLayout.verticalInset,
+              top: drawerLayout.topInset,
+              bottom: drawerLayout.bottomInset,
             ),
             child: Container(
               width: drawerLayout.width,

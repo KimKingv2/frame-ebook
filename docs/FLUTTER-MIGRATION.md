@@ -179,6 +179,11 @@ These items must still pass CI and device verification before being treated as c
 - This is distinct from ordinary browser fullscreen, which may retain the regular reader chrome. Escape / system-back and the existing top-zone listener remain the exit paths.
 - The immersive state is source-aligned; same-viewport visual comparison and cross-platform exit/restore acceptance remain pending.
 
+### Safe-area-aware reader drawers
+
+- Both right appearance and left navigation drawers now include the device's stable Safe Area insets, matching the legacy safe-area CSS. Normal panels add 8 px; compact immersive panels add 6 px, while desktop fullscreen remains edge-to-edge.
+- Tests cover notched-phone top/bottom insets in normal and fullscreen modes, in addition to the existing 320/390/820/1440 px width matrix.
+
 ### Compact left navigation drawer geometry
 
 - The compact Flutter navigation now matches the legacy left drawer: maximum 390 px, 91vw with an 18 px minimum outer-width reserve, 8 px top/bottom insets in normal mode, and 6 px in fullscreen.
