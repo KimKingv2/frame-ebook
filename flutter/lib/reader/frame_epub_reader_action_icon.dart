@@ -91,7 +91,7 @@ class _FrameEpubReaderActionGlyphPainter extends CustomPainter {
 
   static Path _parseSvgPath(String data) {
     final tokens = RegExp(
-      r'[MmLlHhVvCcZz]|[-+]?(?:\\d*\\.\\d+|\\d+\\.?\\d*)(?:[eE][-+]?\\d+)?',
+      r'[MmLlHhVvCcZz]|[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?',
     ).allMatches(data).map((match) => match.group(0)!).toList();
     final path = Path();
     var index = 0;
@@ -129,6 +129,7 @@ class _FrameEpubReaderActionGlyphPainter extends CustomPainter {
           path.moveTo(current.dx, current.dy);
           subpathStart = current;
           command = relative ? 'l' : 'L';
+          break;
         case 'L':
         case 'l':
           final relative = command == 'l';
@@ -138,18 +139,21 @@ class _FrameEpubReaderActionGlyphPainter extends CustomPainter {
               ? current + Offset(x, y)
               : Offset(x, y);
           path.lineTo(current.dx, current.dy);
+          break;
         case 'H':
         case 'h':
           final relative = command == 'h';
           final x = nextNumber();
           current = Offset(relative ? current.dx + x : x, current.dy);
           path.lineTo(current.dx, current.dy);
+          break;
         case 'V':
         case 'v':
           final relative = command == 'v';
           final y = nextNumber();
           current = Offset(current.dx, relative ? current.dy + y : y);
           path.lineTo(current.dx, current.dy);
+          break;
         case 'C':
         case 'c':
           final relative = command == 'c';
@@ -171,6 +175,7 @@ class _FrameEpubReaderActionGlyphPainter extends CustomPainter {
             end.dy,
           );
           current = end;
+          break;
         default:
           throw FormatException('Unsupported SVG path command: $command');
       }
