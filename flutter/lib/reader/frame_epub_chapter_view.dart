@@ -2361,6 +2361,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           maxLines: 1,
         );
 
+        TextPainter? adjustedAnnotationPainter;
         try {
           basePainter.layout();
           annotationPainter.layout();
@@ -2419,6 +2420,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               : annotationPainter;
           if (additionalSpacing > 0) {
             alignedAnnotationPainter.layout();
+            adjustedAnnotationPainter = alignedAnnotationPainter;
           }
           final annotationWidth = alignedAnnotationPainter.width;
 
@@ -2471,9 +2473,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         } finally {
           basePainter.dispose();
           annotationPainter.dispose();
-          if (!identical(alignedAnnotationPainter, annotationPainter)) {
-            alignedAnnotationPainter.dispose();
-          }
+          adjustedAnnotationPainter?.dispose();
         }
         continue;
       }
