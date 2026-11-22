@@ -772,6 +772,8 @@ void main() {
       final segmented = rubyWidgets.skip(2).toList();
       expect(segmented.map((item) => item.annotation.toPlainText()).toList(),
           ['かん', 'じ']);
+      expect(segmented.first.rubyAlign, 'space-around');
+      expect(segmented.first.rubyPosition, 'alternate');
       expect(tester.takeException(), isNull);
     } finally {
       await archive.close();

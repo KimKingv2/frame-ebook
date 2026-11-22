@@ -224,13 +224,6 @@ class FrameEpubCssCascade {
       case 'a':
         result['text-decoration'] = 'underline';
         break;
-      case 'ruby':
-        result.addAll({
-          'ruby-align': 'space-around',
-          'ruby-position': 'alternate',
-          'ruby-overhang': 'auto',
-        });
-        break;
       case 'sup':
         result.addAll({
           'font-size': 'smaller',
