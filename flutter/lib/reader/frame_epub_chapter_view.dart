@@ -366,10 +366,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         _resetPaginationMeasurement();
       }
       if (oldWidget.restoreRevision != widget.restoreRevision) {
+        // Explicit same-document CFI navigation needs a fresh full-chapter
+        // measurement. The current PageView only materializes nearby pages,
+        // so measuring against its lazy children can misidentify a distant
+        // target as page zero.
         _lastVisibleTextNode = null;
         _lastVisibleTextOffset = null;
-        _initialPageForRestore = null;
-        _restoreScheduled = false;
+        _resetPaginationMeasurement();
       }
     }
   }
