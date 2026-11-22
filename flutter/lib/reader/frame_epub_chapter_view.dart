@@ -1426,6 +1426,24 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final inlineSpans = <InlineSpan>[];
     final sourceSpans = HashMap<TextSpan, _TextSpanSource>.identity();
 
+    var paragraphIndentInserted = false;
+    void ensureParagraphIndent() {
+      if (paragraphIndentInserted) return;
+      paragraphIndentInserted = true;
+      if (parent.name.local.toLowerCase() != 'p') return;
+      final indent = _firstLineIndentWidth(
+        parentStyle,
+        availableWidth: paginationWidth,
+      );
+      if (indent == null) return;
+      // Keep layout indentation separate from source XHTML text so CFI ranges
+      // and saved annotations continue to point at the original text nodes.
+      inlineSpans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: SizedBox(width: indent, height: 0),
+      ));
+    }
+
     void appendText(
       XmlText node,
       Map<String, String> style, {
@@ -1442,6 +1460,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               inlineSpans.isEmpty)) {
         return;
       }
+      ensureParagraphIndent();
       inlineSpans.addAll(_sourceTextSpans(node, prepared, sourceSpans));
     }
 
@@ -1543,6 +1562,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         continue;
       }
       if (tag == 'br') {
+        ensureParagraphIndent();
         inlineSpans.add(const TextSpan(text: '\n'));
       } else if (_isBlockElement(tag, childStyle) ||
           (widget.fixedLayout && tag == 'img')) {
@@ -1598,6 +1618,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           ));
         }
       } else {
+        ensureParagraphIndent();
         inlineSpans.add(_inlineSpan(
           child,
           childStyle,
@@ -2357,6 +2378,34 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       };
     }
     return style;
+  }
+
+  double? _firstLineIndentWidth(
+    Map<String, String> style, {
+    double? availableWidth,
+  }) {
+    final raw = style['text-indent']?.trim().toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+
+    // CSS permits modifiers such as "hanging" and "each-line" after the
+    // length. This renderer applies the common first-line length component.
+    final match = RegExp(
+      r'^([+-]?(?:\d+\.?\d*|\.\d+))(px|pt|em|rem|%)?(?:\s|$)',
+    ).firstMatch(raw);
+    if (match == null) return null;
+    final number = double.tryParse(match.group(1)!);
+    if (number == null || number <= 0) return null;
+
+    final width = availableWidth != null && availableWidth.isFinite
+        ? availableWidth
+        : widget.contentMaxWidth;
+    final unit = match.group(2);
+    final fontSize = _length(style['font-size'], widget.fontSize);
+    final indent = unit == '%'
+        ? width * number / 100
+        : _cssDimension(number.toString() + (unit ?? ''), fontSize);
+    if (indent == null || !indent.isFinite || indent <= 0) return null;
+    return indent.clamp(0.0, width * 0.75).toDouble();
   }
 
   TextStyle _textStyle(Map<String, String> style) {

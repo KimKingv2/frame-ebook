@@ -52,6 +52,7 @@ class _MemoryFileSource implements FrameFileSource {
 Uint8List _fixture({
   String additionalIntroText = '',
   String additionalTableMarkup = '',
+  String additionalParagraphMarkup = '',
   bool fixedLayout = false,
 }) {
   const container = '''
@@ -92,6 +93,7 @@ Uint8List _fixture({
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
     $additionalTableMarkup
+    $additionalParagraphMarkup
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
     <p>跨文件尾註 <a epub:type="noteref" href="notes.xhtml#endnote-2">[2]</a></p>
@@ -269,6 +271,27 @@ void main() {
     expect(selection.endOffset, 3);
   });
 
+  test('maps selection offsets after a first-line layout placeholder', () {
+    final source = XmlText('首行縮排');
+    final selection = FrameEpubTextSelectionMapper.map(
+      selection: const TextSelection(baseOffset: 1, extentOffset: 5),
+      displayedText: '\uFFFC首行縮排',
+      sources: [
+        FrameEpubTextRangeSource(
+          start: 1,
+          end: 5,
+          node: source,
+          sourceOffsets: [0, 1, 2, 3, 4],
+        ),
+      ],
+    );
+
+    expect(selection, isNotNull);
+    expect(selection!.quote, '首行縮排');
+    expect(selection.startOffset, 0);
+    expect(selection.endOffset, 4);
+  });
+
   test('rejects collapsed or text-free placeholder-only selections', () {
     final source = XmlText('visible');
     expect(
@@ -297,7 +320,10 @@ void main() {
   });
 
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
-    final bytes = _fixture();
+    final bytes = _fixture(
+      additionalParagraphMarkup:
+          '<p style="text-indent: 2em">首行縮排回歸</p>',
+    );
     final book = FrameBook.fromJson({
       'id': 'chapter-widget-test',
       'provider': 'vps',
@@ -370,6 +396,19 @@ void main() {
       expect(find.textContaining('EPUB'), findsOneWidget);
       expect(find.text('章節目標'), findsOneWidget);
       expect(find.byType(SelectableText), findsWidgets);
+      final indentedParagraph = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .firstWhere(
+            (widget) =>
+                widget.textSpan?.toPlainText().contains('首行縮排回歸') ?? false,
+          );
+      final indent = (indentedParagraph.textSpan!.children!
+          .whereType<WidgetSpan>()
+          .single
+          .child) as SizedBox;
+      expect(indent.width, 32);
+      expect(indent.height, 0);
+
       final paragraph = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
           .firstWhere(
