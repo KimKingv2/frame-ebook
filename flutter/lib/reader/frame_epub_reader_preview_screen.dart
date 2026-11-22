@@ -1407,7 +1407,8 @@ class _FrameEpubReaderPreviewScreenState
                             immersive: immersive,
                           ),
                         ),
-                        if (ready)
+                        if (session != null &&
+                            session.status == FrameEpubReaderStatus.ready)
                           Visibility(
                             visible: !immersive,
                             maintainState: true,
