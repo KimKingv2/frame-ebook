@@ -153,9 +153,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('reader-immersive-layout')), findsOneWidget);
-    expect(find.byKey(const ValueKey('reader-workspace-root')), findsNothing);
+    expect(find.byKey(const ValueKey('reader-immersive-layout')), findsNothing);
+    expect(find.byKey(const ValueKey('reader-workspace-root')), findsOneWidget);
     expect(find.byKey(const ValueKey('reader-desktop-toolbar')), findsNothing);
+    expect(find.byKey(const ValueKey('reader-body-surface')), findsOneWidget);
 
     final safeArea = tester.widget<SafeArea>(find.byType(SafeArea).first);
     expect(safeArea.top, isFalse);
@@ -176,6 +177,42 @@ void main() {
       find.byKey(const ValueKey('reader-rounded-content-clip')),
     );
     expect(clip.borderRadius, BorderRadius.circular(12));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps the reader body mounted while toggling immersive mode',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final screenKey = GlobalKey();
+    Widget buildReader(bool immersive) => MaterialApp(
+          home: FrameEpubReaderPreviewScreen(
+            key: screenKey,
+            book: _testBook(),
+            fileSource: _FailingFileSource(),
+            repository: FrameReaderRepository(_PreviewApi()),
+            initialImmersiveForTest: immersive,
+          ),
+        );
+
+    await tester.pumpWidget(buildReader(false));
+    await tester.pumpAndSettle();
+    final bodyBefore = tester.element(
+      find.byKey(const ValueKey('reader-body-surface')),
+    );
+
+    await tester.pumpWidget(buildReader(true));
+    await tester.pumpAndSettle();
+    final bodyAfter = tester.element(
+      find.byKey(const ValueKey('reader-body-surface')),
+    );
+
+    expect(identical(bodyBefore, bodyAfter), isTrue);
+    expect(find.byKey(const ValueKey('reader-workspace-root')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reader-immersive-layout')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

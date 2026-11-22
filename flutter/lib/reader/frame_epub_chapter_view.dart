@@ -302,6 +302,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   bool _paginationMeasurementScheduled = false;
   int _paginationRevision = 0;
   Size? _paginationViewportSize;
+  double? _paginationPageWidth;
   int? _initialPageForRestore;
   bool _paginationSpreadActive = false;
   XmlText? _lastVisibleTextNode;
@@ -594,6 +595,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     _paginationMeasurementScheduled = false;
     _paginationPages = const [];
     _paginationViewportSize = null;
+    _paginationPageWidth = null;
     _initialPageForRestore = null;
     _paginationSpreadActive = false;
     _restoreScheduled = false;
@@ -739,8 +741,37 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         pageAreaWidth < spreadWidthLimit ? pageAreaWidth : spreadWidthLimit;
     final pageWidth =
         spreadActive ? (spreadWidth - spreadGutter) / 2 : singlePageWidth;
-    final availableHeight =
-        viewportSize.height - widget.verticalMargin.clamp(8, 64) * 2;
+    final verticalMargin = widget.verticalMargin.clamp(8, 64);
+    final availableHeight = viewportSize.height - verticalMargin * 2;
+    final previousViewportSize = _paginationViewportSize;
+    final previousPageWidth = _paginationPageWidth;
+    final pageWidthShrank = previousPageWidth != null &&
+        pageWidth < previousPageWidth - 0.5;
+    final heightShrank = previousViewportSize != null &&
+        viewportSize.height < previousViewportSize.height - 0.5;
+    final spreadChanged = previousViewportSize != null &&
+        _paginationSpreadActive != spreadActive;
+
+    if (previousViewportSize != null &&
+        (pageWidthShrank || heightShrank || spreadChanged)) {
+      _resetPaginationMeasurement();
+    }
+    _paginationSpreadActive = spreadActive;
+
+    // A larger viewport can show the existing page with extra breathing room.
+    // Keep the previous text-fragment bounds so fullscreen/window expansion
+    // does not force an expensive full-chapter pagination pass.
+    final layoutPageWidth = _paginationPageWidth == null ||
+            pageWidth < _paginationPageWidth! - 0.5
+        ? pageWidth
+        : _paginationPageWidth!;
+    final measuredAvailableHeight = _paginationViewportSize == null
+        ? availableHeight
+        : _paginationViewportSize!.height - verticalMargin * 2;
+    final layoutAvailableHeight = availableHeight < measuredAvailableHeight
+        ? availableHeight
+        : measuredAvailableHeight;
+
     _paginationTextKeyCursor = 0;
     _paginationTextPositions.clear();
     final items = _flowChildren(
@@ -748,25 +779,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       bodyStyle,
       cascade,
       flattenBlockContainers: true,
-      paginationWidth: (pageWidth - widget.horizontalPadding * 2)
-          .clamp(1.0, pageWidth)
+      paginationWidth: (layoutPageWidth - widget.horizontalPadding * 2)
+          .clamp(1.0, layoutPageWidth)
           .toDouble(),
-      paginationMaxHeight: availableHeight > 1 ? availableHeight : 1,
+      paginationMaxHeight:
+          layoutAvailableHeight > 1 ? layoutAvailableHeight : 1,
       paginationTextScaler:
           MediaQuery.maybeOf(context)?.textScaler ?? TextScaler.noScaling,
     );
     _ensureFlowItemKeys(items.length);
 
-    if (_paginationViewportSize != null &&
-        _paginationViewportSize != viewportSize) {
-      _resetPaginationMeasurement();
-      _paginationSpreadActive = spreadActive;
-    }
-
     if (!_paginationReady) {
       _schedulePaginationMeasurement(
         viewportSize: viewportSize,
-        availableHeight: availableHeight > 1 ? availableHeight : 1,
+        pageWidth: layoutPageWidth,
+        availableHeight:
+            layoutAvailableHeight > 1 ? layoutAvailableHeight : 1,
       );
       return Stack(
         children: [
@@ -888,6 +916,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   void _schedulePaginationMeasurement({
     required Size viewportSize,
+    required double pageWidth,
     required double availableHeight,
   }) {
     if (_paginationMeasurementScheduled) return;
@@ -912,6 +941,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       setState(() {
         _paginationPages = pages;
         _paginationViewportSize = viewportSize;
+        _paginationPageWidth = pageWidth;
         _paginationReady = true;
         _paginationMeasurementScheduled = false;
         _restoreScheduled = false;

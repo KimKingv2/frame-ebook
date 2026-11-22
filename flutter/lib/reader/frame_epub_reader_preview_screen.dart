@@ -133,6 +133,16 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   @override
+  void didUpdateWidget(covariant FrameEpubReaderPreviewScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final testImmersive = widget.initialImmersiveForTest;
+    if (testImmersive != null &&
+        testImmersive != oldWidget.initialImmersiveForTest) {
+      _isImmersive = testImmersive;
+    }
+  }
+
+  @override
   void onFullScreenChanged(bool enabled, SystemUiMode? systemUiMode) {
     if (!mounted || _isImmersive == enabled) return;
     setState(() => _isImmersive = enabled);
@@ -1220,8 +1230,8 @@ class _FrameEpubReaderPreviewScreenState
   }) =>
       Container(
         key: const ValueKey('reader-rounded-frame'),
-        margin: EdgeInsets.all(immersive ? 8 : 0),
-        padding: EdgeInsets.all(immersive ? 8 : wide ? 6 : 10),
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.all(wide ? 6 : 10),
         decoration: BoxDecoration(
           gradient: immersive
               ? null
@@ -1268,9 +1278,8 @@ class _FrameEpubReaderPreviewScreenState
                 ? 10.0
                 : 14.0;
     const sidebarWidth = 220.0;
-    final showDesktopSidebar = wide &&
-        _isSidebarVisible &&
-        session?.status == FrameEpubReaderStatus.ready;
+    final ready = session?.status == FrameEpubReaderStatus.ready;
+    final showDesktopSidebar = wide && _isSidebarVisible && ready;
 
     return Padding(
       key: const ValueKey('reader-workspace-root'),
@@ -1278,86 +1287,97 @@ class _FrameEpubReaderPreviewScreenState
       child: Column(
         children: [
           if (!wide)
-            _buildReaderTopBar(
+            Visibility(
+              visible: !immersive,
+              maintainState: true,
+              maintainAnimation: true,
+              child: _buildReaderTopBar(
+                session,
+                viewportWidth: viewportWidth - shellInset * 2,
+              ),
+            ),
+          Visibility(
+            visible: !immersive,
+            maintainState: true,
+            maintainAnimation: true,
+            child: _buildBookHeading(
               session,
               viewportWidth: viewportWidth - shellInset * 2,
+              wide: wide,
             ),
-          _buildBookHeading(
-            session,
-            viewportWidth: viewportWidth - shellInset * 2,
-            wide: wide,
           ),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                0,
-                immersive ? 0 : 8,
-                0,
-                immersive ? 0 : 4,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+              child: Stack(
                 children: [
-                  if (showDesktopSidebar) ...[
-                    SizedBox(
-                      width: sidebarWidth,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _readerPanel,
-                          border: Border.all(
-                            color: const Color(0x33C1AAEE),
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: _buildReaderSidebar(
-                          session!,
-                          initialTabIndex: 0,
-                          desktopLayout: true,
-                          onClose: () => setState(
-                            () => _isSidebarVisible = false,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
+                  Positioned.fill(
                     child: Column(
                       children: [
                         Expanded(
                           child: _buildReaderFrame(
-                            _buildBody(session),
+                            KeyedSubtree(
+                              key: const ValueKey('reader-body-surface'),
+                              child: _buildBody(session),
+                            ),
                             wide: wide,
                             immersive: immersive,
                           ),
                         ),
-                        if (session?.status == FrameEpubReaderStatus.ready)
-                          _chapterControls(session!),
-                        if (session?.status == FrameEpubReaderStatus.ready)
-                          _readingSessionIndicator(),
+                        if (ready)
+                          Visibility(
+                            visible: !immersive,
+                            maintainState: true,
+                            maintainAnimation: true,
+                            child: _chapterControls(session!),
+                          ),
+                        if (ready)
+                          Visibility(
+                            visible: !immersive,
+                            maintainState: true,
+                            maintainAnimation: true,
+                            child: _readingSessionIndicator(),
+                          ),
                       ],
                     ),
                   ),
+                  if (wide && ready)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Visibility(
+                        visible: showDesktopSidebar && !immersive,
+                        maintainState: true,
+                        maintainAnimation: true,
+                        child: SizedBox(
+                          width: sidebarWidth,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _readerPanel,
+                              border: Border.all(
+                                color: const Color(0x33C1AAEE),
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _buildReaderSidebar(
+                              session!,
+                              initialTabIndex: 0,
+                              desktopLayout: true,
+                              onClose: () => setState(
+                                () => _isSidebarVisible = false,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildImmersiveLayout(FrameEpubReaderSession? session) {
-    return ColoredBox(
-      key: const ValueKey('reader-immersive-layout'),
-      color: const Color(0xFF12101A),
-      child: SizedBox.expand(
-        child: _buildReaderFrame(
-          _buildBody(session),
-          wide: true,
-          immersive: true,
-        ),
       ),
     );
   }
@@ -1384,20 +1404,11 @@ class _FrameEpubReaderPreviewScreenState
               builder: (context, constraints) {
                 final viewportWidth = constraints.maxWidth;
                 final wide = viewportWidth > 820;
-                if (_isImmersive) {
-                  return _buildImmersiveLayout(session);
-                }
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: _buildReaderWorkspace(
-                        session,
-                        viewportWidth: viewportWidth,
-                        wide: wide,
-                        immersive: false,
-                      ),
-                    ),
-                  ],
+                return _buildReaderWorkspace(
+                  session,
+                  viewportWidth: viewportWidth,
+                  wide: wide,
+                  immersive: _isImmersive,
                 );
               },
             ),
