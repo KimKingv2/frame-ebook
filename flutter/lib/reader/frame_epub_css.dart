@@ -39,6 +39,7 @@ class FrameEpubCssCascade {
     'white-space',
     'word-spacing',
     'direction',
+    'list-style-type',
   };
 
   /// Resolves a computed declaration map for [element].

@@ -321,8 +321,24 @@ void main() {
 
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
     final bytes = _fixture(
-      additionalParagraphMarkup:
-          '<p style="text-indent: 2em">首行縮排回歸</p>',
+      additionalParagraphMarkup: '''
+        <p style="text-indent: 2em">首行縮排回歸</p>
+        <ol style="list-style-type: upper-alpha" start="26">
+          <li>字母編號甲</li><li>字母編號乙</li>
+        </ol>
+        <ol style="list-style-type: lower-roman" start="4">
+          <li>羅馬編號</li>
+        </ol>
+        <ol reversed>
+          <li>倒序編號二</li><li>倒序編號一</li>
+        </ol>
+        <ol><li value="7">指定起點</li><li>接續編號</li></ol>
+        <ol type="A" start="28"><li>HTML 型別編號</li></ol>
+        <ol style="list-style-type: decimal-leading-zero" start="3">
+          <li>補零編號</li>
+        </ol>
+        <ul style="list-style-type: square"><li>方形項目</li></ul>
+      ''',
     );
     final book = FrameBook.fromJson({
       'id': 'chapter-widget-test',
@@ -408,6 +424,17 @@ void main() {
           .child) as SizedBox;
       expect(indent.width, 32);
       expect(indent.height, 0);
+
+      expect(find.text('Z.'), findsOneWidget);
+      expect(find.text('AA.'), findsOneWidget);
+      expect(find.text('iv.'), findsOneWidget);
+      expect(find.text('2.'), findsOneWidget);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.text('7.'), findsOneWidget);
+      expect(find.text('8.'), findsOneWidget);
+      expect(find.text('AB.'), findsOneWidget);
+      expect(find.text('03.'), findsOneWidget);
+      expect(find.text('▪'), findsOneWidget);
 
       final paragraph = tester
           .widgetList<SelectableText>(find.byType(SelectableText))

@@ -2067,17 +2067,66 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     TextScaler? paginationTextScaler,
   }) {
     final ordered = list.name.local.toLowerCase() == 'ol';
-    final items = list.children.whereType<XmlElement>().where(
+    final items = list.children
+        .whereType<XmlElement>()
+        .where(
           (element) =>
               element.name.local.toLowerCase() == 'li' &&
               !FrameEpubFootnoteResolver.isFootnoteTarget(element),
-        );
+        )
+        .toList(growable: false);
     final widgets = <Widget>[];
-    var index = 0;
+    final reversed = ordered && _attribute(list, 'reversed') != null;
+    final step = reversed ? -1 : 1;
+    var currentValue = int.tryParse(_attribute(list, 'start') ?? '') ??
+        (reversed ? items.length : 1);
+    var listStyleType = style['list-style-type'];
+    if (listStyleType == null) {
+      switch (_attribute(list, 'type')?.trim()) {
+        case '1':
+          listStyleType = 'decimal';
+          break;
+        case 'a':
+          listStyleType = 'lower-alpha';
+          break;
+        case 'A':
+          listStyleType = 'upper-alpha';
+          break;
+        case 'i':
+          listStyleType = 'lower-roman';
+          break;
+        case 'I':
+          listStyleType = 'upper-roman';
+          break;
+        case 'disc':
+          listStyleType = 'disc';
+          break;
+        case 'circle':
+          listStyleType = 'circle';
+          break;
+        case 'square':
+          listStyleType = 'square';
+          break;
+        case 'none':
+          listStyleType = 'none';
+          break;
+      }
+    }
     for (final item in items) {
-      index++;
+      final explicitValue = ordered
+          ? int.tryParse(_attribute(item, 'value') ?? '')
+          : null;
+      if (explicitValue != null) currentValue = explicitValue;
       final itemStyle = _computedStyle(item, cascade, style);
-      final marker = ordered ? '$index.' : _listMarker(style['list-style-type']);
+      final itemListStyleType =
+          itemStyle['list-style-type'] ?? listStyleType;
+      final marker = ordered
+          ? _orderedListMarker(currentValue, itemListStyleType)
+          : _listMarker(itemListStyleType);
+      currentValue += step;
+      final markerWidth = marker.length > 3
+          ? marker.length * widget.fontSize * 0.62
+          : 28.0;
       widgets.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: KeyedSubtree(
@@ -2086,7 +2135,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 28,
+                width: markerWidth,
                 child: Text(marker, style: _textStyle(itemStyle)),
               ),
               Expanded(
@@ -2098,7 +2147,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                     cascade,
                     paginationWidth: paginationWidth == null
                         ? null
-                        : (paginationWidth - 28)
+                        : (paginationWidth - markerWidth)
                             .clamp(1.0, paginationWidth)
                             .toDouble(),
                     paginationMaxHeight: paginationMaxHeight,
@@ -2494,8 +2543,57 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     return null;
   }
 
+  static String _orderedListMarker(int value, String? type) {
+    switch (type?.toLowerCase()) {
+      case 'none':
+        return '';
+      case 'decimal-leading-zero':
+        final digits = value.toString();
+        return value >= 0 && value < 10 ? '0$digits.' : '$digits.';
+      case 'lower-alpha':
+      case 'upper-alpha':
+        if (value < 1) return '$value.';
+        var remaining = value;
+        final letters = <int>[];
+        while (remaining > 0) {
+          remaining--;
+          letters.add(remaining % 26);
+          remaining ~/= 26;
+        }
+        final base = type!.toLowerCase() == 'upper-alpha' ? 65 : 97;
+        return '${String.fromCharCodes(
+          letters.reversed.map((letter) => base + letter),
+        )}.';
+      case 'lower-roman':
+      case 'upper-roman':
+        if (value < 1 || value > 3999) return '$value.';
+        const values = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+        const numerals = [
+          'M', 'CM', 'D', 'CD', 'C', 'XC', 'L',
+          'XL', 'X', 'IX', 'V', 'IV', 'I',
+        ];
+        var remaining = value;
+        final result = StringBuffer();
+        for (var index = 0; index < values.length; index++) {
+          while (remaining >= values[index]) {
+            result.write(numerals[index]);
+            remaining -= values[index];
+          }
+        }
+        final numeral = result.toString();
+        return type!.toLowerCase() == 'lower-roman'
+            ? '${numeral.toLowerCase()}.'
+            : '$numeral.';
+      default:
+        return '$value.';
+    }
+  }
+
   static String _listMarker(String? value) {
     switch (value?.toLowerCase()) {
+      case 'disc':
+      case null:
+        return '•';
       case 'circle':
         return '○';
       case 'square':

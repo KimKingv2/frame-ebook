@@ -106,6 +106,29 @@ void main() {
       expect(itemStyle['color'], 'purple');
     });
 
+    test('inherits list-style-type from the parent list', () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([
+        'ol { list-style-type: upper-alpha; }',
+      ]);
+      final document = XmlDocument.parse(
+        '<ol><li><p>item</p></li></ol>',
+      );
+      final list = document.rootElement;
+      final item = list.children.whereType<XmlElement>().first;
+      final paragraph = item.descendants.whereType<XmlElement>().first;
+
+      final listStyle = cascade.resolve(list);
+      final itemStyle = cascade.resolve(item, parentStyle: listStyle);
+      final paragraphStyle = cascade.resolve(
+        paragraph,
+        parentStyle: itemStyle,
+      );
+
+      expect(listStyle['list-style-type'], 'upper-alpha');
+      expect(itemStyle['list-style-type'], 'upper-alpha');
+      expect(paragraphStyle['list-style-type'], 'upper-alpha');
+    });
+
     test('keeps unsupported selectors from matching arbitrary elements', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         'p:unsupported-state { color: red; }',
