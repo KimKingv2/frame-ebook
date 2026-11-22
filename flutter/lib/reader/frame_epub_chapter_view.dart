@@ -2400,10 +2400,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               _cssDimension(annotationStyle['letter-spacing'], annotationFontSize) ??
                   0;
           final alignedAnnotation = additionalSpacing > 0
-              ? annotation.copyWith(
+              ? TextSpan(
                   style: annotation.style?.copyWith(
                     letterSpacing: existingLetterSpacing + additionalSpacing,
                   ),
+                  text: annotation.text,
+                  children: annotation.children,
+                  semanticsLabel: annotation.semanticsLabel,
                 )
               : annotation;
           final alignedAnnotationPainter = additionalSpacing > 0

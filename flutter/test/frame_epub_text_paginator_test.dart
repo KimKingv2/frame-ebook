@@ -1,4 +1,3 @@
-import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/reader/frame_epub_text_paginator.dart';
@@ -53,6 +52,8 @@ void main() {
       placeholderHeight: 28,
       horizontalOffset: -18,
       verticalOffset: 0,
+      rubyAlign: 'center',
+      rubyPosition: 'over',
     );
     final text = TextSpan(
       style: const TextStyle(fontSize: 18, height: 1.5),

@@ -734,7 +734,6 @@ void main() {
       await tester.pumpAndSettle();
 
       final rubyWidgets = <FrameEpubRubyAnnotation>[];
-      final annotationSpans = <TextSpan>[];
       void collect(InlineSpan span) {
         if (span is! TextSpan) return;
         for (final child in span.children ?? const <InlineSpan>[]) {
@@ -756,7 +755,8 @@ void main() {
 
       final aligned = rubyWidgets.first;
       expect(aligned.rubyAlign, 'start');
-      final nested = aligned.annotation.children!.single as TextSpan;
+      final alignedAnnotation = aligned.annotation as TextSpan;
+      final nested = alignedAnnotation.children!.single as TextSpan;
       expect(nested.toPlainText(), 'かんじ');
       expect(nested.style?.color, const Color(0xFF800080));
       expect(nested.style?.fontWeight, FontWeight.bold);
