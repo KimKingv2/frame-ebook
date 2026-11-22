@@ -1329,10 +1329,6 @@ class _FrameEpubReaderPreviewScreenState
               builder: (context, constraints) {
                 final viewportWidth = constraints.maxWidth;
                 final wide = viewportWidth > 820;
-                if (_isImmersive) {
-                  return _buildImmersiveLayout(session);
-                }
-
                 return Stack(
                   children: [
                     Positioned.fill(
