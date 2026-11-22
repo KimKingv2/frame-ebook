@@ -172,6 +172,12 @@ These items must still pass CI and device verification before being treated as c
 
 
 ### Reader responsive geometry correction
+### Reader workspace and immersive layout correction
+
+- The normal reader now keeps page navigation outside the framed reading viewport, matching the legacy DOM hierarchy. Desktop navigation uses the legacy three-column layout; compact screens place previous/next controls above the full-width progress panel at the 720 px breakpoint.
+- Desktop immersive mode now retains the legacy left navigation column at 220 px when the sidebar is enabled. The reader frame drops its border, radius, padding and shadow while immersive, keeping the page surface flush with the fullscreen workspace.
+- The reading-time indicator has moved from the author line to the footer below page navigation, matching the legacy Reading Room information hierarchy. Compact immersive mode remains drawer-based and does not force-open the sidebar.
+
 
 - Flutter now uses the legacy 820 px breakpoint for the persistent desktop sidebar, and the legacy 220 px sidebar width through 1050 px before returning to 250 px on wider layouts.
 - The appearance panel now follows the original CSS placement rules: top-right from 561 px upward (82 px top offset and the centered 1500 px shell's right inset), and bottom-right at 560 px and below (8 px outer inset, viewport width minus 16 px, and an 84% viewport-height ceiling).

@@ -903,8 +903,6 @@ class _FrameEpubReaderPreviewScreenState
                   widget.book.author.trim().isEmpty
                       ? widget.book.fileName
                       : widget.book.author.trim(),
-                  if (_readingTimeTracker != null)
-                    '本次閱讀 ${_readingDurationLabel(_readingSeconds)}',
                 ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1009,23 +1007,90 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Widget _buildReaderFrame(Widget child, {required bool wide}) => Container(
-        margin: EdgeInsets.fromLTRB(wide ? 0 : 2, 0, 2, 2),
-        padding: const EdgeInsets.all(8),
+  Widget _buildReaderFrame(
+    Widget child, {
+    required bool wide,
+    bool immersive = false,
+  }) =>
+      Container(
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.all(immersive ? 0 : 10),
         decoration: BoxDecoration(
-          color: _readerPanel,
-          border: Border.all(color: const Color(0x33CFBEEF)),
-          borderRadius: BorderRadius.circular(13),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x26000000),
-              blurRadius: 22,
-              offset: Offset(0, 9),
-            ),
-          ],
+          gradient: immersive
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xF8272034), Color(0xFA13111B)],
+                ),
+          border: immersive
+              ? null
+              : Border.all(color: const Color(0x24CFBEEF)),
+          borderRadius:
+              immersive ? BorderRadius.zero : BorderRadius.circular(14),
+          boxShadow: immersive
+              ? const []
+              : const [
+                  BoxShadow(
+                    color: Color(0x3D000000),
+                    blurRadius: 48,
+                    offset: Offset(0, 18),
+                  ),
+                ],
         ),
         child: child,
       );
+
+  Widget _buildImmersiveLayout(
+    FrameEpubReaderSession? session, {
+    required bool wide,
+  }) {
+    final ready = session?.status == FrameEpubReaderStatus.ready;
+    final showSidebar = wide && _isSidebarVisible && ready;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(17, 12, 17, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showSidebar) ...[
+            SizedBox(
+              width: 220,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _readerPanel,
+                  border: Border.all(color: const Color(0x33C1AAEE)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _buildReaderSidebar(
+                  session!,
+                  initialTabIndex: 0,
+                  desktopLayout: true,
+                  onClose: () => setState(() => _isSidebarVisible = false),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: _buildReaderFrame(
+                    _buildBody(session),
+                    wide: wide,
+                    immersive: true,
+                  ),
+                ),
+                if (ready) _chapterControls(session!),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1043,10 +1108,13 @@ class _FrameEpubReaderPreviewScreenState
           body: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                if (_isImmersive) return _buildBody(session);
-
                 final wide = constraints.maxWidth > 820;
-                final sidebarWidth = constraints.maxWidth <= 1050 ? 220.0 : 250.0;
+                if (_isImmersive) {
+                  return _buildImmersiveLayout(session, wide: wide);
+                }
+
+                final sidebarWidth =
+                    constraints.maxWidth <= 1050 ? 220.0 : 250.0;
                 final showDesktopSidebar = wide &&
                     _isSidebarVisible &&
                     session?.status == FrameEpubReaderStatus.ready;
@@ -1089,9 +1157,21 @@ class _FrameEpubReaderPreviewScreenState
                               const SizedBox(width: 14),
                             ],
                             Expanded(
-                              child: _buildReaderFrame(
-                                _buildBody(session),
-                                wide: wide,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildReaderFrame(
+                                      _buildBody(session),
+                                      wide: wide,
+                                    ),
+                                  ),
+                                  if (session?.status ==
+                                      FrameEpubReaderStatus.ready)
+                                    _chapterControls(session!),
+                                  if (session?.status ==
+                                      FrameEpubReaderStatus.ready)
+                                    _readingSessionIndicator(),
+                                ],
                               ),
                             ),
                           ],
@@ -1231,7 +1311,6 @@ class _FrameEpubReaderPreviewScreenState
             ],
           ),
         ),
-        _chapterControls(session),
       ],
     );
   }
@@ -1409,6 +1488,59 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  Widget _readingSessionIndicator() => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+        child: SizedBox(
+          height: 28,
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF9C83CE),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x8CA78BE0),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _readingTimeTracker == null
+                    ? '閱讀時間計時待命'
+                    : '閱讀時間計時中',
+                style: const TextStyle(
+                  color: Color(0xFF94899F),
+                  fontSize: 9,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _readingDurationLabel(_readingSeconds),
+                style: const TextStyle(
+                  color: Color(0xFFD4C4EF),
+                  fontFamily: 'Georgia',
+                  fontSize: 11,
+                  letterSpacing: .5,
+                ),
+              ),
+              const Spacer(),
+              const Text(
+                '前景閱讀 · 閒置 5 分鐘暫停',
+                style: TextStyle(
+                  color: Color(0xFF756C80),
+                  fontSize: 8,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   Widget _chapterControls(FrameEpubReaderSession session) {
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -1419,132 +1551,134 @@ class _FrameEpubReaderPreviewScreenState
         final chapterPercent =
             (_currentChapterFraction(session) * 100).round().clamp(0, 100);
         final bookPercent = _readingProgressPercent(session);
-        final canGoPrevious =
-            _canTurnReaderPage(session, forward: false);
+        final canGoPrevious = _canTurnReaderPage(session, forward: false);
         final canGoNext = _canTurnReaderPage(session, forward: true);
-        final label = session.currentChapterLabel.trim();
+        final compact = MediaQuery.sizeOf(context).width <= 720;
+
+        Widget pageButton({required bool previous}) {
+          final enabled = previous ? canGoPrevious : canGoNext;
+          return OutlinedButton.icon(
+            onPressed: enabled
+                ? () => unawaited(
+                      _turnReaderPage(session, forward: !previous),
+                    )
+                : null,
+            icon: Icon(
+              previous ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+              size: 18,
+            ),
+            label: Text(previous ? '上一頁' : '下一頁'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _readerText,
+              side: const BorderSide(color: Color(0x44393247)),
+              minimumSize: const Size(116, 37),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              textStyle: const TextStyle(fontSize: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        }
+
+        Widget progressRow(String label, int percent, {double height = 4}) =>
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: Color(0xFFA69BB6),
+                          fontSize: 9,
+                          letterSpacing: .2,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$percent%',
+                      style: const TextStyle(
+                        color: Color(0xFFD5C6F7),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: percent / 100,
+                    minHeight: height,
+                    color: _readerAccent,
+                    backgroundColor: const Color(0x24AB97CA),
+                  ),
+                ),
+              ],
+            );
+
+        final progressPanel = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            progressRow('本章進度', chapterPercent),
+            const SizedBox(height: 8),
+            progressRow('全書進度', bookPercent, height: 3),
+          ],
+        );
 
         return Material(
-          color: _readerPanel,
+          color: Colors.transparent,
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(7, 7, 7, 9),
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: canGoPrevious
-                        ? () => unawaited(
-                              _turnReaderPage(session, forward: false),
-                            )
-                        : null,
-                    icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                    label: const Text('上一頁'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _readerText,
-                      side: const BorderSide(color: Color(0x44393247)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 9,
-                      ),
-                      textStyle: const TextStyle(fontSize: 10),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
+              padding: const EdgeInsets.fromLTRB(2, 12, 2, 4),
+              child: compact
+                  ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                label.isEmpty ? '未命名章節' : label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: _readerText,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              '本章 $chapterPercent%',
-                              style: const TextStyle(
-                                color: _readerMuted,
-                                fontSize: 9,
-                              ),
-                            ),
+                            Expanded(child: pageButton(previous: true)),
+                            const SizedBox(width: 8),
+                            Expanded(child: pageButton(previous: false)),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: chapterPercent / 100,
-                            minHeight: 3,
-                            color: _readerAccent,
-                            backgroundColor: const Color(0xFF423A50),
+                        const SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: progressPanel,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: pageButton(previous: true),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '全書進度',
-                                style: TextStyle(
-                                  color: _readerMuted,
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '$bookPercent%',
-                              style: const TextStyle(
-                                color: _readerText,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 220,
+                            maxWidth: 300,
+                          ),
+                          child: progressPanel,
                         ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: bookPercent / 100,
-                            minHeight: 4,
-                            color: _readerAccent,
-                            backgroundColor: const Color(0xFF423A50),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: pageButton(previous: false),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: canGoNext
-                        ? () => unawaited(
-                              _turnReaderPage(session, forward: true),
-                            )
-                        : null,
-                    icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                    label: const Text('下一頁'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _readerText,
-                      side: const BorderSide(color: Color(0x44393247)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 9,
-                      ),
-                      textStyle: const TextStyle(fontSize: 10),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         );
