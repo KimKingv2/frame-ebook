@@ -45,6 +45,7 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
     required this.book,
     this.fileSource,
     this.repository,
+    this.initialImmersiveForTest,
     super.key,
   });
 
@@ -54,6 +55,10 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
   /// screens obtain the standard platform adapters from the factories.
   final FrameFileSource? fileSource;
   final FrameReaderRepository? repository;
+
+  /// Test-only initial visual state. Production enters fullscreen through
+  /// [FullScreen] so the platform/browser grants the native fullscreen mode.
+  final bool? initialImmersiveForTest;
 
   @override
   State<FrameEpubReaderPreviewScreen> createState() =>
@@ -113,13 +118,14 @@ class _FrameEpubReaderPreviewScreenState
     try {
       FullScreen.addListener(this);
       _fullScreenListenerRegistered = true;
-      _isImmersive = FullScreen.isFullScreen;
+      _isImmersive =
+          widget.initialImmersiveForTest ?? FullScreen.isFullScreen;
     } on Object {
       // Widget tests and embedded hosts may mount this screen without running
       // the app-level fullscreen plugin bootstrap. Keep normal reader mode
       // available; the production app initializes the plugin in main().
       _fullScreenListenerRegistered = false;
-      _isImmersive = false;
+      _isImmersive = widget.initialImmersiveForTest ?? false;
     }
     HardwareKeyboard.instance.addHandler(_handleReadingKeyEvent);
     _chapterScrollController = ScrollController();
@@ -1213,8 +1219,9 @@ class _FrameEpubReaderPreviewScreenState
     bool immersive = false,
   }) =>
       Container(
-        margin: EdgeInsets.zero,
-        padding: EdgeInsets.all(immersive ? 0 : wide ? 6 : 10),
+        key: const ValueKey('reader-rounded-frame'),
+        margin: EdgeInsets.all(immersive ? 8 : 0),
+        padding: EdgeInsets.all(immersive ? 8 : wide ? 6 : 10),
         decoration: BoxDecoration(
           gradient: immersive
               ? null
@@ -1223,11 +1230,12 @@ class _FrameEpubReaderPreviewScreenState
                   end: Alignment.bottomRight,
                   colors: [Color(0xF8272034), Color(0xFA13111B)],
                 ),
-          border: immersive
-              ? null
-              : Border.all(color: const Color(0x24CFBEEF)),
-          borderRadius:
-              immersive ? BorderRadius.zero : BorderRadius.circular(14),
+          color: immersive ? const Color(0xFF171420) : null,
+          border: Border.all(
+            color: const Color(0x33CFBEEF),
+            width: immersive ? 1 : 0.8,
+          ),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: immersive
               ? const []
               : const [
@@ -1238,7 +1246,12 @@ class _FrameEpubReaderPreviewScreenState
                   ),
                 ],
         ),
-        child: child,
+        child: ClipRRect(
+          key: const ValueKey('reader-rounded-content-clip'),
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
       );
 
   Widget _buildReaderWorkspace(
@@ -1294,7 +1307,7 @@ class _FrameEpubReaderPreviewScreenState
                           border: Border.all(
                             color: const Color(0x33C1AAEE),
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: _buildReaderSidebar(
@@ -1335,6 +1348,20 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  Widget _buildImmersiveLayout(FrameEpubReaderSession? session) {
+    return ColoredBox(
+      key: const ValueKey('reader-immersive-layout'),
+      color: const Color(0xFF12101A),
+      child: SizedBox.expand(
+        child: _buildReaderFrame(
+          _buildBody(session),
+          wide: true,
+          immersive: true,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
@@ -1349,10 +1376,17 @@ class _FrameEpubReaderPreviewScreenState
         child: Scaffold(
           backgroundColor: _readerChrome,
           body: SafeArea(
+            top: !_isImmersive,
+            bottom: !_isImmersive,
+            left: !_isImmersive,
+            right: !_isImmersive,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final viewportWidth = constraints.maxWidth;
                 final wide = viewportWidth > 820;
+                if (_isImmersive) {
+                  return _buildImmersiveLayout(session);
+                }
                 return Stack(
                   children: [
                     Positioned.fill(
@@ -1360,7 +1394,7 @@ class _FrameEpubReaderPreviewScreenState
                         session,
                         viewportWidth: viewportWidth,
                         wide: wide,
-                        immersive: _isImmersive,
+                        immersive: false,
                       ),
                     ),
                   ],

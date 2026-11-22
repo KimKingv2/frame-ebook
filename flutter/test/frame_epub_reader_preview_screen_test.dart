@@ -117,12 +117,66 @@ void main() {
     expect(find.text('FRAME READER'), findsNothing);
     expect(find.text('NOW READING'), findsNothing);
     expect(find.text('Preview test book'), findsOneWidget);
+    final frame = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-rounded-frame')),
+    );
+    final decoration = frame.decoration! as BoxDecoration;
+    expect(decoration.borderRadius, BorderRadius.circular(18));
+    expect(
+      find.byKey(const ValueKey('reader-rounded-content-clip')),
+      findsOneWidget,
+    );
 
     final workspace = tester.getRect(
       find.byKey(const ValueKey('reader-workspace-root')),
     );
     expect(workspace.left, 0);
     expect(workspace.width, 1440);
+  });
+
+  testWidgets('restores the true immersive reading-only layout with rounded page',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FrameEpubReaderPreviewScreen(
+          book: _testBook(),
+          fileSource: _FailingFileSource(),
+          repository: FrameReaderRepository(_PreviewApi()),
+          initialImmersiveForTest: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('reader-immersive-layout')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reader-workspace-root')), findsNothing);
+    expect(find.byKey(const ValueKey('reader-desktop-toolbar')), findsNothing);
+
+    final safeArea = tester.widget<SafeArea>(find.byType(SafeArea).first);
+    expect(safeArea.top, isFalse);
+    expect(safeArea.bottom, isFalse);
+    expect(safeArea.left, isFalse);
+    expect(safeArea.right, isFalse);
+
+    final frame = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-rounded-frame')),
+    );
+    final decoration = frame.decoration! as BoxDecoration;
+    expect(decoration.borderRadius, BorderRadius.circular(18));
+    expect(
+      find.byKey(const ValueKey('reader-rounded-content-clip')),
+      findsOneWidget,
+    );
+    final clip = tester.widget<ClipRRect>(
+      find.byKey(const ValueKey('reader-rounded-content-clip')),
+    );
+    expect(clip.borderRadius, BorderRadius.circular(12));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('rejects non-EPUB files before opening a cloud source',
