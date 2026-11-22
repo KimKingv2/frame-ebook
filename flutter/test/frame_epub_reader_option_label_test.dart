@@ -37,6 +37,7 @@ void main() {
     expect(label.style?.color, foreground);
     expect(label.style?.fontFamily, 'NotoSansTC');
     expect(label.style?.fontSize, 11);
+  });
 
   testWidgets('dropdown selected value and popup options stay visible',
       (tester) async {
