@@ -78,6 +78,7 @@ class _FakeApi implements FrameApiClient {
   Map<String, dynamic>? postedState;
   Completer<void>? stateSaveStarted;
   Completer<void>? stateSaveGate;
+  Completer<void>? stateSaveCompleted;
 
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
@@ -105,6 +106,11 @@ class _FakeApi implements FrameApiClient {
       if (gate != null) await gate.future;
       postedState = Map<String, dynamic>.from(body['state'] as Map);
       state = postedState!;
+      final completed = stateSaveCompleted;
+      stateSaveCompleted = null;
+      if (completed != null && !completed.isCompleted) {
+        completed.complete();
+      }
       return {'state': state};
     }
     throw StateError('Unexpected POST $path');
@@ -710,6 +716,8 @@ void main() {
       final fixture = _zipFixture();
       final source = _MemoryFrameFileSource(fixture);
       final api = _FakeApi();
+      final saved = Completer<void>();
+      api.stateSaveCompleted = saved;
       final session = FrameEpubReaderSession(
         book: _book(fixture.length),
         fileSource: source,
@@ -726,6 +734,7 @@ void main() {
         'OPS/Text/chapter-two.xhtml',
       );
 
+      await saved.future.timeout(const Duration(seconds: 2));
       final progress = api.postedState!['progress'] as Map;
       expect(progress['index'], 1);
       expect(progress['label'], '第二章');

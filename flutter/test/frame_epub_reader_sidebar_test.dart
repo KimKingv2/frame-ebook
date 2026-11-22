@@ -141,6 +141,11 @@ void main() {
           ),
         ],
       ),
+      FrameEpubTocEntry(
+        label: '版權頁',
+        reference: null,
+        children: const [],
+      ),
     ];
 
     await tester.pumpWidget(
