@@ -173,6 +173,13 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Appearance drawer corrected against the final legacy CSS cascade
+
+- The final legacy CSS rules define the appearance panel as a right-side full-height drawer: 440 px maximum on wide layouts, 420 px on compact layouts, a 91vw width cap, 8 px vertical inset, left-only rounded corners and a sticky 58 px header.
+- Flutter's appearance panel now follows that final cascade, including the 820 px compact breakpoint and edge-to-edge fullscreen placement. It slides from the right with the legacy 480 ms easing, and the modal scrim uses the final darkened/blurred treatment.
+- Appearance controls now apply immediately and save through the existing D1 keys on each change, matching the legacy interaction rather than waiting for a separate Save button. Sequential saves prevent an older rapid change from overwriting a newer selection.
+- Geometry tests cover desktop, compact, breakpoint and fullscreen cases. Pixel comparison and actual platform acceptance remain outstanding.
+
 ### Compact Reading Room quick-action dock
 
 - The four reader quick actions now move into a fixed bottom dock at the legacy 820 px breakpoint, both in normal and compact immersive layouts.

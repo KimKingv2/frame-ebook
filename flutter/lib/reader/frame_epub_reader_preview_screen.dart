@@ -2568,6 +2568,7 @@ class _FrameEpubReaderPreviewScreenState
     if (session == null) return;
     final panelLayout = FrameEpubAppearancePanelLayout.fromViewport(
       MediaQuery.sizeOf(context),
+      fullscreen: _isImmersive,
     );
     var lineHeight = _lineHeight;
     var fontScale = _fontScale;
@@ -2586,62 +2587,176 @@ class _FrameEpubReaderPreviewScreenState
     var comicImageFit = _comicImageFit;
     var comicBackdrop = _comicBackdrop;
 
+    var appearanceStatus = '外觀設定會保存至雲端 D1，其他裝置可自動還原。';
+    var panelVisible = true;
+    var saveRevision = 0;
+    Future<void> saveQueue = Future<void>.value();
+
+    Future<void> persistAppearance(StateSetter setSheetState) async {
+      final layoutChanged = _layoutMode != layoutMode ||
+          _lineHeight != lineHeight ||
+          _fontScale != fontScale ||
+          _fontFamilyPreference != fontFamilyPreference ||
+          _fontWeightPreference != fontWeightPreference ||
+          _paragraphSpacingPreference != paragraphSpacingPreference ||
+          _textAlignPreference != textAlignPreference ||
+          _verticalMargin != verticalMargin ||
+          _horizontalMarginPercent != horizontalMarginPercent;
+      if (layoutChanged) {
+        final previousPageController = _chapterPageController;
+        _chapterPageController = PageController();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          previousPageController.dispose();
+        });
+      }
+      if (mounted) {
+        setState(() {
+          _lineHeight = lineHeight;
+          _fontScale = fontScale;
+          _fontFamilyPreference = fontFamilyPreference;
+          _fontWeightPreference = fontWeightPreference;
+          _paragraphSpacingPreference = paragraphSpacingPreference;
+          _textAlignPreference = textAlignPreference;
+          _verticalMargin = verticalMargin;
+          _horizontalMarginPercent = horizontalMarginPercent;
+          _theme = theme;
+          _layoutMode = layoutMode;
+          _pageLayoutPreference = pageLayoutPreference;
+          _comicReadingMode = comicReadingMode;
+          _comicPageLayout = comicPageLayout;
+          _comicImageFit = comicImageFit;
+          _comicBackdrop = comicBackdrop;
+        });
+      }
+
+      final payload = <String, String>{
+        'fontScale': fontScale.toString(),
+        'lineHeight': lineHeight.toString(),
+        'verticalMargin': verticalMargin.round().toString(),
+        'horizontalMargin': horizontalMarginPercent.round().toString(),
+        'fontFamily': fontFamilyPreference,
+        'fontWeight': fontWeightPreference,
+        'paragraphSpacing': paragraphSpacingPreference,
+        'textAlign': textAlignPreference,
+        'readingMode': readingMode,
+        'pageLayout': pageLayoutPreference,
+        'theme': theme == 'light'
+            ? 'paper'
+            : theme == 'dark'
+                ? 'night'
+                : 'sepia',
+        'comicReadingMode': comicReadingMode,
+        'comicPageLayout': comicPageLayout,
+        'comicImageFit': comicImageFit,
+        'backdrop': comicBackdrop,
+      };
+      final revision = ++saveRevision;
+      if (panelVisible) {
+        setSheetState(() => appearanceStatus = '外觀設定正在保存至雲端 D1……');
+      }
+
+      // Serialize rapid successive changes so an older request cannot finish
+      // after and overwrite a newer appearance selection.
+      final nextSave = saveQueue
+          .catchError((Object _) {})
+          .then((_) => session.saveAppearance(payload));
+      saveQueue = nextSave;
+      try {
+        await nextSave;
+        if (panelVisible && mounted && revision == saveRevision) {
+          setSheetState(
+            () => appearanceStatus = '外觀設定已保存至雲端，可在其他裝置繼續使用。',
+          );
+        }
+      } on Object catch (error) {
+        if (panelVisible && mounted && revision == saveRevision) {
+          setSheetState(
+            () => appearanceStatus = '雲端保存失敗：$error',
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('閱讀設定尚未同步：$error')),
+          );
+        }
+      }
+    }
+
     Widget buildSettingsPanel(BuildContext closeContext) =>
         StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            panelLayout.contentHorizontalPadding,
-            5,
-            panelLayout.contentHorizontalPadding,
-            14 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * .86,
-            ),
-            child: SingleChildScrollView(
+          builder: (context, setSheetState) {
+            void updateSetting(VoidCallback update) {
+              setSheetState(update);
+              unawaited(persistAppearance(setSheetState));
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                panelLayout.contentHorizontalPadding,
+                0,
+                panelLayout.contentHorizontalPadding,
+                14 + MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Container(
+                    height: 58,
+                    margin: const EdgeInsets.only(left: -2, right: -2, bottom: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Color(0x21C1AAEE)),
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
+                        const Text(
                           '閱讀外觀',
                           style: TextStyle(
-                            color: _readerText,
-                            fontSize: 15,
+                            color: Color(0xFFF4F0FA),
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        SizedBox(height: 3),
-                        Text(
+                        const Spacer(),
+                        const Text(
                           'PERSONALIZE YOUR PAGE',
                           style: TextStyle(
-                            color: Color(0xFF887A9C),
+                            color: Color(0xFF746B83),
                             fontSize: 8,
                             letterSpacing: 1.3,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0x2EBEA6E5)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: IconButton(
+                            tooltip: '關閉閱讀設定',
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => Navigator.of(closeContext).pop(),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFFD8C6F3),
+                              size: 19,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: '關閉閱讀設定',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(closeContext).pop(),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: _readerMuted,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+
               Row(
                 children: [
                   const Text(
@@ -2675,7 +2790,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '1.3', label: '特大'),
                     ],
                     onChanged: (v) =>
-                        setSheetState(() => fontScale = double.parse(v)),
+                        updateSetting(() => fontScale = double.parse(v)),
                   ),
                   _appearanceDropdown(
                     label: '行距',
@@ -2687,7 +2802,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '2.00', label: '特寬'),
                     ],
                     onChanged: (v) =>
-                        setSheetState(() => lineHeight = double.parse(v)),
+                        updateSetting(() => lineHeight = double.parse(v)),
                   ),
                   _appearanceDropdown(
                     label: '字體',
@@ -2698,7 +2813,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'sans', label: '黑體'),
                     ],
                     onChanged: (v) =>
-                        setSheetState(() => fontFamilyPreference = v),
+                        updateSetting(() => fontFamilyPreference = v),
                   ),
                   _appearanceDropdown(
                     label: '字重',
@@ -2709,7 +2824,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'medium', label: '稍厚 500'),
                     ],
                     onChanged: (v) =>
-                        setSheetState(() => fontWeightPreference = v),
+                        updateSetting(() => fontWeightPreference = v),
                   ),
                   _appearanceDropdown(
                     label: '段落間距',
@@ -2720,7 +2835,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'standard', label: '舒適'),
                       (value: 'loose', label: '寬鬆'),
                     ],
-                    onChanged: (v) => setSheetState(
+                    onChanged: (v) => updateSetting(
                       () => paragraphSpacingPreference = v,
                     ),
                   ),
@@ -2733,7 +2848,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'justify', label: '左右對齊'),
                     ],
                     onChanged: (v) =>
-                        setSheetState(() => textAlignPreference = v),
+                        updateSetting(() => textAlignPreference = v),
                   ),
                 ],
               ),
@@ -2756,7 +2871,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '48', label: '大留白 48 px'),
                       (value: '64', label: '極寬 64 px'),
                     ],
-                    onChanged: (v) => setSheetState(() => verticalMargin = double.parse(v)),
+                    onChanged: (v) => updateSetting(() => verticalMargin = double.parse(v)),
                   ),
                   _appearanceDropdown(
                     label: '左右外側留白',
@@ -2771,7 +2886,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '16', label: '16%'),
                       (value: '20', label: '20%'),
                     ],
-                    onChanged: (v) => setSheetState(() => horizontalMarginPercent = double.parse(v)),
+                    onChanged: (v) => updateSetting(() => horizontalMarginPercent = double.parse(v)),
                   ),
                 ],
               ),
@@ -2804,7 +2919,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'paginated', label: '分頁翻頁'),
                       (value: 'scrolled', label: '連續捲動'),
                     ],
-                    onChanged: (value) => setSheetState(() {
+                    onChanged: (value) => updateSetting(() {
                       readingMode = value;
                       layoutMode = readingMode == 'scrolled'
                           ? 'continuous'
@@ -2821,7 +2936,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '1', label: '單頁'),
                       (value: '2', label: '雙頁優先'),
                     ],
-                    onChanged: (value) => setSheetState(() {
+                    onChanged: (value) => updateSetting(() {
                       pageLayoutPreference = value;
                       layoutMode = readingMode == 'scrolled'
                           ? 'continuous'
@@ -2887,7 +3002,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'scrolled', label: '直式長卷'),
                     ],
                     onChanged: (value) =>
-                        setSheetState(() => comicReadingMode = value),
+                        updateSetting(() => comicReadingMode = value),
                     enabled: session.isFixedLayout,
                   ),
                   _appearanceDropdown(
@@ -2898,7 +3013,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: '2', label: '雙頁優先'),
                     ],
                     onChanged: (value) =>
-                        setSheetState(() => comicPageLayout = value),
+                        updateSetting(() => comicPageLayout = value),
                     enabled: session.isFixedLayout &&
                         comicReadingMode == 'paginated',
                   ),
@@ -2910,7 +3025,7 @@ class _FrameEpubReaderPreviewScreenState
                       (value: 'fit-width', label: '適合寬度'),
                     ],
                     onChanged: (value) =>
-                        setSheetState(() => comicImageFit = value),
+                        updateSetting(() => comicImageFit = value),
                     enabled: session.isFixedLayout &&
                         comicReadingMode == 'paginated',
                   ),
@@ -2942,19 +3057,19 @@ class _FrameEpubReaderPreviewScreenState
                     label: const Text('木質桌面'),
                     selected: comicBackdrop == 'wood',
                     onSelected: (_) =>
-                        setSheetState(() => comicBackdrop = 'wood'),
+                        updateSetting(() => comicBackdrop = 'wood'),
                   ),
                   ChoiceChip(
                     label: const Text('亞麻暖灰'),
                     selected: comicBackdrop == 'linen',
                     onSelected: (_) =>
-                        setSheetState(() => comicBackdrop = 'linen'),
+                        updateSetting(() => comicBackdrop = 'linen'),
                   ),
                   ChoiceChip(
                     label: const Text('深色石板'),
                     selected: comicBackdrop == 'slate',
                     onSelected: (_) =>
-                        setSheetState(() => comicBackdrop = 'slate'),
+                        updateSetting(() => comicBackdrop = 'slate'),
                   ),
                 ],
               ),
@@ -2989,7 +3104,7 @@ class _FrameEpubReaderPreviewScreenState
                     label: const Text('紙白'),
                     selected: theme == 'light',
                     onSelected: (_) =>
-                        setSheetState(() => theme = 'light'),
+                        updateSetting(() => theme = 'light'),
                   ),
                   ChoiceChip(
                     avatar: const CircleAvatar(
@@ -2999,7 +3114,7 @@ class _FrameEpubReaderPreviewScreenState
                     label: const Text('暖紙'),
                     selected: theme == 'sepia',
                     onSelected: (_) =>
-                        setSheetState(() => theme = 'sepia'),
+                        updateSetting(() => theme = 'sepia'),
                   ),
                   ChoiceChip(
                     avatar: const CircleAvatar(
@@ -3009,124 +3124,101 @@ class _FrameEpubReaderPreviewScreenState
                     label: const Text('夜讀'),
                     selected: theme == 'dark',
                     onSelected: (_) =>
-                        setSheetState(() => theme = 'dark'),
+                        updateSetting(() => theme = 'dark'),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () async {
-                  if (_layoutMode != layoutMode ||
-                      _lineHeight != lineHeight ||
-                      _fontScale != fontScale ||
-                      _fontFamilyPreference != fontFamilyPreference ||
-                      _fontWeightPreference != fontWeightPreference ||
-                      _paragraphSpacingPreference != paragraphSpacingPreference ||
-                      _textAlignPreference != textAlignPreference ||
-                      _verticalMargin != verticalMargin ||
-                      _horizontalMarginPercent != horizontalMarginPercent) {
-                    final previousPageController = _chapterPageController;
-                    _chapterPageController = PageController();
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      previousPageController.dispose();
-                    });
-                  }
-                  setState(() {
-                    _lineHeight = lineHeight;
-                    _fontScale = fontScale;
-                    _fontFamilyPreference = fontFamilyPreference;
-                    _fontWeightPreference = fontWeightPreference;
-                    _paragraphSpacingPreference = paragraphSpacingPreference;
-                    _textAlignPreference = textAlignPreference;
-                    _verticalMargin = verticalMargin;
-                    _horizontalMarginPercent = horizontalMarginPercent;
-                    _theme = theme;
-                    _layoutMode = layoutMode;
-                    _pageLayoutPreference = pageLayoutPreference;
-                    _comicReadingMode = comicReadingMode;
-                    _comicPageLayout = comicPageLayout;
-                    _comicImageFit = comicImageFit;
-                    _comicBackdrop = comicBackdrop;
-                  });
-                  Navigator.of(closeContext).pop();
-                  try {
-                    await session.saveAppearance({
-                      // Legacy D1 keys keep Flutter and the existing reader in sync.
-                      'fontScale': fontScale.toString(),
-                      'lineHeight': lineHeight.toString(),
-                      'verticalMargin': verticalMargin.round().toString(),
-                      'horizontalMargin': horizontalMarginPercent.round().toString(),
-                      'fontFamily': fontFamilyPreference,
-                      'fontWeight': fontWeightPreference,
-                      'paragraphSpacing': paragraphSpacingPreference,
-                      'textAlign': textAlignPreference,
-                      'readingMode': readingMode,
-                      'pageLayout': pageLayoutPreference,
-                      'theme': theme == 'light' ? 'paper' : theme == 'dark' ? 'night' : 'sepia',
-                      'comicReadingMode': comicReadingMode,
-                      'comicPageLayout': comicPageLayout,
-                      'comicImageFit': comicImageFit,
-                      'backdrop': comicBackdrop,
-                    });
-                  } on Object catch (error) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('閱讀設定尚未同步：${error}')),
-                    );
-                  }
-                },
-                child: const Text('保存設定'),
-              ),
+
+                          const SizedBox(height: 10),
+                          Text(
+                            appearanceStatus,
+                            style: const TextStyle(
+                              color: Color(0xFF94899F),
+                              fontSize: 9,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ),
-        ),
-      );
+            );
+          },
+        );
 
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierLabel: '關閉閱讀設定',
-      barrierColor: Colors.black45,
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
-        alignment: panelLayout.alignment,
-        child: SafeArea(
-          child: Padding(
-            padding: panelLayout.outerPadding,
-            child: Material(
-              color: _readerPanel,
-              elevation: 24,
-              borderRadius: BorderRadius.circular(15),
-              clipBehavior: Clip.antiAlias,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: panelLayout.width,
-                  maxHeight: panelLayout.maxHeight,
+      barrierColor: const Color(0x9407060B),
+      transitionDuration: const Duration(milliseconds: 480),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+          Align(
+            alignment: panelLayout.alignment,
+            child: Padding(
+              padding: panelLayout.outerPadding,
+              child: Container(
+                width: panelLayout.width,
+                height: panelLayout.height,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B1726),
+                  border: const Border(
+                    top: BorderSide(color: Color(0x47C1AAEE)),
+                    left: BorderSide(color: Color(0x47C1AAEE)),
+                    bottom: BorderSide(color: Color(0x47C1AAEE)),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x75000000),
+                      blurRadius: 72,
+                      offset: Offset(-24, 0),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0DFFFFFF),
+                      blurRadius: 0,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
                 ),
-                child: SizedBox(
-                  width: panelLayout.width,
-                  child: buildSettingsPanel(dialogContext),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: buildSettingsPanel(dialogContext),
               ),
             ),
           ),
-        ),
+        ],
       ),
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
         final offset = Tween<Offset>(
-          begin: const Offset(0, -0.025),
+          begin: const Offset(1.05, 0),
           end: Offset.zero,
         ).chain(
           CurveTween(curve: Curves.easeOutCubic),
         ).animate(animation);
         return FadeTransition(
-          opacity: animation,
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0, .82, curve: Curves.easeOut),
+          ),
           child: SlideTransition(position: offset, child: child),
         );
       },
     );
+    panelVisible = false;
 
   }
 }
