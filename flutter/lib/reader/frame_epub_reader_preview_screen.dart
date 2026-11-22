@@ -1000,11 +1000,108 @@ class _FrameEpubReaderPreviewScreenState
       _readerQuickAction(
         tooltip: '進入沉浸式全螢幕',
         icon: Icons.fullscreen_rounded,
-        selected: false,
+        selected: _isImmersive,
         compact: compact,
         onPressed: ready ? _toggleImmersiveMode : null,
       ),
     ];
+
+    final author = widget.book.author.trim().isEmpty
+        ? widget.book.fileName
+        : widget.book.author.trim();
+
+    if (wide) {
+      // Desktop Reader follows the legacy workspace: book identity at the
+      // upper-left, reader actions at the upper-right, and no second title
+      // block consuming the first quarter of the reading viewport.
+      return SizedBox(
+        key: const ValueKey('reader-desktop-toolbar'),
+        height: 64,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2D253C),
+                  border: Border.all(color: const Color(0x443F3552)),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  tooltip: '返回書架',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
+                  ),
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18,
+                    color: Color(0xFFE8E1F5),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _bookTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _readerText,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: .1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFAAA3B6),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 0,
+                runSpacing: 4,
+                children: actions,
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: () => unawaited(_openLegacyReadingStats()),
+                borderRadius: BorderRadius.circular(5),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+                  child: Text(
+                    '閱讀時光',
+                    style: TextStyle(
+                      color: Color(0xFFBBA9DF),
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     final chapterLabel = session?.currentChapterLabel.trim() ?? '';
     final progressLabel = ready
@@ -1018,9 +1115,6 @@ class _FrameEpubReaderPreviewScreenState
         child: LayoutBuilder(
           builder: (context, constraints) {
             final narrowHeading = constraints.maxWidth <= 560;
-            final author = widget.book.author.trim().isEmpty
-                ? widget.book.fileName
-                : widget.book.author.trim();
             return SizedBox(
               width: constraints.maxWidth,
               child: Column(
@@ -1096,7 +1190,7 @@ class _FrameEpubReaderPreviewScreenState
   }) =>
       Container(
         margin: EdgeInsets.zero,
-        padding: EdgeInsets.all(immersive ? 0 : 10),
+        padding: EdgeInsets.all(immersive ? 0 : wide ? 6 : 10),
         decoration: BoxDecoration(
           gradient: immersive
               ? null
@@ -1123,15 +1217,96 @@ class _FrameEpubReaderPreviewScreenState
         child: child,
       );
 
-  Widget _buildImmersiveLayout(FrameEpubReaderSession? session) {
-    return ColoredBox(
-      color: const Color(0xFF12101A),
-      child: SizedBox.expand(
-        child: _buildReaderFrame(
-          _buildBody(session),
-          wide: true,
-          immersive: true,
-        ),
+  Widget _buildReaderWorkspace(
+    FrameEpubReaderSession? session, {
+    required double viewportWidth,
+    required bool wide,
+    required bool immersive,
+  }) {
+    final shellInset = wide
+        ? 16.0
+        : viewportWidth <= 420
+            ? 11.0
+            : viewportWidth <= 560
+                ? 10.0
+                : 14.0;
+    const sidebarWidth = 220.0;
+    final showDesktopSidebar = wide &&
+        _isSidebarVisible &&
+        session?.status == FrameEpubReaderStatus.ready;
+
+    return Padding(
+      key: const ValueKey('reader-workspace-root'),
+      padding: EdgeInsets.symmetric(horizontal: shellInset),
+      child: Column(
+        children: [
+          if (!wide)
+            _buildReaderTopBar(
+              session,
+              viewportWidth: viewportWidth - shellInset * 2,
+            ),
+          _buildBookHeading(
+            session,
+            viewportWidth: viewportWidth - shellInset * 2,
+            wide: wide,
+          ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                0,
+                immersive ? 0 : 8,
+                0,
+                immersive ? 0 : 4,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showDesktopSidebar) ...[
+                    SizedBox(
+                      width: sidebarWidth,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _readerPanel,
+                          border: Border.all(
+                            color: const Color(0x33C1AAEE),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _buildReaderSidebar(
+                          session!,
+                          initialTabIndex: 0,
+                          desktopLayout: true,
+                          onClose: () => setState(
+                            () => _isSidebarVisible = false,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: _buildReaderFrame(
+                            _buildBody(session),
+                            wide: wide,
+                            immersive: immersive,
+                          ),
+                        ),
+                        if (session?.status == FrameEpubReaderStatus.ready)
+                          _chapterControls(session!),
+                        if (session?.status == FrameEpubReaderStatus.ready)
+                          _readingSessionIndicator(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1158,97 +1333,14 @@ class _FrameEpubReaderPreviewScreenState
                   return _buildImmersiveLayout(session);
                 }
 
-                final shellInset = viewportWidth <= 420
-                    ? 11.0
-                    : viewportWidth <= 560
-                        ? 10.0
-                        : viewportWidth <= 820
-                            ? 14.0
-                            : viewportWidth <= 1050
-                                ? 21.0
-                                : 32.0;
-                final sidebarWidth =
-                    viewportWidth <= 1050 ? 220.0 : 250.0;
-                final showDesktopSidebar = wide &&
-                    _isSidebarVisible &&
-                    session?.status == FrameEpubReaderStatus.ready;
-
                 return Stack(
                   children: [
                     Positioned.fill(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: shellInset),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1500),
-                            child: Column(
-                        children: [
-                          _buildReaderTopBar(
-                            session,
-                            viewportWidth: viewportWidth - shellInset * 2,
-                          ),
-                          _buildBookHeading(
-                            session,
-                            viewportWidth: viewportWidth - shellInset * 2,
-                            wide: wide,
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (showDesktopSidebar) ...[
-                                    SizedBox(
-                                      width: sidebarWidth,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: _readerPanel,
-                                          border: Border.all(
-                                            color: const Color(0x33C1AAEE),
-                                          ),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        clipBehavior: Clip.antiAlias,
-                                        child: _buildReaderSidebar(
-                                          session!,
-                                          initialTabIndex: 0,
-                                          desktopLayout: true,
-                                          onClose: () => setState(
-                                            () => _isSidebarVisible = false,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                  ],
-                                  Expanded(
-                                    child: Column(
-                                      children: [
-                                        Expanded(
-                                          child: _buildReaderFrame(
-                                            _buildBody(session),
-                                            wide: wide,
-                                          ),
-                                        ),
-                                        if (session?.status ==
-                                            FrameEpubReaderStatus.ready)
-                                          _chapterControls(session!),
-                                        if (session?.status ==
-                                            FrameEpubReaderStatus.ready)
-                                          _readingSessionIndicator(),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                            ),
-                          ),
-                        ),
+                      child: _buildReaderWorkspace(
+                        session,
+                        viewportWidth: viewportWidth,
+                        wide: wide,
+                        immersive: _isImmersive,
                       ),
                     ),
                   ],

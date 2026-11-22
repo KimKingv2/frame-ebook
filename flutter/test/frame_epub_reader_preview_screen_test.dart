@@ -94,6 +94,37 @@ void main() {
     expect(find.text('返回舊版閱讀室'), findsOneWidget);
   });
 
+  testWidgets('uses the full-width desktop reader toolbar and workspace',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FrameEpubReaderPreviewScreen(
+          book: _testBook(),
+          fileSource: _FailingFileSource(),
+          repository: FrameReaderRepository(_PreviewApi()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('reader-desktop-toolbar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reader-workspace-root')), findsOneWidget);
+    expect(find.text('FRAME READER'), findsNothing);
+    expect(find.text('NOW READING'), findsNothing);
+    expect(find.text('Preview test book'), findsOneWidget);
+
+    final workspace = tester.getRect(
+      find.byKey(const ValueKey('reader-workspace-root')),
+    );
+    expect(workspace.left, 0);
+    expect(workspace.width, 1440);
+  });
+
   testWidgets('rejects non-EPUB files before opening a cloud source',
       (tester) async {
     await tester.pumpWidget(
