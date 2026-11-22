@@ -249,7 +249,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                                   ? const Color(0xFFF6F0FF)
                                   : depth == 0
                                       ? const Color(0xFFE1D7EF)
-                                      : _sidebarText,
+                                      : const Color(0xFFBCB2CA),
                               fontFamily: 'NotoSansTC',
                               fontSize: widget.desktopLayout ? 9 : 12,
                               height: 1.45,
@@ -364,7 +364,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         _annotations.where((item) => item.type != 'bookmark').length;
 
     return Material(
-      color: widget.desktopLayout ? _sidebarPanel : const Color(0xFF1B1726),
+      color: widget.desktopLayout ? Colors.transparent : const Color(0xFF1B1726),
       child: widget.desktopLayout
           ? _buildDesktopLayout(bookmarkCount, noteCount)
           : Padding(
@@ -476,7 +476,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(top: 11),
-            padding: const EdgeInsets.only(top: 11),
+            padding: EdgeInsets.fromLTRB(horizontalInset, 11, horizontalInset, 0),
             decoration: const BoxDecoration(
               border: Border(
                 top: BorderSide(color: Color(0x1AC1AAEE)),
@@ -485,8 +485,9 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             child: const Text(
               '閱讀位置、筆記與書籤都會同步保存至雲端',
               style: TextStyle(
-                color: Color(0xFF94899F),
-                fontSize: 9,
+                color: Color(0xFF776D85),
+                fontSize: 8,
+                height: 1.7,
               ),
             ),
           ),
@@ -599,6 +600,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
       );
 
   Widget _buildDesktopLayout(int bookmarkCount, int noteCount) {
+    final horizontalInset =
+        MediaQuery.sizeOf(context).width <= 1050 ? 11.0 : 14.0;
     final notes = _annotations
         .where((item) => item.type != 'bookmark')
         .toList()
@@ -716,7 +719,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         const Divider(height: 1, color: Color(0x55393247)),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(0, 13, 0, 14),
+            padding: EdgeInsets.fromLTRB(
+              horizontalInset,
+              13,
+              horizontalInset,
+              14,
+            ),
             children: [
               _desktopSectionHeading('章節目錄', 'CONTENTS'),
               const SizedBox(height: 7),

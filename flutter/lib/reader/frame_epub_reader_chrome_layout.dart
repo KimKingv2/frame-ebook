@@ -35,3 +35,18 @@ class FrameEpubReaderWorkspaceLayout {
   final double sidebarWidth;
   final double gap;
 }
+
+
+/// Widths of the four legacy Reading Room quick actions.
+double frameEpubReaderQuickActionWidth(
+  double viewportWidth, {
+  required bool bookmark,
+}) {
+  if (bookmark) return 72;
+  if (viewportWidth <= 380) return 86;
+  if (viewportWidth <= 820) return 92;
+  return 104;
+}
+
+double frameEpubReaderQuickActionHeight(double viewportWidth) =>
+    viewportWidth <= 820 ? 33 : 34;

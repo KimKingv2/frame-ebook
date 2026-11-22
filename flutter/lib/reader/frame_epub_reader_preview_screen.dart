@@ -87,6 +87,7 @@ class _FrameEpubReaderPreviewScreenState
   String? _pendingCfi;
   int? _pendingPercent;
   String? _lastSavedCfi;
+  String? _readerStatusMessage = '尚未載入 EPUB。';
   _SelectedEpubText? _selectedText;
   bool _isFixedPageZoomed = false;
 
@@ -107,6 +108,7 @@ class _FrameEpubReaderPreviewScreenState
   Timer? _comicSpineNavigationTimer;
   FrameReadingTimeTracker? _readingTimeTracker;
   int _readingSeconds = 0;
+  bool _isReadingActive = false;
   bool _isImmersive = false;
   bool _isSidebarVisible = true;
   bool _bookmarkBusy = false;
@@ -176,7 +178,14 @@ class _FrameEpubReaderPreviewScreenState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final tracker = _readingTimeTracker;
     if (tracker == null) return;
-    unawaited(tracker.setForeground(state == AppLifecycleState.resumed));
+    unawaited(
+      tracker.setForeground(state == AppLifecycleState.resumed).then((_) {
+        if (!mounted) return;
+        setState(() {
+          _isReadingActive = tracker.isActiveAt(DateTime.now());
+        });
+      }),
+    );
   }
 
   void _startReadingTimeTracking(FrameEpubReaderSession session) {
@@ -186,7 +195,12 @@ class _FrameEpubReaderPreviewScreenState
       repository: session.repository,
       onUpdate: (seconds) {
         if (!mounted) return;
-        setState(() => _readingSeconds = seconds);
+        final active =
+            _readingTimeTracker?.isActiveAt(DateTime.now()) ?? false;
+        setState(() {
+          _readingSeconds = seconds;
+          _isReadingActive = active;
+        });
       },
       onError: (error) {
         if (!mounted) return;
@@ -221,7 +235,13 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   void _recordReadingActivity() {
-    _readingTimeTracker?.activity();
+    final tracker = _readingTimeTracker;
+    if (tracker == null) return;
+    tracker.activity();
+    final active = tracker.isActiveAt(DateTime.now());
+    if (mounted && active != _isReadingActive) {
+      setState(() => _isReadingActive = active);
+    }
   }
 
   String _readingDurationLabel(int seconds) {
@@ -519,6 +539,10 @@ class _FrameEpubReaderPreviewScreenState
         .toInt();
     _pendingCfi = cfi;
     _pendingPercent = percent;
+    const savingMessage = '閱讀位置正在保存至雲端 D1……';
+    if (mounted && _readerStatusMessage != savingMessage) {
+      setState(() => _readerStatusMessage = savingMessage);
+    }
     _progressSaveTimer?.cancel();
     _progressSaveTimer = Timer(
       const Duration(milliseconds: 1400),
@@ -540,6 +564,10 @@ class _FrameEpubReaderPreviewScreenState
       _lastSavedCfi = cfi;
     } on Object catch (error) {
       if (!mounted) return;
+      setState(
+        () => _readerStatusMessage =
+            '雲端閱讀位置保存失敗，請檢查連線後重新載入。',
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('閱讀位置尚未同步：$error')),
       );
@@ -817,11 +845,13 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   Widget _readerQuickAction({
+    required Key key,
     required String tooltip,
     required IconData icon,
     required VoidCallback? onPressed,
     required bool selected,
-    bool compact = false,
+    required double width,
+    required double height,
   }) {
     final iconColor = onPressed == null
         ? const Color(0xFF746C80)
@@ -829,22 +859,20 @@ class _FrameEpubReaderPreviewScreenState
             ? _readerAccent
             : const Color(0xFFDCD2ED);
 
-    final width = compact ? 32.0 : 36.0;
-    final height = compact ? 27.0 : 31.0;
     return Container(
+      key: key,
       width: width,
       height: height,
-      margin: const EdgeInsets.only(left: 6),
       decoration: BoxDecoration(
         color: selected
-            ? const Color(0xFF30263F)
-            : const Color(0xFF2D253C),
+            ? const Color(0xFF35294A)
+            : const Color(0xD12D253C),
         border: Border.all(
           color: selected
-              ? const Color(0x887F68AA)
-              : const Color(0x443F3552),
+              ? const Color(0x75A78BFA)
+              : const Color(0x3DB49AE1),
         ),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: IconButton(
         tooltip: tooltip,
@@ -1011,7 +1039,12 @@ class _FrameEpubReaderPreviewScreenState
             ? Icons.bookmark_rounded
             : Icons.bookmark_add_outlined,
         selected: bookmarked,
-        compact: compact,
+        width: frameEpubReaderQuickActionWidth(
+          viewportWidth,
+          bookmark: true,
+        ),
+        height: frameEpubReaderQuickActionHeight(viewportWidth),
+        key: const ValueKey('reader-action-bookmark'),
         onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
       ),
       _readerQuickAction(
@@ -1020,7 +1053,12 @@ class _FrameEpubReaderPreviewScreenState
             : '目錄、筆記與書籤',
         icon: Icons.menu_book_outlined,
         selected: wide && _isSidebarVisible,
-        compact: compact,
+        width: frameEpubReaderQuickActionWidth(
+          viewportWidth,
+          bookmark: false,
+        ),
+        height: frameEpubReaderQuickActionHeight(viewportWidth),
+        key: const ValueKey('reader-action-sidebar'),
         onPressed: !ready
             ? null
             : () {
@@ -1035,14 +1073,24 @@ class _FrameEpubReaderPreviewScreenState
         tooltip: '閱讀設定',
         icon: Icons.tune_rounded,
         selected: false,
-        compact: compact,
+        width: frameEpubReaderQuickActionWidth(
+          viewportWidth,
+          bookmark: false,
+        ),
+        height: frameEpubReaderQuickActionHeight(viewportWidth),
+        key: const ValueKey('reader-action-appearance'),
         onPressed: ready ? _showAppearance : null,
       ),
       _readerQuickAction(
         tooltip: '進入沉浸式全螢幕',
         icon: Icons.fullscreen_rounded,
         selected: _isImmersive,
-        compact: compact,
+        width: frameEpubReaderQuickActionWidth(
+          viewportWidth,
+          bookmark: false,
+        ),
+        height: frameEpubReaderQuickActionHeight(viewportWidth),
+        key: const ValueKey('reader-action-fullscreen'),
         onPressed: ready ? _toggleImmersiveMode : null,
       ),
     ];
@@ -1063,7 +1111,7 @@ class _FrameEpubReaderPreviewScreenState
         key: const ValueKey('reader-desktop-toolbar'),
         constraints: const BoxConstraints(minHeight: 84),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 12, 4, 16),
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1130,9 +1178,24 @@ class _FrameEpubReaderPreviewScreenState
                   ],
                 ),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 12),
+              InkWell(
+                onTap: () => unawaited(_openLegacyReadingStats()),
+                borderRadius: BorderRadius.circular(5),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+                  child: Text(
+                    '閱讀時光',
+                    style: TextStyle(
+                      color: Color(0xFFBBA9DF),
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
+                constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1153,26 +1216,11 @@ class _FrameEpubReaderPreviewScreenState
                     const SizedBox(height: 5),
                     Wrap(
                       alignment: WrapAlignment.end,
-                      spacing: 0,
-                      runSpacing: 4,
+                      spacing: 6,
+                      runSpacing: 0,
                       children: actions,
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              InkWell(
-                onTap: () => unawaited(_openLegacyReadingStats()),
-                borderRadius: BorderRadius.circular(5),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-                  child: Text(
-                    '閱讀時光',
-                    style: TextStyle(
-                      color: Color(0xFFBBA9DF),
-                      fontSize: 10,
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -1415,13 +1463,6 @@ class _FrameEpubReaderPreviewScreenState
                             maintainAnimation: true,
                             child: _chapterControls(session),
                           ),
-                        if (ready)
-                          Visibility(
-                            visible: !immersive,
-                            maintainState: true,
-                            maintainAnimation: true,
-                            child: _readingSessionIndicator(),
-                          ),
                       ],
                     ),
                   ),
@@ -1429,6 +1470,8 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
           ),
+          if (!immersive) _readerStatusLine(),
+          if (ready && !immersive) _readingSessionIndicator(),
         ],
       ),
     );
@@ -1771,8 +1814,31 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  Widget _readerStatusLine() => Padding(
+        key: const ValueKey('reader-status-line'),
+        padding: const EdgeInsets.only(top: 7),
+        child: SizedBox(
+          width: double.infinity,
+          height: 18,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _readerStatusMessage ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFA99EB7),
+                fontSize: 9,
+                height: 1.8,
+              ),
+            ),
+          ),
+        ),
+      );
+
   Widget _readingSessionIndicator() => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+        key: const ValueKey('reading-session-indicator'),
+        padding: const EdgeInsets.only(bottom: 18),
         child: SizedBox(
           height: 28,
           child: Row(
@@ -1793,15 +1859,13 @@ class _FrameEpubReaderPreviewScreenState
               ),
               const SizedBox(width: 8),
               Text(
-                _readingTimeTracker == null
-                    ? '閱讀時間計時待命'
-                    : '閱讀時間計時中',
+                _isReadingActive ? '正在記錄本次閱讀' : '本次閱讀已暫停',
                 style: const TextStyle(
                   color: Color(0xFF94899F),
                   fontSize: 9,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 3),
               Text(
                 _readingDurationLabel(_readingSeconds),
                 style: const TextStyle(
@@ -1840,27 +1904,24 @@ class _FrameEpubReaderPreviewScreenState
 
         Widget pageButton({required bool previous}) {
           final enabled = previous ? canGoPrevious : canGoNext;
-          return OutlinedButton.icon(
+          return OutlinedButton(
             onPressed: enabled
                 ? () => unawaited(
                       _turnReaderPage(session, forward: !previous),
                     )
                 : null,
-            icon: Icon(
-              previous ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
-              size: 18,
-            ),
-            label: Text(previous ? '上一頁' : '下一頁'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _readerText,
-              side: const BorderSide(color: Color(0x44393247)),
-              minimumSize: const Size(116, 37),
+              foregroundColor: const Color(0xFFE8E1F5),
+              side: const BorderSide(color: Color(0x40AE91E2)),
+              minimumSize: const Size(0, 37),
               padding: const EdgeInsets.symmetric(horizontal: 14),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               textStyle: const TextStyle(fontSize: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+            child: Text(previous ? '← 上一頁' : '下一頁 →'),
           );
         }
 
@@ -1951,7 +2012,10 @@ class _FrameEpubReaderPreviewScreenState
                             minWidth: 220,
                             maxWidth: 300,
                           ),
-                          child: progressPanel,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: progressPanel,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
