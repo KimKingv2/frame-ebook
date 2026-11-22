@@ -547,20 +547,30 @@ void main() {
 
       collect(root);
       final subscript = spans.firstWhere(
-        (span) => span.text == '2' && span.style?.fontFeatures?.any(
-              (feature) => feature.feature == 'subs' && feature.value == 1,
-            ) ==
-            true,
+        (span) =>
+            span.text == null &&
+            span.toPlainText() == '2' &&
+            span.style?.fontFeatures?.any(
+                  (feature) =>
+                      feature.feature == 'subs' && feature.value == 1,
+                ) ==
+                true,
       );
       final superscript = spans.firstWhere(
-        (span) => span.text == '3' && span.style?.fontFeatures?.any(
-              (feature) => feature.feature == 'sups' && feature.value == 1,
-            ) ==
-            true,
+        (span) =>
+            span.text == null &&
+            span.toPlainText() == '3' &&
+            span.style?.fontFeatures?.any(
+                  (feature) =>
+                      feature.feature == 'sups' && feature.value == 1,
+                ) ==
+                true,
       );
+      final subscriptText =
+          spans.firstWhere((span) => span.text == '2');
       expect(subscript.style?.fontSize, lessThan(root.style?.fontSize ?? 16));
       expect(superscript.style?.fontSize, lessThan(root.style?.fontSize ?? 16));
-      expect(subscript.style?.backgroundColor, const Color(0x6665C9A5));
+      expect(subscriptText.style?.backgroundColor, const Color(0x6665C9A5));
       expect(root.toPlainText(), contains('Water H2O and x3'));
       expect(find.byType(SelectableText), findsWidgets);
     } finally {
