@@ -476,7 +476,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(top: 11),
-            padding: EdgeInsets.fromLTRB(horizontalInset, 11, horizontalInset, 0),
+            padding: const EdgeInsets.only(top: 11),
             decoration: const BoxDecoration(
               border: Border(
                 top: BorderSide(color: Color(0x1AC1AAEE)),
@@ -485,9 +485,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             child: const Text(
               '閱讀位置、筆記與書籤都會同步保存至雲端',
               style: TextStyle(
-                color: Color(0xFF776D85),
-                fontSize: 8,
-                height: 1.7,
+                color: Color(0xFF94899F),
+                fontSize: 9,
               ),
             ),
           ),
@@ -823,18 +822,21 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0x55393247)),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(13, 9, 13, 11),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '閱讀位置、筆記與書籤都會同步保存至雲端',
-              style: TextStyle(
-                color: Color(0xFF8B8198),
-                fontSize: 9,
-                height: 1.6,
-              ),
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 11),
+          padding: EdgeInsets.fromLTRB(horizontalInset, 11, horizontalInset, 0),
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Color(0x1AC1AAEE)),
+            ),
+          ),
+          child: const Text(
+            '閱讀位置、筆記與書籤都會同步保存至雲端',
+            style: TextStyle(
+              color: Color(0xFF776D85),
+              fontSize: 8,
+              height: 1.7,
             ),
           ),
         ),
