@@ -1075,17 +1075,6 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     );
   }
 
-  Widget _buildToc() {
-    if (widget.toc.isEmpty) {
-      return const _SidebarEmptyState(message: '這本 EPUB 沒有提供可用目錄。');
-    }
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: _buildTocTree(widget.toc),
-    );
-  }
-
   Widget _buildAnnotations({required bool bookmarksOnly}) {
     final items = _annotations
         .where((item) =>
@@ -1125,22 +1114,5 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
 
 }
 
-class _SidebarEmptyState extends StatelessWidget {
-  const _SidebarEmptyState({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: _sidebarMuted, fontSize: 13),
-          ),
-        ),
-      );
-}
 
 
