@@ -1379,7 +1379,7 @@ class _FrameEpubReaderPreviewScreenState
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: _buildReaderSidebar(
-                          session,
+                          session!,
                           initialTabIndex: 0,
                           desktopLayout: true,
                           onClose: () => setState(
@@ -1410,7 +1410,7 @@ class _FrameEpubReaderPreviewScreenState
                             visible: !immersive,
                             maintainState: true,
                             maintainAnimation: true,
-                            child: _chapterControls(session!),
+                            child: _chapterControls(session),
                           ),
                         if (ready)
                           Visibility(
