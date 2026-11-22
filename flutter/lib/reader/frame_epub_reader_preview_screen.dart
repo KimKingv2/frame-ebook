@@ -2612,6 +2612,7 @@ class _FrameEpubReaderPreviewScreenState
     final panelLayout = FrameEpubAppearancePanelLayout.fromViewport(
       MediaQuery.sizeOf(context),
       fullscreen: _isImmersive,
+      safeArea: MediaQuery.viewPaddingOf(context),
     );
     var lineHeight = _lineHeight;
     var fontScale = _fontScale;
