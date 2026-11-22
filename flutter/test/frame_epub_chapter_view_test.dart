@@ -1403,6 +1403,7 @@ void main() {
       Widget buildReader({
         required XmlElement anchor,
         FrameEpubCfiPoint? textPoint,
+        double? scrollFraction,
         int restoreRevision = 0,
       }) =>
           MaterialApp(
@@ -1415,6 +1416,7 @@ void main() {
                 initialAnchor: anchor,
                 initialTextNode: textPoint?.node,
                 initialTextOffset: textPoint?.offset,
+                initialScrollFraction: scrollFraction,
                 restoreRevision: restoreRevision,
               ),
             ),
@@ -1445,6 +1447,7 @@ void main() {
         buildReader(
           anchor: laterAnchor,
           textPoint: laterPoint,
+          scrollFraction: 1,
           restoreRevision: 1,
         ),
       );

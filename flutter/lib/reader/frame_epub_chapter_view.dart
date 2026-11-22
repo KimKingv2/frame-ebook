@@ -368,6 +368,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       if (oldWidget.restoreRevision != widget.restoreRevision) {
         _lastVisibleTextNode = null;
         _lastVisibleTextOffset = null;
+        _initialPageForRestore = null;
         _restoreScheduled = false;
       }
     }
@@ -995,6 +996,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       if (distance == 0) break;
     }
 
+    if (!closestDistance.isFinite) return null;
     for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
       if (pages[pageIndex].itemIndices.contains(closestItem)) {
         return pageIndex;
@@ -1028,13 +1030,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         final measuredTargetPage = _measureInitialAnchorPage(_paginationPages);
         if (measuredTargetPage != null) {
           _initialPageForRestore = measuredTargetPage;
+        } else if (_initialPageForRestore == null &&
+            widget.initialScrollFraction != null &&
+            _paginationPages.length > 1) {
+          _initialPageForRestore =
+              (widget.initialScrollFraction!.clamp(0.0, 1.0) *
+                      (_paginationPages.length - 1))
+                  .round();
         }
-        final restoredSinglePage = _initialPageForRestore ??
-            (widget.initialScrollFraction != null && _paginationPages.length > 1
-                ? (widget.initialScrollFraction! *
-                        (_paginationPages.length - 1))
-                    .round()
-                : 0);
+        final restoredSinglePage = _initialPageForRestore ?? 0;
         final pageCount = _paginationSpreadActive
             ? FrameEpubPageLayout.groupIntoSpreads(_paginationPages.length)
                 .length
