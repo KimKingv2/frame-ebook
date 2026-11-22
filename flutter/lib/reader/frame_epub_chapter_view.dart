@@ -2430,7 +2430,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           final rubyPosition = (style['ruby-position'] ?? 'alternate')
               .trim()
               .toLowerCase()
-              .split(RegExp(r'\\s+'));
+              .split(RegExp(r'\s+'));
           final below =
               rubyPosition.contains('under') || rubyPosition.contains('below');
           final parentFontSize = _length(style['font-size'], widget.fontSize);
