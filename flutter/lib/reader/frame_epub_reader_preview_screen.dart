@@ -11,6 +11,7 @@ import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../library/frame_book.dart';
 import '../library/frame_reader_repository.dart';
+import '../legacy/frame_legacy_page.dart';
 import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
@@ -28,7 +29,7 @@ import 'frame_reading_time_tracker.dart';
 import 'frame_epub_reader_sidebar.dart';
 import 'frame_epub_note_editor_dialog.dart';
 
-const _readerChrome = Color(0xFF171420);
+const _readerChrome = Color(0xFF12101A);
 const _readerPanel = Color(0xFF211D2D);
 const _readerText = Color(0xFFF4F0FA);
 const _readerMuted = Color(0xFFAAA2B8);
@@ -778,15 +779,18 @@ class _FrameEpubReaderPreviewScreenState
     required IconData icon,
     required VoidCallback? onPressed,
     required bool selected,
+    bool compact = false,
   }) {
     final iconColor = onPressed == null
         ? const Color(0xFF746C80)
         : selected
             ? _readerAccent
             : const Color(0xFFDCD2ED);
+    final width = compact ? 32.0 : 36.0;
+    final height = compact ? 27.0 : 31.0;
     return Container(
-      width: 36,
-      height: 32,
+      width: width,
+      height: height,
       margin: const EdgeInsets.only(left: 6),
       decoration: BoxDecoration(
         color: selected
@@ -804,18 +808,144 @@ class _FrameEpubReaderPreviewScreenState
         onPressed: onPressed,
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.compact,
-        constraints: const BoxConstraints.tightFor(width: 36, height: 32),
+        constraints: BoxConstraints.tightFor(width: width, height: height),
         icon: Icon(icon, size: 18, color: iconColor),
       ),
     );
   }
 
-  Widget _buildReaderHeader(
+  Future<void> _openLegacyReadingStats() async {
+    final uri = FrameAppConfig.apiBaseUri.replace(path: '/reading-stats/');
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => FrameApiScope.inherit(
+          context: context,
+          child: buildFrameLegacyPage(
+            uri: uri,
+            title: '閱讀時光',
+            showToolbar: false,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReaderTopBar(
     FrameEpubReaderSession? session, {
-    required bool wide,
+    required double viewportWidth,
   }) {
+    final compact = viewportWidth <= 560;
+    final engineStatus = switch (session?.status) {
+      FrameEpubReaderStatus.opening ||
+      FrameEpubReaderStatus.idle => '正在載入雲端書籍',
+      FrameEpubReaderStatus.error => '書籍或閱讀引擎載入失敗',
+      FrameEpubReaderStatus.ready => session!.isFixedLayout
+          ? '固定版面 EPUB 已載入'
+          : 'EPUB 閱讀引擎已就緒',
+      _ => '閱讀引擎基礎 API 已檢出',
+    };
+
+    Widget textLink(String label, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: const Color(0xFFBBA9DF),
+                fontSize: compact ? 9 : 10,
+              ),
+            ),
+          ),
+        );
+
+    return SizedBox(
+      height: compact ? 60 : 72,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Color(0x243D354B)),
+          ),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: () => Navigator.of(context).maybePop(),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'FRAME ',
+                        style: TextStyle(
+                          color: Color(0xFFF0EDF7),
+                          fontSize: 12,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'READER',
+                        style: TextStyle(
+                          color: Color(0xFFBCA9F7),
+                          fontSize: 12,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Spacer(),
+            if (!compact) ...[
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      (viewportWidth * .34).clamp(120.0, 360.0).toDouble(),
+                ),
+                child: Text(
+                  engineStatus,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFA79BB8),
+                    fontSize: 9,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 18),
+              const Text(
+                'READING ROOM · 0.6',
+                style: TextStyle(
+                  color: Color(0xFF938AA1),
+                  fontSize: 9,
+                  letterSpacing: 1.7,
+                ),
+              ),
+              const SizedBox(width: 18),
+            ],
+            textLink('閱讀時光', () => unawaited(_openLegacyReadingStats())),
+            SizedBox(width: compact ? 10 : 18),
+            textLink('← 我的書架', () => Navigator.of(context).maybePop()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookHeading(
+    FrameEpubReaderSession? session, {
+    required double viewportWidth,
+    required bool wide,
+    bool showQuickActions = true,
+  }) {
+    final compact = viewportWidth <= 560;
     final ready = session?.status == FrameEpubReaderStatus.ready;
-    final percent = _readingProgressPercent(session);
     final currentBookmarkCfi = ready
         ? _bookmarkCfi(
             session!,
@@ -828,181 +958,140 @@ class _FrameEpubReaderPreviewScreenState
         ) !=
         null;
 
-    Widget actionButtons() => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _readerQuickAction(
-              tooltip: bookmarked ? '移除目前位置的書籤' : '加入目前位置的書籤',
-              icon: bookmarked
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_add_outlined,
-              selected: bookmarked,
-              onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
-            ),
-            _readerQuickAction(
-              tooltip: wide
-                  ? (_isSidebarVisible ? '隱藏閱讀導覽' : '顯示閱讀導覽')
-                  : '目錄、筆記與書籤',
-              icon: Icons.menu_book_outlined,
-              selected: wide && _isSidebarVisible,
-              onPressed: !ready
-                  ? null
-                  : () {
-                      if (wide) {
-                        setState(
-                          () => _isSidebarVisible = !_isSidebarVisible,
-                        );
-                      } else {
-                        unawaited(_showTableOfContents());
-                      }
-                    },
-            ),
-            _readerQuickAction(
-              tooltip: '閱讀設定',
-              icon: Icons.tune_rounded,
-              selected: false,
-              onPressed: ready ? _showAppearance : null,
-            ),
-            _readerQuickAction(
-              tooltip: '進入沉浸式全螢幕',
-              icon: Icons.fullscreen_rounded,
-              selected: false,
-              onPressed: ready ? _toggleImmersiveMode : null,
-            ),
-          ],
-        );
-
-    Widget titleBlock() => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'NOW READING',
-                style: TextStyle(
-                  color: Color(0xFF887A9C),
-                  fontSize: 8,
-                  letterSpacing: 1.7,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _bookTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _readerText,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                [
-                  widget.book.author.trim().isEmpty
-                      ? widget.book.fileName
-                      : widget.book.author.trim(),
-                ].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: _readerMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        );
-
-    Widget progressBlock({bool compact = false}) => Column(
-          crossAxisAlignment:
-              compact ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '全書進度  $percent%',
-              style: const TextStyle(
-                color: _readerText,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            SizedBox(
-              width: compact ? double.infinity : 150,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: ready ? percent / 100 : 0,
-                  minHeight: 4,
-                  color: _readerAccent,
-                  backgroundColor: const Color(0xFF423A50),
-                ),
-              ),
-            ),
-          ],
-        );
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(wide ? 22 : 10, 12, wide ? 22 : 8, 13),
-      decoration: const BoxDecoration(
-        color: _readerChrome,
-        border: Border(
-          bottom: BorderSide(color: Color(0x332F293B), width: 1),
-        ),
+    final actions = <Widget>[
+      _readerQuickAction(
+        tooltip: bookmarked ? '移除目前位置的書籤' : '加入目前位置的書籤',
+        icon: bookmarked
+            ? Icons.bookmark_rounded
+            : Icons.bookmark_add_outlined,
+        selected: bookmarked,
+        compact: compact,
+        onPressed: ready && !_bookmarkBusy ? _toggleBookmark : null,
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 660;
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      _readerQuickAction(
+        tooltip: wide
+            ? (_isSidebarVisible ? '隱藏閱讀導覽' : '顯示閱讀導覽')
+            : '目錄、筆記與書籤',
+        icon: Icons.menu_book_outlined,
+        selected: wide && _isSidebarVisible,
+        compact: compact,
+        onPressed: !ready
+            ? null
+            : () {
+                if (wide) {
+                  setState(() => _isSidebarVisible = !_isSidebarVisible);
+                } else {
+                  unawaited(_showTableOfContents());
+                }
+              },
+      ),
+      _readerQuickAction(
+        tooltip: '閱讀設定',
+        icon: Icons.tune_rounded,
+        selected: false,
+        compact: compact,
+        onPressed: ready ? _showAppearance : null,
+      ),
+      _readerQuickAction(
+        tooltip: '進入沉浸式全螢幕',
+        icon: Icons.fullscreen_rounded,
+        selected: false,
+        compact: compact,
+        onPressed: ready ? _toggleImmersiveMode : null,
+      ),
+    ];
+
+    final chapterLabel = session?.currentChapterLabel.trim() ?? '';
+    final progressLabel = ready
+        ? (chapterLabel.isEmpty ? '閱讀中' : chapterLabel)
+        : '等待閱讀';
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 84),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(4, 12, 4, compact ? 12 : 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrowHeading = constraints.maxWidth <= 560;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: '返回書架',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: _readerMuted,
+                Expanded(
+                  flex: 7,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'NOW READING',
+                        style: TextStyle(
+                          color: Color(0xFF938AA1),
+                          fontSize: 9,
+                          letterSpacing: 1.7,
+                        ),
                       ),
-                    ),
-                    titleBlock(),
-                    const SizedBox(width: 8),
-                    progressBlock(),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _bookTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _readerText,
+                          fontSize: narrowHeading ? 15 : 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: .1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.book.author.trim().isEmpty
+                            ? widget.book.fileName
+                            : widget.book.author.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFAAA3B6),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: actionButtons(),
+                const SizedBox(width: 12),
+                Flexible(
+                  flex: 5,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        progressLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: const Color(0xFFC7B5FB),
+                          fontFamily: 'Georgia',
+                          fontSize: narrowHeading ? 20 : 23,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      if (showQuickActions) ...[
+                        const SizedBox(height: 5),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 0,
+                          runSpacing: 4,
+                          children: actions,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             );
-          }
-
-          return Row(
-            children: [
-              IconButton(
-                tooltip: '返回書架',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(
-                  Icons.arrow_back_rounded,
-                  color: _readerMuted,
-                ),
-              ),
-              const SizedBox(width: 7),
-              titleBlock(),
-              const SizedBox(width: 20),
-              progressBlock(),
-              const SizedBox(width: 12),
-              actionButtons(),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -1048,12 +1137,22 @@ class _FrameEpubReaderPreviewScreenState
     final ready = session?.status == FrameEpubReaderStatus.ready;
     final showSidebar = wide && _isSidebarVisible && ready;
 
+    final viewportWidth = MediaQuery.sizeOf(context).width;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(17, 12, 17, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
+      child: Column(
         children: [
-          if (showSidebar) ...[
+          _buildBookHeading(
+            session,
+            viewportWidth: viewportWidth - 34,
+            wide: wide,
+            showQuickActions: false,
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showSidebar) ...[
             SizedBox(
               width: 220,
               child: Container(
@@ -1073,17 +1172,20 @@ class _FrameEpubReaderPreviewScreenState
             ),
             const SizedBox(width: 12),
           ],
-          Expanded(
-            child: Column(
-              children: [
                 Expanded(
-                  child: _buildReaderFrame(
-                    _buildBody(session),
-                    wide: wide,
-                    immersive: true,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: _buildReaderFrame(
+                          _buildBody(session),
+                          wide: wide,
+                          immersive: true,
+                        ),
+                      ),
+                      if (ready) _chapterControls(session!),
+                    ],
                   ),
                 ),
-                if (ready) _chapterControls(session!),
               ],
             ),
           ),
@@ -1108,77 +1210,100 @@ class _FrameEpubReaderPreviewScreenState
           body: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final wide = constraints.maxWidth > 820;
+                final viewportWidth = constraints.maxWidth;
+                final wide = viewportWidth > 820;
                 if (_isImmersive) {
                   return _buildImmersiveLayout(session, wide: wide);
                 }
 
+                final shellInset = viewportWidth <= 420
+                    ? 11.0
+                    : viewportWidth <= 560
+                        ? 10.0
+                        : viewportWidth <= 820
+                            ? 14.0
+                            : viewportWidth <= 1050
+                                ? 21.0
+                                : 32.0;
                 final sidebarWidth =
-                    constraints.maxWidth <= 1050 ? 220.0 : 250.0;
+                    viewportWidth <= 1050 ? 220.0 : 250.0;
                 final showDesktopSidebar = wide &&
                     _isSidebarVisible &&
                     session?.status == FrameEpubReaderStatus.ready;
-                return Column(
-                  children: [
-                    _buildReaderHeader(session, wide: wide),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          wide ? 18 : 8,
-                          10,
-                          wide ? 18 : 8,
-                          8,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (showDesktopSidebar) ...[
-                              SizedBox(
-                                width: sidebarWidth,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: _readerPanel,
-                                    border: Border.all(
-                                      color: const Color(0x33C1AAEE),
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: _buildReaderSidebar(
-                                    session!,
-                                    initialTabIndex: 0,
-                                    desktopLayout: true,
-                                    onClose: () => setState(
-                                      () => _isSidebarVisible = false,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                            ],
-                            Expanded(
-                              child: Column(
+
+                return Padding(
+                  padding: EdgeInsets.symmetric(horizontal: shellInset),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1500),
+                      child: Column(
+                        children: [
+                          _buildReaderTopBar(
+                            session,
+                            viewportWidth: viewportWidth - shellInset * 2,
+                          ),
+                          _buildBookHeading(
+                            session,
+                            viewportWidth: viewportWidth - shellInset * 2,
+                            wide: wide,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
+                                  if (showDesktopSidebar) ...[
+                                    SizedBox(
+                                      width: sidebarWidth,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: _readerPanel,
+                                          border: Border.all(
+                                            color: const Color(0x33C1AAEE),
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: _buildReaderSidebar(
+                                          session!,
+                                          initialTabIndex: 0,
+                                          desktopLayout: true,
+                                          onClose: () => setState(
+                                            () => _isSidebarVisible = false,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                  ],
                                   Expanded(
-                                    child: _buildReaderFrame(
-                                      _buildBody(session),
-                                      wide: wide,
+                                    child: Column(
+                                      children: [
+                                        Expanded(
+                                          child: _buildReaderFrame(
+                                            _buildBody(session),
+                                            wide: wide,
+                                          ),
+                                        ),
+                                        if (session?.status ==
+                                            FrameEpubReaderStatus.ready)
+                                          _chapterControls(session!),
+                                        if (session?.status ==
+                                            FrameEpubReaderStatus.ready)
+                                          _readingSessionIndicator(),
+                                      ],
                                     ),
                                   ),
-                                  if (session?.status ==
-                                      FrameEpubReaderStatus.ready)
-                                    _chapterControls(session!),
-                                  if (session?.status ==
-                                      FrameEpubReaderStatus.ready)
-                                    _readingSessionIndicator(),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 );
               },
             ),

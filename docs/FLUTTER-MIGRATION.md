@@ -173,6 +173,14 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Legacy header hierarchy and app-shell geometry
+
+- The Flutter preview now separates the legacy 72 px FRAME READER topbar from the 84 px NOW READING book heading instead of combining them into one toolbar.
+- The topbar restores the engine-status role, READING ROOM · 0.6 label, Reading Time navigation and bookshelf return link. The book heading restores the chapter progress detail at the right and places icon-only reader actions beneath it.
+- The full reader content now sits inside the legacy centred 1500 px shell with the original responsive horizontal insets at 1050, 820, 560 and 420 px.
+- The immersive layout keeps the book heading visible while hiding its quick-action row, matching the legacy fullscreen chrome hierarchy more closely.
+- Screenshot comparison and platform acceptance are still required before marking visual parity complete.
+
 
 - The normal reader now keeps page navigation outside the framed reading viewport, matching the legacy DOM hierarchy. Desktop navigation uses the legacy three-column layout; compact screens place previous/next controls above the full-width progress panel at the 720 px breakpoint.
 - Desktop immersive mode now retains the legacy left navigation column at 220 px when the sidebar is enabled. The reader frame drops its border, radius, padding and shadow while immersive, keeping the page surface flush with the fullscreen workspace.
