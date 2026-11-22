@@ -1253,62 +1253,66 @@ class _FrameEpubReaderPreviewScreenState
   }) {
     final ready = session?.status == FrameEpubReaderStatus.ready;
     final showSidebar = wide && _isSidebarVisible && ready;
-
     final viewportWidth = MediaQuery.sizeOf(context).width;
+
     return Stack(
       children: [
         Positioned.fill(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
             child: Column(
-        children: [
-          _buildBookHeading(
-            session,
-            viewportWidth: viewportWidth - 34,
-            wide: wide,
-            showQuickActions: false,
-          ),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (showSidebar) ...[
-            SizedBox(
-              width: 220,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _readerPanel,
-                  border: Border.all(color: const Color(0x33C1AAEE)),
-                  borderRadius: BorderRadius.circular(12),
+                _buildBookHeading(
+                  session,
+                  viewportWidth: viewportWidth - 34,
+                  wide: wide,
+                  showQuickActions: false,
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: _buildReaderSidebar(
-                  session!,
-                  initialTabIndex: 0,
-                  desktopLayout: true,
-                  onClose: () => setState(() => _isSidebarVisible = false),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
                 Expanded(
-                  child: Column(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (showSidebar) ...[
+                        SizedBox(
+                          width: 220,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _readerPanel,
+                              border: Border.all(
+                                color: const Color(0x33C1AAEE),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _buildReaderSidebar(
+                              session!,
+                              initialTabIndex: 0,
+                              desktopLayout: true,
+                              onClose: () =>
+                                  setState(() => _isSidebarVisible = false),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
                       Expanded(
-                        child: _buildReaderFrame(
-                          _buildBody(session),
-                          wide: wide,
-                          immersive: true,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: _buildReaderFrame(
+                                _buildBody(session),
+                                wide: wide,
+                                immersive: true,
+                              ),
+                            ),
+                            if (ready) _chapterControls(session!),
+                          ],
                         ),
                       ),
-                      if (ready) _chapterControls(session!),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
             ),
           ),
         ),
