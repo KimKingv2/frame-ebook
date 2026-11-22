@@ -173,6 +173,13 @@ These items must still pass CI and device verification before being treated as c
 
 ### Reader responsive geometry correction
 ### Reader workspace and immersive layout correction
+### Compact left navigation drawer geometry
+
+- The compact Flutter navigation now matches the legacy left drawer: maximum 390 px, 91vw with an 18 px minimum outer-width reserve, 8 px top/bottom insets in normal mode, and 6 px in fullscreen.
+- The drawer uses the legacy left-edge flush placement, 18 px right-side corners, dark surface, right-edge border and 70 px shadow. Its slide duration is aligned with the final 440 ms CSS transition.
+- The mobile heading and close control now match the 46 px header / 42 px close target, without the legacy-hidden brand mark. Tabs and TOC horizontal inset are tightened to the original navigation.
+- Geometry tests cover standard phone, drawer cap, narrow phone and fullscreen inset. Interaction and screenshot acceptance remain open.
+
 ### Appearance control grid and interaction styling
 
 - Typography controls now follow the legacy three-column desktop / two-column compact grid. Reading mode, page layout and both margin controls share the original two-column PAGE LAYOUT group; comic controls use the two-column grid.

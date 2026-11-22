@@ -343,7 +343,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         _annotations.where((item) => item.type != 'bookmark').length;
 
     return Material(
-      color: _sidebarPanel,
+      color: widget.desktopLayout ? _sidebarPanel : const Color(0xFF1B1726),
       child: widget.desktopLayout
           ? _buildDesktopLayout(bookmarkCount, noteCount)
           : _buildCompactLayout(bookmarkCount),
@@ -353,55 +353,74 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
   Widget _buildCompactLayout(int bookmarkCount) => Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 10, 10),
-            child: Row(
-              children: [
-                const Icon(Icons.menu_book_outlined, color: _sidebarAccent),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    '閱讀導覽',
-                    style: TextStyle(
-                      color: _sidebarText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.only(bottom: 12),
+            child: SizedBox(
+              height: 46,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '閱讀導覽',
+                      style: TextStyle(
+                        color: _sidebarText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: '重新整理標註',
-                  visualDensity: VisualDensity.compact,
-                  onPressed:
-                      _refreshingAnnotations ? null : _refreshAnnotations,
-                  icon: _refreshingAnnotations
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: _sidebarAccent,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.refresh_rounded,
-                          color: _sidebarMuted,
-                        ),
-                ),
-                IconButton(
-                  tooltip: '關閉閱讀導覽',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: widget.onClose,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: _sidebarMuted,
+                  SizedBox(
+                    width: 34,
+                    height: 34,
+                    child: IconButton(
+                      tooltip: '重新整理標註',
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed:
+                          _refreshingAnnotations ? null : _refreshAnnotations,
+                      icon: _refreshingAnnotations
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _sidebarAccent,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.refresh_rounded,
+                              color: _sidebarMuted,
+                              size: 19,
+                            ),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0x33BEA6E5)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      tooltip: '關閉閱讀導覽',
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 42, height: 42),
+                      onPressed: widget.onClose,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: _sidebarMuted,
+                        size: 19,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const Divider(height: 1, color: Color(0x55393247)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 _buildTabButton('目錄', 0),
@@ -876,7 +895,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             foregroundColor: selected ? _sidebarAccent : _sidebarMuted,
             backgroundColor:
                 selected ? const Color(0x332A213B) : Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -887,7 +906,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
@@ -902,7 +921,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: _buildTocTree(widget.toc),
     );
   }

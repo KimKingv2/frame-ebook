@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'frame_epub_reader_overlay_layout.dart';
 import 'frame_epub_reader_chrome_layout.dart';
+import 'frame_epub_reader_sidebar_layout.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
@@ -2110,21 +2111,49 @@ class _FrameEpubReaderPreviewScreenState
       return;
     }
 
+    final drawerLayout = FrameEpubReaderSidebarLayout.fromViewport(
+      MediaQuery.sizeOf(context),
+      fullscreen: _isImmersive,
+    );
+
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierLabel: '關閉閱讀導覽',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        final screen = MediaQuery.sizeOf(dialogContext);
-        final width = (screen.width * .88).clamp(280.0, 420.0).toDouble();
-        return Align(
-          alignment: Alignment.centerLeft,
-          child: SafeArea(
-            child: SizedBox(
-              width: width,
-              height: double.infinity,
+      barrierColor: const Color(0x9407060B),
+      transitionDuration: const Duration(milliseconds: 440),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
+        alignment: Alignment.centerLeft,
+        child: SafeArea(
+          left: false,
+          right: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: drawerLayout.verticalInset,
+              bottom: drawerLayout.verticalInset,
+            ),
+            child: Container(
+              width: drawerLayout.width,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B1726),
+                border: const Border(
+                  top: BorderSide(color: Color(0x4DC1AAEE)),
+                  right: BorderSide(color: Color(0x4DC1AAEE)),
+                  bottom: BorderSide(color: Color(0x4DC1AAEE)),
+                ),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x9E000000),
+                    blurRadius: 70,
+                    offset: Offset(22, 0),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
               child: _buildReaderSidebar(
                 session,
                 initialTabIndex: initialTabIndex,
@@ -2132,16 +2161,22 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
         final position = Tween<Offset>(
-          begin: const Offset(-1, 0),
+          begin: const Offset(-1.05, 0),
           end: Offset.zero,
         ).chain(
           CurveTween(curve: Curves.easeOutCubic),
         ).animate(animation);
-        return SlideTransition(position: position, child: child);
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0, .85, curve: Curves.easeOut),
+          ),
+          child: SlideTransition(position: position, child: child),
+        );
       },
     );
   }
