@@ -463,6 +463,111 @@ void main() {
       await archive.close();
     }
   });
+  testWidgets('renders superscript and subscript without replacing source text',
+      (tester) async {
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <p>Water H<sub>2</sub>O and x<sup>3</sup>.</p>
+        <p>Author style: CO<span style="font-variant-position: sub">2</span>.</p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-script-position-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/script-position.epub',
+      'fileName': 'script-position.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final subscriptNode = chapter.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == '2');
+      final subscriptCfi = FrameEpubCfi.createRange(
+        book: epub,
+        spineIndex: 0,
+        startNode: subscriptNode,
+        startOffset: 0,
+        endNode: subscriptNode,
+        endOffset: subscriptNode.value.length,
+      )!;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                annotations: [
+                  FrameReaderAnnotation(
+                    id: 'subscript-source-range',
+                    bookId: book.id,
+                    type: 'highlight',
+                    cfi: subscriptCfi,
+                    quote: '2',
+                    color: 'mint',
+                    createdAt: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final selectable = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .firstWhere(
+            (widget) =>
+                widget.textSpan?.toPlainText().contains('Water H2O and x3') ??
+                false,
+          );
+      final root = selectable.textSpan!;
+      final spans = <TextSpan>[];
+
+      void collect(InlineSpan span) {
+        if (span is! TextSpan) return;
+        spans.add(span);
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          collect(child);
+        }
+      }
+
+      collect(root);
+      final subscript = spans.firstWhere(
+        (span) => span.text == '2' && span.style?.fontFeatures?.any(
+              (feature) => feature.feature == 'subs' && feature.value == 1,
+            ) ==
+            true,
+      );
+      final superscript = spans.firstWhere(
+        (span) => span.text == '3' && span.style?.fontFeatures?.any(
+              (feature) => feature.feature == 'sups' && feature.value == 1,
+            ) ==
+            true,
+      );
+      expect(subscript.style?.fontSize, lessThan(root.style?.fontSize ?? 16));
+      expect(superscript.style?.fontSize, lessThan(root.style?.fontSize ?? 16));
+      expect(subscript.style?.backgroundColor, const Color(0x6665C9A5));
+      expect(root.toPlainText(), contains('Water H2O and x3'));
+      expect(find.byType(SelectableText), findsWidgets);
+    } finally {
+      await archive.close();
+    }
+  });
+
   testWidgets('preserves EPUB ordered and unordered list markers',
       (tester) async {
     tester.view.physicalSize = const Size(1440, 2200);

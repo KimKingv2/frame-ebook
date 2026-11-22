@@ -106,6 +106,47 @@ void main() {
       expect(itemStyle['color'], 'purple');
     });
 
+    test('applies semantic superscript and subscript defaults and inheritance',
+        () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([
+        'body { font-size: 20px; }',
+        'sup { color: purple; }',
+      ]);
+      final document = XmlDocument.parse(
+        '<body><p>H<sub>2</sub>O and x<sup><span>3</span></sup></p></body>',
+      );
+      final body = document.rootElement;
+      final paragraph = body.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final subscript = paragraph.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'sub');
+      final superscript = paragraph.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'sup');
+      final nestedSpan = superscript.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'span');
+
+      final bodyStyle = cascade.resolve(body);
+      final paragraphStyle =
+          cascade.resolve(paragraph, parentStyle: bodyStyle);
+      final subscriptStyle =
+          cascade.resolve(subscript, parentStyle: paragraphStyle);
+      final superscriptStyle =
+          cascade.resolve(superscript, parentStyle: paragraphStyle);
+      final nestedStyle =
+          cascade.resolve(nestedSpan, parentStyle: superscriptStyle);
+
+      expect(subscriptStyle['font-variant-position'], 'sub');
+      expect(superscriptStyle['font-variant-position'], 'super');
+      expect(subscriptStyle['font-size'], 'smaller');
+      expect(superscriptStyle['font-size'], 'smaller');
+      expect(nestedStyle['font-variant-position'], 'super');
+      expect(superscriptStyle['color'], 'purple');
+    });
+
     test('inherits list-style-type from the parent list', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         'ol { list-style-type: upper-alpha; }',

@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:typed_data';
+import 'dart:ui' show FontFeature;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
@@ -2468,10 +2469,44 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               style['font-style'] == 'oblique'
           ? FontStyle.italic
           : FontStyle.normal,
+      fontFeatures: _positionFontFeatures(style),
       decoration: _textDecoration(style['text-decoration']),
       height: _lineHeight(style['line-height'], size),
       letterSpacing: _cssDimension(style['letter-spacing'], size),
     );
+  }
+
+  static List<FontFeature>? _positionFontFeatures(
+    Map<String, String> style,
+  ) {
+    final variantPosition =
+        style['font-variant-position']?.trim().toLowerCase();
+    final verticalAlign = style['vertical-align']?.trim().toLowerCase();
+    final position = switch (variantPosition) {
+      'super' || 'sub' => variantPosition,
+      _ => verticalAlign,
+    };
+
+    switch (position) {
+      case 'super':
+        return const [
+          FontFeature.superscripts(),
+          FontFeature('subs', 0),
+        ];
+      case 'sub':
+        return const [
+          FontFeature('sups', 0),
+          FontFeature.subscripts(),
+        ];
+      case 'normal':
+      case 'baseline':
+        return const [
+          FontFeature('sups', 0),
+          FontFeature('subs', 0),
+        ];
+      default:
+        return null;
+    }
   }
 
   static bool _isNonVisualTag(String tag) => const {

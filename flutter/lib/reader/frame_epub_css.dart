@@ -29,6 +29,7 @@ class FrameEpubCssCascade {
     'font-size',
     'font-style',
     'font-variant',
+    'font-variant-position',
     'font-weight',
     'letter-spacing',
     'line-height',
@@ -219,6 +220,18 @@ class FrameEpubCssCascade {
         break;
       case 'a':
         result['text-decoration'] = 'underline';
+        break;
+      case 'sup':
+        result.addAll({
+          'font-size': 'smaller',
+          'font-variant-position': 'super',
+        });
+        break;
+      case 'sub':
+        result.addAll({
+          'font-size': 'smaller',
+          'font-variant-position': 'sub',
+        });
         break;
       case 'ul':
       case 'ol':
