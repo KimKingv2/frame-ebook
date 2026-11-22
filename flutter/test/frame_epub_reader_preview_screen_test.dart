@@ -121,7 +121,7 @@ void main() {
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
     final decoration = frame.decoration! as BoxDecoration;
-    expect(decoration.borderRadius, BorderRadius.circular(18));
+    expect(decoration.borderRadius, BorderRadius.circular(14));
     expect(
       find.byKey(const ValueKey('reader-rounded-content-clip')),
       findsOneWidget,
@@ -168,7 +168,7 @@ void main() {
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
     final decoration = frame.decoration! as BoxDecoration;
-    expect(decoration.borderRadius, BorderRadius.circular(18));
+    expect(decoration.borderRadius, BorderRadius.circular(14));
     expect(
       find.byKey(const ValueKey('reader-rounded-content-clip')),
       findsOneWidget,
@@ -176,7 +176,7 @@ void main() {
     final clip = tester.widget<ClipRRect>(
       find.byKey(const ValueKey('reader-rounded-content-clip')),
     );
-    expect(clip.borderRadius, BorderRadius.circular(12));
+    expect(clip.borderRadius, BorderRadius.circular(8));
     expect(tester.takeException(), isNull);
   });
 

@@ -617,7 +617,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 13, 8, 11),
+          padding: const EdgeInsets.fromLTRB(14, 17, 8, 11),
           child: Row(
             children: [
               const Expanded(
@@ -716,7 +716,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         const Divider(height: 1, color: Color(0x55393247)),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(11, 13, 11, 14),
+            padding: const EdgeInsets.fromLTRB(0, 13, 0, 14),
             children: [
               _desktopSectionHeading('章節目錄', 'CONTENTS'),
               const SizedBox(height: 7),

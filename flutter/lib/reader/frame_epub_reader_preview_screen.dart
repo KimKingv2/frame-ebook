@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'frame_epub_reader_overlay_layout.dart';
+import 'frame_epub_reader_chrome_layout.dart';
 import 'frame_epub_reader_sidebar_layout.dart';
 import 'frame_epub_reader_option_label.dart';
 
@@ -1050,16 +1051,21 @@ class _FrameEpubReaderPreviewScreenState
         ? widget.book.fileName
         : widget.book.author.trim();
 
+    final chapterLabel = session?.currentChapterLabel.trim() ?? '';
+    final progressLabel = ready
+        ? (chapterLabel.isEmpty ? '閱讀中' : chapterLabel)
+        : '等待閱讀';
+
     if (wide) {
-      // Desktop Reader follows the legacy workspace: book identity at the
-      // upper-left, reader actions at the upper-right, and no second title
-      // block consuming the first quarter of the reading viewport.
-      return SizedBox(
+      // Match the legacy 84px book-heading: identity on the left, current
+      // chapter label and quick actions on the right.
+      return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
-        height: 64,
+        constraints: const BoxConstraints(minHeight: 84),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 16),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 width: 36,
@@ -1091,18 +1097,27 @@ class _FrameEpubReaderPreviewScreenState
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      'NOW READING',
+                      style: TextStyle(
+                        color: Color(0xFF938AA1),
+                        fontSize: 9,
+                        letterSpacing: 1.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       _bookTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: _readerText,
-                        fontSize: 17,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         letterSpacing: .1,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       author,
                       maxLines: 1,
@@ -1115,12 +1130,35 @@ class _FrameEpubReaderPreviewScreenState
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 0,
-                runSpacing: 4,
-                children: actions,
+              const SizedBox(width: 18),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      progressLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: Color(0xFFC7B5FB),
+                        fontFamily: 'Georgia',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w400,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 0,
+                      runSpacing: 4,
+                      children: actions,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 10),
               InkWell(
@@ -1142,11 +1180,6 @@ class _FrameEpubReaderPreviewScreenState
         ),
       );
     }
-
-    final chapterLabel = session?.currentChapterLabel.trim() ?? '';
-    final progressLabel = ready
-        ? (chapterLabel.isEmpty ? '閱讀中' : chapterLabel)
-        : '等待閱讀';
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 84),
@@ -1231,7 +1264,7 @@ class _FrameEpubReaderPreviewScreenState
       Container(
         key: const ValueKey('reader-rounded-frame'),
         margin: EdgeInsets.zero,
-        padding: EdgeInsets.all(wide ? 6 : 10),
+        padding: EdgeInsets.all(immersive ? 6 : wide ? 10 : 7),
         decoration: BoxDecoration(
           gradient: immersive
               ? null
@@ -1242,10 +1275,10 @@ class _FrameEpubReaderPreviewScreenState
                 ),
           color: immersive ? const Color(0xFF171420) : null,
           border: Border.all(
-            color: const Color(0x33CFBEEF),
-            width: immersive ? 1 : 0.8,
+            color: const Color(0x24CFBEEF),
+            width: 1,
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: immersive
               ? const []
               : const [
@@ -1258,7 +1291,7 @@ class _FrameEpubReaderPreviewScreenState
         ),
         child: ClipRRect(
           key: const ValueKey('reader-rounded-content-clip'),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           clipBehavior: Clip.antiAlias,
           child: child,
         ),
@@ -1277,9 +1310,13 @@ class _FrameEpubReaderPreviewScreenState
             : viewportWidth <= 560
                 ? 10.0
                 : 14.0;
-    const sidebarWidth = 220.0;
     final ready = session?.status == FrameEpubReaderStatus.ready;
-    final showDesktopSidebar = wide && _isSidebarVisible && ready;
+    final workspaceLayout = FrameEpubReaderWorkspaceLayout.fromViewport(
+      viewportWidth: viewportWidth,
+      fullscreen: immersive,
+      sidebarVisible: wide && ready && _isSidebarVisible && !immersive,
+    );
+    final showDesktopSidebar = workspaceLayout.sidebarWidth > 0;
 
     return Padding(
       key: const ValueKey('reader-workspace-root'),
@@ -1309,9 +1346,53 @@ class _FrameEpubReaderPreviewScreenState
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
-              child: Stack(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Positioned.fill(
+                  SizedBox(
+                    width: workspaceLayout.sidebarWidth,
+                    child: Visibility(
+                      visible: showDesktopSidebar,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xF0201B2C),
+                              Color(0xEB17141F),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: const Color(0x24C1AAEE),
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x21000000),
+                              blurRadius: 34,
+                              offset: Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: _buildReaderSidebar(
+                          session!,
+                          initialTabIndex: 0,
+                          desktopLayout: true,
+                          onClose: () => setState(
+                            () => _isSidebarVisible = false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (workspaceLayout.gap > 0)
+                    SizedBox(width: workspaceLayout.gap),
+                  Expanded(
+                    key: const ValueKey('reader-main-column'),
                     child: Column(
                       children: [
                         Expanded(
@@ -1341,38 +1422,6 @@ class _FrameEpubReaderPreviewScreenState
                       ],
                     ),
                   ),
-                  if (wide && ready)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      child: Visibility(
-                        visible: showDesktopSidebar && !immersive,
-                        maintainState: true,
-                        maintainAnimation: true,
-                        child: SizedBox(
-                          width: sidebarWidth,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _readerPanel,
-                              border: Border.all(
-                                color: const Color(0x33C1AAEE),
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: _buildReaderSidebar(
-                              session!,
-                              initialTabIndex: 0,
-                              desktopLayout: true,
-                              onClose: () => setState(
-                                () => _isSidebarVisible = false,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),

@@ -53,3 +53,21 @@ A CI pass is necessary but not sufficient. Do not mark the Reader UI or interact
 ## Acceptance record
 
 Preliminary screenshot inspection was performed on 2026-11-22 using the user's supplied pair. The source images are 4096 × 1832 (legacy) and 4096 × 1826 (Flutter). The dominant paper-colour bounds were measured as legacy x=570..4049, y=132..1602 (3480 × 1471 px) and Flutter x=1102..3525, y=508..1591 (2424 × 1084 px). This establishes a major geometry mismatch, but is not a valid final pixel-diff baseline because browser viewport, device-pixel ratio, zoom, exact fullscreen state and font rasterisation were not confirmed identical. The Flutter desktop layout was then changed to remove the 1500 px centred cap, compact the reader identity/actions into one toolbar and align the sidebar and page in one full-width workspace. This source-level/widget-test correction is not a claim of pixel-level acceptance. Formal acceptance still requires fresh captures with the identical viewport/DPR, fixture, EPUB CFI, preferences and UI state, then image-diff evidence for the full matrix. Record platform, tested commit, fixture and remaining exceptions here.
+
+
+## Source-level comparison review · 2026-11-22
+
+Compared the legacy reference in `pages/epub-lab/index.html`,
+`pages/assets/epub-lab.css` and
+`pages/assets/epub-lab-comics-20261112.js` against the Flutter preview.
+
+Confirmed desktop differences and corrections in this revision:
+
+- Navigation behaviour: legacy desktop uses a two-column grid. Above 1050px it reserves a 250px sidebar and 16px gap; at 1050px and below it reserves 220px and 12px. Closing the sidebar removes that column and gap so the reading surface expands. At 820px and below it switches to an overlay drawer. Flutter now uses the same breakpoints and reserved-column behaviour.
+- Reader frame: legacy desktop frame uses 10px inner padding, 14px corner radius and a 1px low-opacity border; the inner reading viewport uses an 8px radius. Flutter now uses those desktop values. Compact and immersive padding remain separately constrained.
+- Desktop sidebar surface: legacy uses a low-contrast two-stop violet-black gradient, a 13px radius and a soft shadow. Flutter now uses the corresponding treatment and restores the legacy top/content gutters.
+- Book heading: legacy uses an 84px minimum heading block, 12px/4px/16px outer insets, an 18px title and a right-aligned current-chapter label above the action row. Flutter now follows that hierarchy and geometry.
+
+Remaining source-level differences to review in a subsequent pass include the exact chapter-progress panel composition, the original topbar/engine-status row, typography and row density inside the annotation cards, and the text-flow renderer (Foliate.js versus the Flutter-native renderer). These areas cannot be certified as pixel-identical from CSS inspection alone.
+
+No pixel-parity acceptance is claimed. A valid image-diff still requires fresh legacy and Flutter captures using the same EPUB fixture, CFI/page, preferences, annotations, viewport, device-pixel ratio, browser zoom and loaded fonts. The previous acceptance note already records that a historical screenshot pair did not meet this controlled-capture requirement.
