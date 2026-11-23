@@ -447,3 +447,20 @@ regression uses a long multi-line cell next to short cells in both rows. These
 automated checks establish table geometry for the covered fixture; they do
 not claim full browser-equivalent HTML table conformance or close the
 screenshot/device acceptance gate.
+
+
+## Verify overlapping rowspan constraints and rich cell content · 2026-11-23
+
+The shared table grid now has additional geometry coverage for five rows with
+five intersecting row-span constraints. The regression checks the outer edges
+of each merged cell against the independently measured row markers, including
+spans that begin inside rows already enlarged by other spans. A separate XHTML
+fixture places multiple paragraphs and a long text run in one spanning cell,
+with unordered/ordered lists in its adjacent rows and a tappable footnote link
+inside the merged cell. It verifies the final cell geometry and that the
+footnote callback remains reachable after the shared-grid layout.
+
+These fixtures exercise overlapping row-height constraints and mixed textual
+cell children. Image intrinsic-size and asynchronous image-load behaviour in
+tables still require their own fixture and device/browser measurement; this
+does not claim complete table conformance or replace visual parity acceptance.

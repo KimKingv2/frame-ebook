@@ -1314,6 +1314,110 @@ void main() {
     }
   });
 
+  testWidgets(
+      'measures rowspan cells with paragraphs, lists and tappable footnotes',
+      (tester) async {
+    final spanningText = List.filled(48, '跨列資料').join('，');
+    final table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="2">
+              <p>合併儲存格導言</p>
+              <p>$spanningText</p>
+              <p><a epub:type="noteref" href="#footnote-1">[表格註腳]</a></p>
+            </td>
+            <td>
+              <p>第一列標題</p>
+              <ul><li>第一列項目 A</li><li>第一列項目 B</li></ul>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p>第二列標題</p>
+              <ol><li>第二列項目 A</li><li>第二列項目 B</li></ol>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-rich-content-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-rich-content.epub',
+      'fileName': 'table-rowspan-rich-content.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    FrameEpubFootnote? openedFootnote;
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+            onFootnote: (footnote) => openedFootnote = footnote,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('合併儲存格導言'), findsOneWidget);
+      expect(find.text(spanningText), findsOneWidget);
+      expect(find.text('第一列項目 A'), findsOneWidget);
+      expect(find.text('第二列項目 B'), findsOneWidget);
+
+      final spanningCell = find.ancestor(
+        of: find.text('合併儲存格導言'),
+        matching: find.byType(DecoratedBox),
+      );
+      final firstRowCell = find.ancestor(
+        of: find.text('第一列標題'),
+        matching: find.byType(DecoratedBox),
+      );
+      final secondRowCell = find.ancestor(
+        of: find.text('第二列標題'),
+        matching: find.byType(DecoratedBox),
+      );
+      final spanningRect = tester.getRect(spanningCell);
+      final firstRowRect = tester.getRect(firstRowCell);
+      final secondRowRect = tester.getRect(secondRowCell);
+
+      expect(spanningRect.top, closeTo(firstRowRect.top, 0.6));
+      expect(secondRowRect.top, closeTo(firstRowRect.bottom, 0.6));
+      expect(spanningRect.bottom, closeTo(secondRowRect.bottom, 0.6));
+      expect(spanningRect.height, greaterThan(firstRowRect.height));
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('[表格註腳]'));
+      await tester.pumpAndSettle();
+      expect(openedFootnote?.title, '註腳');
+      expect(openedFootnote?.content, '這是註腳的內文。');
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('keeps long EPUB tables bounded within a paginated page',
       (tester) async {
     final rowText = List.filled(24, '表格文字內容').join('、');

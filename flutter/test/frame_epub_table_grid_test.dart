@@ -62,3 +62,125 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+
+  testWidgets('satisfies several overlapping rowspan height constraints',
+      (tester) async {
+    const aKey = ValueKey('span-a');
+    const bKey = ValueKey('span-b');
+    const dKey = ValueKey('span-d');
+    const eKey = ValueKey('span-e');
+    const fKey = ValueKey('span-f');
+    const markerKeys = [
+      ValueKey('row-marker-0'),
+      ValueKey('row-marker-1'),
+      ValueKey('row-marker-2'),
+      ValueKey('row-marker-3'),
+      ValueKey('row-marker-4'),
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: FrameEpubTableGrid(
+          width: 480,
+          columnCount: 4,
+          rowCount: 5,
+          children: [
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 0,
+              columnSpan: 1,
+              rowSpan: 3,
+              child: const SizedBox(key: aKey, height: 125),
+            ),
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 1,
+              columnSpan: 1,
+              rowSpan: 2,
+              child: const SizedBox(key: bKey, height: 90),
+            ),
+            const FrameEpubTableGridCell(
+              row: 0,
+              column: 2,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(height: 22),
+            ),
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 3,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: markerKeys[0], height: 16),
+            ),
+            FrameEpubTableGridCell(
+              row: 1,
+              column: 2,
+              columnSpan: 1,
+              rowSpan: 3,
+              child: const SizedBox(key: dKey, height: 155),
+            ),
+            FrameEpubTableGridCell(
+              row: 1,
+              column: 3,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: markerKeys[1], height: 20),
+            ),
+            FrameEpubTableGridCell(
+              row: 2,
+              column: 1,
+              columnSpan: 1,
+              rowSpan: 3,
+              child: const SizedBox(key: eKey, height: 130),
+            ),
+            FrameEpubTableGridCell(
+              row: 2,
+              column: 3,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: markerKeys[2], height: 24),
+            ),
+            FrameEpubTableGridCell(
+              row: 3,
+              column: 0,
+              columnSpan: 1,
+              rowSpan: 2,
+              child: const SizedBox(key: fKey, height: 95),
+            ),
+            FrameEpubTableGridCell(
+              row: 3,
+              column: 3,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: markerKeys[3], height: 28),
+            ),
+            FrameEpubTableGridCell(
+              row: 4,
+              column: 3,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: markerKeys[4], height: 32),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    final markers = markerKeys.map((key) => tester.getRect(find.byKey(key)));
+    final rowRects = markers.toList(growable: false);
+    Rect spanRect(ValueKey<String> key) => tester.getRect(find.byKey(key));
+
+    expect(spanRect(aKey).top, closeTo(rowRects[0].top, 0.01));
+    expect(spanRect(aKey).bottom, closeTo(rowRects[2].bottom, 0.01));
+    expect(spanRect(bKey).top, closeTo(rowRects[0].top, 0.01));
+    expect(spanRect(bKey).bottom, closeTo(rowRects[1].bottom, 0.01));
+    expect(spanRect(dKey).top, closeTo(rowRects[1].top, 0.01));
+    expect(spanRect(dKey).bottom, closeTo(rowRects[3].bottom, 0.01));
+    expect(spanRect(eKey).top, closeTo(rowRects[2].top, 0.01));
+    expect(spanRect(eKey).bottom, closeTo(rowRects[4].bottom, 0.01));
+    expect(spanRect(fKey).top, closeTo(rowRects[3].top, 0.01));
+    expect(spanRect(fKey).bottom, closeTo(rowRects[4].bottom, 0.01));
+    expect(tester.takeException(), isNull);
+  });
+}

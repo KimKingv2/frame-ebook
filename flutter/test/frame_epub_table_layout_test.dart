@@ -59,6 +59,52 @@ void main() {
     );
   });
 
+  test('places several rowspans before preserving following source cells', () {
+    final layout = FrameEpubTableLayout.build(
+      rows: [
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 3, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 2, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 3, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 3, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 2, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+      ],
+    );
+
+    expect(layout.columnCount, 4);
+    final rowTwo = layout.rows[2].placements;
+    expect(
+      rowTwo.map((placement) => (placement.cellIndex, placement.columnSpan)),
+      [(null, 1), (0, 1), (null, 1), (1, 1)],
+    );
+    expect(
+      layout.rows.map((row) => row.placements.fold<int>(
+            0,
+            (sum, placement) => sum + placement.columnSpan,
+          )),
+      everyElement(4),
+    );
+    expect(layout.rows[0].placements.first.rowSpan, 3);
+    expect(layout.rows[1].placements[2].rowSpan, 3);
+    expect(layout.rows[2].placements[1].rowSpan, 3);
+    expect(layout.rows[3].placements.first.rowSpan, 2);
+  });
+
   test('keeps source cell order and header flags after grid placement', () {
     final layout = FrameEpubTableLayout.build(
       rows: [
