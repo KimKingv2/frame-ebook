@@ -14,6 +14,7 @@ import 'frame_epub_resource_loader.dart';
 import 'frame_epub_page_layout.dart';
 import 'frame_epub_ruby_annotation.dart';
 import 'frame_epub_text_paginator.dart';
+import 'frame_epub_table_layout.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
 class FrameEpubTextSelection {
@@ -1943,87 +1944,39 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return const SizedBox.shrink();
     }
 
-    final rawRows = <List<XmlElement>>[];
-    var columnCount = 1;
-    for (final row in rows) {
-      final cells = row.element.children
-          .whereType<XmlElement>()
-          .where((cell) {
-            final tag = cell.name.local.toLowerCase();
-            return tag == 'td' || tag == 'th';
-          })
-          .toList(growable: false);
-      rawRows.add(cells);
-      final columns = cells.fold<int>(
-        0,
-        (total, cell) =>
-            total +
-            (int.tryParse(_attribute(cell, 'colspan') ?? '') ?? 1)
-                .clamp(1, 12)
-                .toInt(),
-      );
-      if (columns > columnCount) columnCount = columns;
-    }
-
-    final carryRows = List<int>.filled(columnCount, 0);
-    final gridRows = <List<({XmlElement? element, int span, bool header})>>[];
-    for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-      final cells = rawRows[rowIndex];
-      final placements =
-          <({XmlElement? element, int span, bool header})>[];
-      final nextCarry = List<int>.from(carryRows);
-      var column = 0;
-      var cellIndex = 0;
-
-      while (column < columnCount) {
-        if (carryRows[column] > 0) {
-          var span = 1;
-          while (column + span < columnCount &&
-              carryRows[column + span] > 0) {
-            span++;
-          }
-          for (var offset = 0; offset < span; offset++) {
-            nextCarry[column + offset] =
-                (nextCarry[column + offset] - 1).clamp(0, rows.length);
-          }
-          placements.add((element: null, span: span, header: false));
-          column += span;
-          continue;
-        }
-
-        if (cellIndex >= cells.length) {
-          placements.add((element: null, span: 1, header: false));
-          column++;
-          continue;
-        }
-
-        final cell = cells[cellIndex++];
-        final cellTag = cell.name.local.toLowerCase();
-        final span = (int.tryParse(_attribute(cell, 'colspan') ?? '') ?? 1)
-            .clamp(1, columnCount - column)
-            .toInt();
-        final rowSpan = (int.tryParse(_attribute(cell, 'rowspan') ?? '') ?? 1)
-            .clamp(1, rows.length - rowIndex)
-            .toInt();
-        for (var offset = 0; offset < span; offset++) {
-          final target = column + offset;
-          final remaining = rowSpan - 1;
-          if (remaining > nextCarry[target]) {
-            nextCarry[target] = remaining;
-          }
-        }
-        placements.add((
-          element: cell,
-          span: span,
-          header: cellTag == 'th' || rows[rowIndex].header,
-        ));
-        column += span;
-      }
-      gridRows.add(placements);
-      for (var index = 0; index < columnCount; index++) {
-        carryRows[index] = nextCarry[index];
-      }
-    }
+    final rawRows = rows
+        .map(
+          (row) => row.element.children
+              .whereType<XmlElement>()
+              .where((cell) {
+                final tag = cell.name.local.toLowerCase();
+                return tag == 'td' || tag == 'th';
+              })
+              .toList(growable: false),
+        )
+        .toList(growable: false);
+    final tableLayout = FrameEpubTableLayout.build(
+      rows: [
+        for (var rowIndex = 0; rowIndex < rawRows.length; rowIndex++)
+          [
+            for (final cell in rawRows[rowIndex])
+              FrameEpubTableCellSpec(
+                columnSpan: int.tryParse(
+                      _attribute(cell, 'colspan') ?? '',
+                    ) ??
+                    1,
+                rowSpan: int.tryParse(
+                      _attribute(cell, 'rowspan') ?? '',
+                    ) ??
+                    1,
+                header: cell.name.local.toLowerCase() == 'th' ||
+                    rows[rowIndex].header,
+              ),
+          ],
+      ],
+    );
+    final columnCount = tableLayout.columnCount;
+    final gridRows = tableLayout.rows;
 
     final requestedWidth = paginationWidth ?? widget.contentMaxWidth;
     final minimumColumnWidth = 104.0;
@@ -2045,16 +1998,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final rowBackground = _cssColor(rowStyle['background-color']);
       final children = <Widget>[];
 
-      for (final placement in gridRows[rowIndex]) {
-        final cell = placement.element;
-        if (cell == null) {
+      for (final placement in gridRows[rowIndex].placements) {
+        final cellIndex = placement.cellIndex;
+        if (cellIndex == null) {
           children.add(Expanded(
-            flex: placement.span,
+            flex: placement.columnSpan,
             child: const SizedBox.shrink(),
           ));
           continue;
         }
-
+        final cell = rawRows[rowIndex][cellIndex];
         final cellStyle = _computedStyle(cell, cascade, rowStyle);
         final padding = _boxInsets(cellStyle, 'padding', widget.fontSize);
         final cellPadding =
@@ -2068,10 +2021,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           'bottom' => Alignment.bottomLeft,
           _ => Alignment.topLeft,
         };
-        final cellTextWidth = (tableWidth * placement.span / columnCount -
-                cellPadding.horizontal)
-            .clamp(1.0, tableWidth)
-            .toDouble();
+        final cellTextWidth =
+            (tableWidth * placement.columnSpan / columnCount -
+                    cellPadding.horizontal)
+                .clamp(1.0, tableWidth)
+                .toDouble();
         final contents = _flowChildren(
           cell,
           cellStyle,
@@ -2103,7 +2057,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           );
         }
         children.add(Expanded(
-          flex: placement.span,
+          flex: placement.columnSpan,
           child: KeyedSubtree(
             key: _elementKey(cell),
             child: cellContent,

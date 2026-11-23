@@ -1144,6 +1144,92 @@ void main() {
     }
   });
 
+  testWidgets(
+      'keeps table column widths aligned when rowspan precedes a colspan',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="2">固定欄位</td>
+            <td>第二欄</td>
+            <td>第三欄</td>
+          </tr>
+          <tr>
+            <td colspan="2">跨欄內容</td>
+            <td>第四欄</td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-colspan-grid-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-colspan.epub',
+      'fileName': 'table-rowspan-colspan.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('固定欄位'), findsOneWidget);
+      expect(find.text('第二欄'), findsOneWidget);
+      expect(find.text('第三欄'), findsOneWidget);
+      expect(find.text('跨欄內容'), findsOneWidget);
+      expect(find.text('第四欄'), findsOneWidget);
+
+      final mergedCell = find.ancestor(
+        of: find.text('跨欄內容'),
+        matching: find.byType(DecoratedBox),
+      );
+      final fourthCell = find.ancestor(
+        of: find.text('第四欄'),
+        matching: find.byType(DecoratedBox),
+      );
+      expect(mergedCell, findsOneWidget);
+      expect(fourthCell, findsOneWidget);
+      final mergedWidth = tester.getSize(mergedCell).width;
+      final fourthWidth = tester.getSize(fourthCell).width;
+      expect(
+        mergedWidth,
+        closeTo(fourthWidth * 2, 1.5),
+        reason: 'A two-column cell must use exactly two of the table tracks.',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('keeps long EPUB tables bounded within a paginated page',
       (tester) async {
     final rowText = List.filled(24, '表格文字內容').join('、');

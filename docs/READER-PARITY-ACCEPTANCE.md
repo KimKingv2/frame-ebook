@@ -403,3 +403,27 @@ widget regression uses a long XHTML paragraph with `text-indent: 2em`, checks
 that it spans multiple reader pages, and confirms the complete text occurs
 exactly once in the rendered selectable text. This is automated test evidence,
 not yet a browser screenshot comparison or a survey of real-world EPUBs.
+
+
+## Align table columns when rowspans and colspans overlap · 2026-11-23
+
+Table grid construction now accounts for occupied columns before placing each
+row's next cell. Previously, the global column count was estimated from the
+sum of colspans in each source row, without adding columns pushed to the right
+by an active rowspan. A row containing a rowspan in its first column followed
+by a two-column colspan and another cell could therefore render four flex
+tracks while calculating cell text widths against a three-column table. That
+made widths inconsistent between rows.
+
+The table layout is extracted into `frame_epub_table_layout.dart`. It resolves
+cell start columns against active rowspans, expands the final grid width when
+needed, and emits explicit empty placements so every row uses the same total
+number of tracks. The renderer uses those placements for both flex allocation
+and text-width measurement. Source cell order and the existing bounded
+vertical scrolling for long tables are preserved.
+
+A widget regression covers a two-row table where a rowspan forces a following
+row's colspan to the right, then asserts the merged cell is exactly twice the
+width of the adjacent single-column cell. Unit tests verify the final track
+count and row placement maps independently. This is automated layout evidence,
+not a screenshot pixel-diff or a complete HTML table conformance claim.
