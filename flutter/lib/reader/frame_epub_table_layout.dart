@@ -64,7 +64,6 @@ class FrameEpubTableLayout {
     final occupiedUntil = <int>[];
     final rawPlacements =
         <Map<int, FrameEpubTableCellPlacement>>[];
-    final rawOccupancy = <List<bool>>[];
     var columnCount = 0;
 
     for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
@@ -122,7 +121,6 @@ class FrameEpubTableLayout {
       }
 
       rawPlacements.add(placements);
-      rawOccupancy.add(occupied);
       if (occupied.length > columnCount) columnCount = occupied.length;
     }
 

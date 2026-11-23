@@ -100,7 +100,7 @@ void main() {
       everyElement(4),
     );
     expect(layout.rows[0].placements.first.rowSpan, 3);
-    expect(layout.rows[1].placements[2].rowSpan, 3);
+    expect(layout.rows[1].placements[1].rowSpan, 3);
     expect(layout.rows[2].placements[1].rowSpan, 3);
     expect(layout.rows[3].placements.first.rowSpan, 2);
   });
