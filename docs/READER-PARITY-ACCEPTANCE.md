@@ -336,3 +336,24 @@ old measurement even when the new page width is larger. A widget regression
 starts at 820px, crosses to 759px, and verifies that the text column expands
 from the spread width to the single-page width. This is automated layout
 evidence, not a browser screenshot or pixel-diff claim.
+
+## Restore CFI positions across inline XHTML text nodes · 2026-11-23
+
+Paginated text fragments previously recorded only the first XHTML text node
+inside each rendered fragment. If a saved CFI pointed into a later inline node
+(such as text inside `<strong>` or `<em>`) that shared a page fragment with
+preceding text, the fragment lookup could miss the target node and fall back
+to the chapter's first page.
+
+Each fragment now retains its complete list of source text ranges, including
+the original UTF-16 offsets. Restore lookup selects the fragment whose source
+range contains the CFI offset, with a nearest-range fallback for offsets
+affected by whitespace normalization. Exact page-boundary offsets are
+assigned to the following fragment, while the terminal end of a text node
+remains addressable. Live progress still uses the first source range in
+reading order so the saved CFI stays at the start of the visible fragment.
+
+A widget regression restores to a CFI in a later `<strong>` node after a long
+paragraph prefix and verifies that the reader opens beyond page zero. This is
+automated widget evidence; browser-level visual and real-book restore timing
+remain part of acceptance.

@@ -68,10 +68,36 @@ class _TextSelectionEndpoint {
 }
 
 class _PaginatedTextPosition {
-  const _PaginatedTextPosition(this.node, this.offset);
+  const _PaginatedTextPosition(this.sources);
 
-  final XmlText node;
-  final int offset;
+  final List<FrameEpubTextRangeSource> sources;
+
+  /// Finds the source range containing the requested original XHTML offset.
+  ///
+  /// Ranges are half-open so an offset exactly on a page boundary belongs to
+  /// the following fragment. The end of the source text remains addressable.
+  FrameEpubTextRangeSource? sourceFor(XmlText node, int offset) {
+    FrameEpubTextRangeSource? nearest;
+    var nearestDistance = 1 << 30;
+    for (final source in sources) {
+      if (!identical(source.node, node) || source.sourceOffsets.isEmpty) {
+        continue;
+      }
+      final start = source.sourceOffsets.first;
+      final end = source.sourceOffsets.last;
+      if (offset >= start &&
+          (offset < end || (offset == end && offset == node.value.length))) {
+        return source;
+      }
+
+      final distance = offset < start ? start - offset : offset - end;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = source;
+      }
+    }
+    return nearest;
+  }
 }
 
 class _TextSpanSlice {
@@ -967,35 +993,25 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                 ? null
                 : FrameEpubCfi.firstTextPoint(anchor);
     if (point != null) {
-        _PaginatedTextPosition? best;
-        GlobalKey? bestKey;
-        var bestDistance = 1 << 30;
-        for (final entry in _paginationTextPositions.entries) {
-          final position = entry.value;
-          if (!identical(position.node, point.node)) continue;
-          final distance = point.offset >= position.offset
-              ? point.offset - position.offset
-              : (1 << 29) + position.offset - point.offset;
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            best = position;
-            bestKey = entry.key;
-          }
+      GlobalKey? matchingKey;
+      for (final entry in _paginationTextPositions.entries) {
+        if (entry.value.sourceFor(point.node, point.offset) != null) {
+          matchingKey = entry.key;
+          break;
         }
-        final fragmentObject =
-            bestKey?.currentContext?.findRenderObject();
-        if (best != null &&
-            fragmentObject is RenderBox &&
-            fragmentObject.hasSize) {
-          final itemIndex = _flowItemIndexForFragment(fragmentObject);
-          if (itemIndex != null) {
-            for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-              if (pages[pageIndex].itemIndices.contains(itemIndex)) {
-                return pageIndex;
-              }
+      }
+      final fragmentObject =
+          matchingKey?.currentContext?.findRenderObject();
+      if (fragmentObject is RenderBox && fragmentObject.hasSize) {
+        final itemIndex = _flowItemIndexForFragment(fragmentObject);
+        if (itemIndex != null) {
+          for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+            if (pages[pageIndex].itemIndices.contains(itemIndex)) {
+              return pageIndex;
             }
           }
         }
+      }
     }
 
     RenderBox? anchorBox;
@@ -1151,9 +1167,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           }
           final itemIndex = _flowItemIndexForFragment(object);
           if (itemIndex == null) continue;
+          final firstSource = entry.value.sources.first;
           visible.add((
-            node: entry.value.node,
-            offset: entry.value.offset,
+            node: firstSource.node,
+            offset: firstSource.sourceOffsets.first,
             itemIndex: itemIndex,
             top: top,
           ));
@@ -1594,10 +1611,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             ? null
             : _nextPaginationTextKey();
         if (fragmentKey != null && selectionSources.isNotEmpty) {
-          final source = selectionSources.first;
           _paginationTextPositions[fragmentKey] = _PaginatedTextPosition(
-            source.node,
-            source.sourceOffsets.first,
+            selectionSources,
           );
         }
         final selectable = SelectableText.rich(

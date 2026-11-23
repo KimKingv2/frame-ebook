@@ -1464,6 +1464,84 @@ void main() {
     }
   });
 
+  testWidgets(
+      'restores a CFI inside a later inline text node on its measured page',
+      (tester) async {
+    final prefix = List.filled(100, '前段文字跨頁定位測試。').join();
+    final targetText = '這是需要精確恢復的行內目標文字。';
+    final bytes = _fixture(
+      additionalParagraphMarkup:
+          '<p>$prefix<em>前置行內文字</em><strong id="target-inline">$targetText</strong></p>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-inline-cfi-restore-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/inline-cfi-restore.epub',
+      'fileName': 'inline-cfi-restore.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final targetElement = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere(
+            (element) => element.getAttribute('id') == 'target-inline',
+          );
+      final targetTextNode =
+          targetElement.children.whereType<XmlText>().single;
+      expect(targetTextNode.value, targetText);
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              paginated: true,
+              pageController: pageController,
+              initialTextNode: targetTextNode,
+              initialTextOffset: 4,
+              initialScrollFraction: 0,
+              restoreRevision: 1,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.page,
+        greaterThan(0),
+        reason: 'An inline CFI later in the chapter must not fall back to page zero.',
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('keeps the current pagination when the viewport only grows taller',
       (tester) async {
     final longText = List.filled(
