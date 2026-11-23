@@ -1536,6 +1536,85 @@ void main() {
     }
   });
 
+  testWidgets(
+      're-measures page width when a two-page spread collapses to one page',
+      (tester) async {
+    final longText = List.filled(
+      180,
+      '切換雙頁與單頁版面時，正文應重新依照目前頁寬分頁，不能沿用舊欄寬。',
+    ).join();
+    final bytes = _fixture(additionalParagraphMarkup: '<p>$longText</p>');
+    final book = FrameBook.fromJson({
+      'id': 'chapter-spread-collapse-pagination-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/spread-collapse.epub',
+      'fileName': 'spread-collapse.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(820, 420);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              paginated: true,
+              doublePageSpread: true,
+              pageController: pageController,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(pageController.hasClients, isTrue);
+      final spreadTextWidth = tester.getSize(
+        find.byType(SelectableText).first,
+      ).width;
+      expect(spreadTextWidth, lessThan(400));
+
+      // 759px falls below the renderer's 760px two-page threshold.
+      // The single-page text column must be measured at the wider page size.
+      tester.view.physicalSize = const Size(759, 420);
+      await tester.pumpAndSettle();
+
+      final singlePageTextWidth = tester.getSize(
+        find.byType(SelectableText).first,
+      ).width;
+      expect(
+        singlePageTextWidth,
+        greaterThan(500),
+        reason: 'Single-page layout must not retain the narrower spread width.',
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('long paragraphs are split into separate paginated text fragments', (tester) async {
     final longText = List.filled(
       900,

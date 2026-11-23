@@ -727,7 +727,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     const spreadGutter = 24.0;
     final spreadActive =
         widget.doublePageSpread && viewportSize.width >= 760;
-    _paginationSpreadActive = spreadActive;
+    final previousSpreadActive = _paginationSpreadActive;
 
     final outerMargin = viewportSize.width *
         widget.horizontalMarginPercent.clamp(0, 20) / 100;
@@ -750,7 +750,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final heightShrank = previousViewportSize != null &&
         viewportSize.height < previousViewportSize.height - 0.5;
     final spreadChanged = previousViewportSize != null &&
-        _paginationSpreadActive != spreadActive;
+        previousSpreadActive != spreadActive;
 
     if (previousViewportSize != null &&
         (pageWidthShrank || heightShrank || spreadChanged)) {

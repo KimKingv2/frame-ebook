@@ -321,3 +321,18 @@ Widget-level resource-loader tests verify concurrent request coalescing,
 subsequent in-memory reuse with no extra Range reads, and separation between
 default and stricter parsing limits. This is bounded-cache and request-count
 evidence; real-book navigation timing still needs device/browser measurement.
+
+## Re-measure page width when a two-page spread collapses to one page · 2026-11-23
+
+When a wide viewport crossed below the 760px two-page threshold, the reader
+could switch back to single-page presentation while retaining the narrower
+page width measured for the previous spread. The spread-mode comparison was
+being overwritten before it was checked, so widening-only geometry changes
+could skip the required pagination pass.
+
+The renderer now compares the previous spread state before recording the new
+state. A change between spread and single-page presentation invalidates the
+old measurement even when the new page width is larger. A widget regression
+starts at 820px, crosses to 759px, and verifies that the text column expands
+from the spread width to the single-page width. This is automated layout
+evidence, not a browser screenshot or pixel-diff claim.
