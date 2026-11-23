@@ -201,3 +201,22 @@ the reduced bottom inset and status-line spacing.
 
 These are automated widget/layout checks, not screenshot pixel-diff
 acceptance.
+
+
+## Draw page-turn labels independently of Material button defaults · 2026-11-23
+
+The user reported that the previous/next controls still rendered as empty
+outlined boxes in the deployed Web reader. The previous implementation
+verified that Text widgets existed in the widget tree, but did not verify
+that their foreground style was visibly painted by the Material button.
+
+The controls are now rendered as a fixed-size decorated surface with a direct
+Text widget and an explicit TextStyle colour, avoiding OutlinedButton and its
+inherited disabled-state styling. The directional chevrons are text glyphs
+rather than Material icon-font glyphs. Disabled controls retain a muted but
+high-contrast label and border; enabled controls retain the brighter label.
+Widget tests check the exact painted Text child, explicit colours, non-zero
+layout bounds, button dimensions and tap behaviour.
+
+This remains widget/layout evidence rather than browser screenshot pixel-diff
+evidence. A live browser visual check is still required to close the report.

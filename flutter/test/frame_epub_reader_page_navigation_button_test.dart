@@ -3,7 +3,7 @@ import 'package:frame_ebook/reader/frame_epub_reader_page_navigation_button.dart
 import 'package:material_ui/material_ui.dart';
 
 void main() {
-  testWidgets('keeps previous and next controls visible when disabled',
+  testWidgets('paints explicit text and arrows for enabled and disabled controls',
       (tester) async {
     var nextPressed = false;
 
@@ -33,28 +33,24 @@ void main() {
       ),
     );
 
-    expect(find.text('上一頁'), findsOneWidget);
-    expect(find.text('下一頁'), findsOneWidget);
-    expect(find.byIcon(Icons.chevron_left_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+    const previousText = '‹  上一頁';
+    const nextText = '下一頁  ›';
+    expect(find.text(previousText), findsOneWidget);
+    expect(find.text(nextText), findsOneWidget);
 
-    final previous = tester.widget<OutlinedButton>(
-      find.byKey(const ValueKey('reader-page-turn-previous')),
-    );
-    final previousStyle = previous.style!;
-    expect(previous.onPressed, isNull);
-    expect(
-      previousStyle.foregroundColor!.resolve({WidgetState.disabled}),
-      const Color(0xFFB8ADC9),
-    );
-    expect(
-      previousStyle.backgroundColor!.resolve({WidgetState.disabled}),
-      const Color(0xFF292432),
-    );
-    expect(
-      previousStyle.side!.resolve({WidgetState.disabled})!.color,
-      const Color(0xFF665B78),
-    );
+    final previousLabel = tester.widget<Text>(find.text(previousText));
+    final nextLabel = tester.widget<Text>(find.text(nextText));
+    expect(previousLabel.style?.color, const Color(0xFFB8ADC9));
+    expect(nextLabel.style?.color, const Color(0xFFECE6F5));
+    expect(previousLabel.style?.fontSize, 12);
+    expect(nextLabel.style?.fontSize, 12);
+
+    final previousLabelSize = tester.getSize(find.text(previousText));
+    final nextLabelSize = tester.getSize(find.text(nextText));
+    expect(previousLabelSize.width, greaterThan(0));
+    expect(previousLabelSize.height, greaterThan(0));
+    expect(nextLabelSize.width, greaterThan(0));
+    expect(nextLabelSize.height, greaterThan(0));
 
     final previousRect = tester.getRect(
       find.byKey(const ValueKey('reader-page-turn-previous')),
@@ -62,10 +58,19 @@ void main() {
     final nextRect = tester.getRect(
       find.byKey(const ValueKey('reader-page-turn-next')),
     );
-    expect(previousRect.width, greaterThanOrEqualTo(104));
-    expect(previousRect.height, greaterThanOrEqualTo(37));
-    expect(nextRect.width, greaterThanOrEqualTo(104));
-    expect(nextRect.height, greaterThanOrEqualTo(37));
+    expect(previousRect.width, 116);
+    expect(previousRect.height, 37);
+    expect(nextRect.width, 116);
+    expect(nextRect.height, 37);
+
+    final previousGesture = tester.widget<GestureDetector>(
+      find.byKey(const ValueKey('reader-page-turn-previous')),
+    );
+    final nextGesture = tester.widget<GestureDetector>(
+      find.byKey(const ValueKey('reader-page-turn-next')),
+    );
+    expect(previousGesture.onTap, isNull);
+    expect(nextGesture.onTap, isNotNull);
 
     await tester.tap(find.byKey(const ValueKey('reader-page-turn-next')));
     await tester.pump();

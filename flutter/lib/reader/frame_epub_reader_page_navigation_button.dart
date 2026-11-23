@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-/// A page-turn action whose disabled state remains visibly legible at the
-/// beginning or end of a book.
+/// A page-turn control that draws its own label and arrow instead of relying
+/// on the inherited Material button text style.
 class FrameEpubReaderPageNavigationButton extends StatelessWidget {
   const FrameEpubReaderPageNavigationButton({
     required this.previous,
@@ -16,57 +16,54 @@ class FrameEpubReaderPageNavigationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      key: ValueKey(
-        previous ? 'reader-page-turn-previous' : 'reader-page-turn-next',
-      ),
-      onPressed: enabled ? onPressed : null,
-      style: ButtonStyle(
-        foregroundColor: WidgetStateProperty.resolveWith((states) {
-          return states.contains(WidgetState.disabled)
-              ? const Color(0xFFB8ADC9)
-              : const Color(0xFFECE6F5);
-        }),
-        backgroundColor: WidgetStateProperty.resolveWith((states) {
-          return states.contains(WidgetState.disabled)
-              ? const Color(0xFF292432)
-              : const Color(0xFF342B43);
-        }),
-        side: WidgetStateProperty.resolveWith((states) {
-          return BorderSide(
-            color: states.contains(WidgetState.disabled)
-                ? const Color(0xFF665B78)
-                : const Color(0xFF8D79A8),
-          );
-        }),
-        minimumSize: const WidgetStatePropertyAll(Size(104, 37)),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 14),
-        ),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-        shape: const WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
+    final label = previous ? '上一頁' : '下一頁';
+    final text = previous ? '‹  上一頁' : '下一頁  ›';
+    final foreground =
+        enabled ? const Color(0xFFECE6F5) : const Color(0xFFB8ADC9);
+    final background =
+        enabled ? const Color(0xFF342B43) : const Color(0xFF292432);
+    final border =
+        enabled ? const Color(0xFF8D79A8) : const Color(0xFF8A7B9C);
+
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: label,
+        child: MouseRegion(
+          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          child: GestureDetector(
+            key: ValueKey(
+              previous ? 'reader-page-turn-previous' : 'reader-page-turn-next',
+            ),
+            behavior: HitTestBehavior.opaque,
+            onTap: enabled ? onPressed : null,
+            child: Container(
+              width: 116,
+              height: 37,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: background,
+                border: Border.all(color: border, width: 1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (previous) ...[
-            const Icon(Icons.chevron_left_rounded, size: 17),
-            const SizedBox(width: 3),
-          ],
-          Text(previous ? '上一頁' : '下一頁'),
-          if (!previous) ...[
-            const SizedBox(width: 3),
-            const Icon(Icons.chevron_right_rounded, size: 17),
-          ],
-        ],
       ),
     );
   }
