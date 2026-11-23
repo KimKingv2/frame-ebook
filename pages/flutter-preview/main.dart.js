@@ -94220,19 +94220,20 @@ q=B.e.ai(q.fx,8,64)*2
 j=s-q
 i=a6.cy
 h=a6.db
-g=h!=null&&k<h-0.5
+g=h!=null&&Math.abs(k-h)>0.5
 f=i!=null
-e=f&&s<i.b-0.5
+e=f&&Math.abs(s-i.b)>0.5
 d=f&&o!==p
 if(f)s=g||e||d
 else s=!1
 if(s)a6.xy()
 a6.dy=p
 c=a6.db
-if(c==null||k<c-0.5)c=k
+if(c==null)c=k
 s=a6.cy
-b=s==null?j:s.b-q
-a=j<b?j:b
+f=s==null
+b=f?j:s.b-q
+a=f?j:b
 a6.ax=0
 a6.at.U(0)
 a6.a.toString
@@ -94305,16 +94306,19 @@ if(c<g){g=c
 h=f}if(c===0)break}if(!isFinite(g))return a
 for(a0=a3.length,m=0;m<a0;++m)if(B.b.n(a3[m].a,h))return m
 return a},
-a_z(){var s,r,q,p,o=this
-if(!o.w){s=o.a
-s=s.k3==null&&s.p1==null}else s=!0
+a_z(){var s,r,q,p,o,n=this
+if(!(n.fr!=null&&n.fx!=null)){s=n.a
+r=s.k4!=null&&s.ok!=null}else r=!0
+if(!n.w)if(!r){s=n.a
+s=s.k3==null&&s.p1==null}else s=!1
+else s=!0
 if(s)return
-o.w=!0
-r=o.cx
-s=o.a
-q=s.p2
-p=s.c
-$.a_.ok$.push(new A.aDh(o,r,q,p))},
+n.w=!0
+q=n.cx
+s=n.a
+p=s.p2
+o=s.c
+$.a_.ok$.push(new A.aDh(n,q,p,o))},
 Mh(){var s,r,q=this.a
 if(q.e||q.p4==null)return
 s=q.c
