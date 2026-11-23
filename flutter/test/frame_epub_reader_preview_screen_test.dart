@@ -162,7 +162,19 @@ void main() {
     );
     expect(chapterTitleRect.center.dx, frameForGap.center.dx);
     expect(chapterTitleRect.center.dy, toolbarRect.center.dy);
-    expect(toolbarRect.height, 40);
+    final bookIdentityRect = tester.getRect(
+      find.byKey(const ValueKey('reader-book-identity')),
+    );
+    expect(bookIdentityRect.center.dy, toolbarRect.center.dy);
+    final backButtonRect = tester.getRect(
+      find.byKey(const ValueKey('reader-back-to-library')),
+    );
+    expect(backButtonRect.center.dy, toolbarRect.center.dy);
+    for (final rect in actionRects) {
+      expect(rect.center.dy, toolbarRect.center.dy);
+    }
+    expect(toolbarRect.bottom, frameForGap.top);
+    expect(toolbarRect.height, 50);
     expect(frameForGap.top - toolbarRect.top, 50);
 
     final frame = tester.widget<Container>(
@@ -190,7 +202,7 @@ void main() {
     final contentInset = tester.widget<Padding>(
       find.byKey(const ValueKey('reader-content-row-inset')),
     );
-    expect(contentInset.padding, const EdgeInsets.fromLTRB(0, 10, 0, 2));
+    expect(contentInset.padding, const EdgeInsets.fromLTRB(0, 0, 0, 2));
     final frameRect = tester.getRect(
       find.byKey(const ValueKey('reader-rounded-frame')),
     );

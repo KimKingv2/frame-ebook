@@ -234,3 +234,17 @@ previously requested bottom spacing is unchanged.
 Regression tests assert the desktop frame is now 50px below the desktop
 toolbar top (previously 42px), and assert the compact top and bottom insets.
 Chapter-title centering and toolbar placement are otherwise unchanged.
+
+
+## Center toolbar contents in the screen-to-frame top band · 2026-11-23
+
+The desktop gap above the reading frame is now a single 50px toolbar band.
+The desktop toolbar minimum height is 50px and the separate frame-row top
+inset is zero, preserving the frame's existing top coordinate. The book title
+and author block, centered chapter label, back button and all four action
+buttons are vertically centered on the same axis within that band.
+
+Widget regression coverage checks the center coordinate of each group/control,
+and confirms the toolbar bottom meets the frame top with no second hidden gap.
+Compact layout and immersive-mode insets are unchanged. These are automated
+layout checks, not screenshot pixel-diff acceptance.

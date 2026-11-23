@@ -1007,7 +1007,7 @@ class _FrameEpubReaderPreviewScreenState
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
-        constraints: const BoxConstraints(minHeight: 40),
+        constraints: const BoxConstraints(minHeight: 50),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: SizedBox(
@@ -1028,6 +1028,7 @@ class _FrameEpubReaderPreviewScreenState
                       ),
                       child: IconButton(
                         tooltip: '返回書架',
+                        key: const ValueKey('reader-back-to-library'),
                         onPressed: () => Navigator.of(context).maybePop(),
                         padding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
@@ -1046,6 +1047,7 @@ class _FrameEpubReaderPreviewScreenState
                     SizedBox(
                       width: bookColumnWidth,
                       child: Column(
+                        key: const ValueKey('reader-book-identity'),
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1288,7 +1290,7 @@ class _FrameEpubReaderPreviewScreenState
               key: const ValueKey('reader-content-row-inset'),
               padding: EdgeInsets.fromLTRB(
                 0,
-                immersive ? 2 : wide ? 10 : 8,
+                immersive ? 2 : wide ? 0 : 8,
                 0,
                 2,
               ),
