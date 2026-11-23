@@ -771,30 +771,29 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final availableHeight = viewportSize.height - verticalMargin * 2;
     final previousViewportSize = _paginationViewportSize;
     final previousPageWidth = _paginationPageWidth;
-    final pageWidthShrank = previousPageWidth != null &&
-        pageWidth < previousPageWidth - 0.5;
-    final heightShrank = previousViewportSize != null &&
-        viewportSize.height < previousViewportSize.height - 0.5;
+    final pageWidthChanged = previousPageWidth != null &&
+        (pageWidth - previousPageWidth).abs() > 0.5;
+    final heightChanged = previousViewportSize != null &&
+        (viewportSize.height - previousViewportSize.height).abs() > 0.5;
     final spreadChanged = previousViewportSize != null &&
         previousSpreadActive != spreadActive;
 
+    // Pagination depends on both text width and available page height.
+    // Re-measure on growth as well as shrinkage; the current source CFI is
+    // retained separately and becomes the restore anchor for the new layout.
     if (previousViewportSize != null &&
-        (pageWidthShrank || heightShrank || spreadChanged)) {
+        (pageWidthChanged || heightChanged || spreadChanged)) {
       _resetPaginationMeasurement();
     }
     _paginationSpreadActive = spreadActive;
 
-    // A larger viewport can show the existing page with extra breathing room.
-    // Keep the previous text-fragment bounds so fullscreen/window expansion
-    // does not force an expensive full-chapter pagination pass.
-    final layoutPageWidth = _paginationPageWidth == null ||
-            pageWidth < _paginationPageWidth! - 0.5
+    final layoutPageWidth = _paginationPageWidth == null
         ? pageWidth
         : _paginationPageWidth!;
     final measuredAvailableHeight = _paginationViewportSize == null
         ? availableHeight
         : _paginationViewportSize!.height - verticalMargin * 2;
-    final layoutAvailableHeight = availableHeight < measuredAvailableHeight
+    final layoutAvailableHeight = _paginationViewportSize == null
         ? availableHeight
         : measuredAvailableHeight;
 
@@ -1058,8 +1057,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       _elementKeys.putIfAbsent(element, GlobalKey.new);
 
   void _scheduleInitialRestore() {
+    final hasSavedTextPosition =
+        (_lastVisibleTextNode != null && _lastVisibleTextOffset != null) ||
+        (widget.initialTextNode != null && widget.initialTextOffset != null);
     if (_restoreScheduled ||
-        (widget.initialAnchor == null &&
+        (!hasSavedTextPosition &&
+            widget.initialAnchor == null &&
             widget.initialScrollFraction == null)) {
       return;
     }

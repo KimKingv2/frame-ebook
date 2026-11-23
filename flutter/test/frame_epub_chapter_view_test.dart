@@ -1542,11 +1542,11 @@ void main() {
     }
   });
 
-  testWidgets('keeps the current pagination when the viewport only grows taller',
+  testWidgets('restores the current CFI when the viewport grows taller',
       (tester) async {
     final longText = List.filled(
-      90,
-      '全螢幕切換只增加可用高度時，閱讀位置與現有分頁不應重新載入。每一頁的內容應維持穩定。',
+      360,
+      '視窗尺寸變更後，閱讀器必須保留目前文字節點與 UTF-16 位移，再依照新頁高重新分頁。',
     ).join();
     final bytes = _fixture(additionalParagraphMarkup: '<p>$longText</p>');
     final book = FrameBook.fromJson({
@@ -1565,47 +1565,199 @@ void main() {
       book: book,
     );
     final pageController = PageController();
+    final reportedPositions = <String>[];
     try {
       final epub = await const FrameEpubParser().parse(archive);
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
+
+      Widget buildReader({
+        required PageController controller,
+        FrameEpubCfiLocation? restorePoint,
+      }) =>
+          MaterialApp(
+            home: Scaffold(
+              body: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                paginated: true,
+                pageController: controller,
+                initialTextNode: restorePoint?.node is XmlText
+                    ? restorePoint!.node as XmlText
+                    : null,
+                initialTextOffset:
+                    restorePoint?.node is XmlText ? restorePoint!.offset : null,
+                initialScrollFraction: restorePoint == null ? null : 0,
+                restoreRevision: restorePoint == null ? 0 : 1,
+                onReadingPosition: (cfi, _) => reportedPositions.add(cfi),
+              ),
+            ),
+          );
 
       tester.view.physicalSize = const Size(420, 260);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      await tester.pumpWidget(buildReader(controller: pageController));
+      await tester.pumpAndSettle();
+      expect(pageController.hasClients, isTrue);
+      expect(pageController.position.maxScrollExtent, greaterThan(0));
+
+      pageController.jumpToPage(4);
+      await tester.pumpAndSettle();
+      expect(reportedPositions, isNotEmpty);
+      final savedCfi = reportedPositions.last;
+      final savedPoint = FrameEpubCfi.resolve(
+        book: epub,
+        document: chapter.document,
+        cfi: savedCfi,
+      );
+      expect(savedPoint?.node, isA<XmlText>());
+
+      tester.view.physicalSize = const Size(420, 420);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final restoredPage = pageController.page!.round();
+
+      // A fresh reader given the same CFI is the reference for where that
+      // exact text node and offset belongs under the enlarged viewport.
+      final referenceController = PageController();
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: FrameEpubChapterView(
-              chapter: chapter,
-              resourceLoader: loader,
-              paginated: true,
-              pageController: pageController,
+        buildReader(
+          controller: referenceController,
+          restorePoint: savedPoint,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(referenceController.page!.round(), restoredPage);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      referenceController.dispose();
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+  testWidgets('restores the current CFI after font size and line height change',
+      (tester) async {
+    final longText = List.filled(
+      420,
+      '字級與行距調整會改變每頁能容納的文字量，但不能讓正在閱讀的位置倒退到章節開頭。',
+    ).join();
+    final bytes = _fixture(additionalParagraphMarkup: '<p>$longText</p>');
+    final book = FrameBook.fromJson({
+      'id': 'chapter-pagination-typography-restore-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/typography-restore.epub',
+      'fileName': 'typography-restore.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    final reportedPositions = <String>[];
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      Widget buildReader({
+        required PageController controller,
+        required double fontSize,
+        required double lineHeight,
+        FrameEpubCfiLocation? restorePoint,
+      }) =>
+          MaterialApp(
+            home: Scaffold(
+              body: FrameEpubChapterView(
+                chapter: chapter,
+                resourceLoader: loader,
+                paginated: true,
+                pageController: controller,
+                fontSize: fontSize,
+                lineHeight: lineHeight,
+                initialTextNode: restorePoint?.node is XmlText
+                    ? restorePoint!.node as XmlText
+                    : null,
+                initialTextOffset:
+                    restorePoint?.node is XmlText ? restorePoint!.offset : null,
+                initialScrollFraction: restorePoint == null ? null : 0,
+                restoreRevision: restorePoint == null ? 0 : 1,
+                onReadingPosition: (cfi, _) => reportedPositions.add(cfi),
+              ),
             ),
-          ),
+          );
+
+      tester.view.physicalSize = const Size(420, 320);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        buildReader(
+          controller: pageController,
+          fontSize: 16,
+          lineHeight: 1.65,
         ),
       );
       await tester.pumpAndSettle();
       expect(pageController.hasClients, isTrue);
       expect(pageController.position.maxScrollExtent, greaterThan(0));
 
-      pageController.jumpToPage(1);
+      pageController.jumpToPage(5);
       await tester.pumpAndSettle();
-      expect(pageController.page, 1);
+      expect(reportedPositions, isNotEmpty);
+      final savedCfi = reportedPositions.last;
+      final savedPoint = FrameEpubCfi.resolve(
+        book: epub,
+        document: chapter.document,
+        cfi: savedCfi,
+      );
+      expect(savedPoint?.node, isA<XmlText>());
 
-      tester.view.physicalSize = const Size(420, 420);
-      await tester.pump();
+      await tester.pumpWidget(
+        buildReader(
+          controller: pageController,
+          fontSize: 26,
+          lineHeight: 1.95,
+        ),
+      );
+      await tester.pumpAndSettle();
 
       expect(find.byType(PageView), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(pageController.page, 1);
-
-      await tester.pumpAndSettle();
-      expect(pageController.page, 1);
       expect(tester.takeException(), isNull);
+      final restoredPage = pageController.page!.round();
+
+      // Verify the live reader lands on the same page as a fresh CFI restore
+      // measured with the new typography, not merely on any non-zero page.
+      final referenceController = PageController();
+      await tester.pumpWidget(
+        buildReader(
+          controller: referenceController,
+          fontSize: 26,
+          lineHeight: 1.95,
+          restorePoint: savedPoint,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(referenceController.page!.round(), restoredPage);
+      expect(tester.takeException(), isNull);
+
       await tester.pumpWidget(const SizedBox.shrink());
+      referenceController.dispose();
     } finally {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();

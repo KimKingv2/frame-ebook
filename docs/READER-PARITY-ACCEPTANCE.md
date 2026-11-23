@@ -357,3 +357,24 @@ A widget regression restores to a CFI in a later `<strong>` node after a long
 paragraph prefix and verifies that the reader opens beyond page zero. This is
 automated widget evidence; browser-level visual and real-book restore timing
 remain part of acceptance.
+
+
+## Preserve the active CFI across typography and viewport reflow · 2026-11-23
+
+The paginated renderer now invalidates its measured fragments whenever the
+effective page width or available page height changes, whether the viewport
+grows or shrinks. It no longer carries narrower/shorter page measurements into
+a larger window. Before remeasurement, the latest visible text node and its
+original UTF-16 offset remain in the chapter state; the restore scheduler now
+uses that internal CFI anchor even when the parent has not supplied a new
+initial-position property. Explicit initialTextNode / initialTextOffset
+restores are also recognized independently of the optional scroll-fraction
+fallback.
+
+Widget regressions navigate to a later page, record the emitted CFI, then
+compare the live reader's restored page with a fresh reader restored from that
+same node and offset under the new viewport height or new font size / line
+height. This verifies source-position-to-page mapping after reflow, rather
+than merely checking that the reader remains on a non-zero page. These are
+automated widget tests; browser pixel comparison and real-book timing remain
+part of the acceptance gate.
