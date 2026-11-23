@@ -117,12 +117,49 @@ void main() {
     }
   });
 
-  test('keeps inline widget placeholders in one intact fragment', () {
+  test('paginates long text around a fixed-size layout placeholder', () {
+    final text = TextSpan(
+      style: const TextStyle(fontSize: 18, height: 1.6),
+      children: [
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: SizedBox(width: 24, height: 0),
+        ),
+        TextSpan(text: List.filled(50, '縮排後仍需要正常切頁。').join()),
+      ],
+    );
+    final plainText = text.toPlainText(
+      includeSemanticsLabels: false,
+      includePlaceholders: true,
+    );
+
+    final ranges = FrameEpubTextPaginator.paginate(
+      text: text,
+      maxWidth: 120,
+      maxHeight: 70,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      textScaler: TextScaler.noScaling,
+    );
+
+    expect(ranges.length, greaterThan(1));
+    expect(ranges.first.start, 0);
+    expect(ranges.last.end, plainText.length);
+    for (var index = 1; index < ranges.length; index++) {
+      expect(ranges[index].start, ranges[index - 1].end);
+    }
+    expect(
+      ranges.map((range) => plainText.substring(range.start, range.end)).join(),
+      plainText,
+    );
+  });
+
+  test('keeps unknown inline widget placeholders in one intact fragment', () {
     final text = TextSpan(
       style: const TextStyle(fontSize: 18),
       children: [
         TextSpan(text: 'Before image '),
-        WidgetSpan(child: SizedBox(width: 24, height: 24)),
+        WidgetSpan(child: Container(width: 24, height: 24)),
         TextSpan(text: List.filled(40, ' after image ').join()),
       ],
     );

@@ -1904,4 +1904,82 @@ void main() {
     }
   });
 
+  testWidgets(
+      'paginates a long first-line-indented EPUB paragraph without losing text',
+      (tester) async {
+    final longText = List.filled(
+      260,
+      '首行縮排不應阻止長章節文字按頁高切割，也不能遺失或重複任何文字。',
+    ).join();
+    final bytes = _fixture(
+      additionalParagraphMarkup:
+          '<p style="text-indent: 2em">$longText</p>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-indented-long-paragraph-pagination-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/indented-long-paragraph.epub',
+      'fileName': 'indented-long-paragraph.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(420, 280);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.position.maxScrollExtent,
+        greaterThan(0),
+        reason: 'A long paragraph with text-indent must span reader pages.',
+      );
+
+      final displayedText = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .map((widget) => widget.textSpan.toPlainText(
+                includeSemanticsLabels: false,
+                includePlaceholders: true,
+              ))
+          .join()
+          .replaceAll('\uFFFC', '');
+      expect(displayedText, contains(longText));
+      expect(displayedText.split(longText).length - 1, 1);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+
 }

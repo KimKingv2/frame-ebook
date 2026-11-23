@@ -378,3 +378,28 @@ height. This verifies source-position-to-page mapping after reflow, rather
 than merely checking that the reader remains on a non-zero page. These are
 automated widget tests; browser pixel comparison and real-book timing remain
 part of the acceptance gate.
+
+
+## Keep first-line-indented long paragraphs eligible for pagination · 2026-11-23
+
+Chinese EPUB books commonly apply CSS `text-indent` to paragraphs. The Flutter
+renderer represents this first-line indent as a `WidgetSpan` containing a
+childless `SizedBox(width: indent, height: 0)`. The paginator previously
+treated every non-ruby `WidgetSpan` as an unknown-size widget and returned the
+entire paragraph as one fragment. A long indented paragraph could therefore
+turn into a vertically scrollable single page instead of flowing across
+reader pages.
+
+The paginator now supplies TextPainter with dimensions for this narrowly
+defined, fixed-size childless `SizedBox` placeholder and keeps its logical
+placeholder position in the text ranges. Ruby annotations retain their
+existing measured dimensions. Images, SVG, and interactive widgets remain
+intact because their actual render-box dimensions cannot safely be inferred
+from the span tree.
+
+Unit coverage verifies contiguous ranges around a fixed-size placeholder and
+continues to verify that unknown widget placeholders are not split. An EPUB
+widget regression uses a long XHTML paragraph with `text-indent: 2em`, checks
+that it spans multiple reader pages, and confirms the complete text occurs
+exactly once in the rendered selectable text. This is automated test evidence,
+not yet a browser screenshot comparison or a survey of real-world EPUBs.

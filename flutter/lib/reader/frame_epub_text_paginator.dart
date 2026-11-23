@@ -5,10 +5,10 @@ import 'frame_epub_ruby_annotation.dart';
 
 /// Splits rich text into line-aligned fragments that fit a page's height.
 ///
-/// Placeholder widgets (images, SVG placeholders, and interactive link
-/// widgets) are deliberately kept intact. Their intrinsic dimensions are
-/// supplied by the widget tree rather than TextPainter, so fragmenting them
-/// without a full render pass could clip or overlap content.
+/// Fixed-size, childless SizedBoxes (such as the reader's first-line indent)
+/// and ruby annotations have deterministic placeholder dimensions and can be
+/// measured by TextPainter. Images, SVG and interactive widgets still require
+/// their real render boxes, so paragraphs containing them remain intact.
 class FrameEpubTextPaginator {
   FrameEpubTextPaginator._();
 
@@ -32,7 +32,7 @@ class FrameEpubTextPaginator {
         maxHeight <= 0) {
       return [whole];
     }
-    final placeholderDimensions = _rubyPlaceholderDimensions(text);
+    final placeholderDimensions = _supportedPlaceholderDimensions(text);
     if (placeholderDimensions == null) return [whole];
 
     final painter = TextPainter(
@@ -108,22 +108,45 @@ class FrameEpubTextPaginator {
     }
   }
 
-  static List<PlaceholderDimensions>? _rubyPlaceholderDimensions(
+  static List<PlaceholderDimensions>? _supportedPlaceholderDimensions(
     InlineSpan span,
   ) {
     final dimensions = <PlaceholderDimensions>[];
     var hasUnsupportedPlaceholder = false;
     span.visitChildren((child) {
-      if (child is WidgetSpan) {
-        final widget = child.child;
-        if (widget is FrameEpubRubyAnnotation) {
-          dimensions.add(widget.placeholderDimensions);
-        } else {
-          // Images and interactive widgets still need their real render-box
-          // dimensions, so keep those paragraphs in one intact fragment.
-          hasUnsupportedPlaceholder = true;
-        }
+      if (child is! WidgetSpan) return true;
+      final widget = child.child;
+      if (widget is FrameEpubRubyAnnotation) {
+        dimensions.add(widget.placeholderDimensions);
+        return true;
       }
+
+      // The chapter renderer uses this exact shape for CSS text-indent:
+      // WidgetSpan(middle, SizedBox(width: indent, height: 0)).
+      // It is safe to measure because no intrinsic child layout is involved.
+      if (widget is SizedBox &&
+          widget.child == null &&
+          widget.width != null &&
+          widget.height != null &&
+          widget.width!.isFinite &&
+          widget.height!.isFinite &&
+          widget.width! >= 0 &&
+          widget.height! >= 0 &&
+          ((child.alignment != PlaceholderAlignment.baseline &&
+                  child.alignment != PlaceholderAlignment.aboveBaseline &&
+                  child.alignment != PlaceholderAlignment.belowBaseline) ||
+              child.baseline != null)) {
+        dimensions.add(PlaceholderDimensions(
+          size: Size(widget.width!, widget.height!),
+          alignment: child.alignment,
+          baseline: child.baseline,
+        ));
+        return true;
+      }
+
+      // Images, SVG and interactive widgets need their actual render-box
+      // dimensions. Do not guess: leave their containing paragraph intact.
+      hasUnsupportedPlaceholder = true;
       return true;
     });
     return hasUnsupportedPlaceholder ? null : dimensions;
