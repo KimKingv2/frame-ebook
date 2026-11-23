@@ -15,6 +15,7 @@ import 'frame_epub_page_layout.dart';
 import 'frame_epub_ruby_annotation.dart';
 import 'frame_epub_text_paginator.dart';
 import 'frame_epub_table_layout.dart';
+import 'frame_epub_table_grid.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
 class FrameEpubTextSelection {
@@ -1990,21 +1991,21 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final borderColor = _cssColor(tableStyle['border-color']) ??
         const Color(0xFF51495E);
     final tablePadding = _boxInsets(tableStyle, 'padding', widget.fontSize);
-    final rowsWidgets = <Widget>[];
+    if (columnCount == 0) {
+      return const SizedBox.shrink();
+    }
+    final gridCells = <Widget>[];
 
     for (var rowIndex = 0; rowIndex < gridRows.length; rowIndex++) {
       final row = rows[rowIndex];
       final rowStyle = _computedStyle(row.element, cascade, tableStyle);
       final rowBackground = _cssColor(rowStyle['background-color']);
-      final children = <Widget>[];
+      var column = 0;
 
       for (final placement in gridRows[rowIndex].placements) {
         final cellIndex = placement.cellIndex;
         if (cellIndex == null) {
-          children.add(Expanded(
-            flex: placement.columnSpan,
-            child: const SizedBox.shrink(),
-          ));
+          column += placement.columnSpan;
           continue;
         }
         final cell = rawRows[rowIndex][cellIndex];
@@ -2056,30 +2057,25 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             child: cellContent,
           );
         }
-        children.add(Expanded(
-          flex: placement.columnSpan,
+        gridCells.add(FrameEpubTableGridCell(
+          row: rowIndex,
+          column: column,
+          columnSpan: placement.columnSpan,
+          rowSpan: placement.rowSpan,
           child: KeyedSubtree(
             key: _elementKey(cell),
             child: cellContent,
           ),
         ));
+        column += placement.columnSpan;
       }
-
-      rowsWidgets.add(IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      ));
     }
 
-    Widget content = SizedBox(
+    Widget content = FrameEpubTableGrid(
       width: tableWidth,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: rowsWidgets,
-      ),
+      columnCount: columnCount,
+      rowCount: gridRows.length,
+      children: gridCells,
     );
     if (tablePadding != EdgeInsets.zero) {
       content = Padding(padding: tablePadding, child: content);

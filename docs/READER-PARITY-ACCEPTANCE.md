@@ -427,3 +427,23 @@ row's colspan to the right, then asserts the merged cell is exactly twice the
 width of the adjacent single-column cell. Unit tests verify the final track
 count and row placement maps independently. This is automated layout evidence,
 not a screenshot pixel-diff or a complete HTML table conformance claim.
+
+
+## Render real vertical geometry for EPUB rowspan cells · 2026-11-23
+
+The table renderer now lays out cells in one shared grid rather than building
+each source row as an independent Flutter Row. It measures ordinary cells to
+establish the initial row heights, then expands the covered rows when a
+rowspanning cell's natural content height is greater than their combined
+height. The spanning cell is laid out once more at the sum of those row heights,
+so its background, border and vertical alignment occupy the full merged area.
+Column spans, header flags, source cell order, horizontal overflow and the
+existing bounded long-table scroll container remain in place.
+
+The layout helper now retains each source cell's bounded rowSpan in its grid
+placement. A render-object geometry test verifies exact start/end alignment
+across two rows with independently sized content, and an EPUB widget
+regression uses a long multi-line cell next to short cells in both rows. These
+automated checks establish table geometry for the covered fixture; they do
+not claim full browser-equivalent HTML table conformance or close the
+screenshot/device acceptance gate.

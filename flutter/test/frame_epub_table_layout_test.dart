@@ -49,6 +49,14 @@ void main() {
         (1, 1),
       ],
     );
+    expect(
+      layout.rows[0].placements.map((placement) => placement.rowSpan),
+      [2, 1, 1, 1],
+    );
+    expect(
+      layout.rows[1].placements.map((placement) => placement.rowSpan),
+      [1, 1, 1],
+    );
   });
 
   test('keeps source cell order and header flags after grid placement', () {

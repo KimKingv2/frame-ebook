@@ -19,12 +19,14 @@ class FrameEpubTableCellPlacement {
   const FrameEpubTableCellPlacement({
     required this.cellIndex,
     required this.columnSpan,
+    this.rowSpan = 1,
     this.header = false,
   });
 
   /// Index in the source row, or null for an occupied/empty grid track.
   final int? cellIndex;
   final int columnSpan;
+  final int rowSpan;
   final bool header;
 }
 
@@ -97,14 +99,15 @@ class FrameEpubTableLayout {
             continue;
           }
 
-          placements[cursor] = FrameEpubTableCellPlacement(
-            cellIndex: cellIndex,
-            columnSpan: columnSpan,
-            header: spec.header,
-          );
           final rowSpan = spec.rowSpan
               .clamp(1, rows.length - rowIndex)
               .toInt();
+          placements[cursor] = FrameEpubTableCellPlacement(
+            cellIndex: cellIndex,
+            columnSpan: columnSpan,
+            rowSpan: rowSpan,
+            header: spec.header,
+          );
           final occupiedThrough = rowIndex + rowSpan;
           for (var offset = 0; offset < columnSpan; offset++) {
             final column = cursor + offset;
