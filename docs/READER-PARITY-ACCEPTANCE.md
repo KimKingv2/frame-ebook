@@ -302,3 +302,22 @@ area, preserving the original footprint of each layout. Widget tests assert the 
 right alignment and verify that the footnote text and footer share the same
 vertical center. These are geometry assertions, not screenshot pixel-diff
 acceptance.
+
+
+## Reuse EPUB stylesheet graphs between chapter navigations · 2026-11-23
+
+The resource loader now caches parsed CSS dependency graphs in bounded memory,
+and coalesces concurrent requests for the same graph. This avoids repeatedly
+reading and scanning the same linked stylesheets when navigating between
+chapters that share a book theme, and also avoids duplicate work when one
+chapter links the same stylesheet more than once. Cache entries are keyed by
+stylesheet path and parsing limits; entries larger than 512 KiB are not kept,
+and the shared cache is capped at eight graphs / approximately 2 MiB. Disposing
+the EPUB session clears both completed and in-flight graph references. No CSS
+or book content is written to disk, and this does not trigger whole-book
+prefetching.
+
+Widget-level resource-loader tests verify concurrent request coalescing,
+subsequent in-memory reuse with no extra Range reads, and separation between
+default and stricter parsing limits. This is bounded-cache and request-count
+evidence; real-book navigation timing still needs device/browser measurement.

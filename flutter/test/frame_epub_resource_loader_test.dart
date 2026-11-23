@@ -414,6 +414,37 @@ void main() {
       }
     });
 
+    test('caches stylesheet graphs and coalesces concurrent requests',
+        () async {
+      final (archive, loader, source) = await _openFixture();
+      try {
+        final requestsBefore = source.requests.length;
+        final concurrent = await Future.wait([
+          loader.loadStylesheetGraph('OPS/Styles/main.css'),
+          loader.loadStylesheetGraph('OPS/Styles/main.css'),
+        ]);
+
+        expect(identical(concurrent.first, concurrent.last), isTrue);
+        final requestsAfterFirstLoad = source.requests.length;
+        expect(requestsAfterFirstLoad, greaterThan(requestsBefore));
+
+        final cached = await loader.loadStylesheetGraph('OPS/Styles/main.css');
+        expect(identical(cached, concurrent.first), isTrue);
+        expect(source.requests.length, requestsAfterFirstLoad);
+
+        final limited = await loader.loadStylesheetGraph(
+          'OPS/Styles/main.css',
+          maxDepth: 0,
+        );
+        expect(identical(limited, cached), isFalse);
+        expect(limited.stylesheets, hasLength(1));
+        expect(source.requests.length, greaterThan(requestsAfterFirstLoad));
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
     test('resolves CSS imports, images and fonts with cycle protection',
         () async {
       final (archive, loader, _) = await _openFixture();

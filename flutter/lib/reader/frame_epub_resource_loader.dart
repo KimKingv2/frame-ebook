@@ -219,8 +219,16 @@ class FrameEpubResourceLoader {
   final LinkedHashMap<String, FrameEpubChapterDocument> _chapterCache =
       LinkedHashMap<String, FrameEpubChapterDocument>();
   final Map<String, Future<FrameEpubChapterDocument>> _chapterLoads = {};
+  final LinkedHashMap<String, FrameEpubStylesheetGraph>
+      _stylesheetGraphCache = LinkedHashMap<String, FrameEpubStylesheetGraph>();
+  final Map<String, Future<FrameEpubStylesheetGraph>> _stylesheetGraphLoads = {};
   int _cachedChapterBytes = 0;
+  int _cachedStylesheetGraphBytes = 0;
   bool _disposed = false;
+
+  static const _maxCachedStylesheetGraphCount = 8;
+  static const _maxCachedStylesheetGraphBytes = 2 * 1024 * 1024;
+  static const _maxCachedStylesheetGraphEntryBytes = 512 * 1024;
   late final Map<String, FrameEpubManifestItem> _manifestByPath = {
     for (final item in book.manifest.values)
       if (item.path != null && !item.isExternal) item.path!: item,
@@ -472,6 +480,9 @@ class FrameEpubResourceLoader {
   void dispose() {
     _disposed = true;
     _chapterLoads.clear();
+    _stylesheetGraphLoads.clear();
+    _stylesheetGraphCache.clear();
+    _cachedStylesheetGraphBytes = 0;
     clearChapterCache();
   }
 
@@ -480,10 +491,81 @@ class FrameEpubResourceLoader {
     int maxDepth = 8,
     int maxStylesheets = 128,
   }) async {
+    if (_disposed) throw StateError('EPUB 資源載入器已關閉。');
     if (maxDepth < 0 || maxStylesheets <= 0) {
       throw ArgumentError('CSS 解析上限無效。');
     }
 
+    final cacheKey = '$entryPath\u0000$maxDepth\u0000$maxStylesheets';
+    final cached = _stylesheetGraphCache.remove(cacheKey);
+    if (cached != null) {
+      _stylesheetGraphCache[cacheKey] = cached;
+      return cached;
+    }
+
+    final pending = _stylesheetGraphLoads[cacheKey];
+    if (pending != null) return pending;
+
+    final load = _loadStylesheetGraphUncached(
+      entryPath,
+      maxDepth: maxDepth,
+      maxStylesheets: maxStylesheets,
+    );
+    late final Future<FrameEpubStylesheetGraph> shared;
+    shared = load.then((graph) {
+      if (!_disposed && identical(_stylesheetGraphLoads[cacheKey], shared)) {
+        _cacheStylesheetGraph(cacheKey, graph);
+      }
+      return graph;
+    }).whenComplete(() {
+      if (identical(_stylesheetGraphLoads[cacheKey], shared)) {
+        _stylesheetGraphLoads.remove(cacheKey);
+      }
+    });
+    _stylesheetGraphLoads[cacheKey] = shared;
+    return shared;
+  }
+
+  void _cacheStylesheetGraph(String key, FrameEpubStylesheetGraph graph) {
+    final estimatedBytes = _estimateStylesheetGraphBytes(graph);
+    if (estimatedBytes <= 0 ||
+        estimatedBytes > _maxCachedStylesheetGraphEntryBytes) {
+      return;
+    }
+
+    final previous = _stylesheetGraphCache.remove(key);
+    if (previous != null) {
+      _cachedStylesheetGraphBytes -= _estimateStylesheetGraphBytes(previous);
+    }
+    _stylesheetGraphCache[key] = graph;
+    _cachedStylesheetGraphBytes += estimatedBytes;
+
+    while (_stylesheetGraphCache.isNotEmpty &&
+        (_stylesheetGraphCache.length > _maxCachedStylesheetGraphCount ||
+            _cachedStylesheetGraphBytes > _maxCachedStylesheetGraphBytes)) {
+      final oldestKey = _stylesheetGraphCache.keys.first;
+      final oldest = _stylesheetGraphCache.remove(oldestKey)!;
+      _cachedStylesheetGraphBytes -= _estimateStylesheetGraphBytes(oldest);
+    }
+  }
+
+  int _estimateStylesheetGraphBytes(FrameEpubStylesheetGraph graph) {
+    var bytes = 0;
+    for (final entry in graph.stylesheets.entries) {
+      bytes += (entry.key.length + entry.value.css.length) * 2;
+      bytes += entry.value.references.length * 64;
+    }
+    for (final warning in graph.warnings) {
+      bytes += warning.length * 2;
+    }
+    return bytes;
+  }
+
+  Future<FrameEpubStylesheetGraph> _loadStylesheetGraphUncached(
+    String entryPath, {
+    required int maxDepth,
+    required int maxStylesheets,
+  }) async {
     final loaded = <String, FrameEpubStylesheetDocument>{};
     final warnings = <String>[];
     var totalStylesheetBytes = 0;
