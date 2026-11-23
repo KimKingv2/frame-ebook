@@ -264,3 +264,17 @@ Widget tests assert the desktop card padding, margin, border radius/colour,
 marker rail width, quote and note typography, line clamps, and delete button
 geometry. This is source and widget-layout evidence, not screenshot
 pixel-diff acceptance.
+
+
+## Restore progress-meter states and engine-status visibility · 2026-11-23
+
+The reading progress dock is being split into a reusable, independently
+testable widget so its desktop and compact geometry, percentage labels,
+accessibility semantics, and fixed-layout visibility can be verified without
+opening a cloud EPUB session. The legacy chapter row is conditional for
+reflowable EPUB; fixed-layout comics keep only the whole-book meter.
+
+The target styling is the 4px violet chapter gradient and 3px muted-violet
+whole-book gradient, with 9px tabular percentage labels and the original 8px
+row gap. This is automated widget evidence, not screenshot pixel-diff
+acceptance.
