@@ -61,7 +61,6 @@ void main() {
     expect(spanningRect.height, closeTo(90, 0.01));
     expect(tester.takeException(), isNull);
   });
-}
 
   testWidgets('satisfies several overlapping rowspan height constraints',
       (tester) async {
