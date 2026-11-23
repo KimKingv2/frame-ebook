@@ -183,10 +183,19 @@ void main() {
     final statusRect = tester.getRect(
       find.byKey(const ValueKey('reader-status-line')),
     );
+    final statusPadding = tester.widget<Padding>(
+      find.byKey(const ValueKey('reader-status-line')),
+    );
+    expect(statusPadding.padding, const EdgeInsets.only(top: 4));
+    final contentInset = tester.widget<Padding>(
+      find.byKey(const ValueKey('reader-content-row-inset')),
+    );
+    expect(contentInset.padding, const EdgeInsets.fromLTRB(0, 2, 0, 2));
     final frameRect = tester.getRect(
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
     expect(statusRect.top, greaterThanOrEqualTo(frameRect.bottom));
+    expect((workspace.bottom - statusRect.bottom).abs(), lessThanOrEqualTo(1));
   });
 
   testWidgets('restores the compact rectangular 32px action row',

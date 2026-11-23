@@ -181,3 +181,23 @@ heading. Compact layouts also reduce the top navigation bar and heading insets.
 Widget tests assert the 40px heading, 42px heading-to-frame offset, and both
 axes of title centering. These are geometry assertions, not screenshot
 pixel-diff acceptance.
+
+
+## Lower reader spacing and restore visible page-turn controls · 2026-11-23
+
+Following the user's request, the lower workspace inset is reduced from 4px
+to 2px, the status-line top inset from 7px to 4px, and the page-control
+container vertical padding from 12px/4px to 6px/2px. The compact progress
+separator is reduced from 10px to 6px. This gives the reading frame more
+vertical room while preserving the page-progress information and status line.
+
+Previous/next controls now use explicit enabled and disabled foreground,
+background and border colours. Their labels and chevrons remain visible at
+book boundaries; only the action is disabled. Each control has a stable test
+key and a minimum 104px × 37px target. Widget coverage checks both rendered
+labels, both directional chevrons, disabled-state contrast values, target
+geometry and the enabled next-page callback. Desktop layout coverage asserts
+the reduced bottom inset and status-line spacing.
+
+These are automated widget/layout checks, not screenshot pixel-diff
+acceptance.

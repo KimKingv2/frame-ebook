@@ -27,6 +27,7 @@ import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
 import 'frame_epub_reader_sidebar.dart';
+import 'frame_epub_reader_page_navigation_button.dart';
 import 'frame_epub_note_editor_dialog.dart';
 
 const _readerChrome = Color(0xFF12101A);
@@ -1284,7 +1285,8 @@ class _FrameEpubReaderPreviewScreenState
           ),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(0, wide ? 2 : 4, 0, 4),
+              key: const ValueKey('reader-content-row-inset'),
+              padding: EdgeInsets.fromLTRB(0, wide ? 2 : 4, 0, 2),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1704,7 +1706,7 @@ class _FrameEpubReaderPreviewScreenState
 
   Widget _readerStatusLine() => Padding(
         key: const ValueKey('reader-status-line'),
-        padding: const EdgeInsets.only(top: 7),
+        padding: const EdgeInsets.only(top: 4),
         child: SizedBox(
           width: double.infinity,
           height: 18,
@@ -1738,28 +1740,14 @@ class _FrameEpubReaderPreviewScreenState
         final canGoNext = _canTurnReaderPage(session, forward: true);
         final compact = MediaQuery.sizeOf(context).width <= 720;
 
-        Widget pageButton({required bool previous}) {
-          final enabled = previous ? canGoPrevious : canGoNext;
-          return OutlinedButton(
-            onPressed: enabled
-                ? () => unawaited(
-                      _turnReaderPage(session, forward: !previous),
-                    )
-                : null,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFE8E1F5),
-              side: const BorderSide(color: Color(0x40AE91E2)),
-              minimumSize: const Size(0, 37),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle: const TextStyle(fontSize: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        Widget pageButton({required bool previous}) =>
+            FrameEpubReaderPageNavigationButton(
+              previous: previous,
+              enabled: previous ? canGoPrevious : canGoNext,
+              onPressed: () => unawaited(
+                _turnReaderPage(session, forward: !previous),
               ),
-            ),
-            child: Text(previous ? '← 上一頁' : '下一頁 →'),
-          );
-        }
+            );
 
         Widget progressRow(String label, int percent, {double height = 4}) =>
             Column(
@@ -1815,7 +1803,7 @@ class _FrameEpubReaderPreviewScreenState
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(2, 12, 2, 4),
+              padding: const EdgeInsets.fromLTRB(2, 6, 2, 2),
               child: compact
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1827,7 +1815,7 @@ class _FrameEpubReaderPreviewScreenState
                             Expanded(child: pageButton(previous: false)),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 6),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: progressPanel,
