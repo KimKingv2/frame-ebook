@@ -161,3 +161,22 @@ inset so its center remains aligned with the reading frame's actual edges. The
 widget test checks that the chapter-title center and reading-frame center share
 the same horizontal coordinate. This is a layout-geometry assertion, not a
 screenshot pixel-diff claim.
+
+
+## Remove the Reading Time interface and tighten the reader header · 2026-11-23
+
+The Flutter Reader no longer exposes the legacy "閱讀時光" route or its
+in-reader reading-session indicator. The preview screen also stops starting the
+reading-time tracker, so removing the interface does not leave background
+reading-time calls running. This change does not alter reading-position,
+bookmark or annotation synchronization.
+
+The wide desktop heading is reduced from 84px to 40px, approximately halving
+the heading's contribution to the screen-top-to-reader spacing while retaining
+the 36px inner layout needed by the controls. The four compact action buttons
+remain 36 × 31px and keep their existing 4px gaps. The current chapter title is
+centered both horizontally over the reading column and vertically within the
+heading. Compact layouts also reduce the top navigation bar and heading insets.
+Widget tests assert the 40px heading, 42px heading-to-frame offset, and both
+axes of title centering. These are geometry assertions, not screenshot
+pixel-diff acceptance.

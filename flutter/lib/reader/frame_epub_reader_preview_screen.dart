@@ -27,7 +27,6 @@ import 'frame_epub_appearance_preferences.dart';
 import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
-import 'frame_reading_time_tracker.dart';
 import 'frame_epub_reader_sidebar.dart';
 import 'frame_epub_note_editor_dialog.dart';
 
@@ -68,7 +67,7 @@ class FrameEpubReaderPreviewScreen extends StatefulWidget {
 
 class _FrameEpubReaderPreviewScreenState
     extends State<FrameEpubReaderPreviewScreen>
-    with WidgetsBindingObserver, FullScreenListener {
+    with FullScreenListener {
   bool _initialized = false;
   bool _appearanceInitialized = false;
   String? _setupError;
@@ -106,9 +105,6 @@ class _FrameEpubReaderPreviewScreenState
   String _comicImageFit = 'fit-page';
   String _comicBackdrop = 'wood';
   Timer? _comicSpineNavigationTimer;
-  FrameReadingTimeTracker? _readingTimeTracker;
-  int _readingSeconds = 0;
-  bool _isReadingActive = false;
   bool _isImmersive = false;
   bool _isSidebarVisible = true;
   bool _bookmarkBusy = false;
@@ -117,7 +113,6 @@ class _FrameEpubReaderPreviewScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     try {
       FullScreen.addListener(this);
       _fullScreenListenerRegistered = true;
@@ -174,88 +169,14 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    final tracker = _readingTimeTracker;
-    if (tracker == null) return;
-    unawaited(
-      tracker.setForeground(state == AppLifecycleState.resumed).then((_) {
-        if (!mounted) return;
-        setState(() {
-          _isReadingActive = tracker.isActiveAt(DateTime.now());
-        });
-      }),
-    );
-  }
-
-  void _startReadingTimeTracking(FrameEpubReaderSession session) {
-    if (_readingTimeTracker != null) return;
-    final tracker = FrameReadingTimeTracker(
-      book: widget.book,
-      repository: session.repository,
-      onUpdate: (seconds) {
-        if (!mounted) return;
-        final active =
-            _readingTimeTracker?.isActiveAt(DateTime.now()) ?? false;
-        setState(() {
-          _readingSeconds = seconds;
-          _isReadingActive = active;
-        });
-      },
-      onError: (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('閱讀時光尚未同步：$error')),
-        );
-      },
-    );
-    _readingTimeTracker = tracker;
-    unawaited(
-      tracker.start(
-        foreground: WidgetsBinding.instance.lifecycleState == null ||
-            WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
-      ).catchError((Object error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('無法啟動閱讀時光記錄：$error')),
-        );
-      }),
-    );
-  }
-
   bool _handleReadingKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
-      _recordReadingActivity();
       if (event.logicalKey == LogicalKeyboardKey.escape && _isImmersive) {
         _exitImmersiveMode();
         return true;
       }
     }
     return false;
-  }
-
-  void _recordReadingActivity() {
-    final tracker = _readingTimeTracker;
-    if (tracker == null) return;
-    tracker.activity();
-    final active = tracker.isActiveAt(DateTime.now());
-    if (mounted && active != _isReadingActive) {
-      setState(() => _isReadingActive = active);
-    }
-  }
-
-  String _readingDurationLabel(int seconds) {
-    final safe = seconds < 0 ? 0 : seconds;
-    final hours = safe ~/ 3600;
-    final minutes = (safe % 3600) ~/ 60;
-    final remainder = safe % 60;
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:'
-          '${minutes.toString().padLeft(2, '0')}:'
-          '${remainder.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(2, '0')}:'
-        '${remainder.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -343,7 +264,6 @@ class _FrameEpubReaderPreviewScreenState
       _activeFragment = fragment;
     }
     if (session?.status == FrameEpubReaderStatus.ready) {
-      _startReadingTimeTracking(session!);
       if (!_appearanceInitialized) {
         _restoreAppearance(session.readerState.appearance);
         _appearanceInitialized = true;
@@ -412,7 +332,6 @@ class _FrameEpubReaderPreviewScreenState
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     try {
       if (_fullScreenListenerRegistered) FullScreen.removeListener(this);
       if (FullScreen.isFullScreen) FullScreen.setFullScreen(false);
@@ -425,9 +344,6 @@ class _FrameEpubReaderPreviewScreenState
   }
 
   Future<void> _releaseResources() async {
-    final readingTracker = _readingTimeTracker;
-    _readingTimeTracker = null;
-    if (readingTracker != null) await readingTracker.stop();
     await _flushReadingPosition();
     _progressSaveTimer?.cancel();
     _comicSpineNavigationTimer?.cancel();
@@ -885,22 +801,6 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Future<void> _openLegacyReadingStats() async {
-    final uri = FrameAppConfig.apiBaseUri.replace(path: '/reading-stats/');
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => FrameApiScope.inherit(
-          context: context,
-          child: buildFrameLegacyPage(
-            uri: uri,
-            title: '閱讀時光',
-            showToolbar: false,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildReaderTopBar(
     FrameEpubReaderSession? session, {
     required double viewportWidth,
@@ -932,7 +832,7 @@ class _FrameEpubReaderPreviewScreenState
         );
 
     return SizedBox(
-      height: compact ? 60 : 72,
+      height: compact ? 42 : 48,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(
@@ -1004,8 +904,6 @@ class _FrameEpubReaderPreviewScreenState
               ),
               const SizedBox(width: 18),
             ],
-            textLink('閱讀時光', () => unawaited(_openLegacyReadingStats())),
-            SizedBox(width: compact ? 10 : 18),
             textLink('← 我的書架', () => Navigator.of(context).maybePop()),
           ],
         ),
@@ -1110,11 +1008,11 @@ class _FrameEpubReaderPreviewScreenState
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
-        constraints: const BoxConstraints(minHeight: 84),
+        constraints: const BoxConstraints(minHeight: 40),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: SizedBox(
-            height: 74,
+            height: 36,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1186,34 +1084,13 @@ class _FrameEpubReaderPreviewScreenState
                       ),
                     ),
                     const Spacer(),
-                    InkWell(
-                      onTap: () => unawaited(_openLegacyReadingStats()),
-                      borderRadius: BorderRadius.circular(5),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          '閱讀時光',
-                          style: TextStyle(
-                            color: Color(0xFFBBA9DF),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 260),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const SizedBox(height: 22),
-                          const SizedBox(height: 5),
-                          actionRow,
-                        ],
+                        children: [actionRow],
                       ),
                     ),
                   ],
@@ -1222,6 +1099,7 @@ class _FrameEpubReaderPreviewScreenState
                   left: readerColumnOffset - 4,
                   width: readerColumnWidth,
                   top: 0,
+                  bottom: 0,
                   child: Center(
                     child: SizedBox(
                       width: chapterLabelWidth,
@@ -1251,9 +1129,9 @@ class _FrameEpubReaderPreviewScreenState
 
     return ConstrainedBox(
       key: const ValueKey('reader-mobile-toolbar'),
-      constraints: const BoxConstraints(minHeight: 84),
+      constraints: const BoxConstraints(minHeight: 0),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(2, 11, 2, compact ? 8 : 10),
+        padding: const EdgeInsets.fromLTRB(2, 5, 2, 4),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final narrowHeading = constraints.maxWidth <= 560;
@@ -1493,7 +1371,6 @@ class _FrameEpubReaderPreviewScreenState
             ),
           ),
           if (!immersive) _readerStatusLine(),
-          if (ready && !immersive) _readingSessionIndicator(),
         ],
       ),
     );
@@ -1508,8 +1385,6 @@ class _FrameEpubReaderPreviewScreenState
         if (!didPop) _exitImmersiveMode();
       },
       child: Listener(
-        onPointerDown: (_) => _recordReadingActivity(),
-        onPointerSignal: (_) => _recordReadingActivity(),
         child: Scaffold(
           backgroundColor: _readerChrome,
           body: SafeArea(
@@ -1854,58 +1729,6 @@ class _FrameEpubReaderPreviewScreenState
                 height: 1.8,
               ),
             ),
-          ),
-        ),
-      );
-
-  Widget _readingSessionIndicator() => Padding(
-        key: const ValueKey('reading-session-indicator'),
-        padding: const EdgeInsets.only(bottom: 18),
-        child: SizedBox(
-          height: 28,
-          child: Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF9C83CE),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x8CA78BE0),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _isReadingActive ? '正在記錄本次閱讀' : '本次閱讀已暫停',
-                style: const TextStyle(
-                  color: Color(0xFF94899F),
-                  fontSize: 9,
-                ),
-              ),
-              const SizedBox(width: 3),
-              Text(
-                _readingDurationLabel(_readingSeconds),
-                style: const TextStyle(
-                  color: Color(0xFFD4C4EF),
-                  fontFamily: 'Georgia',
-                  fontSize: 11,
-                  letterSpacing: .5,
-                ),
-              ),
-              const Spacer(),
-              const Text(
-                '前景閱讀 · 閒置 5 分鐘暫停',
-                style: TextStyle(
-                  color: Color(0xFF756C80),
-                  fontSize: 8,
-                ),
-              ),
-            ],
           ),
         ),
       );

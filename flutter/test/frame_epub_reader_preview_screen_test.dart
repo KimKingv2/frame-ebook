@@ -117,6 +117,7 @@ void main() {
     expect(find.text('FRAME READER'), findsNothing);
     expect(find.text('NOW READING'), findsOneWidget);
     expect(find.text('Preview test book'), findsOneWidget);
+    expect(find.text('閱讀時光'), findsNothing);
     expect(find.byKey(const ValueKey('reader-status-line')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('reading-session-indicator')),
@@ -160,7 +161,9 @@ void main() {
       find.byKey(const ValueKey('reader-chapter-title')),
     );
     expect(chapterTitleRect.center.dx, frameForGap.center.dx);
-    expect(chapterTitleRect.bottom, lessThan(actionRowRect.top));
+    expect(chapterTitleRect.center.dy, toolbarRect.center.dy);
+    expect(toolbarRect.height, 40);
+    expect(frameForGap.top - toolbarRect.top, 42);
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
@@ -208,6 +211,8 @@ void main() {
       find.byKey(const ValueKey('reader-mobile-toolbar')),
       findsOneWidget,
     );
+    expect(find.text('閱讀時光'), findsNothing);
+    expect(find.byKey(const ValueKey('reading-session-indicator')), findsNothing);
     final actionKeys = [
       const ValueKey('reader-action-bookmark'),
       const ValueKey('reader-action-sidebar'),
