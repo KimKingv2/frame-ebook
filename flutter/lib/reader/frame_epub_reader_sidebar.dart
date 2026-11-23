@@ -473,22 +473,24 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
               ],
             ),
           ),
-          Container(
-            key: const ValueKey('sidebar-cloud-sync-footnote'),
-            width: double.infinity,
-            height: 25,
-            margin: const EdgeInsets.only(top: 11),
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0x1AC1AAEE)),
+          Padding(
+            padding: const EdgeInsets.only(top: 11),
+            child: Container(
+              key: const ValueKey('sidebar-cloud-sync-footnote'),
+              width: double.infinity,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Color(0x1AC1AAEE)),
+                ),
               ),
-            ),
-            child: const Text(
-              '閱讀位置、筆記與書籤都會同步保存至雲端',
-              style: TextStyle(
-                color: Color(0xFF94899F),
-                fontSize: 9,
+              child: const Text(
+                '閱讀位置、筆記與書籤都會同步保存至雲端',
+                style: TextStyle(
+                  color: Color(0xFF94899F),
+                  fontSize: 9,
+                ),
               ),
             ),
           ),
@@ -824,24 +826,26 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ],
           ),
         ),
-        Container(
-          key: const ValueKey('sidebar-cloud-sync-footnote'),
-          width: double.infinity,
-          height: 25,
-          margin: const EdgeInsets.only(top: 11),
-          padding: EdgeInsets.symmetric(horizontal: horizontalInset),
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: Color(0x1AC1AAEE)),
+        Padding(
+          padding: const EdgeInsets.only(top: 11),
+          child: Container(
+            key: const ValueKey('sidebar-cloud-sync-footnote'),
+            width: double.infinity,
+            height: 25,
+            padding: EdgeInsets.symmetric(horizontal: horizontalInset),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Color(0x1AC1AAEE)),
+              ),
             ),
-          ),
-          child: const Text(
-            '閱讀位置、筆記與書籤都會同步保存至雲端',
-            style: TextStyle(
-              color: Color(0xFF776D85),
-              fontSize: 8,
-              height: 1.7,
+            child: const Text(
+              '閱讀位置、筆記與書籤都會同步保存至雲端',
+              style: TextStyle(
+                color: Color(0xFF776D85),
+                fontSize: 8,
+                height: 1.7,
+              ),
             ),
           ),
         ),

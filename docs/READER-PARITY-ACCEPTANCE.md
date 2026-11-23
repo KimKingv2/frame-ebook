@@ -296,9 +296,9 @@ additional row or vertical space is introduced. The reader frame therefore
 retains its existing 2px gap above the status line and the same bottom-of-screen
 spacing.
 
-The sidebar cloud-sync footnote keeps its existing 25px footer content area and
-11px top separation. Its text is now centered vertically inside that area for
-both compact and desktop layouts. Widget tests assert the engine label's bottom
+The sidebar cloud-sync footnote keeps its 11px top separation. Its text is now
+centered vertically inside a 22px compact footer area and a 25px desktop footer
+area, preserving the original footprint of each layout. Widget tests assert the engine label's bottom
 right alignment and verify that the footnote text and footer share the same
 vertical center. These are geometry assertions, not screenshot pixel-diff
 acceptance.
