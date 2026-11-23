@@ -352,6 +352,105 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
+  testWidgets('desktop annotation cards match legacy density and typography',
+      (tester) async {
+    const note = FrameReaderAnnotation(
+      id: 'desktop-style-note',
+      bookId: 'book-one',
+      type: 'note',
+      cfi: 'epubcfi(/6/2!/4/2:3)',
+      quote: '舊版閱讀室引用文字',
+      text: '舊版閱讀室筆記預覽',
+      color: 'violet',
+      createdAt: 30,
+    );
+
+    await tester.binding.setSurfaceSize(const Size(1440, 850));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 250,
+            child: FrameEpubReaderSidebar(
+              toc: const [],
+              currentPath: null,
+              annotations: const [note],
+              initialTabIndex: 0,
+              desktopLayout: true,
+              onSelectToc: (_) {},
+              onOpenAnnotation: (_) {},
+              onEditNote: (_) {},
+              onRefreshAnnotations: () async {},
+              onDeleteAnnotation: (_) async => true,
+              onClose: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('筆記與標註'));
+    await tester.pumpAndSettle();
+
+    final card = tester.widget<Container>(
+      find.byKey(const ValueKey('reader-annotation-card-desktop-style-note')),
+    );
+    expect(
+      card.padding,
+      const EdgeInsets.symmetric(horizontal: 7, vertical: 9),
+    );
+    expect(card.margin, const EdgeInsets.only(bottom: 7));
+    final decoration = card.decoration! as BoxDecoration;
+    expect(decoration.borderRadius, BorderRadius.circular(8));
+    expect(
+      (decoration.border! as Border).top.color,
+      const Color(0x17BEA6E5),
+    );
+
+    final markerRail = tester.getSize(
+      find.byKey(
+        const ValueKey('reader-annotation-marker-rail-desktop-style-note'),
+      ),
+    );
+    expect(markerRail.width, 5);
+
+    final kind = tester.widget<Text>(find.text('筆記').last);
+    expect(kind.style?.fontSize, 8);
+    expect(kind.style?.letterSpacing, .5);
+
+    final quote = tester.widget<Text>(
+      find.byKey(
+        const ValueKey('reader-annotation-quote-desktop-style-note'),
+      ),
+    );
+    expect(quote.style?.fontSize, 9);
+    expect(quote.style?.height, 1.65);
+    expect(quote.maxLines, 2);
+
+    final preview = tester.widget<Text>(
+      find.byKey(
+        const ValueKey('reader-annotation-note-preview-desktop-style-note'),
+      ),
+    );
+    expect(preview.style?.fontSize, 8);
+    expect(preview.style?.height, 1.6);
+    expect(preview.maxLines, 2);
+
+    final deleteButton = tester.widget<TextButton>(
+      find.byKey(
+        const ValueKey('reader-annotation-delete-desktop-style-note'),
+      ),
+    );
+    expect(deleteButton.style?.minimumSize?.resolve({})?.height, 25);
+    expect(
+      deleteButton.style?.padding?.resolve({}),
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+    );
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
   testWidgets('annotation cards keep selected quote and note preview separate',
       (tester) async {
     const note = FrameReaderAnnotation(

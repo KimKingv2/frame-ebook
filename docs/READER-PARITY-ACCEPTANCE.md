@@ -248,3 +248,19 @@ Widget regression coverage checks the center coordinate of each group/control,
 and confirms the toolbar bottom meets the frame top with no second hidden gap.
 Compact layout and immersive-mode insets are unchanged. These are automated
 layout checks, not screenshot pixel-diff acceptance.
+
+
+## Match desktop annotation-card density to the legacy Reading Room · 2026-11-23
+
+The Flutter desktop sidebar annotation cards now follow the effective legacy
+sidebar CSS: 9px vertical / 7px horizontal card padding, 7px card separation,
+5px marker rail, 9px quote text at 1.65 line-height, 8px note preview at 1.6
+line-height, and the 25px / 8px-horizontal delete control. The kind label uses
+the legacy 0.5px letter spacing. Note markers now use separated dash segments
+instead of a continuous solid rule. Mobile card padding and target sizing stay
+unchanged.
+
+Widget tests assert the desktop card padding, margin, border radius/colour,
+marker rail width, quote and note typography, line clamps, and delete button
+geometry. This is source and widget-layout evidence, not screenshot
+pixel-diff acceptance.

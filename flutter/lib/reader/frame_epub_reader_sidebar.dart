@@ -902,15 +902,17 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         size: desktop ? 13 : 16,
       );
     } else if (isNote) {
-      marker = Container(
+      marker = SizedBox(
         width: 3,
         height: desktop ? 34 : 42,
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(
-              color: markerColor,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List<Widget>.generate(
+            6,
+            (_) => Container(
               width: 2,
-              style: BorderStyle.solid,
+              height: 3,
+              color: markerColor,
             ),
           ),
         ),
@@ -943,16 +945,17 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: desktop ? 3 : 9),
+      key: ValueKey('reader-annotation-card-${annotation.id}'),
+      margin: EdgeInsets.only(bottom: desktop ? 7 : 9),
       padding: EdgeInsets.symmetric(
         horizontal: desktop ? 7 : 10,
-        vertical: desktop ? 7 : 12,
+        vertical: desktop ? 9 : 12,
       ),
       decoration: BoxDecoration(
         color: const Color(0x07FFFFFF),
         border: Border.all(
           color: desktop
-              ? const Color(0x1CBEA6E5)
+              ? const Color(0x17BEA6E5)
               : const Color(0x17BEA6E5),
         ),
         borderRadius: BorderRadius.circular(desktop ? 8 : 11),
@@ -961,7 +964,8 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: desktop ? 12 : 6,
+            key: ValueKey('reader-annotation-marker-rail-${annotation.id}'),
+            width: desktop ? 5 : 6,
             child: Padding(
               padding: EdgeInsets.only(top: isBookmark ? 2 : 1),
               child: marker,
@@ -970,6 +974,7 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           const SizedBox(width: 7),
           Expanded(
             child: TextButton(
+              key: ValueKey('reader-annotation-content-${annotation.id}'),
               onPressed: annotation.cfi.trim().isEmpty
                   ? null
                   : () => widget.onOpenAnnotation(annotation),
@@ -991,30 +996,32 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
                     style: TextStyle(
                       color: const Color(0xFFBCA8E9),
                       fontSize: desktop ? 8 : 10,
-                      letterSpacing: .35,
+                      letterSpacing: .5,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     quote.isEmpty ? quoteFallback : quote,
+                    key: ValueKey('reader-annotation-quote-${annotation.id}'),
                     maxLines: desktop ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: const Color(0xFFE4DDEC),
                       fontSize: desktop ? 9 : 11,
-                      height: desktop ? 1.55 : 1.65,
+                      height: 1.65,
                     ),
                   ),
                   if (isNote && note.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       note,
+                      key: ValueKey('reader-annotation-note-preview-${annotation.id}'),
                       maxLines: desktop ? 2 : 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: const Color(0xFF9F94AD),
                         fontSize: desktop ? 8 : 10,
-                        height: desktop ? 1.5 : 1.6,
+                        height: 1.6,
                       ),
                     ),
                   ],
@@ -1026,14 +1033,15 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           Tooltip(
             message: '刪除$title',
             child: TextButton(
+              key: ValueKey('reader-annotation-delete-${annotation.id}'),
               onPressed: () => _deleteAnnotation(annotation),
               style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFC99AAA),
               padding: EdgeInsets.symmetric(
-                horizontal: desktop ? 5 : 9,
-                vertical: desktop ? 3 : 0,
+                horizontal: desktop ? 8 : 9,
+                vertical: 0,
               ),
-              minimumSize: Size(0, desktop ? 27 : 34),
+              minimumSize: Size(0, desktop ? 25 : 34),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
