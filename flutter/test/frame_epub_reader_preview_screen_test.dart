@@ -115,7 +115,7 @@ void main() {
     expect(find.byKey(const ValueKey('reader-desktop-toolbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('reader-workspace-root')), findsOneWidget);
     expect(find.text('FRAME READER'), findsNothing);
-    expect(find.text('NOW READING'), findsOneWidget);
+    expect(find.text('NOW READING'), findsNothing);
     expect(find.text('Preview test book'), findsOneWidget);
     expect(find.text('閱讀時光'), findsNothing);
     expect(find.byKey(const ValueKey('reader-status-line')), findsOneWidget);

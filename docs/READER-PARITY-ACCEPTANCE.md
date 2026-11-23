@@ -173,8 +173,9 @@ bookmark or annotation synchronization.
 
 The wide desktop heading is reduced from 84px to 40px, approximately halving
 the heading's contribution to the screen-top-to-reader spacing while retaining
-the 36px inner layout needed by the controls. The four compact action buttons
-remain 36 × 31px and keep their existing 4px gaps. The current chapter title is
+the 36px inner layout needed by the controls. The book identity is compacted to a two-line title/author block so it fits
+without overflow; the four compact action buttons remain 36 × 31px and keep
+their existing 4px gaps. The current chapter title is
 centered both horizontally over the reading column and vertically within the
 heading. Compact layouts also reduce the top navigation bar and heading insets.
 Widget tests assert the 40px heading, 42px heading-to-frame offset, and both

@@ -1048,34 +1048,27 @@ class _FrameEpubReaderPreviewScreenState
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'NOW READING',
-                            style: TextStyle(
-                              color: Color(0xFF938AA1),
-                              fontSize: 9,
-                              letterSpacing: 1.7,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
                           Text(
                             _bookTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: _readerText,
-                              fontSize: 18,
+                              fontSize: 16,
+                              height: 1.1,
                               fontWeight: FontWeight.w600,
                               letterSpacing: .1,
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             author,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Color(0xFFAAA3B6),
-                              fontSize: 10,
+                              fontSize: 9,
+                              height: 1.1,
                             ),
                           ),
                         ],
