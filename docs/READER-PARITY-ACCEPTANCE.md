@@ -220,3 +220,17 @@ layout bounds, button dimensions and tap behaviour.
 
 This remains widget/layout evidence rather than browser screenshot pixel-diff
 evidence. A live browser visual check is still required to close the report.
+
+
+## Increase the reader frame top breathing room · 2026-11-23
+
+The user requested a little more distance between the top screen edge and
+the reader frame. In normal desktop layout, the content row's top inset is
+increased from 2px to 10px, shifting the frame down by 8px. In compact/mobile
+layout it increases from 4px to 8px, shifting the frame down by 4px.
+Immersive mode retains its 2px top inset. The lower inset remains 2px so the
+previously requested bottom spacing is unchanged.
+
+Regression tests assert the desktop frame is now 50px below the desktop
+toolbar top (previously 42px), and assert the compact top and bottom insets.
+Chapter-title centering and toolbar placement are otherwise unchanged.

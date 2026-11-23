@@ -1286,7 +1286,12 @@ class _FrameEpubReaderPreviewScreenState
           Expanded(
             child: Padding(
               key: const ValueKey('reader-content-row-inset'),
-              padding: EdgeInsets.fromLTRB(0, wide ? 2 : 4, 0, 2),
+              padding: EdgeInsets.fromLTRB(
+                0,
+                immersive ? 2 : wide ? 10 : 8,
+                0,
+                2,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

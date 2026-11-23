@@ -163,7 +163,7 @@ void main() {
     expect(chapterTitleRect.center.dx, frameForGap.center.dx);
     expect(chapterTitleRect.center.dy, toolbarRect.center.dy);
     expect(toolbarRect.height, 40);
-    expect(frameForGap.top - toolbarRect.top, 42);
+    expect(frameForGap.top - toolbarRect.top, 50);
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
@@ -190,7 +190,7 @@ void main() {
     final contentInset = tester.widget<Padding>(
       find.byKey(const ValueKey('reader-content-row-inset')),
     );
-    expect(contentInset.padding, const EdgeInsets.fromLTRB(0, 2, 0, 2));
+    expect(contentInset.padding, const EdgeInsets.fromLTRB(0, 10, 0, 2));
     final frameRect = tester.getRect(
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
@@ -243,6 +243,13 @@ void main() {
         find.byKey(const ValueKey('reader-quick-actions-row')),
       ).width,
       140,
+    );
+    final compactContentInset = tester.widget<Padding>(
+      find.byKey(const ValueKey('reader-content-row-inset')),
+    );
+    expect(
+      compactContentInset.padding,
+      const EdgeInsets.fromLTRB(0, 8, 0, 2),
     );
     expect(tester.takeException(), isNull);
   });
