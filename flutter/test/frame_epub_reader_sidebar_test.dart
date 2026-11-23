@@ -340,6 +340,14 @@ void main() {
     expect(cloudFootnote.style?.color, const Color(0xFF776D85));
     expect(cloudFootnote.style?.fontSize, 8);
     expect(cloudFootnote.style?.height, 1.7);
+    final footnoteRect = tester.getRect(
+      find.byKey(const ValueKey('sidebar-cloud-sync-footnote')),
+    );
+    final footnoteTextRect = tester.getRect(
+      find.text('閱讀位置、筆記與書籤都會同步保存至雲端'),
+    );
+    expect(footnoteRect.height, 25);
+    expect(footnoteTextRect.center.dy, closeTo(footnoteRect.center.dy, .6));
 
     await tester.tap(find.text('筆記與標註'));
     await tester.pumpAndSettle();

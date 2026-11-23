@@ -284,3 +284,21 @@ Desktop engine status is placed in the upper strip of the existing 50px book
 toolbar, while the quick-action row remains vertically centered on the toolbar
 axis. The compact and tablet top bars always reserve a flexible, ellipsized
 slot for the engine status; the removed Reading Time link stays absent.
+
+
+## Move engine status to the bottom-right and vertically center the cloud-sync footnote · 2026-11-23
+
+The engine status no longer occupies the desktop action-toolbar strip or the
+compact top bar. It now shares the existing bottom status line, aligned to the
+right edge, while the reading-position save/error message remains on the left.
+The status line keeps its existing 18px content height and 4px top inset; no
+additional row or vertical space is introduced. The reader frame therefore
+retains its existing 2px gap above the status line and the same bottom-of-screen
+spacing.
+
+The sidebar cloud-sync footnote keeps its existing 25px footer content area and
+11px top separation. Its text is now centered vertically inside that area for
+both compact and desktop layouts. Widget tests assert the engine label's bottom
+right alignment and verify that the footnote text and footer share the same
+vertical center. These are geometry assertions, not screenshot pixel-diff
+acceptance.

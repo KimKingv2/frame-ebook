@@ -474,9 +474,11 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
             ),
           ),
           Container(
+            key: const ValueKey('sidebar-cloud-sync-footnote'),
             width: double.infinity,
+            height: 25,
             margin: const EdgeInsets.only(top: 11),
-            padding: const EdgeInsets.only(top: 11),
+            alignment: Alignment.center,
             decoration: const BoxDecoration(
               border: Border(
                 top: BorderSide(color: Color(0x1AC1AAEE)),
@@ -823,9 +825,12 @@ class _FrameEpubReaderSidebarState extends State<FrameEpubReaderSidebar> {
           ),
         ),
         Container(
+          key: const ValueKey('sidebar-cloud-sync-footnote'),
           width: double.infinity,
+          height: 25,
           margin: const EdgeInsets.only(top: 11),
-          padding: EdgeInsets.fromLTRB(horizontalInset, 11, horizontalInset, 0),
+          padding: EdgeInsets.symmetric(horizontal: horizontalInset),
+          alignment: Alignment.center,
           decoration: const BoxDecoration(
             border: Border(
               top: BorderSide(color: Color(0x1AC1AAEE)),

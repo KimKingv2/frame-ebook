@@ -823,12 +823,10 @@ class _FrameEpubReaderPreviewScreenState
         _ => '閱讀引擎基礎 API 已檢出',
       };
 
-  Widget _buildReaderTopBar(
-    FrameEpubReaderSession? session, {
+  Widget _buildReaderTopBar({
     required double viewportWidth,
   }) {
     final compact = viewportWidth <= 560;
-    final engineStatus = _readerEngineStatus(session);
 
     Widget textLink(String label, VoidCallback onTap) => InkWell(
           onTap: onTap,
@@ -887,25 +885,6 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
             const Spacer(),
-            Flexible(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: (viewportWidth * .35)
-                      .clamp(92.0, compact ? 140.0 : 360.0)
-                      .toDouble(),
-                ),
-                child: Text(
-                  engineStatus,
-                  key: const ValueKey('reader-engine-status'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFFA79BB8),
-                    fontSize: compact ? 8 : 9,
-                  ),
-                ),
-              ),
-            ),
             SizedBox(width: compact ? 8 : 18),
             if (!compact) ...[
               const Text(
@@ -1019,7 +998,6 @@ class _FrameEpubReaderPreviewScreenState
           (readerColumnWidth * .42).clamp(120.0, 260.0).toDouble();
       final bookColumnWidth =
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
-      final engineStatus = _readerEngineStatus(session);
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
         constraints: const BoxConstraints(minHeight: 50),
@@ -1097,29 +1075,9 @@ class _FrameEpubReaderPreviewScreenState
                       constraints: const BoxConstraints(maxWidth: 260),
                       child: SizedBox(
                         height: 46,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: actionRow,
-                            ),
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Text(
-                                engineStatus,
-                                key: const ValueKey('reader-engine-status'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFFA79BB8),
-                                  fontSize: 7,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: actionRow,
                         ),
                       ),
                     ),
@@ -1301,7 +1259,6 @@ class _FrameEpubReaderPreviewScreenState
               maintainState: true,
               maintainAnimation: true,
               child: _buildReaderTopBar(
-                session,
                 viewportWidth: viewportWidth - shellInset * 2,
               ),
             ),
@@ -1406,7 +1363,7 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
           ),
-          if (!immersive) _readerStatusLine(),
+          if (!immersive) _readerStatusLine(session),
         ],
       ),
     );
@@ -1747,24 +1704,49 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
-  Widget _readerStatusLine() => Padding(
+  Widget _readerStatusLine(FrameEpubReaderSession? session) => Padding(
         key: const ValueKey('reader-status-line'),
         padding: const EdgeInsets.only(top: 4),
         child: SizedBox(
+          key: const ValueKey('reader-status-line-content'),
           width: double.infinity,
           height: 18,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _readerStatusMessage ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFA99EB7),
-                fontSize: 9,
-                height: 1.8,
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _readerStatusMessage ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFA99EB7),
+                      fontSize: 9,
+                      height: 1.8,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _readerEngineStatus(session),
+                    key: const ValueKey('reader-engine-status'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      color: Color(0xFFA79BB8),
+                      fontSize: 8,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );

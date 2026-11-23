@@ -146,10 +146,6 @@ void main() {
     final actionRowRect = tester.getRect(
       find.byKey(const ValueKey('reader-quick-actions-row')),
     );
-    final engineStatusRect = tester.getRect(
-      find.byKey(const ValueKey('reader-engine-status')),
-    );
-    expect(engineStatusRect.bottom, lessThanOrEqualTo(actionRowRect.top));
     expect(actionRowRect.width, 156);
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('reader-desktop-toolbar')),
@@ -201,6 +197,14 @@ void main() {
     final statusRect = tester.getRect(
       find.byKey(const ValueKey('reader-status-line')),
     );
+    final statusContentRect = tester.getRect(
+      find.byKey(const ValueKey('reader-status-line-content')),
+    );
+    final engineStatusRect = tester.getRect(
+      find.byKey(const ValueKey('reader-engine-status')),
+    );
+    expect(engineStatusRect.center.dy, statusContentRect.center.dy);
+    expect(engineStatusRect.right, closeTo(statusContentRect.right, .1));
     final statusPadding = tester.widget<Padding>(
       find.byKey(const ValueKey('reader-status-line')),
     );
@@ -213,6 +217,7 @@ void main() {
       find.byKey(const ValueKey('reader-rounded-frame')),
     );
     expect(statusRect.top, greaterThanOrEqualTo(frameRect.bottom));
+    expect(statusRect.top - frameRect.bottom, 2);
     expect((workspace.bottom - statusRect.bottom).abs(), lessThanOrEqualTo(1));
   });
 
