@@ -1962,10 +1962,13 @@ void main() {
 
       final displayedText = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
-          .map((widget) => widget.textSpan.toPlainText(
+          .map((widget) =>
+              widget.textSpan?.toPlainText(
                 includeSemanticsLabels: false,
                 includePlaceholders: true,
-              ))
+              ) ??
+              widget.data ??
+              '')
           .join()
           .replaceAll('\uFFFC', '');
       expect(displayedText, contains(longText));
