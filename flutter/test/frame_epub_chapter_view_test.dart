@@ -1960,17 +1960,38 @@ void main() {
         reason: 'A long paragraph with text-indent must span reader pages.',
       );
 
-      final displayedText = tester
-          .widgetList<SelectableText>(find.byType(SelectableText))
-          .map((widget) =>
-              widget.textSpan?.toPlainText(
-                includeSemanticsLabels: false,
-                includePlaceholders: true,
-              ) ??
-              widget.data ??
-              '')
-          .join()
-          .replaceAll('\uFFFC', '');
+      final pageCount =
+          (pageController.position.maxScrollExtent /
+                  pageController.position.viewportDimension)
+              .round() +
+          1;
+      expect(pageCount, greaterThan(1));
+      final pageViewRect = tester.getRect(find.byType(PageView));
+      final pageText = <String>[];
+      for (var pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        pageController.jumpToPage(pageIndex);
+        await tester.pumpAndSettle();
+
+        final visiblePieces = <String>[];
+        for (final element in find.byType(SelectableText).evaluate()) {
+          final selectable = element.widget as SelectableText;
+          if (!tester.getRect(find.byWidget(selectable)).overlaps(pageViewRect)) {
+            continue;
+          }
+          visiblePieces.add(
+            selectable.textSpan?.toPlainText(
+                  includeSemanticsLabels: false,
+                  includePlaceholders: true,
+                ) ??
+                selectable.data ??
+                '',
+          );
+        }
+        pageText.add(visiblePieces.join());
+      }
+
+      final displayedText =
+          pageText.join().replaceAll('\uFFFC', '');
       expect(displayedText, contains(longText));
       expect(displayedText.split(longText).length - 1, 1);
       expect(tester.takeException(), isNull);
