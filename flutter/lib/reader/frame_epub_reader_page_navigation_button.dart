@@ -21,22 +21,36 @@ class FrameEpubReaderPageNavigationButton extends StatelessWidget {
         previous ? 'reader-page-turn-previous' : 'reader-page-turn-next',
       ),
       onPressed: enabled ? onPressed : null,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFECE6F5),
-        disabledForegroundColor: const Color(0xFFB8ADC9),
-        backgroundColor: const Color(0xFF342B43),
-        disabledBackgroundColor: const Color(0xFF292432),
-        side: const BorderSide(color: Color(0xFF8D79A8)),
-        disabledBorderColor: const Color(0xFF665B78),
-        minimumSize: const Size(104, 37),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+      style: ButtonStyle(
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.disabled)
+              ? const Color(0xFFB8ADC9)
+              : const Color(0xFFECE6F5);
+        }),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.disabled)
+              ? const Color(0xFF292432)
+              : const Color(0xFF342B43);
+        }),
+        side: WidgetStateProperty.resolveWith((states) {
+          return BorderSide(
+            color: states.contains(WidgetState.disabled)
+                ? const Color(0xFF665B78)
+                : const Color(0xFF8D79A8),
+          );
+        }),
+        minimumSize: const WidgetStatePropertyAll(Size(104, 37)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 14),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        shape: const WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
         ),
       ),
       child: Row(
