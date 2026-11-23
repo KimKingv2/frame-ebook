@@ -156,12 +156,11 @@ void main() {
       frameForGap.top - actionRowRect.bottom,
       lessThanOrEqualTo(16),
     );
-    expect(
-      actionRowRect.top - tester.getRect(
-        find.text('等待閱讀'),
-      ).bottom,
-      5,
+    final chapterTitleRect = tester.getRect(
+      find.byKey(const ValueKey('reader-chapter-title')),
     );
+    expect(chapterTitleRect.center.dx, frameForGap.center.dx);
+    expect(chapterTitleRect.bottom, lessThan(actionRowRect.top));
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),

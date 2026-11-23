@@ -1017,6 +1017,8 @@ class _FrameEpubReaderPreviewScreenState
     FrameEpubReaderSession? session, {
     required double viewportWidth,
     required bool wide,
+    required double readerColumnOffset,
+    required double readerColumnWidth,
   }) {
     final compact = viewportWidth <= 560;
     final ready = session?.status == FrameEpubReaderStatus.ready;
@@ -1102,118 +1104,146 @@ class _FrameEpubReaderPreviewScreenState
     );
 
     if (wide) {
+      final chapterLabelWidth =
+          (readerColumnWidth * .42).clamp(120.0, 260.0).toDouble();
+      final bookColumnWidth =
+          (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
         constraints: const BoxConstraints(minHeight: 84),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D253C),
-                  border: Border.all(color: const Color(0x443F3552)),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  tooltip: '返回書架',
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
-                  ),
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    size: 18,
-                    color: Color(0xFFE8E1F5),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: SizedBox(
+            height: 74,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
-                      'NOW READING',
-                      style: TextStyle(
-                        color: Color(0xFF938AA1),
-                        fontSize: 9,
-                        letterSpacing: 1.7,
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2D253C),
+                        border: Border.all(color: const Color(0x443F3552)),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        tooltip: '返回書架',
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 36,
+                        ),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          size: 18,
+                          color: Color(0xFFE8E1F5),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _bookTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _readerText,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: .1,
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: bookColumnWidth,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'NOW READING',
+                            style: TextStyle(
+                              color: Color(0xFF938AA1),
+                              fontSize: 9,
+                              letterSpacing: 1.7,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _bookTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _readerText,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: .1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFAAA3B6),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFAAA3B6),
-                        fontSize: 10,
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => unawaited(_openLegacyReadingStats()),
+                      borderRadius: BorderRadius.circular(5),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          '閱讀時光',
+                          style: TextStyle(
+                            color: Color(0xFFBBA9DF),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const SizedBox(height: 22),
+                          const SizedBox(height: 5),
+                          actionRow,
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              InkWell(
-                onTap: () => unawaited(_openLegacyReadingStats()),
-                borderRadius: BorderRadius.circular(5),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-                  child: Text(
-                    '閱讀時光',
-                    style: TextStyle(
-                      color: Color(0xFFBBA9DF),
-                      fontSize: 10,
+                Positioned(
+                  left: readerColumnOffset,
+                  width: readerColumnWidth,
+                  top: 0,
+                  child: Center(
+                    child: SizedBox(
+                      width: chapterLabelWidth,
+                      child: Text(
+                        progressLabel,
+                        key: const ValueKey('reader-chapter-title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFFC7B5FB),
+                          fontFamily: 'Georgia',
+                          fontSize: 22,
+                          fontWeight: FontWeight.w400,
+                          height: 1,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      progressLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        color: Color(0xFFC7B5FB),
-                        fontFamily: 'Georgia',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w400,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    actionRow,
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -1375,6 +1405,12 @@ class _FrameEpubReaderPreviewScreenState
               session,
               viewportWidth: viewportWidth,
               wide: wide,
+              readerColumnOffset:
+                  workspaceLayout.sidebarWidth + workspaceLayout.gap,
+              readerColumnWidth: viewportWidth -
+                  shellInset * 2 -
+                  workspaceLayout.sidebarWidth -
+                  workspaceLayout.gap,
             ),
           ),
           Expanded(

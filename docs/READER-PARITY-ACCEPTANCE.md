@@ -144,3 +144,18 @@ The widget tests assert per-button dimensions, inter-button gaps, total row
 width, chapter-label spacing and desktop distance to the reading frame. This
 remains source/test geometry evidence; controlled screenshot comparison is
 still required for formal pixel-level acceptance.
+
+
+## Center the current chapter title over the reading surface · 2026-11-23
+
+The desktop current-chapter label (`currentChapterLabel`, with the existing
+fallback text before a book is ready) now sits centered above the actual reading
+frame. Its horizontal anchor is calculated from the main reading-column bounds,
+after subtracting the visible navigation sidebar and its gap. This keeps the
+label aligned with the reading surface when the desktop sidebar is expanded or
+collapsed. The four compact rectangular action buttons remain right-aligned and
+retain their current dimensions.
+
+The widget test checks that the chapter-title center and reading-frame center
+share the same horizontal coordinate. This is a layout-geometry assertion,
+not a screenshot pixel-diff claim.
