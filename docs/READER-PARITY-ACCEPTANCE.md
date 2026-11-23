@@ -156,6 +156,8 @@ label aligned with the reading surface when the desktop sidebar is expanded or
 collapsed. The four compact rectangular action buttons remain right-aligned and
 retain their current dimensions.
 
-The widget test checks that the chapter-title center and reading-frame center
-share the same horizontal coordinate. This is a layout-geometry assertion,
-not a screenshot pixel-diff claim.
+The title's left anchor also accounts for the desktop heading's 4px horizontal
+inset so its center remains aligned with the reading frame's actual edges. The
+widget test checks that the chapter-title center and reading-frame center share
+the same horizontal coordinate. This is a layout-geometry assertion, not a
+screenshot pixel-diff claim.

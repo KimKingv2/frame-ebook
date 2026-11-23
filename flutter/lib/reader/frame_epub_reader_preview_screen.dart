@@ -1219,7 +1219,7 @@ class _FrameEpubReaderPreviewScreenState
                   ],
                 ),
                 Positioned(
-                  left: readerColumnOffset,
+                  left: readerColumnOffset - 4,
                   width: readerColumnWidth,
                   top: 0,
                   child: Center(
