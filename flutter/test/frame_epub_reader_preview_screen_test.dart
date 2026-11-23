@@ -124,9 +124,6 @@ void main() {
     final engineStatusRect = tester.getRect(
       find.byKey(const ValueKey('reader-engine-status')),
     );
-    final actionRowRect = tester.getRect(
-      find.byKey(const ValueKey('reader-quick-actions-row')),
-    );
     expect(engineStatusRect.bottom, lessThanOrEqualTo(actionRowRect.top));
     expect(
       find.byKey(const ValueKey('reading-session-indicator')),
