@@ -13,7 +13,6 @@ import '../core/frame_api_scope.dart';
 import '../core/frame_app_config.dart';
 import '../library/frame_book.dart';
 import '../library/frame_reader_repository.dart';
-import '../legacy/frame_legacy_page.dart';
 import '../transport/frame_cloud_file_source.dart';
 import '../transport/frame_file_source.dart';
 import '../transport/frame_file_source_factory.dart';
@@ -265,7 +264,7 @@ class _FrameEpubReaderPreviewScreenState
     }
     if (session?.status == FrameEpubReaderStatus.ready) {
       if (!_appearanceInitialized) {
-        _restoreAppearance(session.readerState.appearance);
+        _restoreAppearance(session!.readerState.appearance);
         _appearanceInitialized = true;
       }
     }
@@ -918,7 +917,6 @@ class _FrameEpubReaderPreviewScreenState
     required double readerColumnOffset,
     required double readerColumnWidth,
   }) {
-    final compact = viewportWidth <= 560;
     final ready = session?.status == FrameEpubReaderStatus.ready;
     final currentBookmarkCfi = ready
         ? _bookmarkCfi(
