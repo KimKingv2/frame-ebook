@@ -278,3 +278,9 @@ The target styling is the 4px violet chapter gradient and 3px muted-violet
 whole-book gradient, with 9px tabular percentage labels and the original 8px
 row gap. This is automated widget evidence, not screenshot pixel-diff
 acceptance.
+
+
+Desktop engine status is placed in the upper strip of the existing 50px book
+toolbar, while the quick-action row remains vertically centered on the toolbar
+axis. The compact and tablet top bars always reserve a flexible, ellipsized
+slot for the engine status; the removed Reading Time link stays absent.

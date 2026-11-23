@@ -121,6 +121,13 @@ void main() {
     expect(find.byKey(const ValueKey('reader-status-line')), findsOneWidget);
     expect(find.byKey(const ValueKey('reader-engine-status')), findsOneWidget);
     expect(find.text('書籍或閱讀引擎載入失敗'), findsOneWidget);
+    final engineStatusRect = tester.getRect(
+      find.byKey(const ValueKey('reader-engine-status')),
+    );
+    final actionRowRect = tester.getRect(
+      find.byKey(const ValueKey('reader-quick-actions-row')),
+    );
+    expect(engineStatusRect.bottom, lessThanOrEqualTo(actionRowRect.top));
     expect(
       find.byKey(const ValueKey('reading-session-indicator')),
       findsNothing,

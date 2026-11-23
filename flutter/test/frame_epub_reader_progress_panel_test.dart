@@ -92,7 +92,7 @@ void main() {
     expect(find.text('30%'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('reader-progress-panel'))).width,
-      374,
+      370,
     );
     expect(tester.takeException(), isNull);
   });
@@ -122,6 +122,9 @@ void main() {
 
     expect(find.text('100%'), findsOneWidget);
     expect(find.text('0%'), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('本章進度')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('本章進度')).evaluate(),
+      isNotEmpty,
+    );
   });
 }

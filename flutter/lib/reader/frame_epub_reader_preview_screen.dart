@@ -27,7 +27,6 @@ import 'frame_epub_parser.dart';
 import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
 import 'frame_epub_reader_sidebar.dart';
-import 'frame_epub_reader_page_navigation_button.dart';
 import 'frame_epub_reader_progress_panel.dart';
 import 'frame_epub_note_editor_dialog.dart';
 
@@ -1096,26 +1095,32 @@ class _FrameEpubReaderPreviewScreenState
                     const Spacer(),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 260),
-                      child: Column(
-                        key: const ValueKey('reader-desktop-status-actions'),
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            engineStatus,
-                            key: const ValueKey('reader-engine-status'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFFA79BB8),
-                              fontSize: 8,
-                              height: 1.15,
+                      child: SizedBox(
+                        height: 46,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: actionRow,
                             ),
-                          ),
-                          const SizedBox(height: 3),
-                          actionRow,
-                        ],
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Text(
+                                engineStatus,
+                                key: const ValueKey('reader-engine-status'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFA79BB8),
+                                  fontSize: 7,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
