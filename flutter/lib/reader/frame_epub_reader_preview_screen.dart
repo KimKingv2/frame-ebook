@@ -28,6 +28,7 @@ import 'frame_epub_page_turn_surface.dart';
 import 'frame_epub_reader_session.dart';
 import 'frame_epub_reader_sidebar.dart';
 import 'frame_epub_reader_page_navigation_button.dart';
+import 'frame_epub_reader_progress_panel.dart';
 import 'frame_epub_note_editor_dialog.dart';
 
 const _readerChrome = Color(0xFF12101A);
@@ -616,24 +617,35 @@ class _FrameEpubReaderPreviewScreenState
     }
   }
 
-  int _readingProgressPercent(FrameEpubReaderSession? session) {
+  int _readingProgressPercent(
+    FrameEpubReaderSession? session, {
+    double? chapterFraction,
+  }) {
     final pending = _pendingPercent;
     if (pending != null) return pending.clamp(0, 100).toInt();
     final saved = session?.readerState.progress['percent'];
     if (saved is num) return saved.round().clamp(0, 100).toInt();
-    return session?.chapterProgressPercent ?? 0;
+
+    final index = session?.currentSpineIndex;
+    final count = session?.epub?.spine.length ?? 0;
+    if (index == null || count <= 0) return 0;
+    final completedUnits = session!.isFixedLayout
+        ? index + 1.0
+        : index + (chapterFraction ?? 0);
+    return ((completedUnits / count) * 100).round().clamp(0, 100).toInt();
   }
 
-  double _currentChapterFraction(FrameEpubReaderSession session) {
-    if (session.isFixedLayout) return 1;
+  double? _currentChapterFraction(FrameEpubReaderSession session) {
+    // The legacy Reading Room only exposes a chapter/section meter for
+    // reflowable EPUB. Fixed-layout comics use the whole-book meter only.
+    if (session.isFixedLayout) return null;
+
     if (_layoutMode == 'continuous') {
       final controller = _chapterScrollController;
-      if (!controller.hasClients) return 0;
+      if (!controller.hasClients) return null;
       final position = controller.position;
-      if (!position.hasContentDimensions ||
-          position.maxScrollExtent <= position.minScrollExtent) {
-        return 0;
-      }
+      if (!position.hasContentDimensions) return null;
+      if (position.maxScrollExtent <= position.minScrollExtent) return 1;
       return ((position.pixels - position.minScrollExtent) /
               (position.maxScrollExtent - position.minScrollExtent))
           .clamp(0.0, 1.0)
@@ -641,12 +653,12 @@ class _FrameEpubReaderPreviewScreenState
     }
 
     final controller = _chapterPageController;
-    if (!controller.hasClients) return 0;
+    if (!controller.hasClients) return null;
     final position = controller.position;
     if (!position.hasContentDimensions ||
         !position.viewportDimension.isFinite ||
         position.viewportDimension <= 0) {
-      return 0;
+      return null;
     }
     final lastPage =
         (position.maxScrollExtent / position.viewportDimension).round();
@@ -801,20 +813,23 @@ class _FrameEpubReaderPreviewScreenState
     );
   }
 
+  String _readerEngineStatus(FrameEpubReaderSession? session) =>
+      switch (session?.status) {
+        FrameEpubReaderStatus.opening ||
+        FrameEpubReaderStatus.idle => '正在載入雲端書籍',
+        FrameEpubReaderStatus.error => '書籍或閱讀引擎載入失敗',
+        FrameEpubReaderStatus.ready => session!.isFixedLayout
+            ? '固定版面 EPUB 已載入'
+            : 'EPUB 閱讀引擎已就緒',
+        _ => '閱讀引擎基礎 API 已檢出',
+      };
+
   Widget _buildReaderTopBar(
     FrameEpubReaderSession? session, {
     required double viewportWidth,
   }) {
     final compact = viewportWidth <= 560;
-    final engineStatus = switch (session?.status) {
-      FrameEpubReaderStatus.opening ||
-      FrameEpubReaderStatus.idle => '正在載入雲端書籍',
-      FrameEpubReaderStatus.error => '書籍或閱讀引擎載入失敗',
-      FrameEpubReaderStatus.ready => session!.isFixedLayout
-          ? '固定版面 EPUB 已載入'
-          : 'EPUB 閱讀引擎已就緒',
-      _ => '閱讀引擎基礎 API 已檢出',
-    };
+    final engineStatus = _readerEngineStatus(session);
 
     Widget textLink(String label, VoidCallback onTap) => InkWell(
           onTap: onTap,
@@ -873,26 +888,26 @@ class _FrameEpubReaderPreviewScreenState
               ),
             ),
             const Spacer(),
-            if (viewportWidth > 820) ...[
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth:
-                        (viewportWidth * .34).clamp(120.0, 360.0).toDouble(),
-                  ),
-                  child: Text(
-                    engineStatus,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFA79BB8),
-                      fontSize: 9,
-                    ),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (viewportWidth * .35)
+                      .clamp(92.0, compact ? 140.0 : 360.0)
+                      .toDouble(),
+                ),
+                child: Text(
+                  engineStatus,
+                  key: const ValueKey('reader-engine-status'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFFA79BB8),
+                    fontSize: compact ? 8 : 9,
                   ),
                 ),
               ),
-              const SizedBox(width: 18),
-            ],
+            ),
+            SizedBox(width: compact ? 8 : 18),
             if (!compact) ...[
               const Text(
                 'READING ROOM · 0.6',
@@ -1005,13 +1020,14 @@ class _FrameEpubReaderPreviewScreenState
           (readerColumnWidth * .42).clamp(120.0, 260.0).toDouble();
       final bookColumnWidth =
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
+      final engineStatus = _readerEngineStatus(session);
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
         constraints: const BoxConstraints(minHeight: 50),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: SizedBox(
-            height: 36,
+            height: 46,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1081,10 +1097,25 @@ class _FrameEpubReaderPreviewScreenState
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 260),
                       child: Column(
+                        key: const ValueKey('reader-desktop-status-actions'),
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [actionRow],
+                        children: [
+                          Text(
+                            engineStatus,
+                            key: const ValueKey('reader-engine-status'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFA79BB8),
+                              fontSize: 8,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          actionRow,
+                        ],
                       ),
                     ),
                   ],
@@ -1740,124 +1771,27 @@ class _FrameEpubReaderPreviewScreenState
         _chapterPageController,
       ]),
       builder: (context, child) {
-        final chapterPercent =
-            (_currentChapterFraction(session) * 100).round().clamp(0, 100);
-        final bookPercent = _readingProgressPercent(session);
+        final chapterFraction = _currentChapterFraction(session);
+        final chapterPercent = chapterFraction == null
+            ? null
+            : (chapterFraction * 100).round().clamp(0, 100).toInt();
+        final bookPercent = _readingProgressPercent(
+          session,
+          chapterFraction: chapterFraction,
+        );
         final canGoPrevious = _canTurnReaderPage(session, forward: false);
         final canGoNext = _canTurnReaderPage(session, forward: true);
-        final compact = MediaQuery.sizeOf(context).width <= 720;
 
-        Widget pageButton({required bool previous}) =>
-            FrameEpubReaderPageNavigationButton(
-              previous: previous,
-              enabled: previous ? canGoPrevious : canGoNext,
-              onPressed: () => unawaited(
-                _turnReaderPage(session, forward: !previous),
-              ),
-            );
-
-        Widget progressRow(String label, int percent, {double height = 4}) =>
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: Color(0xFFA69BB6),
-                          fontSize: 9,
-                          letterSpacing: .2,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '$percent%',
-                      style: const TextStyle(
-                        color: Color(0xFFD5C6F7),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: percent / 100,
-                    minHeight: height,
-                    color: _readerAccent,
-                    backgroundColor: const Color(0x24AB97CA),
-                  ),
-                ),
-              ],
-            );
-
-        final progressPanel = Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            progressRow('本章進度', chapterPercent),
-            const SizedBox(height: 8),
-            progressRow('全書進度', bookPercent, height: 3),
-          ],
-        );
-
-        return Material(
-          color: Colors.transparent,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(2, 6, 2, 2),
-              child: compact
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: pageButton(previous: true)),
-                            const SizedBox(width: 8),
-                            Expanded(child: pageButton(previous: false)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: progressPanel,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: pageButton(previous: true),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 220,
-                            maxWidth: 300,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: progressPanel,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: pageButton(previous: false),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+        return FrameEpubReaderProgressPanel(
+          chapterProgressPercent: chapterPercent,
+          bookProgressPercent: bookPercent,
+          canGoPrevious: canGoPrevious,
+          canGoNext: canGoNext,
+          onPrevious: () => unawaited(
+            _turnReaderPage(session, forward: false),
+          ),
+          onNext: () => unawaited(
+            _turnReaderPage(session, forward: true),
           ),
         );
       },

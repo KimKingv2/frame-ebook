@@ -119,6 +119,8 @@ void main() {
     expect(find.text('Preview test book'), findsOneWidget);
     expect(find.text('閱讀時光'), findsNothing);
     expect(find.byKey(const ValueKey('reader-status-line')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reader-engine-status')), findsOneWidget);
+    expect(find.text('書籍或閱讀引擎載入失敗'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('reading-session-indicator')),
       findsNothing,
@@ -232,6 +234,7 @@ void main() {
       find.byKey(const ValueKey('reader-mobile-toolbar')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('reader-engine-status')), findsOneWidget);
     expect(find.text('閱讀時光'), findsNothing);
     expect(find.byKey(const ValueKey('reading-session-indicator')), findsNothing);
     final actionKeys = [
