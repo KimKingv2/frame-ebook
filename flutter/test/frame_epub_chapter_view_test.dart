@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
@@ -1797,8 +1798,9 @@ void main() {
       addTearDown(semantics.dispose);
       final linkSemanticsFinder = find.bySemanticsLabel('可點擊的表格圖片');
       expect(linkSemanticsFinder, findsOneWidget);
-      final linkSemantics = tester.getSemantics(linkSemanticsFinder);
-      expect(linkSemantics.hasFlag(SemanticsFlag.isLink), isTrue);
+      final linkSemantics =
+          tester.getSemantics(linkSemanticsFinder).getSemanticsData();
+      expect(linkSemantics.flagsCollection.isLink, isTrue);
       expect(linkSemantics.hasAction(SemanticsAction.tap), isTrue);
 
       await tester.tap(imageFinder);
