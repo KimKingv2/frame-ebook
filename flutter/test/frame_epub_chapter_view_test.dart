@@ -1549,7 +1549,11 @@ void main() {
       expect(spanningRect.height, greaterThan(imageRect.height));
       expect(imageRect.top, greaterThan(spanningRect.top));
       expect(imageRect.bottom, lessThan(spanningRect.bottom));
-      expect(tester.takeException(), isNull);
+      final layoutException = tester.takeException();
+      if (layoutException != null) {
+        debugDumpRenderTree();
+      }
+      expect(layoutException, isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
       tester.view.resetPhysicalSize();
