@@ -1798,7 +1798,7 @@ void main() {
       addTearDown(semantics.dispose);
       await tester.pump();
       final linkSemanticsFinder =
-          find.byKey(const ValueKey('frame-epub-link-semantics'));
+          find.bySemanticsLabel('可點擊的表格圖片');
       expect(linkSemanticsFinder, findsOneWidget);
       final linkSemantics =
           tester.getSemantics(linkSemanticsFinder).getSemanticsData();

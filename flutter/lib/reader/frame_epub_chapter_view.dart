@@ -2322,7 +2322,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           alignment: PlaceholderAlignment.baseline,
           baseline: TextBaseline.alphabetic,
           child: Semantics(
-            key: const ValueKey('frame-epub-link-semantics'),
             container: true,
             explicitChildNodes: true,
             label: linkLabel,
