@@ -115,6 +115,38 @@ void main() {
     expect(labels[2].label, '第三欄');
   });
 
+  test('preserves parent headings for explicitly linked multi-level headers', () {
+    final labels = FrameEpubTableSemantics.resolve(
+      cells: const [
+        FrameEpubTableSemanticCell(
+          index: 0, row: 0, column: 0, rowSpan: 1, columnSpan: 2,
+          rowGroup: 0, rowGroupEnd: 1, isHeader: true,
+          isHeaderElement: true, isHeaderRow: true, text: '基本資料',
+          id: 'group', scope: 'colgroup',
+        ),
+        FrameEpubTableSemanticCell(
+          index: 1, row: 1, column: 0, rowSpan: 1, columnSpan: 1,
+          rowGroup: 0, rowGroupEnd: 2, isHeader: true,
+          isHeaderElement: true, isHeaderRow: true, text: '書名',
+          id: 'title', scope: 'col', headers: 'group',
+        ),
+        FrameEpubTableSemanticCell(
+          index: 2, row: 2, column: 0, rowSpan: 1, columnSpan: 1,
+          rowGroup: 1, rowGroupEnd: 3, isHeader: false,
+          isHeaderElement: false, isHeaderRow: false, text: '星際旅行',
+          headers: 'title',
+        ),
+      ],
+    );
+
+    expect(labels[1].label, '欄標題：基本資料／書名');
+    expect(
+      labels[2].label,
+      '欄標題：基本資料／書名；儲存格內容：星際旅行',
+    );
+    expect(labels[1].isHeader, isTrue);
+  });
+
   test('unknown explicit header ids are safely ignored', () {
     final labels = FrameEpubTableSemantics.resolve(
       cells: const [

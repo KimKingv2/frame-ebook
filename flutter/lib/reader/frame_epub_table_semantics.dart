@@ -118,17 +118,17 @@ class FrameEpubTableSemantics {
     Map<String, FrameEpubTableSemanticCell> headersById,
     List<FrameEpubTableColumnGroup> columnGroups,
   ) {
-    if (cell.isHeader) {
+    final explicitHeaderIds = (cell.headers ?? '')
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty)
+        .toList(growable: false);
+
+    if (cell.isHeader && explicitHeaderIds.isEmpty) {
       return FrameEpubTableSemanticLabel(
         label: cell.text,
         isHeader: true,
       );
     }
-
-    final explicitHeaderIds = (cell.headers ?? '')
-        .split(RegExp(r'\\s+'))
-        .where((token) => token.isNotEmpty)
-        .toList(growable: false);
 
     final associated = <FrameEpubTableSemanticCell>[];
     if (explicitHeaderIds.isNotEmpty) {
@@ -160,7 +160,7 @@ class FrameEpubTableSemantics {
     final otherHeaders = <String>[];
 
     for (final header in associated) {
-      final label = header.accessibleHeaderText;
+      final label = _headerDescription(header, headersById);
       if (label.isEmpty) continue;
       final scope = _normalizedScope(header.scope, header.isHeaderRow);
       final bucket = switch (scope) {
@@ -184,8 +184,33 @@ class FrameEpubTableSemantics {
 
     return FrameEpubTableSemanticLabel(
       label: parts.join('；'),
-      isHeader: false,
+      isHeader: cell.isHeader,
     );
+  }
+
+  static String _headerDescription(
+    FrameEpubTableSemanticCell header,
+    Map<String, FrameEpubTableSemanticCell> headersById, [
+    Set<String>? visited,
+  ]) {
+    final seen = visited ?? <String>{};
+    final id = header.id;
+    if (id != null && !seen.add(id)) return header.accessibleHeaderText;
+
+    final parentIds = (header.headers ?? '')
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty);
+    final parents = <String>[];
+    for (final parentId in parentIds) {
+      final parent = headersById[parentId];
+      if (parent == null || parent.index == header.index) continue;
+      final description = _headerDescription(parent, headersById, seen);
+      if (description.isNotEmpty && !parents.contains(description)) {
+        parents.add(description);
+      }
+    }
+    final own = header.accessibleHeaderText;
+    return [...parents, if (own.isNotEmpty) own].join('／');
   }
 
   static bool _appliesByScope(
