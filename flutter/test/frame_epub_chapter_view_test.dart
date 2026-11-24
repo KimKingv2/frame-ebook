@@ -1796,8 +1796,16 @@ void main() {
       expect(imageFinder, findsOneWidget);
       final semantics = tester.ensureSemantics();
       addTearDown(semantics.dispose);
-      final linkSemanticsFinder = find.bySemanticsLabel('可點擊的表格圖片');
+      await tester.pump();
+      final linkSemanticsFinder = find.ancestor(
+        of: imageFinder,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.link,
+        ),
+      );
       expect(linkSemanticsFinder, findsOneWidget);
+      final linkWidget = tester.widget<Semantics>(linkSemanticsFinder);
+      expect(linkWidget.label, '可點擊的表格圖片');
       final linkSemantics =
           tester.getSemantics(linkSemanticsFinder).getSemanticsData();
       expect(linkSemantics.flagsCollection.isLink, isTrue);
