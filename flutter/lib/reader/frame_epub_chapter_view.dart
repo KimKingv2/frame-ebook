@@ -16,6 +16,7 @@ import 'frame_epub_ruby_annotation.dart';
 import 'frame_epub_text_paginator.dart';
 import 'frame_epub_table_layout.dart';
 import 'frame_epub_table_grid.dart';
+import 'frame_epub_table_semantics.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
 class FrameEpubTextSelection {
@@ -2031,6 +2032,73 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (columnCount == 0) {
       return const SizedBox.shrink();
     }
+    final columnGroups = <FrameEpubTableColumnGroup>[];
+    var nextColumnGroupStart = 0;
+    for (final child in table.children.whereType<XmlElement>()) {
+      if (child.name.local.toLowerCase() != 'colgroup') continue;
+      final columns = child.children
+          .whereType<XmlElement>()
+          .where((element) => element.name.local.toLowerCase() == 'col')
+          .toList(growable: false);
+      final groupSpan = columns.isEmpty
+          ? (int.tryParse(_attribute(child, 'span') ?? '') ?? 1)
+              .clamp(1, 1000)
+              .toInt()
+          : columns.fold<int>(
+              0,
+              (total, element) =>
+                  total +
+                  (int.tryParse(_attribute(element, 'span') ?? '') ?? 1)
+                      .clamp(1, 1000)
+                      .toInt(),
+            );
+      columnGroups.add(FrameEpubTableColumnGroup(
+        startColumn: nextColumnGroupStart,
+        endColumn: nextColumnGroupStart + groupSpan,
+      ));
+      nextColumnGroupStart += groupSpan;
+    }
+
+    final semanticCells = <FrameEpubTableSemanticCell>[];
+    for (var rowIndex = 0; rowIndex < gridRows.length; rowIndex++) {
+      var column = 0;
+      for (final placement in gridRows[rowIndex].placements) {
+        final cellIndex = placement.cellIndex;
+        if (cellIndex == null) {
+          column += placement.columnSpan;
+          continue;
+        }
+        final cell = rawRows[rowIndex][cellIndex];
+        semanticCells.add(FrameEpubTableSemanticCell(
+          index: semanticCells.length,
+          row: rowIndex,
+          column: column,
+          rowSpan: placement.rowSpan,
+          columnSpan: placement.columnSpan,
+          rowGroup: rows[rowIndex].rowGroup,
+          rowGroupEnd: rowGroupEndIndices[rowIndex],
+          isHeader: placement.header,
+          isHeaderElement: cell.name.local.toLowerCase() == 'th',
+          isHeaderRow: rows[rowIndex].header,
+          text: cell.innerText.trim(),
+          id: _attribute(cell, 'id'),
+          headers: _attribute(cell, 'headers'),
+          scope: _attribute(cell, 'scope'),
+          abbreviation: _attribute(cell, 'abbr'),
+        ));
+        column += placement.columnSpan;
+      }
+    }
+    final semanticLabels = FrameEpubTableSemantics.resolve(
+      cells: semanticCells,
+      columnGroups: columnGroups,
+    );
+    final semanticLabelByPosition = <(int, int), FrameEpubTableSemanticLabel>{};
+    for (var index = 0; index < semanticCells.length; index++) {
+      final cell = semanticCells[index];
+      semanticLabelByPosition[(cell.row, cell.column)] = semanticLabels[index];
+    }
+
     final gridCells = <Widget>[];
 
     for (var rowIndex = 0; rowIndex < gridRows.length; rowIndex++) {
@@ -2094,11 +2162,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             child: cellContent,
           );
         }
-        // Expose each table cell's text, retaining its header role and
-        // allowing descendant links or footnote actions to keep their semantics.
+        // Include related HTML headers in each data cell's accessible name.
+        // Descendant links and footnote actions remain independently exposed.
+        final semanticLabel = semanticLabelByPosition[(rowIndex, column)];
         cellContent = Semantics(
-          label: cell.innerText.trim(),
-          header: placement.header,
+          label: semanticLabel?.label ?? cell.innerText.trim(),
+          header: semanticLabel?.isHeader ?? placement.header,
           child: cellContent,
         );
         gridCells.add(FrameEpubTableGridCell(

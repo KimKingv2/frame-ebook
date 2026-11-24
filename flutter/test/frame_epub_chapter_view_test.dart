@@ -1199,6 +1199,103 @@ void main() {
   });
 
   testWidgets(
+      'announces related row and column headers for EPUB table cells',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <colgroup><col span="1"/></colgroup>
+        <colgroup><col span="1"/></colgroup>
+        <thead>
+          <tr>
+            <th id="book-title" scope="col" abbr="書名">完整書名</th>
+            <th id="book-author" scope="col">作者</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th id="first-book" scope="row">第一本</th>
+            <td headers="book-title first-book">
+              <a href="chapter.xhtml#inside">作者甲</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-header-relations-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-header-relations.epub',
+      'fileName': 'table-header-relations.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      String? openedLink;
+
+      tester.view.physicalSize = const Size(640, 900);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+            onInternalLink: (href) => openedLink = href,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pump();
+        final dataCellFinder = find.bySemanticsLabel(
+          '欄標題：書名；列標題：第一本；儲存格內容：作者甲',
+        );
+        expect(dataCellFinder, findsOneWidget);
+        final dataCell = tester.getSemantics(dataCellFinder).getSemanticsData();
+        expect(dataCell.flagsCollection.isHeader, isFalse);
+
+        final linkFinder = find.bySemanticsLabel('作者甲');
+        expect(linkFinder, findsOneWidget);
+        final linkData = tester.getSemantics(linkFinder).getSemanticsData();
+        expect(linkData.flagsCollection.isLink, isTrue);
+        expect(linkData.hasAction(SemanticsAction.tap), isTrue);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('完整書名'))
+              .getSemanticsData()
+              .flagsCollection.isHeader,
+          isTrue,
+        );
+
+        await tester.tap(linkFinder);
+        await tester.pumpAndSettle();
+        expect(openedLink, 'chapter.xhtml#inside');
+      } finally {
+        semantics.dispose();
+      }
+
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
+  testWidgets(
       'keeps rowspan zero inside its EPUB table row group',
       (tester) async {
     const table = '''
