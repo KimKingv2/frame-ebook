@@ -139,7 +139,7 @@ void main() {
       ],
     );
 
-    expect(labels[1].label, '欄標題：基本資料／書名');
+    expect(labels[1].label, '基本資料／書名');
     expect(
       labels[2].label,
       '欄標題：基本資料／書名；儲存格內容：星際旅行',
