@@ -1797,14 +1797,26 @@ void main() {
       final semantics = tester.ensureSemantics();
       addTearDown(semantics.dispose);
       await tester.pump();
-      final linkSemanticsFinder = find.ancestor(
-        of: imageFinder,
-        matching: find.byType(Semantics),
-      ).first;
+      final linkSemanticsFinder =
+          find.byKey(const ValueKey('frame-epub-link-semantics'));
+      expect(linkSemanticsFinder, findsOneWidget);
       final linkSemantics =
           tester.getSemantics(linkSemanticsFinder).getSemanticsData();
-      expect(linkSemantics.flagsCollection.isLink, isTrue);
-      expect(linkSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(
+        linkSemantics.label,
+        '可點擊的表格圖片',
+        reason: 'The link must expose the image alt text as its accessible name.',
+      );
+      expect(
+        linkSemantics.flagsCollection.isLink,
+        isTrue,
+        reason: 'The EPUB anchor must expose the semantic link role.',
+      );
+      expect(
+        linkSemantics.hasAction(SemanticsAction.tap),
+        isTrue,
+        reason: 'Assistive technology must be able to activate the EPUB link.',
+      );
 
       await tester.tap(imageFinder);
       await tester.pumpAndSettle();
