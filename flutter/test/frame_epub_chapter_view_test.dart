@@ -1200,6 +1200,72 @@ void main() {
     }
   });
 
+
+  testWidgets('honors EPUB col and colgroup width declarations',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <colgroup>
+          <col width="25%"/>
+          <col style="width:75%"/>
+        </colgroup>
+        <thead><tr><th>窄欄</th><th>寬欄</th></tr></thead>
+        <tbody><tr><td>短資料</td><td>這是一段較長的欄位內容</td></tr></tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-column-width-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-column-width.epub',
+      'fileName': 'table-column-width.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(720, 720);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final grid = tester.widget<FrameEpubTableGrid>(
+        find.byType(FrameEpubTableGrid),
+      );
+      expect(grid.columnWidths, hasLength(2));
+      expect(grid.columnWidths[0] / grid.columnWidths[1], closeTo(1 / 3, 0.01));
+      expect(grid.columnWidths[0] + grid.columnWidths[1],
+          closeTo(grid.width, 0.01));
+      expect(find.text('窄欄'), findsOneWidget);
+      expect(find.text('寬欄'), findsOneWidget);
+      expect(find.text('短資料'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets(
       'announces related row and column headers for EPUB table cells',
       (tester) async {

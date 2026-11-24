@@ -8,16 +8,20 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
     required this.width,
     required this.columnCount,
     required this.rowCount,
+    this.columnWidths = const [],
     this.layoutRevision = 0,
     required super.children,
     super.key,
   })  : assert(width >= 0),
         assert(columnCount > 0),
-        assert(rowCount > 0);
+        assert(rowCount > 0),
+        assert(columnWidths.isEmpty || columnWidths.length == columnCount),
+        assert(columnWidths.every((value) => value.isFinite && value > 0));
 
   final double width;
   final int columnCount;
   final int rowCount;
+  final List<double> columnWidths;
   final int layoutRevision;
 
   @override
@@ -26,6 +30,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
       width: width,
       columnCount: columnCount,
       rowCount: rowCount,
+      columnWidths: columnWidths,
       layoutRevision: layoutRevision,
     );
   }
@@ -39,6 +44,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
       ..width = width
       ..columnCount = columnCount
       ..rowCount = rowCount
+      ..columnWidths = columnWidths
       ..layoutRevision = layoutRevision;
   }
 }
@@ -113,15 +119,18 @@ class RenderFrameEpubTableGrid extends RenderBox
     required double width,
     required int columnCount,
     required int rowCount,
+    required List<double> columnWidths,
     required int layoutRevision,
   })  : _width = width,
         _columnCount = columnCount,
         _rowCount = rowCount,
+        _columnWidths = List<double>.of(columnWidths),
         _layoutRevision = layoutRevision;
 
   double _width;
   int _columnCount;
   int _rowCount;
+  List<double> _columnWidths;
   int _layoutRevision;
 
   double get width => _width;
@@ -146,6 +155,22 @@ class RenderFrameEpubTableGrid extends RenderBox
     if (_rowCount == value) return;
     _rowCount = value;
     markNeedsLayout();
+  }
+
+  List<double> get columnWidths => List<double>.unmodifiable(_columnWidths);
+
+  set columnWidths(List<double> value) {
+    if (_sameWidths(_columnWidths, value)) return;
+    _columnWidths = List<double>.of(value);
+    markNeedsLayout();
+  }
+
+  bool _sameWidths(List<double> left, List<double> right) {
+    if (left.length != right.length) return false;
+    for (var index = 0; index < left.length; index++) {
+      if (left[index] != right[index]) return false;
+    }
+    return true;
   }
 
   int get layoutRevision => _layoutRevision;
@@ -201,14 +226,44 @@ class RenderFrameEpubTableGrid extends RenderBox
     return rowHeights;
   }
 
+  List<double> _resolvedColumnWidths(double availableWidth) {
+    if (_columnWidths.length != _columnCount) {
+      return List<double>.filled(_columnCount, availableWidth / _columnCount);
+    }
+    final preferredTotal =
+        _columnWidths.fold<double>(0, (total, width) => total + width);
+    if (!preferredTotal.isFinite || preferredTotal <= 0) {
+      return List<double>.filled(_columnCount, availableWidth / _columnCount);
+    }
+    final scale = availableWidth / preferredTotal;
+    return _columnWidths.map((width) => width * scale).toList(growable: false);
+  }
+
+  double _widthForSpan(List<double> widths, int column, int span) {
+    var total = 0.0;
+    for (var offset = 0; offset < span; offset++) {
+      total += widths[column + offset];
+    }
+    return total;
+  }
+
+  double _leftForColumn(List<double> widths, int column) {
+    var left = 0.0;
+    for (var index = 0; index < column; index++) {
+      left += widths[index];
+    }
+    return left;
+  }
+
   double _heightForWidth(double availableWidth) {
     if (_rowCount <= 0 || _columnCount <= 0) return 0;
+    final trackWidths = _resolvedColumnWidths(availableWidth);
     final measurements = <_MeasuredTableCell>[];
     RenderBox? child = firstChild;
     while (child != null) {
       final data = child.parentData! as FrameEpubTableGridParentData;
       final span = data.columnSpan.clamp(1, _columnCount - data.column).toInt();
-      final cellWidth = availableWidth * span / _columnCount;
+      final cellWidth = _widthForSpan(trackWidths, data.column, span);
       measurements.add(_MeasuredTableCell(
         child: child,
         parentData: data,
@@ -248,12 +303,13 @@ class RenderFrameEpubTableGrid extends RenderBox
       return;
     }
 
+    final trackWidths = _resolvedColumnWidths(width);
     final measurements = <_MeasuredTableCell>[];
     RenderBox? child = firstChild;
     while (child != null) {
       final data = child.parentData! as FrameEpubTableGridParentData;
       final span = data.columnSpan.clamp(1, _columnCount - data.column).toInt();
-      final cellWidth = width * span / _columnCount;
+      final cellWidth = _widthForSpan(trackWidths, data.column, span);
       child.layout(
         BoxConstraints(minWidth: cellWidth, maxWidth: cellWidth),
         parentUsesSize: true,
@@ -272,7 +328,7 @@ class RenderFrameEpubTableGrid extends RenderBox
       final columnSpan =
           data.columnSpan.clamp(1, _columnCount - data.column).toInt();
       final rowSpan = data.rowSpan.clamp(1, _rowCount - data.row).toInt();
-      final cellWidth = width * columnSpan / _columnCount;
+      final cellWidth = _widthForSpan(trackWidths, data.column, columnSpan);
       var cellHeight = 0.0;
       for (var offset = 0; offset < rowSpan; offset++) {
         cellHeight += rowHeights[data.row + offset];
@@ -281,7 +337,7 @@ class RenderFrameEpubTableGrid extends RenderBox
       for (var row = 0; row < data.row; row++) {
         top += rowHeights[row];
       }
-      final left = width * data.column / _columnCount;
+      final left = _leftForColumn(trackWidths, data.column);
       measurement.child.layout(
         BoxConstraints.tightFor(width: cellWidth, height: cellHeight),
         parentUsesSize: true,

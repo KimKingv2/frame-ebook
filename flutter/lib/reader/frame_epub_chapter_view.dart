@@ -17,6 +17,7 @@ import 'frame_epub_text_paginator.dart';
 import 'frame_epub_table_layout.dart';
 import 'frame_epub_table_grid.dart';
 import 'frame_epub_table_semantics.dart';
+import 'frame_epub_table_column_widths.dart';
 
 /// A text selection mapped back to the original XHTML text nodes.
 class FrameEpubTextSelection {
@@ -2018,10 +2019,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final gridRows = tableLayout.rows;
 
     final requestedWidth = paginationWidth ?? widget.contentMaxWidth;
-    final minimumColumnWidth = 104.0;
-    final gridMinimumWidth = minimumColumnWidth * columnCount;
-    final tableWidth =
-        requestedWidth > gridMinimumWidth ? requestedWidth : gridMinimumWidth;
+    const minimumColumnWidth = 104.0;
     final tableBorderAttribute = _attribute(table, 'border');
     final hasBorder = (int.tryParse(tableBorderAttribute ?? '') ?? 0) > 0 ||
         tableStyle.containsKey('border') ||
@@ -2032,7 +2030,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (columnCount == 0) {
       return const SizedBox.shrink();
     }
+    double? columnWidthHint(XmlElement element) {
+      final style = _computedStyle(element, cascade, tableStyle);
+      final rawWidth = style['width'] ?? _attribute(element, 'width');
+      final width = _cssDimension(rawWidth, requestedWidth);
+      return width != null && width.isFinite && width > 0 ? width : null;
+    }
+
     final columnGroups = <FrameEpubTableColumnGroup>[];
+    final columnWidthHints = List<double?>.filled(columnCount, null);
     var nextColumnGroupStart = 0;
     for (final child in table.children.whereType<XmlElement>()) {
       if (child.name.local.toLowerCase() != 'colgroup') continue;
@@ -2056,8 +2062,39 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         startColumn: nextColumnGroupStart,
         endColumn: nextColumnGroupStart + groupSpan,
       ));
+
+      final groupWidth = columnWidthHint(child);
+      final groupTrackWidth = groupWidth == null ? null : groupWidth / groupSpan;
+      var columnStart = nextColumnGroupStart;
+      if (columns.isEmpty) {
+        for (var offset = 0; offset < groupSpan; offset++) {
+          final track = columnStart + offset;
+          if (track < columnCount) columnWidthHints[track] = groupTrackWidth;
+        }
+      } else {
+        for (final element in columns) {
+          final span =
+              (int.tryParse(_attribute(element, 'span') ?? '') ?? 1)
+                  .clamp(1, 1000)
+                  .toInt();
+          final width = columnWidthHint(element) ?? groupTrackWidth;
+          for (var offset = 0; offset < span; offset++) {
+            final track = columnStart + offset;
+            if (track < columnCount) columnWidthHints[track] = width;
+          }
+          columnStart += span;
+        }
+      }
       nextColumnGroupStart += groupSpan;
     }
+
+    final resolvedColumnWidths = FrameEpubTableColumnWidths.resolve(
+      requestedWidth: requestedWidth,
+      minimumColumnWidth: minimumColumnWidth,
+      widthHints: columnWidthHints,
+    );
+    final tableWidth = resolvedColumnWidths.tableWidth;
+    final columnWidths = resolvedColumnWidths.widths;
 
     final semanticCells = <FrameEpubTableSemanticCell>[];
     for (var rowIndex = 0; rowIndex < gridRows.length; rowIndex++) {
@@ -2127,11 +2164,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           'bottom' => Alignment.bottomLeft,
           _ => Alignment.topLeft,
         };
+        final cellTrackWidth = columnWidths
+            .skip(column)
+            .take(placement.columnSpan)
+            .fold<double>(0, (total, width) => total + width);
         final cellTextWidth =
-            (tableWidth * placement.columnSpan / columnCount -
-                    cellPadding.horizontal)
-                .clamp(1.0, tableWidth)
-                .toDouble();
+            (cellTrackWidth - cellPadding.horizontal).clamp(1.0, tableWidth);
         final contents = _flowChildren(
           cell,
           cellStyle,
@@ -2188,6 +2226,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       width: tableWidth,
       columnCount: columnCount,
       rowCount: gridRows.length,
+      columnWidths: columnWidths,
       layoutRevision: _tableLayoutRevision,
       children: gridCells,
     );

@@ -62,6 +62,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+
+  testWidgets('uses explicit column widths when laying out grid tracks',
+      (tester) async {
+    const firstKey = ValueKey('narrow-table-track');
+    const secondKey = ValueKey('wide-table-track');
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: FrameEpubTableGrid(
+          width: 300,
+          columnCount: 2,
+          rowCount: 1,
+          columnWidths: const [75, 225],
+          children: const [
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 0,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: firstKey, height: 24),
+            ),
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: secondKey, height: 24),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    final firstRect = tester.getRect(find.byKey(firstKey));
+    final secondRect = tester.getRect(find.byKey(secondKey));
+    expect(firstRect.width, closeTo(75, 0.01));
+    expect(secondRect.width, closeTo(225, 0.01));
+    expect(secondRect.left, closeTo(firstRect.right, 0.01));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('satisfies several overlapping rowspan height constraints',
       (tester) async {
     const aKey = ValueKey('span-a');
