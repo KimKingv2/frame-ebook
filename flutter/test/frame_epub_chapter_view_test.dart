@@ -7,6 +7,7 @@ import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
 import 'package:frame_ebook/reader/frame_epub_cfi.dart';
 import 'package:frame_ebook/reader/frame_epub_footnote.dart';
+import 'package:frame_ebook/reader/frame_epub_table_grid.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
 import 'package:frame_ebook/reader/frame_epub_ruby_annotation.dart';
@@ -1501,6 +1502,12 @@ void main() {
         );
       });
       await tester.pumpAndSettle();
+      expect(
+        tester.widget<FrameEpubTableGrid>(find.byType(FrameEpubTableGrid))
+            .layoutRevision,
+        greaterThan(0),
+        reason: 'Decoded image frames must invalidate rowspan row heights.',
+      );
       expect(imageWidget.width, closeTo(60, 0.01));
       final imageRect = tester.getRect(imageFinder);
       expect(imageRect.width, closeTo(60, 1));
