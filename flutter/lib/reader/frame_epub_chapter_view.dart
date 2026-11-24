@@ -2648,14 +2648,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
-      width: fixedDimension(style['width']),
-      height: fixedDimension(style['height']),
+      width: fixedDimension(style['width']) ??
+          fixedDimension(_attribute(element, 'width')),
+      height: fixedDimension(style['height']) ??
+          fixedDimension(_attribute(element, 'height')),
       useViewportBounds: widget.fixedLayout,
       maxWidth: fixedDimension(style['width']) ??
+          fixedDimension(_attribute(element, 'width')) ??
           (widget.fixedLayout
               ? pageSize?.width ?? double.infinity
               : (block ? double.infinity : 320)),
       maxHeight: fixedDimension(style['height']) ??
+          fixedDimension(_attribute(element, 'height')) ??
           (widget.fixedLayout
               ? (widget.fixedLayoutImageFit == 'fit-page'
                   ? pageSize?.height ?? double.infinity

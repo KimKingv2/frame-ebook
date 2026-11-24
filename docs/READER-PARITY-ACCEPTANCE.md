@@ -500,3 +500,5 @@ rather than only using them as maximum constraints. An explicit CSS width
 therefore reserves a stable width while an intrinsically sized image updates
 its height after decoding; the loading placeholder keeps an explicitly
 declared size where available.
+
+Legacy XHTML image width and height attributes are now resolved as fallback dimensions after CSS width/height. This preserves EPUB 2-era markup while allowing CSS declarations to take precedence.
