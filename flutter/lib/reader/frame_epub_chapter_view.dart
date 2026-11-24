@@ -3332,13 +3332,6 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
         width: widget.width ??
             (widget.maxWidth.isFinite ? widget.maxWidth : 48),
         height: widget.height ?? 80,
-        child: const Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 1.5),
-          ),
-        ),
       );
 
   @override
