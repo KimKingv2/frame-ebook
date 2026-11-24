@@ -1162,6 +1162,7 @@ void main() {
 
       final semantics = tester.ensureSemantics();
       try {
+        await tester.pump();
         final headerFinder = find.bySemanticsLabel('書名');
         expect(headerFinder, findsOneWidget);
         expect(
