@@ -14,9 +14,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
     super.key,
   })  : assert(width >= 0),
         assert(columnCount > 0),
-        assert(rowCount > 0),
-        assert(columnWidths.isEmpty || columnWidths.length == columnCount),
-        assert(columnWidths.every((value) => value.isFinite && value > 0));
+        assert(rowCount > 0);
 
   final double width;
   final int columnCount;

@@ -2168,8 +2168,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             .skip(column)
             .take(placement.columnSpan)
             .fold<double>(0, (total, width) => total + width);
-        final cellTextWidth =
-            (cellTrackWidth - cellPadding.horizontal).clamp(1.0, tableWidth);
+        final cellTextWidth = (cellTrackWidth - cellPadding.horizontal)
+            .clamp(1.0, tableWidth)
+            .toDouble();
         final contents = _flowChildren(
           cell,
           cellStyle,

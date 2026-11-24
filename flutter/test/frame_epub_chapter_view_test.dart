@@ -1205,12 +1205,13 @@ void main() {
       (tester) async {
     const table = '''
       <table border="1" style="width:100%">
+        <colgroup span="1" width="20%"></colgroup>
         <colgroup>
-          <col width="25%"/>
-          <col style="width:75%"/>
+          <col width="30%"/>
+          <col style="width:50%"/>
         </colgroup>
-        <thead><tr><th>窄欄</th><th>寬欄</th></tr></thead>
-        <tbody><tr><td>短資料</td><td>這是一段較長的欄位內容</td></tr></tbody>
+        <thead><tr><th>窄欄</th><th>中欄</th><th>寬欄</th></tr></thead>
+        <tbody><tr><td>短資料</td><td>中等長度資料</td><td>這是一段較長的欄位內容</td></tr></tbody>
       </table>
     ''';
     final bytes = _fixture(additionalTableMarkup: table);
@@ -1250,11 +1251,15 @@ void main() {
       final grid = tester.widget<FrameEpubTableGrid>(
         find.byType(FrameEpubTableGrid),
       );
-      expect(grid.columnWidths, hasLength(2));
-      expect(grid.columnWidths[0] / grid.columnWidths[1], closeTo(1 / 3, 0.01));
-      expect(grid.columnWidths[0] + grid.columnWidths[1],
-          closeTo(grid.width, 0.01));
+      expect(grid.columnWidths, hasLength(3));
+      expect(grid.columnWidths[0] / grid.columnWidths[2], closeTo(0.4, 0.01));
+      expect(grid.columnWidths[1] / grid.columnWidths[2], closeTo(0.6, 0.01));
+      expect(
+        grid.columnWidths.fold<double>(0, (total, width) => total + width),
+        closeTo(grid.width, 0.01),
+      );
       expect(find.text('窄欄'), findsOneWidget);
+      expect(find.text('中欄'), findsOneWidget);
       expect(find.text('寬欄'), findsOneWidget);
       expect(find.text('短資料'), findsOneWidget);
       expect(tester.takeException(), isNull);
