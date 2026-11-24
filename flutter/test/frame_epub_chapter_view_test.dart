@@ -57,6 +57,8 @@ Uint8List _fixture({
   String additionalParagraphMarkup = '',
   bool fixedLayout = false,
   bool includeInlineImage = false,
+  bool includeSecondaryInlineImage = false,
+  bool includeCorruptInlineImage = false,
 }) {
   const container = '''
 <container><rootfiles>
@@ -72,6 +74,10 @@ Uint8List _fixture({
       '<item id="page-image" href="Images/page.png" media-type="image/png"/>',
     if (includeInlineImage)
       '<item id="inline-image" href="Images/tall.png" media-type="image/png"/>',
+    if (includeSecondaryInlineImage)
+      '<item id="inline-image-small" href="Images/small.png" media-type="image/png"/>',
+    if (includeCorruptInlineImage)
+      '<item id="corrupt-inline-image" href="Images/corrupt.png" media-type="image/png"/>',
   ].join();
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
@@ -147,6 +153,18 @@ Uint8List _fixture({
         base64Decode(
           'iVBORw0KGgoAAAANSUhEUgAAADwAAACMCAIAAACvVF1QAAAAp0lEQVR4nO3OQQ3AIAAAMUDnNCEORfOwx5ElrYLOZ5/xN+t24AvpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka68OywC1I9PrzMAAAAASUVORK5CYII=',
         ),
+      ),
+    if (includeSecondaryInlineImage)
+      _ZipItem(
+        'OPS/Images/small.png',
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      ),
+    if (includeCorruptInlineImage)
+      _ZipItem(
+        'OPS/Images/corrupt.png',
+        utf8.encode('This file is deliberately not a PNG image.'),
       ),
   ]);
 }
@@ -1535,6 +1553,172 @@ void main() {
       expect(imageRect.top, greaterThan(spanningRect.top));
       expect(imageRect.bottom, lessThan(spanningRect.bottom));
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
+
+  testWidgets(
+      'reflows mixed rowspan content with multiple images and a corrupt image',
+      (tester) async {
+    final longText = List.filled(
+      18,
+      '圖片與文字混排時，跨列儲存格仍必須依照實際內容計算高度。',
+    ).join();
+    final table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="3">
+              <p>多媒體跨列儲存格</p>
+              <img src="../Images/tall.png" alt="第一張跨列插圖"
+                width="60" style="display:block"/>
+              <p>$longText</p>
+              <ul>
+                <li>圖片後的清單項目一</li>
+                <li>圖片後的清單項目二</li>
+              </ul>
+              <img src="../Images/small.png" alt="第二張跨列插圖"
+                width="32" style="display:block"/>
+              <p>損毀圖片之前的內容</p>
+              <img src="../Images/corrupt.png" alt="損毀的跨列插圖"
+                width="40" style="display:block"/>
+              <p>跨列儲存格結尾</p>
+            </td>
+            <td><p>混排測試第一列</p><ul><li>第一列項目</li></ul></td>
+          </tr>
+          <tr>
+            <td><p>混排測試第二列</p><ol><li>第二列項目</li></ol></td>
+          </tr>
+          <tr>
+            <td><p>混排測試第三列</p><p>第三列補充文字</p></td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(
+      additionalTableMarkup: table,
+      includeInlineImage: true,
+      includeSecondaryInlineImage: true,
+      includeCorruptInlineImage: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-mixed-images-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-mixed-images.epub',
+      'fileName': 'table-rowspan-mixed-images.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(680, 1120);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 640,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      Finder imageByAlt(String alt) => find.byWidgetPredicate(
+            (widget) => widget is Image && widget.semanticLabel == alt,
+          );
+
+      final firstImageFinder = imageByAlt('第一張跨列插圖');
+      final secondImageFinder = imageByAlt('第二張跨列插圖');
+      final corruptImageFinder = imageByAlt('損毀的跨列插圖');
+      expect(firstImageFinder, findsOneWidget);
+      expect(secondImageFinder, findsOneWidget);
+      expect(corruptImageFinder, findsOneWidget);
+
+      await tester.runAsync(() async {
+        for (final finder in [firstImageFinder, secondImageFinder]) {
+          final image = tester.widget<Image>(finder);
+          await precacheImage(image.image, tester.element(finder));
+        }
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text(longText), findsOneWidget);
+      expect(find.text('圖片後的清單項目一'), findsOneWidget);
+      expect(find.text('圖片後的清單項目二'), findsOneWidget);
+      expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
+
+      final grid = tester.widget<FrameEpubTableGrid>(
+        find.byType(FrameEpubTableGrid),
+      );
+      expect(
+        grid.layoutRevision,
+        greaterThanOrEqualTo(3),
+        reason: 'Each decoded or failed image must invalidate the table layout.',
+      );
+
+      final firstImage = tester.widget<Image>(firstImageFinder);
+      expect(firstImage.width, closeTo(60, 0.01));
+      final firstImageRect = tester.getRect(firstImageFinder);
+      expect(firstImageRect.width, closeTo(60, 1));
+      expect(firstImageRect.height, closeTo(140, 1));
+
+      final secondImage = tester.widget<Image>(secondImageFinder);
+      expect(secondImage.width, closeTo(32, 0.01));
+      final secondImageRect = tester.getRect(secondImageFinder);
+      expect(secondImageRect.width, closeTo(32, 1));
+      expect(secondImageRect.height, closeTo(32, 1));
+
+      final spanningCell = find.ancestor(
+        of: find.text('多媒體跨列儲存格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final firstRowCell = find.ancestor(
+        of: find.text('混排測試第一列'),
+        matching: find.byType(DecoratedBox),
+      );
+      final secondRowCell = find.ancestor(
+        of: find.text('混排測試第二列'),
+        matching: find.byType(DecoratedBox),
+      );
+      final thirdRowCell = find.ancestor(
+        of: find.text('混排測試第三列'),
+        matching: find.byType(DecoratedBox),
+      );
+      final spanningRect = tester.getRect(spanningCell);
+      final firstRowRect = tester.getRect(firstRowCell);
+      final secondRowRect = tester.getRect(secondRowCell);
+      final thirdRowRect = tester.getRect(thirdRowCell);
+      final brokenIconRect = tester.getRect(
+        find.byIcon(Icons.broken_image_outlined),
+      );
+
+      expect(spanningRect.top, closeTo(firstRowRect.top, 0.6));
+      expect(secondRowRect.top, closeTo(firstRowRect.bottom, 0.6));
+      expect(thirdRowRect.top, closeTo(secondRowRect.bottom, 0.6));
+      expect(spanningRect.bottom, closeTo(thirdRowRect.bottom, 0.6));
+      expect(firstImageRect.top, greaterThan(spanningRect.top));
+      expect(secondImageRect.bottom, lessThan(spanningRect.bottom));
+      expect(brokenIconRect.overlaps(spanningRect), isTrue);
+      expect(tester.takeException(), isNull);
+
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
       tester.view.resetPhysicalSize();
