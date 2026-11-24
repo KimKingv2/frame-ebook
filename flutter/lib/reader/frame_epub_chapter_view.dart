@@ -2648,6 +2648,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
+      width: fixedDimension(style['width']),
+      height: fixedDimension(style['height']),
       useViewportBounds: widget.fixedLayout,
       maxWidth: fixedDimension(style['width']) ??
           (widget.fixedLayout
@@ -3228,6 +3230,8 @@ class _FrameEpubImage extends StatefulWidget {
     required this.fit,
     required this.maxWidth,
     required this.maxHeight,
+    this.width,
+    this.height,
     this.useViewportBounds = false,
     required this.alt,
     this.onLayoutChanged,
@@ -3239,6 +3243,8 @@ class _FrameEpubImage extends StatefulWidget {
   final BoxFit fit;
   final double maxWidth;
   final double maxHeight;
+  final double? width;
+  final double? height;
   final bool useViewportBounds;
   final String alt;
   final VoidCallback? onLayoutChanged;
@@ -3290,8 +3296,9 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return SizedBox(
-            width: widget.maxWidth.isFinite ? widget.maxWidth : 48,
-            height: 80,
+            width: widget.width ??
+                (widget.maxWidth.isFinite ? widget.maxWidth : 48),
+            height: widget.height ?? 80,
             child: Center(
               child: snapshot.hasError
                   ? const Icon(
@@ -3326,14 +3333,16 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
                 : constraints.maxHeight;
             final image = Image.memory(
               snapshot.data!,
-              width: widget.useViewportBounds && maxWidth.isFinite
-                  ? maxWidth
-                  : null,
-              height: widget.useViewportBounds &&
-                      widget.fit == BoxFit.contain &&
-                      maxHeight.isFinite
-                  ? maxHeight
-                  : null,
+              width: widget.width ??
+                  (widget.useViewportBounds && maxWidth.isFinite
+                      ? maxWidth
+                      : null),
+              height: widget.height ??
+                  (widget.useViewportBounds &&
+                          widget.fit == BoxFit.contain &&
+                          maxHeight.isFinite
+                      ? maxHeight
+                      : null),
               fit: widget.fit,
               cacheWidth: cacheWidth,
               filterQuality: FilterQuality.medium,

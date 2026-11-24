@@ -1438,7 +1438,8 @@ void main() {
           <tr>
             <td rowspan="2">
               <p>圖片儲存格上方</p>
-              <p><img src="../Images/tall.png" alt="跨列插圖"/></p>
+              <img src="../Images/tall.png" alt="跨列插圖"
+                style="display:block;width:60px"/>
               <p>圖片儲存格下方</p>
             </td>
             <td><p>圖片列第一格</p></td>

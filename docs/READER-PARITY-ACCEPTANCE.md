@@ -495,3 +495,8 @@ and rebuilds the affected page measurement.
 The EPUB regression exercises a real image stored in the archive, waits for
 the image provider to decode, and checks the loaded image bounds, the merged
 cell alignment across both rows, and the absence of RenderFlex overflow.
+Image sizing now applies CSS width and height as actual image dimensions,
+rather than only using them as maximum constraints. An explicit CSS width
+therefore reserves a stable width while an intrinsically sized image updates
+its height after decoding; the loading placeholder keeps an explicitly
+declared size where available.
