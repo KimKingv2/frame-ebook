@@ -1201,6 +1201,72 @@ void main() {
   });
 
 
+
+  testWidgets('honors EPUB border-collapse and border-spacing declarations',
+      (tester) async {
+    const markup = '''
+      <table border="1" style="border-collapse:separate;border-spacing:12px 8px">
+        <tr><td>分離一</td><td>分離二</td></tr>
+        <tr><td>分離三</td><td>分離四</td></tr>
+      </table>
+      <table border="1" style="border-collapse:collapse;border-spacing:20px">
+        <tr><td>合併一</td><td>合併二</td></tr>
+        <tr><td>合併三</td><td>合併四</td></tr>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: markup);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-border-spacing-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-border-spacing.epub',
+      'fileName': 'table-border-spacing.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(720, 720);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final grids = tester.widgetList<FrameEpubTableGrid>(
+        find.byType(FrameEpubTableGrid),
+      ).toList(growable: false);
+      expect(grids, hasLength(2));
+      expect(grids[0].columnSpacing, 12);
+      expect(grids[0].rowSpacing, 8);
+      expect(grids[1].columnSpacing, 0);
+      expect(grids[1].rowSpacing, 0);
+      expect(find.text('分離一'), findsOneWidget);
+      expect(find.text('合併一'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('honors EPUB col and colgroup width declarations',
       (tester) async {
     const table = '''

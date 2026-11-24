@@ -2020,6 +2020,36 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
     final requestedWidth = paginationWidth ?? widget.contentMaxWidth;
     const minimumColumnWidth = 104.0;
+    final borderCollapse =
+        tableStyle['border-collapse']?.trim().toLowerCase() == 'collapse';
+    final rawSpacing = tableStyle['border-spacing'] ??
+        _attribute(table, 'cellspacing');
+    final spacingTokens = rawSpacing == null
+        ? const <String>[]
+        : rawSpacing.trim().split(RegExp(r'\\s+'));
+    double spacingValue(String value) {
+      final parsed = _cssDimension(value, widget.fontSize) ?? 0;
+      return parsed.isFinite && parsed > 0 ? parsed : 0;
+    }
+
+    final defaultSeparateSpacing =
+        tableStyle['border-collapse']?.trim().toLowerCase() == 'separate'
+            ? 2.0
+            : 0.0;
+    final columnSpacing = borderCollapse
+        ? 0.0
+        : spacingTokens.isEmpty
+            ? defaultSeparateSpacing
+            : spacingValue(spacingTokens.first);
+    final rowSpacing = borderCollapse
+        ? 0.0
+        : spacingTokens.isEmpty
+            ? defaultSeparateSpacing
+            : spacingValue(
+                spacingTokens.length > 1
+                    ? spacingTokens[1]
+                    : spacingTokens.first,
+              );
     final tableBorderAttribute = _attribute(table, 'border');
     final hasBorder = (int.tryParse(tableBorderAttribute ?? '') ?? 0) > 0 ||
         tableStyle.containsKey('border') ||
@@ -2088,12 +2118,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       nextColumnGroupStart += groupSpan;
     }
 
+    final totalColumnSpacing = columnSpacing * (columnCount - 1);
+    final requestedTrackWidth = (requestedWidth - totalColumnSpacing)
+        .clamp(1.0, requestedWidth)
+        .toDouble();
     final resolvedColumnWidths = FrameEpubTableColumnWidths.resolve(
-      requestedWidth: requestedWidth,
+      requestedWidth: requestedTrackWidth,
       minimumColumnWidth: minimumColumnWidth,
       widthHints: columnWidthHints,
     );
-    final tableWidth = resolvedColumnWidths.tableWidth;
+    final tableWidth = resolvedColumnWidths.tableWidth + totalColumnSpacing;
     final columnWidths = resolvedColumnWidths.widths;
 
     final semanticCells = <FrameEpubTableSemanticCell>[];
@@ -2165,9 +2199,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           _ => Alignment.topLeft,
         };
         final cellTrackWidth = columnWidths
-            .skip(column)
-            .take(placement.columnSpan)
-            .fold<double>(0, (total, width) => total + width);
+                .skip(column)
+                .take(placement.columnSpan)
+                .fold<double>(0, (total, width) => total + width) +
+            columnSpacing * (placement.columnSpan - 1);
         final cellTextWidth = (cellTrackWidth - cellPadding.horizontal)
             .clamp(1.0, tableWidth)
             .toDouble();
@@ -2195,7 +2230,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             decoration: BoxDecoration(
               color: cellBackground,
               border: hasBorder
-                  ? Border.all(color: borderColor, width: 0.6)
+                  ? Border.all(
+                      color: borderColor,
+                      width: borderCollapse ? 0.3 : 0.6,
+                    )
                   : null,
             ),
             child: cellContent,
@@ -2228,6 +2266,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       columnCount: columnCount,
       rowCount: gridRows.length,
       columnWidths: columnWidths,
+      columnSpacing: columnSpacing,
+      rowSpacing: rowSpacing,
       layoutRevision: _tableLayoutRevision,
       children: gridCells,
     );

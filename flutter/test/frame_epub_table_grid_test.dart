@@ -103,6 +103,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+
+  testWidgets('includes separate border spacing between table tracks',
+      (tester) async {
+    const firstKey = ValueKey('separate-first-cell');
+    const secondKey = ValueKey('separate-second-cell');
+    const nextRowKey = ValueKey('separate-next-row-cell');
+    const spanKey = ValueKey('separate-spanning-cell');
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: FrameEpubTableGrid(
+          width: 300,
+          columnCount: 2,
+          rowCount: 2,
+          columnWidths: const [100, 190],
+          columnSpacing: 10,
+          rowSpacing: 8,
+          children: const [
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 0,
+              columnSpan: 1,
+              rowSpan: 2,
+              child: SizedBox(key: spanKey, height: 58),
+            ),
+            FrameEpubTableGridCell(
+              row: 0,
+              column: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: firstKey, height: 20),
+            ),
+            FrameEpubTableGridCell(
+              row: 1,
+              column: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              child: SizedBox(key: nextRowKey, height: 30),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    final firstRect = tester.getRect(find.byKey(firstKey));
+    final secondRect = tester.getRect(find.byKey(nextRowKey));
+    final spanningRect = tester.getRect(find.byKey(spanKey));
+    expect(firstRect.left, closeTo(110, 0.01));
+    expect(firstRect.width, closeTo(190, 0.01));
+    expect(secondRect.top, closeTo(firstRect.bottom + 8, 0.01));
+    expect(spanningRect.height, closeTo(secondRect.bottom - spanningRect.top, 0.01));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('satisfies several overlapping rowspan height constraints',
       (tester) async {
     const aKey = ValueKey('span-a');
