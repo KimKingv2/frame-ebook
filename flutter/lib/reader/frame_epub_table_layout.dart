@@ -51,7 +51,28 @@ class FrameEpubTableLayout {
 
   static FrameEpubTableLayoutResult build({
     required List<List<FrameEpubTableCellSpec>> rows,
+    List<int>? rowGroupEndIndices,
   }) {
+    if (rowGroupEndIndices != null) {
+      if (rowGroupEndIndices.length != rows.length) {
+        throw ArgumentError.value(
+          rowGroupEndIndices,
+          'rowGroupEndIndices',
+          'Must contain one exclusive end index for each source row.',
+        );
+      }
+      for (var rowIndex = 0; rowIndex < rowGroupEndIndices.length; rowIndex++) {
+        final endIndex = rowGroupEndIndices[rowIndex];
+        if (endIndex <= rowIndex || endIndex > rows.length) {
+          throw ArgumentError.value(
+            endIndex,
+            'rowGroupEndIndices[$rowIndex]',
+            'Must be after its row and no greater than the row count.',
+          );
+        }
+      }
+    }
+
     if (rows.isEmpty) {
       return const FrameEpubTableLayoutResult(
         columnCount: 0,
@@ -98,9 +119,11 @@ class FrameEpubTableLayout {
             continue;
           }
 
-          final rowSpan = spec.rowSpan
-              .clamp(1, rows.length - rowIndex)
-              .toInt();
+          final rowGroupEnd = rowGroupEndIndices?[rowIndex] ?? rows.length;
+          final remainingRowsInGroup = rowGroupEnd - rowIndex;
+          final rowSpan = spec.rowSpan == 0
+              ? remainingRowsInGroup
+              : spec.rowSpan.clamp(1, remainingRowsInGroup).toInt();
           placements[cursor] = FrameEpubTableCellPlacement(
             cellIndex: cellIndex,
             columnSpan: columnSpan,

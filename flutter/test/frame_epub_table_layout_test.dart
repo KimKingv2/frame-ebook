@@ -105,6 +105,57 @@ void main() {
     expect(layout.rows[3].placements.first.rowSpan, 2);
   });
 
+  test('resolves zero rowspans within each row group', () {
+    final layout = FrameEpubTableLayout.build(
+      rowGroupEndIndices: const [2, 2, 4, 4],
+      rows: [
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 0, header: false),
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 20, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 0, header: false),
+        ],
+        const [
+          FrameEpubTableCellSpec(columnSpan: 1, rowSpan: 1, header: false),
+        ],
+      ],
+    );
+
+    expect(layout.rows[0].placements[0].rowSpan, 2);
+    expect(
+      layout.rows[0].placements[1].rowSpan,
+      2,
+      reason: 'A positive rowspan must not escape its row group either.',
+    );
+    expect(
+      layout.rows[2].placements.first.rowSpan,
+      2,
+      reason: 'The next row group must resolve its own rowspan=0 boundary.',
+    );
+    expect(layout.rows, hasLength(4));
+  });
+
+  test('rejects row-group boundaries that do not match the source rows', () {
+    expect(
+      () => FrameEpubTableLayout.build(
+        rows: const [[]],
+        rowGroupEndIndices: const [],
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => FrameEpubTableLayout.build(
+        rows: const [[], []],
+        rowGroupEndIndices: const [3, 2],
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('keeps source cell order and header flags after grid placement', () {
     final layout = FrameEpubTableLayout.build(
       rows: [

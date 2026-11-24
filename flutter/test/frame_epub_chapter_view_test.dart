@@ -1199,6 +1199,96 @@ void main() {
   });
 
   testWidgets(
+      'keeps rowspan zero inside its EPUB table row group',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="0">甲群組合併儲存格</td>
+            <td>甲群組第一列</td>
+          </tr>
+          <tr><td>甲群組第二列</td></tr>
+        </tbody>
+        <tbody>
+          <tr><td>乙群組第一欄</td><td>乙群組第一列</td></tr>
+          <tr><td>乙群組第二欄</td><td>乙群組第二列</td></tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: table);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-zero-group-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-zero.epub',
+      'fileName': 'table-rowspan-zero.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final spanningCell = find.ancestor(
+        of: find.text('甲群組合併儲存格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final firstRowCell = find.ancestor(
+        of: find.text('甲群組第一列'),
+        matching: find.byType(DecoratedBox),
+      );
+      final secondRowCell = find.ancestor(
+        of: find.text('甲群組第二列'),
+        matching: find.byType(DecoratedBox),
+      );
+      final nextGroupCell = find.ancestor(
+        of: find.text('乙群組第一列'),
+        matching: find.byType(DecoratedBox),
+      );
+      expect(spanningCell, findsOneWidget);
+      expect(firstRowCell, findsOneWidget);
+      expect(secondRowCell, findsOneWidget);
+      expect(nextGroupCell, findsOneWidget);
+
+      final spanningRect = tester.getRect(spanningCell);
+      final firstRowRect = tester.getRect(firstRowCell);
+      final secondRowRect = tester.getRect(secondRowCell);
+      final nextGroupRect = tester.getRect(nextGroupCell);
+
+      expect(spanningRect.top, closeTo(firstRowRect.top, 0.6));
+      expect(spanningRect.bottom, closeTo(secondRowRect.bottom, 0.6));
+      expect(nextGroupRect.top, closeTo(secondRowRect.bottom, 0.6));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      await archive.close();
+    }
+  });
+
+  testWidgets(
       'keeps table column widths aligned when rowspan precedes a colspan',
       (tester) async {
     const table = '''

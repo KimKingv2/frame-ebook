@@ -1930,15 +1930,35 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     double? paginationMaxHeight,
     TextScaler? paginationTextScaler,
   }) {
-    final rows = <({XmlElement element, bool header})>[];
+    final rows =
+        <({XmlElement element, bool header, int rowGroup})>[];
+    var nextRowGroupId = 0;
 
-    void collectRows(XmlElement parent, {bool header = false}) {
+    void collectRows(
+      XmlElement parent, {
+      bool header = false,
+      int? rowGroupId,
+    }) {
+      var activeRowGroupId = rowGroupId;
       for (final child in parent.children.whereType<XmlElement>()) {
         final tag = child.name.local.toLowerCase();
         if (tag == 'tr') {
-          rows.add((element: child, header: header));
+          activeRowGroupId ??= nextRowGroupId++;
+          rows.add((
+            element: child,
+            header: header,
+            rowGroup: activeRowGroupId,
+          ));
         } else if (tag == 'thead' || tag == 'tbody' || tag == 'tfoot') {
-          collectRows(child, header: tag == 'thead' || header);
+          activeRowGroupId = null;
+          collectRows(
+            child,
+            header: tag == 'thead' || header,
+            rowGroupId: nextRowGroupId++,
+          );
+        } else if (rowGroupId == null) {
+          // Consecutive direct <tr> children form one implicit row group.
+          activeRowGroupId = null;
         }
       }
     }
@@ -1959,7 +1979,21 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               .toList(growable: false),
         )
         .toList(growable: false);
+    final rowGroupEndIndices = List<int>.filled(rows.length, rows.length);
+    for (var groupStart = 0; groupStart < rows.length;) {
+      final rowGroup = rows[groupStart].rowGroup;
+      var groupEnd = groupStart + 1;
+      while (groupEnd < rows.length && rows[groupEnd].rowGroup == rowGroup) {
+        groupEnd++;
+      }
+      for (var rowIndex = groupStart; rowIndex < groupEnd; rowIndex++) {
+        rowGroupEndIndices[rowIndex] = groupEnd;
+      }
+      groupStart = groupEnd;
+    }
+
     final tableLayout = FrameEpubTableLayout.build(
+      rowGroupEndIndices: rowGroupEndIndices,
       rows: [
         for (var rowIndex = 0; rowIndex < rawRows.length; rowIndex++)
           [
