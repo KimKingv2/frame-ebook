@@ -2313,12 +2313,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         return WidgetSpan(
           alignment: PlaceholderAlignment.baseline,
           baseline: TextBaseline.alphabetic,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          child: Semantics(
+            container: true,
+            link: true,
             onTap: onTap,
-            child: Text.rich(
-              TextSpan(style: textStyle, children: children),
-              softWrap: false,
+            child: GestureDetector(
+              excludeFromSemantics: true,
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Text.rich(
+                TextSpan(style: textStyle, children: children),
+                softWrap: false,
+              ),
             ),
           ),
         );

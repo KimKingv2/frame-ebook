@@ -1793,6 +1793,14 @@ void main() {
         (widget) => widget is Image && widget.semanticLabel == '可點擊的表格圖片',
       );
       expect(imageFinder, findsOneWidget);
+      final semantics = tester.ensureSemantics();
+      addTearDown(semantics.dispose);
+      final linkSemanticsFinder = find.bySemanticsLabel('可點擊的表格圖片');
+      expect(linkSemanticsFinder, findsOneWidget);
+      final linkSemantics = tester.getSemantics(linkSemanticsFinder);
+      expect(linkSemantics.hasFlag(SemanticsFlag.isLink), isTrue);
+      expect(linkSemantics.hasAction(SemanticsAction.tap), isTrue);
+
       await tester.tap(imageFinder);
       await tester.pumpAndSettle();
 
