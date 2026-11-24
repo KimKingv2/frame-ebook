@@ -502,3 +502,6 @@ its height after decoding; the loading placeholder keeps an explicitly
 declared size where available.
 
 Legacy XHTML image width and height attributes are now resolved as fallback dimensions after CSS width/height. This preserves EPUB 2-era markup while allowing CSS declarations to take precedence.
+
+
+Explicitly sized block images are now wrapped in a loose-width alignment surface before entering stretch-aligned EPUB flow columns. This prevents the cell column from overriding the image's width and keeps its intrinsic aspect ratio available to rowspan measurement.

@@ -1501,6 +1501,8 @@ void main() {
         );
       });
       await tester.pumpAndSettle();
+      final imageWidget = tester.widget<Image>(imageFinder);
+      expect(imageWidget.width, closeTo(60, 0.01));
       final imageRect = tester.getRect(imageFinder);
       expect(imageRect.width, closeTo(60, 1));
       expect(imageRect.height, closeTo(140, 1));

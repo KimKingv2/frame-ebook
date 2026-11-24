@@ -2643,23 +2643,23 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
 
     final pageSize = _fixedLayoutViewportSize;
-    return _FrameEpubImage(
+    final explicitWidth = fixedDimension(style['width']) ??
+        fixedDimension(_attribute(element, 'width'));
+    final explicitHeight = fixedDimension(style['height']) ??
+        fixedDimension(_attribute(element, 'height'));
+    final image = _FrameEpubImage(
       loader: widget.resourceLoader,
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
-      width: fixedDimension(style['width']) ??
-          fixedDimension(_attribute(element, 'width')),
-      height: fixedDimension(style['height']) ??
-          fixedDimension(_attribute(element, 'height')),
+      width: explicitWidth,
+      height: explicitHeight,
       useViewportBounds: widget.fixedLayout,
-      maxWidth: fixedDimension(style['width']) ??
-          fixedDimension(_attribute(element, 'width')) ??
+      maxWidth: explicitWidth ??
           (widget.fixedLayout
               ? pageSize?.width ?? double.infinity
               : (block ? double.infinity : 320)),
-      maxHeight: fixedDimension(style['height']) ??
-          fixedDimension(_attribute(element, 'height')) ??
+      maxHeight: explicitHeight ??
           (widget.fixedLayout
               ? (widget.fixedLayoutImageFit == 'fit-page'
                   ? pageSize?.height ?? double.infinity
@@ -2668,6 +2668,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       alt: alt,
       onLayoutChanged: _handleImageLayoutChanged,
     );
+    // A block image sits inside a stretch-aligned flow Column. Align gives the
+    // image loose width constraints so explicit EPUB dimensions are honoured
+    // instead of being expanded to the full cell width.
+    if (block && (explicitWidth != null || explicitHeight != null)) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: image,
+      );
+    }
+    return image;
   }
 
   Widget _imagePlaceholder(String label) => Container(
