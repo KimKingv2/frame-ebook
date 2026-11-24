@@ -2323,6 +2323,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           baseline: TextBaseline.alphabetic,
           child: Semantics(
             container: true,
+            explicitChildNodes: true,
             label: linkLabel,
             link: true,
             onTap: onTap,
