@@ -2026,7 +2026,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         _attribute(table, 'cellspacing');
     final spacingTokens = rawSpacing == null
         ? const <String>[]
-        : rawSpacing.trim().split(RegExp(r'\\s+'));
+        : rawSpacing.trim().split(RegExp(r'\s+'));
     double spacingValue(String value) {
       final parsed = _cssDimension(value, widget.fontSize) ?? 0;
       return parsed.isFinite && parsed > 0 ? parsed : 0;
