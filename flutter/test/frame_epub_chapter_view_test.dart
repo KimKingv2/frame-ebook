@@ -1492,6 +1492,14 @@ void main() {
         (widget) => widget is Image && widget.semanticLabel == '跨列插圖',
       );
       expect(imageFinder, findsOneWidget);
+      final imageWidget = tester.widget<Image>(imageFinder);
+      await tester.runAsync(() async {
+        await precacheImage(
+          imageWidget.image,
+          tester.element(imageFinder),
+        );
+      });
+      await tester.pumpAndSettle();
       final imageRect = tester.getRect(imageFinder);
       expect(imageRect.width, closeTo(60, 1));
       expect(imageRect.height, closeTo(140, 1));
