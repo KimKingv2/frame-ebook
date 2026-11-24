@@ -2060,6 +2060,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             child: cellContent,
           );
         }
+        if (placement.header) {
+          // Preserve XHTML table-header semantics for assistive technologies.
+          cellContent = Semantics(
+            header: true,
+            child: cellContent,
+          );
+        }
         gridCells.add(FrameEpubTableGridCell(
           row: rowIndex,
           column: column,

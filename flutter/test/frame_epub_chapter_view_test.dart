@@ -1160,6 +1160,28 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      final semantics = tester.ensureSemantics();
+      try {
+        final headerFinder = find.bySemanticsLabel('書名');
+        expect(headerFinder, findsOneWidget);
+        expect(
+          tester.getSemantics(headerFinder).getSemanticsData()
+              .flagsCollection.isHeader,
+          isTrue,
+          reason: 'EPUB th cells must expose the semantic header role.',
+        );
+        final bodyFinder = find.bySemanticsLabel('第一本書');
+        expect(bodyFinder, findsOneWidget);
+        expect(
+          tester.getSemantics(bodyFinder).getSemanticsData()
+              .flagsCollection.isHeader,
+          isFalse,
+          reason: 'Ordinary td cells must not be announced as headers.',
+        );
+      } finally {
+        semantics.dispose();
+      }
+
       expect(find.text('書名'), findsOneWidget);
       expect(find.text('作者'), findsOneWidget);
       expect(find.text('合併欄位內容'), findsOneWidget);
