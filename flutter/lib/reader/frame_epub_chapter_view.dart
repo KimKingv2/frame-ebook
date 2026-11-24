@@ -3270,6 +3270,8 @@ class _FrameEpubImage extends StatefulWidget {
 class _FrameEpubImageState extends State<_FrameEpubImage> {
   late Future<Uint8List> _bytes;
   bool _layoutChangeReported = false;
+  bool _layoutRevealScheduled = false;
+  bool _decodedFrameVisible = false;
 
   @override
   void initState() {
@@ -3284,9 +3286,13 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
         !identical(oldWidget.loader, widget.loader)) {
       _bytes = _load();
       _layoutChangeReported = false;
+      _layoutRevealScheduled = false;
+      _decodedFrameVisible = false;
     }
     if (oldWidget.onLayoutChanged != widget.onLayoutChanged) {
       _layoutChangeReported = false;
+      _layoutRevealScheduled = false;
+      _decodedFrameVisible = false;
     }
   }
 
@@ -3298,18 +3304,42 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
   void _reportLayoutChanged() {
     if (_layoutChangeReported || widget.onLayoutChanged == null) return;
     _layoutChangeReported = true;
+    RenderObject? ancestor = context.findRenderObject();
+    while (ancestor != null && ancestor is! RenderFrameEpubTableGrid) {
+      ancestor = ancestor.parent;
+    }
+    if (ancestor is RenderFrameEpubTableGrid) {
+      ancestor.markNeedsLayout();
+    }
+    widget.onLayoutChanged?.call();
+  }
+
+  void _scheduleDecodedFrameReveal() {
+    if (_layoutRevealScheduled) return;
+    _layoutRevealScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      RenderObject? ancestor = context.findRenderObject();
-      while (ancestor != null && ancestor is! RenderFrameEpubTableGrid) {
-        ancestor = ancestor.parent;
-      }
-      if (ancestor is RenderFrameEpubTableGrid) {
-        ancestor.markNeedsLayout();
-      }
-      widget.onLayoutChanged?.call();
+      // Invalidate the table and its chapter pagination before replacing the
+      // fixed-height loading surface with an image of its decoded dimensions.
+      _reportLayoutChanged();
+      setState(() {
+        _decodedFrameVisible = true;
+      });
     });
   }
+
+  Widget _imageDecodePlaceholder() => SizedBox(
+        width: widget.width ??
+            (widget.maxWidth.isFinite ? widget.maxWidth : 48),
+        height: widget.height ?? 80,
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 1.5),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -3369,13 +3399,22 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
               cacheWidth: cacheWidth,
               filterQuality: FilterQuality.medium,
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (frame != null || wasSynchronouslyLoaded) {
-                  _reportLayoutChanged();
+                if (!_decodedFrameVisible) {
+                  if (frame != null || wasSynchronouslyLoaded) {
+                    _scheduleDecodedFrameReveal();
+                  }
+                  // Keep the same loading geometry for this frame. The next
+                  // frame reveals the decoded image after the parent table
+                  // has been invalidated and can measure its natural height.
+                  return _imageDecodePlaceholder();
                 }
                 return child;
               },
               errorBuilder: (_, __, ___) {
-                _reportLayoutChanged();
+                if (!_decodedFrameVisible) {
+                  _scheduleDecodedFrameReveal();
+                  return _imageDecodePlaceholder();
+                }
                 return const Icon(
                   Icons.broken_image_outlined,
                   color: Color(0xFF8F829F),
