@@ -1171,7 +1171,9 @@ void main() {
           isTrue,
           reason: 'EPUB th cells must expose the semantic header role.',
         );
-        final bodyFinder = find.bySemanticsLabel('第一本書');
+        final bodyFinder = find.bySemanticsLabel(
+          '欄標題：書名；儲存格內容：第一本書',
+        );
         expect(bodyFinder, findsOneWidget);
         expect(
           tester.getSemantics(bodyFinder).getSemanticsData()

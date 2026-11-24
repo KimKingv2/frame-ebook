@@ -37,7 +37,7 @@ void main() {
     final labels = FrameEpubTableSemantics.resolve(
       cells: const [
         FrameEpubTableSemanticCell(
-          index: 0, row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          index: 0, row: 0, column: 1, rowSpan: 1, columnSpan: 1,
           rowGroup: 0, rowGroupEnd: 1, isHeader: true,
           isHeaderElement: true, isHeaderRow: true, text: '書名',
         ),
@@ -145,6 +145,22 @@ void main() {
       '欄標題：基本資料／書名；儲存格內容：星際旅行',
     );
     expect(labels[1].isHeader, isTrue);
+  });
+
+  test('invalid explicit header references do not remove header roles', () {
+    final labels = FrameEpubTableSemantics.resolve(
+      cells: const [
+        FrameEpubTableSemanticCell(
+          index: 0, row: 0, column: 0, rowSpan: 1, columnSpan: 1,
+          rowGroup: 0, rowGroupEnd: 1, isHeader: true,
+          isHeaderElement: true, isHeaderRow: true, text: '標題',
+          id: 'heading', headers: 'missing-parent',
+        ),
+      ],
+    );
+
+    expect(labels.single.label, '標題');
+    expect(labels.single.isHeader, isTrue);
   });
 
   test('unknown explicit header ids are safely ignored', () {

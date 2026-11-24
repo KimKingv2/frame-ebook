@@ -150,7 +150,7 @@ class FrameEpubTableSemantics {
     if (associated.isEmpty) {
       return FrameEpubTableSemanticLabel(
         label: cell.text,
-        isHeader: false,
+        isHeader: cell.isHeader,
       );
     }
 
