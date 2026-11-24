@@ -8,6 +8,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
     required this.width,
     required this.columnCount,
     required this.rowCount,
+    this.layoutRevision = 0,
     required super.children,
     super.key,
   })  : assert(width >= 0),
@@ -17,6 +18,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
   final double width;
   final int columnCount;
   final int rowCount;
+  final int layoutRevision;
 
   @override
   RenderFrameEpubTableGrid createRenderObject(BuildContext context) {
@@ -24,6 +26,7 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
       width: width,
       columnCount: columnCount,
       rowCount: rowCount,
+      layoutRevision: layoutRevision,
     );
   }
 
@@ -35,7 +38,8 @@ class FrameEpubTableGrid extends MultiChildRenderObjectWidget {
     renderObject
       ..width = width
       ..columnCount = columnCount
-      ..rowCount = rowCount;
+      ..rowCount = rowCount
+      ..layoutRevision = layoutRevision;
   }
 }
 
@@ -109,13 +113,16 @@ class RenderFrameEpubTableGrid extends RenderBox
     required double width,
     required int columnCount,
     required int rowCount,
+    required int layoutRevision,
   })  : _width = width,
         _columnCount = columnCount,
-        _rowCount = rowCount;
+        _rowCount = rowCount,
+        _layoutRevision = layoutRevision;
 
   double _width;
   int _columnCount;
   int _rowCount;
+  int _layoutRevision;
 
   double get width => _width;
 
@@ -138,6 +145,14 @@ class RenderFrameEpubTableGrid extends RenderBox
   set rowCount(int value) {
     if (_rowCount == value) return;
     _rowCount = value;
+    markNeedsLayout();
+  }
+
+  int get layoutRevision => _layoutRevision;
+
+  set layoutRevision(int value) {
+    if (_layoutRevision == value) return;
+    _layoutRevision = value;
     markNeedsLayout();
   }
 

@@ -329,6 +329,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   bool _paginationReady = false;
   bool _paginationMeasurementScheduled = false;
   int _paginationRevision = 0;
+  int _tableLayoutRevision = 0;
   Size? _paginationViewportSize;
   double? _paginationPageWidth;
   int? _initialPageForRestore;
@@ -611,10 +612,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   }
 
 
-  void _handlePaginatedImageLayoutChanged() {
-    if (!mounted || !widget.paginated) return;
-    _resetPaginationMeasurement();
-    setState(() {});
+  void _handleImageLayoutChanged() {
+    if (!mounted) return;
+    if (widget.paginated) _resetPaginationMeasurement();
+    setState(() {
+      _tableLayoutRevision++;
+    });
   }
 
   void _resetPaginationMeasurement() {
@@ -2075,6 +2078,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       width: tableWidth,
       columnCount: columnCount,
       rowCount: gridRows.length,
+      layoutRevision: _tableLayoutRevision,
       children: gridCells,
     );
     if (tablePadding != EdgeInsets.zero) {
@@ -2656,8 +2660,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                   : double.infinity)
               : 680),
       alt: alt,
-      onLayoutChanged:
-          widget.paginated ? _handlePaginatedImageLayoutChanged : null,
+      onLayoutChanged: _handleImageLayoutChanged,
     );
   }
 
@@ -3303,7 +3306,6 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
             ),
           );
         }
-        _reportLayoutChanged();
         return LayoutBuilder(
           builder: (context, constraints) {
             final dpr = MediaQuery.devicePixelRatioOf(context);
@@ -3335,10 +3337,19 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
               fit: widget.fit,
               cacheWidth: cacheWidth,
               filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.broken_image_outlined,
-                color: Color(0xFF8F829F),
-              ),
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (frame != null || wasSynchronouslyLoaded) {
+                  _reportLayoutChanged();
+                }
+                return child;
+              },
+              errorBuilder: (_, __, ___) {
+                _reportLayoutChanged();
+                return const Icon(
+                  Icons.broken_image_outlined,
+                  color: Color(0xFF8F829F),
+                );
+              },
               semanticLabel: widget.alt,
             );
             if (widget.useViewportBounds &&

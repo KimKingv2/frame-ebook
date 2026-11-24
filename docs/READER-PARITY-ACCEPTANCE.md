@@ -479,3 +479,19 @@ decoded image's intrinsic dimensions in the shared table grid.
 The test establishes the supported inline-image path for a non-paginated
 table. Paginated late-image remeasurement, explicit CSS width/height semantics,
 and additional formats such as SVG remain separate acceptance items.
+
+## Invalidate table row measurements after image decoding · 2026-11-24
+
+An embedded image begins as an 80px loading placeholder and can acquire a
+different intrinsic size when its decoded frame becomes available. The table
+grid now receives a monotonically increasing layout revision from the chapter
+view. The EPUB image widget reports the geometry transition after its first
+decoded frame (or after an image error replaces the placeholder), and the
+chapter view increments that revision. The grid render object marks itself
+dirty and recomputes its row heights, so merged cells no longer keep the
+placeholder height after the image expands. Paginated reading also invalidates
+and rebuilds the affected page measurement.
+
+The EPUB regression exercises a real image stored in the archive, waits for
+the image provider to decode, and checks the loaded image bounds, the merged
+cell alignment across both rows, and the absence of RenderFlex overflow.
