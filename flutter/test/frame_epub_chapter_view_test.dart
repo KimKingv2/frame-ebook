@@ -1512,6 +1512,20 @@ void main() {
       final imageRect = tester.getRect(imageFinder);
       expect(imageRect.width, closeTo(60, 1));
       expect(imageRect.height, closeTo(140, 1));
+      final tableGrid = tester.renderObject<RenderFrameEpubTableGrid>(
+        find.byType(FrameEpubTableGrid),
+      );
+      expect(tableGrid.debugLayoutPassCount, greaterThan(0));
+      expect(
+        tableGrid.debugNaturalCellHeights.first,
+        greaterThanOrEqualTo(imageRect.height),
+        reason: 'The spanning cell natural height must include the decoded image.',
+      );
+      expect(
+        tableGrid.debugRowHeights.reduce((total, height) => total + height),
+        greaterThanOrEqualTo(tableGrid.debugNaturalCellHeights.first),
+        reason: 'The rows covered by rowspan must contain the full natural cell height.',
+      );
 
       final spanningCell = find.ancestor(
         of: find.text('圖片儲存格上方'),

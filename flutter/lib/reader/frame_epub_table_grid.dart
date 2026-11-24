@@ -123,6 +123,13 @@ class RenderFrameEpubTableGrid extends RenderBox
   int _columnCount;
   int _rowCount;
   int _layoutRevision;
+  int _debugLayoutPassCount = 0;
+  List<double> _debugNaturalCellHeights = const [];
+  List<double> _debugRowHeights = const [];
+
+  int get debugLayoutPassCount => _debugLayoutPassCount;
+  List<double> get debugNaturalCellHeights => _debugNaturalCellHeights;
+  List<double> get debugRowHeights => _debugRowHeights;
 
   double get width => _width;
 
@@ -242,6 +249,7 @@ class RenderFrameEpubTableGrid extends RenderBox
 
   @override
   void performLayout() {
+    _debugLayoutPassCount++;
     final width = constraints.constrainWidth(_width);
     if (_rowCount <= 0 || _columnCount <= 0) {
       size = constraints.constrain(Size(width, 0));
@@ -266,7 +274,11 @@ class RenderFrameEpubTableGrid extends RenderBox
       child = data.nextSibling;
     }
 
+    _debugNaturalCellHeights = List<double>.unmodifiable(
+      measurements.map((measurement) => measurement.naturalHeight),
+    );
     final rowHeights = _resolveRowHeights(measurements);
+    _debugRowHeights = List<double>.unmodifiable(rowHeights);
     for (final measurement in measurements) {
       final data = measurement.parentData;
       final columnSpan =
