@@ -1727,6 +1727,91 @@ void main() {
     }
   });
 
+
+  testWidgets(
+      'opens an internal EPUB link when its linked image is tapped inside a table',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td>
+              <p>
+                <a href="chapter.xhtml#inside">
+                  <img src="../Images/tall.png" alt="可點擊的表格圖片"
+                    width="60"/>
+                </a>
+              </p>
+            </td>
+            <td><p>圖片連結旁的表格文字</p></td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(
+      additionalTableMarkup: table,
+      includeInlineImage: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-image-link-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-image-link.epub',
+      'fileName': 'table-image-link.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    String? openedLink;
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+            onInternalLink: (href) => openedLink = href,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.semanticLabel == '可點擊的表格圖片',
+      );
+      expect(imageFinder, findsOneWidget);
+      await tester.tap(imageFinder);
+      await tester.pumpAndSettle();
+
+      expect(
+        openedLink,
+        'chapter.xhtml#inside',
+        reason: 'A linked image inside a table cell must activate its anchor.',
+      );
+      expect(find.text('圖片連結旁的表格文字'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('keeps long EPUB tables bounded within a paginated page',
       (tester) async {
     final rowText = List.filled(24, '表格文字內容').join('、');
