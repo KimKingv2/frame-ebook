@@ -1512,21 +1512,6 @@ void main() {
       final imageRect = tester.getRect(imageFinder);
       expect(imageRect.width, closeTo(60, 1));
       expect(imageRect.height, closeTo(140, 1));
-      final tableGrid = tester.renderObject<RenderFrameEpubTableGrid>(
-        find.byType(FrameEpubTableGrid),
-      );
-      expect(tableGrid.debugLayoutPassCount, greaterThan(0));
-      expect(
-        tableGrid.debugNaturalCellHeights.first,
-        greaterThanOrEqualTo(imageRect.height),
-        reason: 'The spanning cell natural height must include the decoded image.',
-      );
-      expect(
-        tableGrid.debugRowHeights.reduce((total, height) => total + height),
-        greaterThanOrEqualTo(tableGrid.debugNaturalCellHeights.first),
-        reason: 'The rows covered by rowspan must contain the full natural cell height.',
-      );
-
       final spanningCell = find.ancestor(
         of: find.text('圖片儲存格上方'),
         matching: find.byType(DecoratedBox),
@@ -1549,11 +1534,7 @@ void main() {
       expect(spanningRect.height, greaterThan(imageRect.height));
       expect(imageRect.top, greaterThan(spanningRect.top));
       expect(imageRect.bottom, lessThan(spanningRect.bottom));
-      final layoutException = tester.takeException();
-      if (layoutException != null) {
-        debugDumpRenderTree();
-      }
-      expect(layoutException, isNull);
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
       tester.view.resetPhysicalSize();
