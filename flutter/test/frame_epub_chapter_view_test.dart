@@ -55,6 +55,7 @@ Uint8List _fixture({
   String additionalTableMarkup = '',
   String additionalParagraphMarkup = '',
   bool fixedLayout = false,
+  bool includeInlineImage = false,
 }) {
   const container = '''
 <container><rootfiles>
@@ -65,9 +66,12 @@ Uint8List _fixture({
   final layoutMeta = fixedLayout
       ? '<meta property="rendition:layout">pre-paginated</meta>'
       : '';
-  final imageManifest = fixedLayout
-      ? '<item id="page-image" href="Images/page.png" media-type="image/png"/>'
-      : '';
+  final imageManifest = [
+    if (fixedLayout)
+      '<item id="page-image" href="Images/page.png" media-type="image/png"/>',
+    if (includeInlineImage)
+      '<item id="inline-image" href="Images/tall.png" media-type="image/png"/>',
+  ].join();
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
@@ -134,6 +138,13 @@ Uint8List _fixture({
         'OPS/Images/page.png',
         base64Decode(
           'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      ),
+    if (includeInlineImage)
+      _ZipItem(
+        'OPS/Images/tall.png',
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAADwAAACMCAYAAAAgNsoHAAAAoElEQVR42u3PMQEAAAQAMDllkk4herBjARZZPZ+EsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLDwVQuctxnoQIfZbgAAAABJRU5ErkJggg==',
         ),
       ),
   ]);
@@ -1410,6 +1421,104 @@ void main() {
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '註腳');
       expect(openedFootnote?.content, '這是註腳的內文。');
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
+  testWidgets(
+      'reflows a rowspan cell after its embedded image finishes loading',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="2">
+              <p>圖片儲存格上方</p>
+              <p><img src="../Images/tall.png" alt="跨列插圖"/></p>
+              <p>圖片儲存格下方</p>
+            </td>
+            <td><p>圖片列第一格</p></td>
+          </tr>
+          <tr>
+            <td><p>圖片列第二格</p></td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(
+      additionalTableMarkup: table,
+      includeInlineImage: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-image-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-image.epub',
+      'fileName': 'table-rowspan-image.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.semanticLabel == '跨列插圖',
+      );
+      expect(imageFinder, findsOneWidget);
+      final imageRect = tester.getRect(imageFinder);
+      expect(imageRect.width, closeTo(60, 1));
+      expect(imageRect.height, closeTo(140, 1));
+
+      final spanningCell = find.ancestor(
+        of: find.text('圖片儲存格上方'),
+        matching: find.byType(DecoratedBox),
+      );
+      final firstRowCell = find.ancestor(
+        of: find.text('圖片列第一格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final secondRowCell = find.ancestor(
+        of: find.text('圖片列第二格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final spanningRect = tester.getRect(spanningCell);
+      final firstRowRect = tester.getRect(firstRowCell);
+      final secondRowRect = tester.getRect(secondRowCell);
+
+      expect(spanningRect.top, closeTo(firstRowRect.top, 0.6));
+      expect(secondRowRect.top, closeTo(firstRowRect.bottom, 0.6));
+      expect(spanningRect.bottom, closeTo(secondRowRect.bottom, 0.6));
+      expect(spanningRect.height, greaterThan(imageRect.height));
+      expect(imageRect.top, greaterThan(spanningRect.top));
+      expect(imageRect.bottom, lessThan(spanningRect.bottom));
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
       tester.view.resetPhysicalSize();

@@ -464,3 +464,18 @@ These fixtures exercise overlapping row-height constraints and mixed textual
 cell children. Image intrinsic-size and asynchronous image-load behaviour in
 tables still require their own fixture and device/browser measurement; this
 does not claim complete table conformance or replace visual parity acceptance.
+
+
+## Reflow spanning cells after embedded images load · 2026-11-24
+
+The EPUB widget suite now includes an image resource inside a two-row merged
+cell. The fixture uses a real 60 × 140 PNG stored inside the EPUB archive,
+not a mocked render box. The regression waits for asynchronous archive reads
+and image decoding, verifies the decoded image's dimensions, then checks that
+the spanning cell still begins and ends exactly with the two adjacent rows.
+This covers the transition from the fixed-height loading placeholder to the
+decoded image's intrinsic dimensions in the shared table grid.
+
+The test establishes the supported inline-image path for a non-paginated
+table. Paginated late-image remeasurement, explicit CSS width/height semantics,
+and additional formats such as SVG remain separate acceptance items.
