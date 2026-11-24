@@ -144,7 +144,7 @@ Uint8List _fixture({
       _ZipItem(
         'OPS/Images/tall.png',
         base64Decode(
-          'iVBORw0KGgoAAAANSUhEUgAAADwAAACMCAYAAAAgNsoHAAAAoElEQVR42u3PMQEAAAQAMDllkk4herBjARZZPZ+EsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLDwVQuctxnoQIfZbgAAAABJRU5ErkJggg==',
+          'iVBORw0KGgoAAAANSUhEUgAAADwAAACMCAIAAACvVF1QAAAAp0lEQVR4nO3OQQ3AIAAAMUDnNCEORfOwx5ElrYLOZ5/xN+t24AvpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka5IV6Qr0hXpinRFuiJdka68OywC1I9PrzMAAAAASUVORK5CYII=',
         ),
       ),
   ]);
