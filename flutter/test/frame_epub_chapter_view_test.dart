@@ -1795,39 +1795,42 @@ void main() {
       );
       expect(imageFinder, findsOneWidget);
       final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
-      await tester.pump();
       final linkSemanticsFinder =
           find.bySemanticsLabel('可點擊的表格圖片');
-      expect(linkSemanticsFinder, findsOneWidget);
-      final linkSemantics =
-          tester.getSemantics(linkSemanticsFinder).getSemanticsData();
-      expect(
-        linkSemantics.label,
-        '可點擊的表格圖片',
-        reason: 'The link must expose the image alt text as its accessible name.',
-      );
-      expect(
-        linkSemantics.flagsCollection.isLink,
-        isTrue,
-        reason: 'The EPUB anchor must expose the semantic link role.',
-      );
-      expect(
-        linkSemantics.hasAction(SemanticsAction.tap),
-        isTrue,
-        reason: 'Assistive technology must be able to activate the EPUB link.',
-      );
+      try {
+        await tester.pump();
+        expect(linkSemanticsFinder, findsOneWidget);
+        final linkSemantics =
+            tester.getSemantics(linkSemanticsFinder).getSemanticsData();
+        expect(
+          linkSemantics.label,
+          '可點擊的表格圖片',
+          reason: 'The link must expose the image alt text as its accessible name.',
+        );
+        expect(
+          linkSemantics.flagsCollection.isLink,
+          isTrue,
+          reason: 'The EPUB anchor must expose the semantic link role.',
+        );
+        expect(
+          linkSemantics.hasAction(SemanticsAction.tap),
+          isTrue,
+          reason: 'Assistive technology must be able to activate the EPUB link.',
+        );
 
-      await tester.tap(imageFinder);
-      await tester.pumpAndSettle();
+        await tester.tap(linkSemanticsFinder);
+        await tester.pumpAndSettle();
 
-      expect(
-        openedLink,
-        'chapter.xhtml#inside',
-        reason: 'A linked image inside a table cell must activate its anchor.',
-      );
-      expect(find.text('圖片連結旁的表格文字'), findsOneWidget);
-      expect(tester.takeException(), isNull);
+        expect(
+          openedLink,
+          'chapter.xhtml#inside',
+          reason: 'A linked image inside a table cell must activate its anchor.',
+        );
+        expect(find.text('圖片連結旁的表格文字'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
 
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
