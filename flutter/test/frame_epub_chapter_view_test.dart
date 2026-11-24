@@ -1269,7 +1269,12 @@ void main() {
         final dataCell = tester.getSemantics(dataCellFinder).getSemanticsData();
         expect(dataCell.flagsCollection.isHeader, isFalse);
 
-        final linkFinder = find.bySemanticsLabel('作者甲');
+        final linkFinder = find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Semantics && widget.properties.label == '作者甲',
+            )
+            .first;
         expect(linkFinder, findsOneWidget);
         final linkData = tester.getSemantics(linkFinder).getSemanticsData();
         expect(linkData.flagsCollection.isLink, isTrue);

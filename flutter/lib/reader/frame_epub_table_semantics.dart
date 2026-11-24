@@ -154,6 +154,19 @@ class FrameEpubTableSemantics {
       );
     }
 
+    if (cell.isHeader) {
+      final parentHeaders = associated
+          .map((header) => _headerDescription(header, headersById))
+          .where((label) => label.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      final ownLabel = cell.accessibleHeaderText;
+      return FrameEpubTableSemanticLabel(
+        label: [...parentHeaders, if (ownLabel.isNotEmpty) ownLabel].join('／'),
+        isHeader: true,
+      );
+    }
+
     final columnHeaders = <String>[];
     final rowHeaders = <String>[];
     final rowGroupHeaders = <String>[];
