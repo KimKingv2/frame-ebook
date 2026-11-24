@@ -3299,7 +3299,15 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
     if (_layoutChangeReported || widget.onLayoutChanged == null) return;
     _layoutChangeReported = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.onLayoutChanged?.call();
+      if (!mounted) return;
+      RenderObject? ancestor = context.findRenderObject();
+      while (ancestor != null && ancestor is! RenderFrameEpubTableGrid) {
+        ancestor = ancestor.parent;
+      }
+      if (ancestor is RenderFrameEpubTableGrid) {
+        ancestor.markNeedsLayout();
+      }
+      widget.onLayoutChanged?.call();
     });
   }
 
