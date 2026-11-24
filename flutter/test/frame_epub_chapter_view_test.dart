@@ -1730,6 +1730,136 @@ void main() {
 
 
   testWidgets(
+      'preserves a paginated CFI anchor when a table image decodes late',
+      (tester) async {
+    final prefix = List.filled(
+      42,
+      '圖片尚未完成解碼時，分頁位置也必須維持穩定。每段文字都用來增加前置頁面。',
+    ).join();
+    const targetText = '圖片解碼後仍須停留在這段表格文字。';
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="2">
+              <p>跨列儲存格上方文字</p>
+              <img src="../Images/tall.png" alt="分頁延遲載入圖片"
+                width="60" style="display:block"/>
+              <p id="image-page-target">$targetText</p>
+            </td>
+            <td><p>延遲圖片測試第一列</p></td>
+          </tr>
+          <tr>
+            <td><p>延遲圖片測試第二列</p></td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(
+      additionalIntroText: prefix,
+      additionalTableMarkup: table,
+      includeInlineImage: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-paginated-late-image-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-paginated-late-image.epub',
+      'fileName': 'table-paginated-late-image.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final targetElement = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere(
+            (element) => element.getAttribute('id') == 'image-page-target',
+          );
+      final targetTextNode = targetElement.children.whereType<XmlText>().single;
+      expect(targetTextNode.value, targetText);
+
+      tester.view.physicalSize = const Size(420, 560);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              paginated: true,
+              pageController: pageController,
+              initialTextNode: targetTextNode,
+              initialTextOffset: 3,
+              initialScrollFraction: 0,
+              restoreRevision: 1,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.page,
+        greaterThan(0),
+        reason: 'The initial CFI target must be restored beyond the first page.',
+      );
+      expect(find.text(targetText), findsOneWidget);
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.semanticLabel == '分頁延遲載入圖片',
+      );
+      expect(imageFinder, findsOneWidget);
+      final image = tester.widget<Image>(imageFinder);
+      await tester.runAsync(() async {
+        await precacheImage(image.image, tester.element(imageFinder));
+      });
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<FrameEpubTableGrid>(find.byType(FrameEpubTableGrid))
+            .layoutRevision,
+        greaterThan(0),
+        reason: 'The decoded table image must invalidate its measured row heights.',
+      );
+      expect(
+        pageController.page,
+        greaterThan(0),
+        reason: 'Late image remeasurement must not restore the reader to page zero.',
+      );
+      expect(find.text(targetText), findsOneWidget);
+      final targetRect = tester.getRect(find.text(targetText));
+      final pageRect = tester.getRect(find.byType(PageView));
+      expect(
+        pageRect.overlaps(targetRect),
+        isTrue,
+        reason: 'The original CFI target must remain visible after re-pagination.',
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+  testWidgets(
       'opens an internal EPUB link when its linked image is tapped inside a table',
       (tester) async {
     const table = '''
