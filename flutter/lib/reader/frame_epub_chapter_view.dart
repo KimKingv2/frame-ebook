@@ -2310,11 +2310,20 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         decoration: TextDecoration.underline,
       );
       if (onTap != null) {
+        final linkLabelParts = <String>[
+          element.innerText.trim(),
+          for (final descendant
+              in element.descendants.whereType<XmlElement>())
+            if (descendant.name.local.toLowerCase() == 'img')
+              (_attribute(descendant, 'alt') ?? '').trim(),
+        ].where((part) => part.isNotEmpty);
+        final linkLabel = linkLabelParts.join(' ');
         return WidgetSpan(
           alignment: PlaceholderAlignment.baseline,
           baseline: TextBaseline.alphabetic,
           child: Semantics(
             container: true,
+            label: linkLabel,
             link: true,
             onTap: onTap,
             child: GestureDetector(
