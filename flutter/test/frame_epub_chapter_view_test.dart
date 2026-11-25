@@ -935,6 +935,26 @@ void main() {
               .round() +
               1;
 
+      bool containsWidgetSpan(InlineSpan span) {
+        if (span is! TextSpan) return span is WidgetSpan;
+        return (span.children ?? const <InlineSpan>[])
+            .any(containsWidgetSpan);
+      }
+
+      pageController.jumpToPage(0);
+      await tester.pumpAndSettle();
+      final firstPageLinkFragments = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .where((widget) =>
+              (widget.textSpan?.toPlainText().contains(linkPhrase) ?? false) &&
+              containsWidgetSpan(widget.textSpan!))
+          .toList(growable: false);
+      expect(
+        firstPageLinkFragments,
+        isNotEmpty,
+        reason: 'The first fragment must retain the semantic link target.',
+      );
+
       Finder? laterFragmentFinder;
       SelectableText? laterFragment;
       for (var page = 1; page < pageCount; page++) {
@@ -943,7 +963,8 @@ void main() {
         final candidates = tester
             .widgetList<SelectableText>(find.byType(SelectableText))
             .where((widget) =>
-                widget.textSpan?.toPlainText().contains(linkPhrase) ?? false)
+                (widget.textSpan?.toPlainText().contains(linkPhrase) ?? false) &&
+                !containsWidgetSpan(widget.textSpan!))
             .toList(growable: false);
         if (candidates.isEmpty) continue;
 
