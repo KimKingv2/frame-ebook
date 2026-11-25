@@ -629,8 +629,12 @@ void main() {
       expect(editable.textEditingValue.selection, selection);
       expect(mappedSelection, isNotNull);
       expect(mappedSelection!.quote, sourceText);
-      expect(mappedSelection!.startOffset, 0);
-      expect(mappedSelection!.endOffset, sourceText.length);
+      const sourcePrefix = ' 文字。';
+      expect(mappedSelection!.startOffset, sourcePrefix.length);
+      expect(
+        mappedSelection!.endOffset,
+        sourcePrefix.length + sourceText.length,
+      );
       final annotationSelection = mappedSelection;
 
       Actions.invoke(
