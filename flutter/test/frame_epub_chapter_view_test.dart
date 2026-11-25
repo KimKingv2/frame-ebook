@@ -541,8 +541,8 @@ void main() {
     const sourceText =
         'CopyProbe: ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final bytes = _fixture(
-      additionalParagraphMarkup:
-          '<p style="overflow-wrap:anywhere">$sourceText</p>',
+      additionalIntroText:
+          '<span style="overflow-wrap:anywhere">$sourceText</span>',
     );
     final book = FrameBook.fromJson({
       'id': 'chapter-clean-copy-intent-test',
