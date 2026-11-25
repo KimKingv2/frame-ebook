@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:characters/characters.dart';
+
 import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
@@ -304,6 +306,25 @@ void main() {
     expect(selection.endOffset, 3);
   });
 
+  test('copies selected text without synthetic hints but keeps authored U+200B',
+      () {
+    final source = XmlText('a\u200Bb');
+    final copied = FrameEpubTextSelectionMapper.textForClipboard(
+      displayedText: 'a\u200B\u200Bb',
+      selection: const TextSelection(baseOffset: 0, extentOffset: 4),
+      sources: [
+        FrameEpubTextRangeSource(
+          start: 0,
+          end: 4,
+          node: source,
+          sourceOffsets: [0, 1, 2, 2, 3],
+        ),
+      ],
+    );
+
+    expect(copied, 'a\u200Bb');
+  });
+
   test('maps UTF-16 selection offsets around supplementary Unicode characters', () {
     final source = XmlText('a😀b');
     final selection = FrameEpubTextSelectionMapper.map(
@@ -386,6 +407,9 @@ void main() {
       <p style="overflow-wrap:break-word">
         nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
       </p>
+      <p style="overflow-wrap:anywhere">
+        Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽 ABCDEFGHIJKLMNOPQRSTUVWXYZ
+      </p>
     ''';
     final bytes = _fixture(additionalParagraphMarkup: markup);
     final book = FrameBook.fromJson({
@@ -427,7 +451,7 @@ void main() {
             (item) => item.textSpan?.toPlainText().contains('\u200B') ?? false,
           )
           .toList(growable: false);
-      expect(tokenParagraphs, hasLength(3));
+      expect(tokenParagraphs, hasLength(4));
 
       final renderedUrl = tokenParagraphs[0].textSpan!.toPlainText();
       expect(
@@ -451,6 +475,22 @@ void main() {
         renderedNested.replaceAll('\u200B', ''),
         contains('nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ'),
       );
+
+      final graphemeText = tokenParagraphs[3].textSpan!.toPlainText();
+      for (final grapheme in [
+        'e\u0301',
+        '👩‍👩‍👧‍👦',
+        '🇹🇼',
+        '1️⃣',
+        '👍🏽',
+      ]) {
+        expect(
+          graphemeText,
+          contains('$grapheme\u200B'),
+          reason: 'Emergency wrapping must follow the complete grapheme cluster.',
+        );
+      }
+      expect(tokenParagraphs[0].contextMenuBuilder, isNotNull);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {

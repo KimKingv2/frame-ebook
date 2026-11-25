@@ -2,7 +2,9 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
+import 'package:characters/characters.dart';
 import 'package:flutter/painting.dart' show TextPainter;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
@@ -189,30 +191,11 @@ class FrameEpubTextSelectionMapper {
     if (identical(start.node, end.node) && start.offset >= end.offset) {
       return null;
     }
-    bool isSyntheticSoftBreak(int displayOffset) {
-      for (final source in sources) {
-        if (displayOffset < source.start || displayOffset >= source.end) {
-          continue;
-        }
-        final localOffset = displayOffset - source.start;
-        if (localOffset + 1 >= source.sourceOffsets.length) continue;
-        final sourceStart = source.sourceOffsets[localOffset];
-        final sourceEnd = source.sourceOffsets[localOffset + 1];
-        // An original XHTML U+200B consumes one source code unit. Only the
-        // renderer-generated break hint maps to a zero-length source range.
-        return sourceStart == sourceEnd;
-      }
-      return false;
-    }
-
-    final selectedText = StringBuffer();
-    for (var offset = selection.start; offset < selection.end; offset++) {
-      final codeUnit = displayedText.codeUnitAt(offset);
-      if (codeUnit == 0x200B && isSyntheticSoftBreak(offset)) continue;
-      selectedText.writeCharCode(codeUnit);
-    }
-    final quote = selectedText
-        .toString()
+    final quote = textForClipboard(
+      displayedText: displayedText,
+      selection: selection,
+      sources: sources,
+    )
         .replaceAll('\uFFFC', '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
@@ -224,6 +207,43 @@ class FrameEpubTextSelectionMapper {
       endOffset: end.offset,
       quote: quote,
     );
+  }
+
+  /// Returns selected display text without renderer-generated U+200B hints.
+  /// Source-authored zero-width spaces remain untouched.
+  static String textForClipboard({
+    required String displayedText,
+    required TextSelection selection,
+    required List<FrameEpubTextRangeSource> sources,
+  }) {
+    if (selection.isCollapsed ||
+        sources.isEmpty ||
+        selection.start < 0 ||
+        selection.end > displayedText.length ||
+        selection.end <= selection.start) {
+      return '';
+    }
+
+    bool isSyntheticSoftBreak(int displayOffset) {
+      for (final source in sources) {
+        if (displayOffset < source.start || displayOffset >= source.end) {
+          continue;
+        }
+        final localOffset = displayOffset - source.start;
+        if (localOffset + 1 >= source.sourceOffsets.length) continue;
+        return source.sourceOffsets[localOffset] ==
+            source.sourceOffsets[localOffset + 1];
+      }
+      return false;
+    }
+
+    final selectedText = StringBuffer();
+    for (var offset = selection.start; offset < selection.end; offset++) {
+      final codeUnit = displayedText.codeUnitAt(offset);
+      if (codeUnit == 0x200B && isSyntheticSoftBreak(offset)) continue;
+      selectedText.writeCharCode(codeUnit);
+    }
+    return selectedText.toString();
   }
 }
 
@@ -1665,11 +1685,38 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             selectionSources,
           );
         }
+        var activeSelection = const TextSelection.collapsed(offset: -1);
+
+        void copySelection(TextSelection selection) {
+          if (!selection.isValid || selection.isCollapsed) return;
+          Clipboard.setData(ClipboardData(
+            text: FrameEpubTextSelectionMapper.textForClipboard(
+              displayedText: fragmentText,
+              selection: selection,
+              sources: selectionSources,
+            ),
+          ));
+        }
+
         final selectable = SelectableText.rich(
           slice.span,
           textAlign: textAlign,
           textDirection: textDirection,
+          contextMenuBuilder: (context, editableTextState) {
+            final items = editableTextState.contextMenuButtonItems.map((item) {
+              if (item.type != ContextMenuButtonType.copy) return item;
+              return item.copyWith(onPressed: () {
+                copySelection(editableTextState.textEditingValue.selection);
+                editableTextState.hideToolbar();
+              });
+            }).toList(growable: false);
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: editableTextState.contextMenuAnchors,
+              buttonItems: items,
+            );
+          },
           onSelectionChanged: (selection, cause) {
+            activeSelection = selection;
             final callback = widget.onTextSelection;
             if (callback == null) return;
             callback(FrameEpubTextSelectionMapper.map(
@@ -1679,12 +1726,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             ));
           },
         );
+        // Keyboard copy shortcuts use the same clean source mapping as the
+        // platform context menu, so invisible layout hints never leak out.
+        final selectableWithCleanCopy = Actions(
+          actions: <Type, Action<Intent>>{
+            CopySelectionTextIntent:
+                CallbackAction<CopySelectionTextIntent>(
+              onInvoke: (intent) {
+                if (!intent.collapseSelection) copySelection(activeSelection);
+                return null;
+              },
+            ),
+          },
+          child: selectable,
+        );
         final renderedText = preserveHorizontalOverflow
             ? SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: selectable,
+                child: selectableWithCleanCopy,
               )
-            : selectable;
+            : selectableWithCleanCopy;
         widgets.add(
           fragmentKey == null
               ? renderedText
@@ -1786,6 +1847,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     String? wordBreak,
   }) {
     final source = node.value;
+    final graphemeEndOffsets = <int>{};
+    var graphemeOffset = 0;
+    for (final grapheme in source.characters) {
+      graphemeOffset += grapheme.length;
+      graphemeEndOffsets.add(graphemeOffset);
+    }
     final whiteSpaceMode = whiteSpace?.trim().toLowerCase() ?? 'normal';
     final overflowWrapMode = overflowWrap?.trim().toLowerCase();
     final wordBreakMode = wordBreak?.trim().toLowerCase();
@@ -1864,7 +1931,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         // Flutter's paragraph line breaker does not otherwise split a long
         // URL or uninterrupted Latin token. A zero-width opportunity allows
         // emergency wrapping without changing the source XHTML offsets.
-        if (breakAnywhere && !isCollapsibleWhitespace(rune)) {
+        if (breakAnywhere &&
+            graphemeEndOffsets.contains(end) &&
+            !isCollapsibleWhitespace(rune) &&
+            rune != 0x200B) {
           output.write('\u200B');
           sourceOffsets.add(end);
         }
