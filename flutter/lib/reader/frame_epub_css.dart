@@ -39,6 +39,8 @@ class FrameEpubCssCascade {
     'visibility',
     'white-space',
     'word-spacing',
+    'overflow-wrap',
+    'word-break',
     'direction',
     'list-style-type',
     'ruby-align',

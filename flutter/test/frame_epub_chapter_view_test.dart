@@ -282,6 +282,28 @@ void main() {
     expect(selection.endOffset, 6);
   });
 
+  test('omits synthetic wrap hints while preserving source zero-width spaces',
+      () {
+    final source = XmlText('a\u200Bb');
+    final selection = FrameEpubTextSelectionMapper.map(
+      selection: const TextSelection(baseOffset: 0, extentOffset: 4),
+      displayedText: 'a\u200B\u200Bb',
+      sources: [
+        FrameEpubTextRangeSource(
+          start: 0,
+          end: 4,
+          node: source,
+          sourceOffsets: [0, 1, 2, 2, 3],
+        ),
+      ],
+    );
+
+    expect(selection, isNotNull);
+    expect(selection!.quote, 'a\u200Bb');
+    expect(selection.startOffset, 0);
+    expect(selection.endOffset, 3);
+  });
+
   test('maps UTF-16 selection offsets around supplementary Unicode characters', () {
     final source = XmlText('a😀b');
     final selection = FrameEpubTextSelectionMapper.map(
@@ -349,6 +371,93 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  testWidgets(
+      'wraps long URLs and words while keeping them selectable in EPUB text',
+      (tester) async {
+    const markup = '''
+      <p style="overflow-wrap:anywhere">
+        URL：https://example.com/verylongpathwithoutanyspaces0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+      </p>
+      <p style="word-break:break-all">
+        ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
+      </p>
+      <p style="overflow-wrap:break-word">
+        nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+      </p>
+    ''';
+    final bytes = _fixture(additionalParagraphMarkup: markup);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-long-token-wrapping-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/long-token-wrapping.epub',
+      'fileName': 'long-token-wrapping.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 300,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final tokenParagraphs = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .where(
+            (item) => item.textSpan?.toPlainText().contains('\u200B') ?? false,
+          )
+          .toList(growable: false);
+      expect(tokenParagraphs, hasLength(3));
+
+      final renderedUrl = tokenParagraphs[0].textSpan!.toPlainText();
+      expect(
+        renderedUrl.replaceAll('\u200B', ''),
+        contains('https://example.com/verylongpathwithoutanyspaces'),
+      );
+      expect(renderedUrl.split('\u200B').length, greaterThan(20));
+      expect(
+        tester.getSize(find.byWidget(tokenParagraphs[0])).height,
+        greaterThan(32),
+        reason: 'A long URL should occupy wrapped lines in the regular paragraph.',
+      );
+
+      final renderedWord = tokenParagraphs[1].textSpan!.toPlainText();
+      expect(
+        renderedWord.replaceAll('\u200B', ''),
+        contains('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'),
+      );
+      final renderedNested = tokenParagraphs[2].textSpan!.toPlainText();
+      expect(
+        renderedNested.replaceAll('\u200B', ''),
+        contains('nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ'),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
   });
 
   testWidgets('renders XHTML text and forwards internal links', (tester) async {

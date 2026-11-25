@@ -189,8 +189,31 @@ class FrameEpubTextSelectionMapper {
     if (identical(start.node, end.node) && start.offset >= end.offset) {
       return null;
     }
-    final quote = displayedText
-        .substring(selection.start, selection.end)
+    bool isSyntheticSoftBreak(int displayOffset) {
+      for (final source in sources) {
+        if (displayOffset < source.start || displayOffset >= source.end) {
+          continue;
+        }
+        final localOffset = displayOffset - source.start;
+        if (localOffset + 1 >= source.sourceOffsets.length) continue;
+        final sourceStart = source.sourceOffsets[localOffset];
+        final sourceEnd = source.sourceOffsets[localOffset + 1];
+        if (sourceStart != sourceEnd) return false;
+        final isOriginalSoftBreak = sourceStart < source.node.value.length &&
+            source.node.value.codeUnitAt(sourceStart) == 0x200B;
+        return !isOriginalSoftBreak;
+      }
+      return false;
+    }
+
+    final selectedText = StringBuffer();
+    for (var offset = selection.start; offset < selection.end; offset++) {
+      final codeUnit = displayedText.codeUnitAt(offset);
+      if (codeUnit == 0x200B && isSyntheticSoftBreak(offset)) continue;
+      selectedText.writeCharCode(codeUnit);
+    }
+    final quote = selectedText
+        .toString()
         .replaceAll('\uFFFC', '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
@@ -1757,10 +1780,19 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   _PreparedEpubText _prepareText(
     XmlText node,
     String? whiteSpace,
-    String? transform,
-  ) {
+    String? transform, {
+    String? overflowWrap,
+    String? wordBreak,
+  }) {
     final source = node.value;
     final whiteSpaceMode = whiteSpace?.trim().toLowerCase() ?? 'normal';
+    final overflowWrapMode = overflowWrap?.trim().toLowerCase();
+    final wordBreakMode = wordBreak?.trim().toLowerCase();
+    final breakAnywhere = whiteSpaceMode != 'nowrap' &&
+        whiteSpaceMode != 'pre' &&
+        (overflowWrapMode == 'anywhere' ||
+            overflowWrapMode == 'break-word' ||
+            wordBreakMode == 'break-all');
     final collapseAllWhitespace =
         whiteSpaceMode == 'normal' || whiteSpaceMode == 'nowrap';
     final collapseHorizontalWhitespace = whiteSpaceMode == 'pre-line';
@@ -1827,6 +1859,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         output.write(rendered);
         for (var unit = 1; unit <= rendered.length; unit++) {
           sourceOffsets.add(unit == rendered.length ? end : start);
+        }
+        // Flutter's paragraph line breaker does not otherwise split a long
+        // URL or uninterrupted Latin token. A zero-width opportunity allows
+        // emergency wrapping without changing the source XHTML offsets.
+        if (breakAnywhere && !isCollapsibleWhitespace(rune)) {
+          output.write('\u200B');
+          sourceOffsets.add(end);
         }
       }
       index = end;
@@ -2523,6 +2562,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           child,
           style['white-space'],
           style['text-transform'],
+          overflowWrap: style['overflow-wrap'],
+          wordBreak: style['word-break'],
         );
         children.addAll(_sourceTextSpans(child, prepared, sourceSpans));
       } else if (child is XmlElement) {
@@ -2626,6 +2667,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           child,
           style['white-space'],
           style['text-transform'],
+          overflowWrap: style['overflow-wrap'],
+          wordBreak: style['word-break'],
         );
         if (prepared.text.isNotEmpty) {
           pendingBase.addAll(_sourceTextSpans(child, prepared, sourceSpans));
@@ -2826,6 +2869,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           node,
           parentStyle['white-space'],
           parentStyle['text-transform'],
+          overflowWrap: parentStyle['overflow-wrap'],
+          wordBreak: parentStyle['word-break'],
         );
         return prepared.text.isEmpty ? null : TextSpan(text: prepared.text);
       }

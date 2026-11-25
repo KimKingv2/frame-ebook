@@ -60,6 +60,37 @@ void main() {
       expect(paragraphStyle['letter-spacing'], '1px');
     });
 
+    test('inherits overflow-wrap and word-break rules', () {
+      final cascade = FrameEpubCssCascade.fromStylesheets([
+        'body { overflow-wrap: anywhere; word-break: break-all; }',
+        'p { overflow-wrap: break-word; }',
+      ]);
+      final document = XmlDocument.parse(
+        '<body><p><span>long-token</span></p></body>',
+      );
+      final body = document.rootElement;
+      final paragraph = body.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'p');
+      final span = paragraph.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'span');
+
+      final bodyStyle = cascade.resolve(body);
+      final paragraphStyle = cascade.resolve(
+        paragraph,
+        parentStyle: bodyStyle,
+      );
+      final spanStyle = cascade.resolve(
+        span,
+        parentStyle: paragraphStyle,
+      );
+
+      expect(paragraphStyle['overflow-wrap'], 'break-word');
+      expect(spanStyle['overflow-wrap'], 'break-word');
+      expect(spanStyle['word-break'], 'break-all');
+    });
+
     test('important declarations outrank non-important inline styles', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         '#target { color: blue !important; }',
