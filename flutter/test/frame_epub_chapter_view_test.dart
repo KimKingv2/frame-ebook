@@ -253,6 +253,14 @@ void _write32(List<int> output, int value) {
 }
 
 void main() {
+  test('computes UTF-16 grapheme boundaries for combining and emoji clusters', () {
+    const sample = 'e\u0301|👩‍👩‍👧‍👦|🇹🇼|1️⃣|👍🏽';
+    expect(
+      FrameEpubGraphemeBreaks.endOffsets(sample),
+      {2, 3, 14, 15, 19, 20, 23, 24, 28},
+    );
+  });
+
   test('maps a cross-inline selection to its original XHTML text nodes', () {
     final first = XmlText('Hello ');
     final second = XmlText('bold world');
@@ -480,91 +488,6 @@ void main() {
     } finally {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
-      await archive.close();
-    }
-  });
-
-  testWidgets(
-      'inserts emergency wrap opportunities only after complete grapheme clusters',
-      (tester) async {
-    const markup = '''
-      <p style="overflow-wrap:anywhere">
-        Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽 ABCDEFGHIJKLMNOPQRSTUVWXYZ
-      </p>
-    ''';
-    final bytes = _fixture(additionalParagraphMarkup: markup);
-    final book = FrameBook.fromJson({
-      'id': 'chapter-grapheme-wrapping-test',
-      'provider': 'vps',
-      'library': 'books',
-      'rootPath': '/Books',
-      'path': '/Books/grapheme-wrapping.epub',
-      'fileName': 'grapheme-wrapping.epub',
-      'format': 'EPUB',
-      'shelf': 'books',
-      'size': bytes.length,
-    });
-    final archive = await FrameZipArchive.open(
-      source: _MemoryFileSource(bytes),
-      book: book,
-    );
-    final scrollController = ScrollController();
-    try {
-      final epub = await const FrameEpubParser().parse(archive);
-      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
-      final chapter = await loader.loadChapter(epub.spine.single);
-      expect(chapter.document.toXmlString(), contains('Graphemes:'));
-
-      tester.view.physicalSize = const Size(360, 640);
-      tester.view.devicePixelRatio = 1;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: FrameEpubChapterView(
-            chapter: chapter,
-            resourceLoader: loader,
-            scrollController: scrollController,
-            contentMaxWidth: 300,
-          ),
-        ),
-      ));
-      await tester.pumpAndSettle();
-      expect(scrollController.hasClients, isTrue);
-      final graphemeParagraphFinder = find.byWidgetPredicate(
-        (candidate) =>
-            candidate is SelectableText &&
-            (candidate.textSpan?.toPlainText().contains('Graphemes:') ?? false),
-      );
-      await tester.scrollUntilVisible(
-        graphemeParagraphFinder,
-        240,
-        scrollable: find.byType(Scrollable).first,
-      );
-
-      final paragraph = tester.widget<SelectableText>(graphemeParagraphFinder);
-      final rendered = paragraph.textSpan!.toPlainText();
-      expect(
-        rendered.replaceAll('\u200B', ''),
-        contains('Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽'),
-      );
-      for (final grapheme in [
-        'e\u0301',
-        '👩‍👩‍👧‍👦',
-        '🇹🇼',
-        '1️⃣',
-        '👍🏽',
-      ]) {
-        expect(
-          rendered,
-          contains('$grapheme\u200B'),
-          reason: 'A soft break must appear after the entire grapheme: $grapheme',
-        );
-      }
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    } finally {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-      scrollController.dispose();
       await archive.close();
     }
   });

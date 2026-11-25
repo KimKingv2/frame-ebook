@@ -44,6 +44,21 @@ class _PreparedEpubText {
   final List<int> sourceOffsets;
 }
 
+/// UTF-16 offsets immediately after each extended Unicode grapheme cluster.
+class FrameEpubGraphemeBreaks {
+  FrameEpubGraphemeBreaks._();
+
+  static Set<int> endOffsets(String source) {
+    final offsets = <int>{};
+    var offset = 0;
+    for (final grapheme in source.characters) {
+      offset += grapheme.length;
+      offsets.add(offset);
+    }
+    return Set<int>.unmodifiable(offsets);
+  }
+}
+
 class _TextSpanSource {
   const _TextSpanSource(this.node, this.sourceOffsets);
 
@@ -1854,14 +1869,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         (overflowWrapMode == 'anywhere' ||
             overflowWrapMode == 'break-word' ||
             wordBreakMode == 'break-all');
-    final graphemeEndOffsets = <int>{};
-    if (breakAnywhere) {
-      var graphemeOffset = 0;
-      for (final grapheme in source.characters) {
-        graphemeOffset += grapheme.length;
-        graphemeEndOffsets.add(graphemeOffset);
-      }
-    }
+    final graphemeEndOffsets = breakAnywhere
+        ? FrameEpubGraphemeBreaks.endOffsets(source)
+        : const <int>{};
     final collapseAllWhitespace =
         whiteSpaceMode == 'normal' || whiteSpaceMode == 'nowrap';
     final collapseHorizontalWhitespace = whiteSpaceMode == 'pre-line';
