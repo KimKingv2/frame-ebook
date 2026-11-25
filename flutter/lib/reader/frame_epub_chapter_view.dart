@@ -198,10 +198,9 @@ class FrameEpubTextSelectionMapper {
         if (localOffset + 1 >= source.sourceOffsets.length) continue;
         final sourceStart = source.sourceOffsets[localOffset];
         final sourceEnd = source.sourceOffsets[localOffset + 1];
-        if (sourceStart != sourceEnd) return false;
-        final isOriginalSoftBreak = sourceStart < source.node.value.length &&
-            source.node.value.codeUnitAt(sourceStart) == 0x200B;
-        return !isOriginalSoftBreak;
+        // An original XHTML U+200B consumes one source code unit. Only the
+        // renderer-generated break hint maps to a zero-length source range.
+        return sourceStart == sourceEnd;
       }
       return false;
     }
@@ -1585,6 +1584,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         node,
         style['white-space'],
         style['text-transform'],
+        overflowWrap: style['overflow-wrap'],
+        wordBreak: style['word-break'],
       );
       if (prepared.text.isEmpty ||
           (skipLeadingWhitespace &&
