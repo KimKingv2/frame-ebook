@@ -444,14 +444,6 @@ void main() {
       final selectableParagraphs = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
           .toList(growable: false);
-      SelectableText paragraphContaining(String marker) =>
-          selectableParagraphs.singleWhere(
-            (item) => item.textSpan?.toPlainText().contains(marker) ?? false,
-            orElse: () => throw TestFailure(
-              'No selectable paragraph contains: $marker. Rendered text: '
-              '${selectableParagraphs.map((item) => item.textSpan?.toPlainText()).toList()}',
-            ),
-          );
       final tokenParagraphs = selectableParagraphs
           .where(
             (item) => item.textSpan?.toPlainText().contains('\u200B') ?? false,
