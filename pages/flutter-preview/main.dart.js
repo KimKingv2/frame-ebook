@@ -24823,7 +24823,7 @@ bfK(a,b,c){var s=B.c.a_(a),r=A.ai4(b)
 return s.toLowerCase()+"\x00"+B.f.k(r==null?400:r)+"\x00"+A.b1C(c)},
 ai4(a){var s,r=B.c.a_(a).toLowerCase()
 if(r==="normal")return 400
-if(r==="bold")return 700
+if(r==="bold"||r==="bolder")return 700
 s=A.ey(r)
 if(s==null||!isFinite(s)||s<1||s>1000)return null
 return B.f.aa(B.e.ap(s/100),1,9)*100},
