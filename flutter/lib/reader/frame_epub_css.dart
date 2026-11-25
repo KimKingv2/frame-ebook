@@ -210,8 +210,15 @@ class FrameEpubCssCascade {
           'font-family': 'monospace',
         });
         break;
+      case 'td':
+        result['vertical-align'] = 'middle';
+        break;
       case 'th':
-        result.addAll({'font-weight': 'bold', 'text-align': 'center'});
+        result.addAll({
+          'font-weight': 'bold',
+          'text-align': 'center',
+          'vertical-align': 'middle',
+        });
         break;
       case 'strong':
       case 'b':

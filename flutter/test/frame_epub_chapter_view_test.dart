@@ -1202,6 +1202,103 @@ void main() {
 
 
 
+
+  testWidgets(
+      'honors table text alignment, vertical alignment, padding and white-space',
+      (tester) async {
+    const markup = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td style="text-align:right;vertical-align:top;padding:0">右側文字</td>
+            <td style="text-align:center;vertical-align:bottom;padding:12px">
+              <p>底部置中的內容</p>
+            </td>
+            <td>預設垂直置中</td>
+            <td style="white-space:pre-line">甲   乙
+  丙</td>
+            <td style="white-space:nowrap">不可換行內容</td>
+          </tr>
+          <tr>
+            <td>較高的第一段<p>較高的第二段</p><p>較高的第三段</p></td>
+            <td>另一格</td>
+            <td>另一格</td>
+            <td>另一格</td>
+            <td>另一格</td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final bytes = _fixture(additionalTableMarkup: markup);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-text-formatting-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-text-formatting.epub',
+      'fileName': 'table-text-formatting.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(900, 760);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 840,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final selectable = tester.widgetList<SelectableText>(
+        find.byType(SelectableText),
+      );
+      SelectableText findSelectable(String text) => selectable.singleWhere(
+            (item) => item.textSpan?.toPlainText().contains(text) ?? false,
+          );
+
+      expect(findSelectable('右側文字').textAlign, TextAlign.right);
+      expect(findSelectable('底部置中的內容').textAlign, TextAlign.center);
+      expect(findSelectable('不可換行內容').softWrap, isFalse);
+      final preLine = findSelectable('甲 乙');
+      expect(preLine.textSpan?.toPlainText(), '甲 乙\n 丙');
+
+      final alignments = tester
+          .widgetList<Align>(find.byType(Align))
+          .map((widget) => widget.alignment)
+          .toList(growable: false);
+      expect(alignments, contains(Alignment.topLeft));
+      expect(alignments, contains(Alignment.bottomLeft));
+      expect(alignments, contains(Alignment.centerLeft));
+
+      final zeroPadding = find.byWidgetPredicate(
+        (widget) => widget is Padding && widget.padding == EdgeInsets.zero,
+      );
+      expect(zeroPadding, findsWidgets);
+      expect(find.text('右側文字'), findsOneWidget);
+      expect(find.text('預設垂直置中'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
   testWidgets('honors EPUB border-collapse and border-spacing declarations',
       (tester) async {
     const markup = '''

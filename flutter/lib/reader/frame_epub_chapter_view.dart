@@ -1625,10 +1625,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             selectionSources,
           );
         }
+        final whiteSpace = parentStyle['white-space']?.trim().toLowerCase();
         final selectable = SelectableText.rich(
           slice.span,
           textAlign: textAlign,
           textDirection: textDirection,
+          softWrap: whiteSpace != 'nowrap' && whiteSpace != 'pre',
           onSelectionChanged: (selection, cause) {
             final callback = widget.onTextSelection;
             if (callback == null) return;
@@ -1738,7 +1740,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     String? transform,
   ) {
     final source = node.value;
-    final collapseWhitespace = whiteSpace != 'pre' && whiteSpace != 'pre-wrap';
+    final whiteSpaceMode = whiteSpace?.trim().toLowerCase() ?? 'normal';
+    final collapseAllWhitespace =
+        whiteSpaceMode == 'normal' || whiteSpaceMode == 'nowrap';
+    final collapseHorizontalWhitespace = whiteSpaceMode == 'pre-line';
     final output = StringBuffer();
     final sourceOffsets = <int>[0];
     var index = 0;
@@ -1748,6 +1753,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         codeUnit == 0x0A ||
         codeUnit == 0x0D ||
         codeUnit == 0x20;
+
+    bool isHorizontalWhitespace(int codeUnit) =>
+        codeUnit == 0x09 || codeUnit == 0x20;
+
+    bool isLineBreak(int codeUnit) =>
+        codeUnit == 0x0A || codeUnit == 0x0D;
 
     while (index < source.length) {
       final start = index;
@@ -1765,12 +1776,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final codeUnits = hasSurrogatePair ? 2 : 1;
       var end = index + codeUnits;
       String rendered;
-      if (collapseWhitespace && isCollapsibleWhitespace(rune)) {
+      if (collapseAllWhitespace && isCollapsibleWhitespace(rune)) {
         while (end < source.length &&
             isCollapsibleWhitespace(source.codeUnitAt(end))) {
           end++;
         }
         rendered = ' ';
+      } else if (collapseHorizontalWhitespace &&
+          isHorizontalWhitespace(rune)) {
+        while (end < source.length &&
+            isHorizontalWhitespace(source.codeUnitAt(end))) {
+          end++;
+        }
+        rendered = ' ';
+      } else if (collapseHorizontalWhitespace && isLineBreak(rune)) {
+        if (rune == 0x0D &&
+            end < source.length &&
+            source.codeUnitAt(end) == 0x0A) {
+          end++;
+        }
+        rendered = '\n';
       } else {
         rendered = _transformText(String.fromCharCode(rune), transform);
       }
@@ -2187,16 +2212,32 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         final cell = rawRows[rowIndex][cellIndex];
         final cellStyle = _computedStyle(cell, cascade, rowStyle);
         final padding = _boxInsets(cellStyle, 'padding', widget.fontSize);
-        final cellPadding =
-            padding == EdgeInsets.zero ? const EdgeInsets.all(7) : padding;
+        const paddingProperties = {
+          'padding',
+          'padding-top',
+          'padding-right',
+          'padding-bottom',
+          'padding-left',
+          'padding-block-start',
+          'padding-block-end',
+          'padding-inline-start',
+          'padding-inline-end',
+        };
+        final hasExplicitPadding =
+            paddingProperties.any(cellStyle.containsKey);
+        final cellPadding = hasExplicitPadding
+            ? padding
+            : const EdgeInsets.all(7);
         final cellBackground = _cssColor(cellStyle['background-color']) ??
             (placement.header
                 ? const Color(0x332F2940)
                 : rowBackground);
-        final alignment = switch (cellStyle['vertical-align']) {
-          'middle' => Alignment.centerLeft,
+        final alignment = switch (
+          cellStyle['vertical-align']?.trim().toLowerCase()
+        ) {
+          'top' => Alignment.topLeft,
           'bottom' => Alignment.bottomLeft,
-          _ => Alignment.topLeft,
+          _ => Alignment.centerLeft,
         };
         final cellTrackWidth = columnWidths
                 .skip(column)
