@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/reader/frame_epub_text_paginator.dart';
@@ -152,6 +153,60 @@ void main() {
       ranges.map((range) => plainText.substring(range.start, range.end)).join(),
       plainText,
     );
+  });
+
+  test('paginates linked text with a measurable semantic hit target', () {
+    final recognizer = TapGestureRecognizer()..onTap = () {};
+    final link = FrameEpubLinkSemanticsPlaceholder(
+      label: '可跨頁連結文字',
+      onTap: () {},
+      width: 1,
+      height: 18,
+    );
+    final linkText = List.filled(48, '可跨頁連結文字').join('、');
+    final text = TextSpan(
+      style: const TextStyle(fontSize: 18, height: 1.6),
+      children: [
+        const TextSpan(text: '連結前文。'),
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: link,
+        ),
+        TextSpan(text: linkText, recognizer: recognizer),
+        const TextSpan(text: '。連結後文。'),
+      ],
+    );
+    final plainText = text.toPlainText(
+      includeSemanticsLabels: false,
+      includePlaceholders: true,
+    );
+
+    try {
+      final ranges = FrameEpubTextPaginator.paginate(
+        text: text,
+        maxWidth: 120,
+        maxHeight: 70,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.start,
+        textScaler: TextScaler.noScaling,
+      );
+
+      expect(ranges.length, greaterThan(1));
+      expect(ranges.first.start, 0);
+      expect(ranges.last.end, plainText.length);
+      expect(
+        ranges.map((range) => plainText.substring(range.start, range.end)).join(),
+        plainText,
+      );
+      expect(
+        ranges.skip(1).any((range) =>
+            plainText.substring(range.start, range.end).contains('可跨頁連結文字')),
+        isTrue,
+        reason: 'The linked text must continue into later page fragments.',
+      );
+    } finally {
+      recognizer.dispose();
+    }
   });
 
   test('keeps unknown inline widget placeholders in one intact fragment', () {

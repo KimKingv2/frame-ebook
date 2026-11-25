@@ -2770,21 +2770,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           WidgetSpan(
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
-            child: Semantics(
-              container: true,
-              explicitChildNodes: true,
+            child: FrameEpubLinkSemanticsPlaceholder(
               label: linkLabel,
-              link: true,
               onTap: linkOnTap,
-              child: GestureDetector(
-                excludeFromSemantics: true,
-                behavior: HitTestBehavior.opaque,
-                onTap: linkOnTap,
-                child: SizedBox(
-                  width: 1,
-                  height: widget.fontSize * widget.fontScale,
-                ),
-              ),
+              width: 1,
+              height: widget.fontSize * widget.fontScale,
             ),
           ),
         );

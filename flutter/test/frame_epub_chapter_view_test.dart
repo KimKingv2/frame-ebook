@@ -850,6 +850,174 @@ void main() {
     }
   });
 
+  testWidgets(
+      'paginates long inline links and preserves later-fragment selection',
+      (tester) async {
+    const linkPhrase = '可跨頁連結文字';
+    final linkText = List.filled(64, linkPhrase).join('、');
+    const prefix = '連結之前的段落文字。';
+    const suffix = '連結之後的段落文字。';
+    final bytes = _fixture(
+      additionalParagraphMarkup:
+          '<p>$prefix<a href="chapter.xhtml#inside">$linkText</a>$suffix</p>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-paginated-inline-link-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/paginated-inline-link.epub',
+      'fileName': 'paginated-inline-link.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    final clipboardWrites = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          final arguments = call.arguments as Map<Object?, Object?>;
+          clipboardWrites.add(arguments['text'] as String);
+        }
+        return null;
+      },
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      final anchor = chapter.document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.getAttribute('href') ==
+              'chapter.xhtml#inside');
+      final linkedNode = anchor.children.whereType<XmlText>().single;
+      FrameEpubTextSelection? mappedSelection;
+      String? followedHref;
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+            onTextSelection: (selection) {
+              mappedSelection = selection;
+            },
+            onInternalLink: (href) => followedHref = href,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(pageController.hasClients, isTrue);
+      expect(pageController.position.maxScrollExtent, greaterThan(0));
+      final pageCount =
+          (pageController.position.maxScrollExtent /
+                  pageController.position.viewportDimension)
+              .round() +
+              1;
+
+      Finder? laterFragmentFinder;
+      SelectableText? laterFragment;
+      for (var page = 1; page < pageCount; page++) {
+        pageController.jumpToPage(page);
+        await tester.pumpAndSettle();
+        final candidates = tester
+            .widgetList<SelectableText>(find.byType(SelectableText))
+            .where((widget) =>
+                widget.textSpan?.toPlainText().contains(linkPhrase) ?? false)
+            .toList(growable: false);
+        if (candidates.isEmpty) continue;
+
+        final candidate = candidates.first;
+        final recognizers = <GestureRecognizer>[];
+        void collectRecognizers(InlineSpan span) {
+          if (span is TextSpan && span.recognizer != null) {
+            recognizers.add(span.recognizer!);
+          }
+          if (span is TextSpan) {
+            for (final child in span.children ?? const <InlineSpan>[]) {
+              collectRecognizers(child);
+            }
+          }
+        }
+
+        collectRecognizers(candidate.textSpan!);
+        if (recognizers.isNotEmpty) {
+          laterFragment = candidate;
+          laterFragmentFinder = find.byWidget(candidate);
+          break;
+        }
+      }
+
+      expect(
+        laterFragment,
+        isNotNull,
+        reason: 'A later page must retain clickable text from the long anchor.',
+      );
+      final selectable = laterFragment!;
+      final selectableFinder = laterFragmentFinder!;
+      final displayedText = selectable.textSpan!.toPlainText();
+      final localLinkOffset = displayedText.indexOf(linkPhrase);
+      expect(localLinkOffset, greaterThanOrEqualTo(0));
+
+      final editableFinder = find.descendant(
+        of: selectableFinder,
+        matching: find.byType(EditableText),
+      );
+      final editable = tester.state<EditableTextState>(editableFinder);
+      final selection = TextSelection(
+        baseOffset: localLinkOffset,
+        extentOffset: localLinkOffset + linkPhrase.length,
+      );
+      editable.userUpdateTextEditingValue(
+        TextEditingValue(text: displayedText, selection: selection),
+        SelectionChangedCause.longPress,
+      );
+      await tester.pump();
+
+      expect(mappedSelection, isNotNull);
+      expect(identical(mappedSelection!.startNode, linkedNode), isTrue);
+      expect(identical(mappedSelection!.endNode, linkedNode), isTrue);
+      expect(mappedSelection!.startOffset, greaterThan(0));
+      expect(mappedSelection!.endOffset, greaterThan(mappedSelection!.startOffset));
+      expect(mappedSelection!.quote, linkPhrase);
+
+      Actions.invoke(
+        tester.element(selectableFinder),
+        CopySelectionTextIntent.copy,
+      );
+      await tester.pump();
+      expect(clipboardWrites, [linkPhrase]);
+
+      await _tapInlineLink(
+        tester,
+        paragraphContains: linkPhrase,
+        linkText: linkPhrase,
+      );
+      await tester.pumpAndSettle();
+      expect(followedHref, 'chapter.xhtml#inside');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
     final bytes = _fixture(
       additionalParagraphMarkup:

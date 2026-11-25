@@ -1,7 +1,49 @@
 import 'package:flutter/painting.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 
 import 'frame_epub_ruby_annotation.dart';
+
+/// Semantic hit target paired with selectable inline anchor text.
+///
+/// The visible link remains ordinary selectable TextSpan content. This
+/// one-pixel placeholder only exposes a semantic link action and has known
+/// dimensions, so long linked paragraphs can still be paginated safely.
+class FrameEpubLinkSemanticsPlaceholder extends StatelessWidget {
+  const FrameEpubLinkSemanticsPlaceholder({
+    required this.label,
+    required this.onTap,
+    required this.width,
+    required this.height,
+    super.key,
+  })  : assert(width > 0),
+        assert(height > 0);
+
+  final String label;
+  final VoidCallback onTap;
+  final double width;
+  final double height;
+
+  PlaceholderDimensions get placeholderDimensions => PlaceholderDimensions(
+        size: Size(width, height),
+        alignment: PlaceholderAlignment.middle,
+      );
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: label,
+        link: true,
+        onTap: onTap,
+        child: GestureDetector(
+          excludeFromSemantics: true,
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(width: width, height: height),
+        ),
+      );
+}
 
 /// Splits rich text into line-aligned fragments that fit a page's height.
 ///
@@ -117,6 +159,10 @@ class FrameEpubTextPaginator {
       if (child is! WidgetSpan) return true;
       final widget = child.child;
       if (widget is FrameEpubRubyAnnotation) {
+        dimensions.add(widget.placeholderDimensions);
+        return true;
+      }
+      if (widget is FrameEpubLinkSemanticsPlaceholder) {
         dimensions.add(widget.placeholderDimensions);
         return true;
       }
