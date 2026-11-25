@@ -942,9 +942,7 @@ void main() {
       }
 
       Finder? laterFragmentFinder;
-      SelectableText? laterFragment;
       EditableTextState? laterEditable;
-      String? laterDisplayedText;
       int? laterLocalLinkOffset;
 
       for (var page = 1; page < pageCount; page++) {
@@ -1006,25 +1004,21 @@ void main() {
           }
 
           laterFragmentFinder = candidateFinder;
-          laterFragment = candidate;
           laterEditable = candidateEditable;
-          laterDisplayedText = candidateText;
           laterLocalLinkOffset = linkOffset;
           break;
         }
-        if (laterFragment != null) break;
+        if (laterFragmentFinder != null) break;
       }
 
       expect(
-        laterFragment,
+        laterFragmentFinder,
         isNotNull,
         reason: 'A later page must retain a clickable fragment whose CFI '
             'offset is inside the original link text.',
       );
-      final selectable = laterFragment!;
       final selectableFinder = laterFragmentFinder!;
       final editable = laterEditable!;
-      final displayedText = laterDisplayedText!;
       final localLinkOffset = laterLocalLinkOffset!;
 
       expect(mappedSelection, isNotNull);
