@@ -60,6 +60,23 @@ class FrameEpubGraphemeBreaks {
   }
 }
 
+class _LinkSemanticsContext {
+  _LinkSemanticsContext({
+    required this.label,
+    required this.recognizer,
+  });
+
+  final String label;
+  final TapGestureRecognizer recognizer;
+  bool _assigned = false;
+
+  String? claimLabel() {
+    if (_assigned) return null;
+    _assigned = true;
+    return label.isEmpty ? null : label;
+  }
+}
+
 class _TextSpanSource {
   const _TextSpanSource(this.node, this.sourceOffsets);
 
@@ -1461,13 +1478,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     _PreparedEpubText prepared,
     Map<TextSpan, _TextSpanSource> sourceSpans, {
     TapGestureRecognizer? recognizer,
+    String? semanticsLabel,
   }) {
     final text = prepared.text;
     if (text.isEmpty) return const [];
     final ranges = _annotationRangesByNode[node] ??
         const <_ResolvedTextAnnotation>[];
     if (ranges.isEmpty) {
-      final span = TextSpan(text: text, recognizer: recognizer);
+      final span = TextSpan(
+        text: text,
+        recognizer: recognizer,
+        semanticsLabel: semanticsLabel,
+      );
       sourceSpans[span] = _TextSpanSource(node, prepared.sourceOffsets);
       return [span];
     }
@@ -1528,6 +1550,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
     final spans = <TextSpan>[];
     var runStart = 0;
+    var pendingSemanticsLabel = semanticsLabel;
     TextStyle? runStyle = styleForUnit(0);
     for (var index = 1; index < text.length; index++) {
       final nextStyle = styleForUnit(index);
@@ -1541,7 +1564,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         index,
         runStyle,
         recognizer: recognizer,
+        semanticsLabel: pendingSemanticsLabel,
       );
+      pendingSemanticsLabel = null;
       runStart = index;
       runStyle = nextStyle;
     }
@@ -1554,6 +1579,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       text.length,
       runStyle,
       recognizer: recognizer,
+      semanticsLabel: pendingSemanticsLabel,
     );
     return spans;
   }
@@ -1567,12 +1593,14 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     int end,
     TextStyle? style, {
     TapGestureRecognizer? recognizer,
+    String? semanticsLabel,
   }) {
     if (start >= end) return;
     final span = TextSpan(
       text: prepared.text.substring(start, end),
       style: style,
       recognizer: recognizer,
+      semanticsLabel: semanticsLabel,
     );
     spans.add(span);
     sourceSpans[span] = _TextSpanSource(
@@ -2652,6 +2680,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     FrameEpubCssCascade cascade,
     Map<TextSpan, _TextSpanSource> sourceSpans, {
     TapGestureRecognizer? linkRecognizer,
+    _LinkSemanticsContext? linkSemantics,
   }) {
     final tag = element.name.local.toLowerCase();
     if (_isNonVisualTag(tag) ||
@@ -2682,15 +2711,35 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
       linkOnTap = onTap;
       linkRecognizer = onTap == null ? null : _linkRecognizer(element, onTap);
+      if (onTap != null) {
+        final linkLabelParts = <String>[
+          element.innerText.trim(),
+          for (final descendant
+              in element.descendants.whereType<XmlElement>())
+            if (descendant.name.local.toLowerCase() == 'img')
+              (_attribute(descendant, 'alt') ?? '').trim(),
+        ].where((part) => part.isNotEmpty);
+        linkSemantics = _LinkSemanticsContext(
+          label: linkLabelParts.join(' '),
+          recognizer: linkRecognizer!,
+        );
+      }
     }
     if (tag == 'img') {
       Widget image = _buildImage(element, style);
       if (linkRecognizer != null) {
-        image = GestureDetector(
-          excludeFromSemantics: true,
-          behavior: HitTestBehavior.opaque,
+        final alt = (_attribute(element, 'alt') ?? '').trim();
+        image = Semantics(
+          container: true,
+          label: linkSemantics?.claimLabel() ?? alt,
+          link: true,
           onTap: linkRecognizer.onTap,
-          child: image,
+          child: GestureDetector(
+            excludeFromSemantics: true,
+            behavior: HitTestBehavior.opaque,
+            onTap: linkRecognizer.onTap,
+            child: image,
+          ),
         );
       }
       return WidgetSpan(
@@ -2729,6 +2778,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           prepared,
           sourceSpans,
           recognizer: linkRecognizer,
+          semanticsLabel: prepared.text.isEmpty
+              ? null
+              : linkSemantics?.claimLabel(),
         ));
       } else if (child is XmlElement) {
         final childTag = child.name.local.toLowerCase();
@@ -2744,6 +2796,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           cascade,
           sourceSpans,
           linkRecognizer: linkRecognizer,
+          linkSemantics: linkSemantics,
         ));
       }
     }
@@ -2754,16 +2807,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         color: widget.linkColor,
         decoration: TextDecoration.underline,
       );
-      if (linkOnTap != null) {
-        final linkLabelParts = <String>[
-          element.innerText.trim(),
-          for (final descendant
-              in element.descendants.whereType<XmlElement>())
-            if (descendant.name.local.toLowerCase() == 'img')
-              (_attribute(descendant, 'alt') ?? '').trim(),
-        ].where((part) => part.isNotEmpty);
-        linkLabel = linkLabelParts.join(' ');
-      }
     } else if (tag == 'mark') {
       textStyle = textStyle.copyWith(
         backgroundColor: const Color(0x66D8B45B),
@@ -2771,8 +2814,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
     return TextSpan(
       style: textStyle,
-      recognizer: linkOnTap == null ? null : linkRecognizer,
-      semanticsLabel: linkLabel,
       children: children,
     );
   }
