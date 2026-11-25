@@ -605,8 +605,10 @@ void main() {
         matching: find.byType(EditableText),
       );
       final editable = tester.state<EditableTextState>(editableFinder);
+      final copyStart = displayedText.indexOf('CopyProbe:');
+      expect(copyStart, greaterThanOrEqualTo(0));
       final selection = TextSelection(
-        baseOffset: 0,
+        baseOffset: copyStart,
         extentOffset: displayedText.length,
       );
 
