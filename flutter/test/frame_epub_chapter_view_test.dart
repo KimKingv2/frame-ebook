@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 
+import 'package:flutter/gestures.dart' show GestureRecognizer;
 import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
@@ -893,11 +894,9 @@ void main() {
       final epub = await const FrameEpubParser().parse(archive);
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
       final chapter = await loader.loadChapter(epub.spine.single);
-      final anchor = chapter.document.descendants
-          .whereType<XmlElement>()
-          .firstWhere((element) => element.getAttribute('href') ==
-              'chapter.xhtml#inside');
-      final linkedNode = anchor.children.whereType<XmlText>().single;
+      final linkedNode = chapter.document.descendants
+          .whereType<XmlText>()
+          .firstWhere((node) => node.value == linkText);
       FrameEpubTextSelection? mappedSelection;
       String? followedHref;
 
@@ -1002,10 +1001,11 @@ void main() {
       await tester.pump();
       expect(clipboardWrites, [linkPhrase]);
 
-      await _tapInlineLink(
-        tester,
-        paragraphContains: linkPhrase,
-        linkText: linkPhrase,
+      final caret = editable.renderEditable.getLocalRectForCaret(
+        TextPosition(offset: localLinkOffset + linkPhrase.length ~/ 2),
+      );
+      await tester.tapAt(
+        editable.renderEditable.localToGlobal(caret.center),
       );
       await tester.pumpAndSettle();
       expect(followedHref, 'chapter.xhtml#inside');
