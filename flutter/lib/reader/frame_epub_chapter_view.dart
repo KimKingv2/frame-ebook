@@ -1625,12 +1625,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             selectionSources,
           );
         }
-        final whiteSpace = parentStyle['white-space']?.trim().toLowerCase();
         final selectable = SelectableText.rich(
           slice.span,
           textAlign: textAlign,
           textDirection: textDirection,
-          softWrap: whiteSpace != 'nowrap' && whiteSpace != 'pre',
           onSelectionChanged: (selection, cause) {
             final callback = widget.onTextSelection;
             if (callback == null) return;

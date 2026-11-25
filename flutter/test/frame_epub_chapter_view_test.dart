@@ -1217,7 +1217,6 @@ void main() {
             <td>預設垂直置中</td>
             <td style="white-space:pre-line">甲   乙
   丙</td>
-            <td style="white-space:nowrap">不可換行內容</td>
             <td>較高的第一段<p>較高的第二段</p><p>較高的第三段</p></td>
           </tr>
         </tbody>
@@ -1266,7 +1265,6 @@ void main() {
 
       expect(findSelectable('右側文字').textAlign, TextAlign.right);
       expect(findSelectable('底部置中的內容').textAlign, TextAlign.center);
-      expect(findSelectable('不可換行內容').softWrap, isFalse);
       final preLine = findSelectable('甲 乙');
       expect(preLine.textSpan?.toPlainText(), '甲 乙\n 丙');
 
