@@ -1,5 +1,4 @@
 import 'package:flutter/painting.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 
 import 'frame_epub_ruby_annotation.dart';

@@ -2771,7 +2771,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
             child: FrameEpubLinkSemanticsPlaceholder(
-              label: linkLabel,
+              label: linkLabel ?? '',
               onTap: linkOnTap,
               width: 1,
               height: widget.fontSize * widget.fontScale,
