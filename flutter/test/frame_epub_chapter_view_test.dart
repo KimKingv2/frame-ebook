@@ -444,13 +444,23 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final tokenParagraphs = tester
+      final selectableParagraphs = tester
           .widgetList<SelectableText>(find.byType(SelectableText))
+          .toList(growable: false);
+      SelectableText paragraphContaining(String marker) =>
+          selectableParagraphs.singleWhere(
+            (item) => item.textSpan?.toPlainText().contains(marker) ?? false,
+            orElse: () => throw TestFailure(
+              'No selectable paragraph contains: $marker. Rendered text: '
+              '${selectableParagraphs.map((item) => item.textSpan?.toPlainText()).toList()}',
+            ),
+          );
+      final tokenParagraphs = selectableParagraphs
           .where(
             (item) => item.textSpan?.toPlainText().contains('\u200B') ?? false,
           )
           .toList(growable: false);
-      expect(tokenParagraphs, hasLength(4));
+      expect(tokenParagraphs, hasLength(3));
 
       final renderedUrl = tokenParagraphs[0].textSpan!.toPlainText();
       expect(
@@ -475,7 +485,12 @@ void main() {
         contains('nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ'),
       );
 
-      final graphemeText = tokenParagraphs[3].textSpan!.toPlainText();
+      final graphemeText =
+          paragraphContaining('Graphemes:').textSpan!.toPlainText();
+      expect(
+        graphemeText.replaceAll('\u200B', ''),
+        contains('Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽'),
+      );
       for (final grapheme in [
         'e\u0301',
         '👩‍👩‍👧‍👦',
@@ -1430,7 +1445,8 @@ void main() {
           .where(
             (scroll) =>
                 scroll.scrollDirection == Axis.horizontal &&
-                scroll.child is SelectableText,
+                scroll.child is Actions &&
+                (scroll.child as Actions).child is SelectableText,
           )
           .toList(growable: false);
       expect(noWrapScrolls, hasLength(2),
