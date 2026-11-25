@@ -792,11 +792,20 @@ void main() {
 
       collectLinkSpans(selectable.textSpan!);
       expect(linkSpans, isNotEmpty);
-      expect(
-        selectable.textSpan!.children!.whereType<WidgetSpan>(),
-        isEmpty,
-        reason: 'Plain inline links must remain in the paragraph text flow.',
-      );
+      final linkPlaceholders = <WidgetSpan>[];
+      void collectLinkPlaceholders(InlineSpan span) {
+        if (span is TextSpan) {
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collectLinkPlaceholders(child);
+          }
+        } else if (span is WidgetSpan) {
+          linkPlaceholders.add(span);
+        }
+      }
+
+      collectLinkPlaceholders(selectable.textSpan!);
+      expect(linkPlaceholders, hasLength(1));
+      expect(linkPlaceholders.single.child, isA<Semantics>());
 
       final editableFinder = find.descendant(
         of: selectableFinder,
