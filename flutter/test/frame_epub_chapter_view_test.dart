@@ -406,9 +406,6 @@ void main() {
       <p style="overflow-wrap:break-word">
         nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
       </p>
-      <p style="overflow-wrap:anywhere">
-        Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽 ABCDEFGHIJKLMNOPQRSTUVWXYZ
-      </p>
     ''';
     final bytes = _fixture(additionalParagraphMarkup: markup);
     final book = FrameBook.fromJson({
@@ -485,10 +482,67 @@ void main() {
         contains('nested-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ'),
       );
 
-      final graphemeText =
-          paragraphContaining('Graphemes:').textSpan!.toPlainText();
+      expect(tokenParagraphs[0].contextMenuBuilder, isNotNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      await archive.close();
+    }
+  });
+
+  testWidgets(
+      'inserts emergency wrap opportunities only after complete grapheme clusters',
+      (tester) async {
+    const markup = '''
+      <p style="overflow-wrap:anywhere">
+        Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽 ABCDEFGHIJKLMNOPQRSTUVWXYZ
+      </p>
+    ''';
+    final bytes = _fixture(additionalParagraphMarkup: markup);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-grapheme-wrapping-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/grapheme-wrapping.epub',
+      'fileName': 'grapheme-wrapping.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      expect(chapter.document.toXmlString(), contains('Graphemes:'));
+
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 300,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final paragraph = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .singleWhere(
+            (item) => item.textSpan?.toPlainText().contains('Graphemes:') ?? false,
+          );
+      final rendered = paragraph.textSpan!.toPlainText();
       expect(
-        graphemeText.replaceAll('\u200B', ''),
+        rendered.replaceAll('\u200B', ''),
         contains('Graphemes: e\u0301 👩‍👩‍👧‍👦 🇹🇼 1️⃣ 👍🏽'),
       );
       for (final grapheme in [
@@ -499,12 +553,11 @@ void main() {
         '👍🏽',
       ]) {
         expect(
-          graphemeText,
+          rendered,
           contains('$grapheme\u200B'),
-          reason: 'Emergency wrapping must follow the complete grapheme cluster.',
+          reason: 'A soft break must appear after the entire grapheme: $grapheme',
         );
       }
-      expect(tokenParagraphs[0].contextMenuBuilder, isNotNull);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
