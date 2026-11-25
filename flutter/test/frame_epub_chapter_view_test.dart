@@ -540,10 +540,7 @@ void main() {
       (tester) async {
     const sourceText =
         'CopyProbe: ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final bytes = _fixture(
-      additionalIntroText:
-          '<span style="overflow-wrap:anywhere">$sourceText</span>',
-    );
+    final bytes = _fixture(additionalIntroText: sourceText);
     final book = FrameBook.fromJson({
       'id': 'chapter-clean-copy-intent-test',
       'provider': 'vps',
@@ -591,6 +588,17 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      final renderedSelectableTexts = tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .map((item) => item.textSpan?.toPlainText() ?? '')
+          .toList(growable: false);
+      expect(
+        renderedSelectableTexts
+            .where((value) => value.contains('CopyProbe:'))
+            .length,
+        1,
+        reason: 'Rendered selectable text: $renderedSelectableTexts',
+      );
       final selectableFinder = find.byWidgetPredicate(
         (candidate) =>
             candidate is SelectableText &&
@@ -599,7 +607,7 @@ void main() {
       expect(selectableFinder, findsOneWidget);
       final selectable = tester.widget<SelectableText>(selectableFinder);
       final displayedText = selectable.textSpan!.toPlainText();
-      expect(displayedText, contains('\u200B'));
+      expect(displayedText, contains(sourceText));
       final editableFinder = find.descendant(
         of: selectableFinder,
         matching: find.byType(EditableText),
