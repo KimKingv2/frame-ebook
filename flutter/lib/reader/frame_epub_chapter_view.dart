@@ -61,13 +61,9 @@ class FrameEpubGraphemeBreaks {
 }
 
 class _LinkSemanticsContext {
-  _LinkSemanticsContext({
-    required this.label,
-    required this.recognizer,
-  });
+  _LinkSemanticsContext({required this.label});
 
   final String label;
-  final TapGestureRecognizer recognizer;
   bool _assigned = false;
 
   String? claimLabel() {
@@ -2692,7 +2688,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _rubyInlineSpan(element, style, cascade, sourceSpans);
     }
     if (tag == 'br') return const TextSpan(text: '\n');
-    VoidCallback? linkOnTap;
     if (tag == 'a') {
       final href = _attribute(element, 'href') ?? '';
       VoidCallback? onTap;
@@ -2709,7 +2704,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           if (uri != null) onTap = () => widget.onExternalLink!(uri);
         }
       }
-      linkOnTap = onTap;
       linkRecognizer = onTap == null ? null : _linkRecognizer(element, onTap);
       if (onTap != null) {
         final linkLabelParts = <String>[
@@ -2721,7 +2715,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ].where((part) => part.isNotEmpty);
         linkSemantics = _LinkSemanticsContext(
           label: linkLabelParts.join(' '),
-          recognizer: linkRecognizer!,
         );
       }
     }
@@ -2762,7 +2755,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     }
 
-    String? linkLabel;
     final children = <InlineSpan>[];
     for (final child in element.children) {
       if (child is XmlText) {
