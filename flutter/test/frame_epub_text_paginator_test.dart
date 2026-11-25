@@ -169,7 +169,8 @@ void main() {
       children: [
         const TextSpan(text: '連結前文。'),
         WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
           child: link,
         ),
         TextSpan(text: linkText, recognizer: recognizer),

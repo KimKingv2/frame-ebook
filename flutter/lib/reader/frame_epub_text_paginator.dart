@@ -25,7 +25,8 @@ class FrameEpubLinkSemanticsPlaceholder extends StatelessWidget {
 
   PlaceholderDimensions get placeholderDimensions => PlaceholderDimensions(
         size: Size(width, height),
-        alignment: PlaceholderAlignment.middle,
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
       );
 
   @override

@@ -806,7 +806,13 @@ void main() {
 
       collectLinkPlaceholders(selectable.textSpan!);
       expect(linkPlaceholders, hasLength(1));
-      expect(linkPlaceholders.single.child, isA<Semantics>());
+      expect(
+        linkPlaceholders.single.child,
+        isA<FrameEpubLinkSemanticsPlaceholder>(),
+      );
+      final semanticLink =
+          linkPlaceholders.single.child as FrameEpubLinkSemanticsPlaceholder;
+      expect(semanticLink.label, '連結文字');
 
       final editableFinder = find.descendant(
         of: selectableFinder,
