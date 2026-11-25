@@ -1218,13 +1218,7 @@ void main() {
             <td style="white-space:pre-line">甲   乙
   丙</td>
             <td style="white-space:nowrap">不可換行內容</td>
-          </tr>
-          <tr>
             <td>較高的第一段<p>較高的第二段</p><p>較高的第三段</p></td>
-            <td>另一格</td>
-            <td>另一格</td>
-            <td>另一格</td>
-            <td>另一格</td>
           </tr>
         </tbody>
       </table>
@@ -1284,10 +1278,13 @@ void main() {
       expect(alignments, contains(Alignment.bottomLeft));
       expect(alignments, contains(Alignment.centerLeft));
 
-      final zeroPadding = find.byWidgetPredicate(
-        (widget) => widget is Padding && widget.padding == EdgeInsets.zero,
+      final zeroPadding = find.ancestor(
+        of: find.text('右側文字'),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Padding && widget.padding == EdgeInsets.zero,
+        ),
       );
-      expect(zeroPadding, findsWidgets);
+      expect(zeroPadding, findsOneWidget);
       expect(find.text('右側文字'), findsOneWidget);
       expect(find.text('預設垂直置中'), findsOneWidget);
       expect(tester.takeException(), isNull);
