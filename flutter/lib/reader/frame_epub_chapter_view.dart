@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/painting.dart' show TextPainter;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
@@ -382,6 +383,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   final List<GlobalKey> _flowItemKeys = [];
   final List<GlobalKey> _paginationTextKeys = [];
   final Map<GlobalKey, _PaginatedTextPosition> _paginationTextPositions = {};
+  final Map<XmlElement, TapGestureRecognizer> _linkRecognizers =
+      HashMap.identity();
   int _paginationTextKeyCursor = 0;
   List<FrameEpubPage> _paginationPages = const [];
   bool _paginationReady = false;
@@ -411,8 +414,28 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     widget.onPageZoomChanged?.call(zoomed);
   }
 
+  void _disposeLinkRecognizers() {
+    for (final recognizer in _linkRecognizers.values) {
+      recognizer.dispose();
+    }
+    _linkRecognizers.clear();
+  }
+
+  TapGestureRecognizer _linkRecognizer(
+    XmlElement element,
+    VoidCallback onTap,
+  ) {
+    final recognizer = _linkRecognizers.putIfAbsent(
+      element,
+      () => TapGestureRecognizer(),
+    );
+    recognizer.onTap = onTap;
+    return recognizer;
+  }
+
   @override
   void dispose() {
+    _disposeLinkRecognizers();
     _fixedLayoutTransformationController
       ..removeListener(_handleZoomChanged)
       ..dispose();
@@ -428,6 +451,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
     if (!identical(oldWidget.chapter, widget.chapter) ||
         !identical(oldWidget.resourceLoader, widget.resourceLoader)) {
+      _disposeLinkRecognizers();
       _stylesFuture = _loadStylesheets();
       _elementKeys.clear();
       _paginationTextPositions.clear();
@@ -770,6 +794,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         return TextSpan(
           text: clippedText,
           style: current.style,
+          recognizer: current.recognizer,
+          semanticsLabel: current.semanticsLabel,
+          semanticsIdentifier: current.semanticsIdentifier,
           children: children,
         );
       }
@@ -1426,14 +1453,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   List<TextSpan> _sourceTextSpans(
     XmlText node,
     _PreparedEpubText prepared,
-    Map<TextSpan, _TextSpanSource> sourceSpans,
-  ) {
+    Map<TextSpan, _TextSpanSource> sourceSpans, {
+    TapGestureRecognizer? recognizer,
+  }) {
     final text = prepared.text;
     if (text.isEmpty) return const [];
     final ranges = _annotationRangesByNode[node] ??
         const <_ResolvedTextAnnotation>[];
     if (ranges.isEmpty) {
-      final span = TextSpan(text: text);
+      final span = TextSpan(text: text, recognizer: recognizer);
       sourceSpans[span] = _TextSpanSource(node, prepared.sourceOffsets);
       return [span];
     }
@@ -1506,6 +1534,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         runStart,
         index,
         runStyle,
+        recognizer: recognizer,
       );
       runStart = index;
       runStyle = nextStyle;
@@ -1518,6 +1547,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       runStart,
       text.length,
       runStyle,
+      recognizer: recognizer,
     );
     return spans;
   }
@@ -1529,12 +1559,14 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     _PreparedEpubText prepared,
     int start,
     int end,
-    TextStyle? style,
-  ) {
+    TextStyle? style, {
+    TapGestureRecognizer? recognizer,
+  }) {
     if (start >= end) return;
     final span = TextSpan(
       text: prepared.text.substring(start, end),
       style: style,
+      recognizer: recognizer,
     );
     spans.add(span);
     sourceSpans[span] = _TextSpanSource(
@@ -2612,8 +2644,9 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     XmlElement element,
     Map<String, String> style,
     FrameEpubCssCascade cascade,
-    Map<TextSpan, _TextSpanSource> sourceSpans,
-  ) {
+    Map<TextSpan, _TextSpanSource> sourceSpans, {
+    TapGestureRecognizer? linkRecognizer,
+  }) {
     final tag = element.name.local.toLowerCase();
     if (_isNonVisualTag(tag) ||
         style['display'] == 'none' ||
@@ -2624,48 +2657,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _rubyInlineSpan(element, style, cascade, sourceSpans);
     }
     if (tag == 'br') return const TextSpan(text: '\n');
-    if (tag == 'img') {
-      return WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: _buildImage(element, style),
-      );
-    }
-    if (tag == 'svg' || tag == 'math') {
-      return WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: _unsupportedInlineObject(tag),
-      );
-    }
-
-    final children = <InlineSpan>[];
-    for (final child in element.children) {
-      if (child is XmlText) {
-        final prepared = _prepareText(
-          child,
-          style['white-space'],
-          style['text-transform'],
-          overflowWrap: style['overflow-wrap'],
-          wordBreak: style['word-break'],
-        );
-        children.addAll(_sourceTextSpans(child, prepared, sourceSpans));
-      } else if (child is XmlElement) {
-        final childTag = child.name.local.toLowerCase();
-        final childStyle = _computedStyle(child, cascade, style);
-        if (_isNonVisualTag(childTag) ||
-            childStyle['display'] == 'none' ||
-            childStyle['visibility'] == 'hidden') {
-          continue;
-        }
-        children.add(_inlineSpan(
-          child,
-          childStyle,
-          cascade,
-          sourceSpans,
-        ));
-      }
-    }
-
-    var textStyle = _textStyle(style);
     if (tag == 'a') {
       final href = _attribute(element, 'href') ?? '';
       VoidCallback? onTap;
@@ -2682,40 +2673,85 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           if (uri != null) onTap = () => widget.onExternalLink!(uri);
         }
       }
+      linkRecognizer = onTap == null ? null : _linkRecognizer(element, onTap);
+    }
+    if (tag == 'img') {
+      Widget image = _buildImage(element, style);
+      if (linkRecognizer != null) {
+        final alt = (_attribute(element, 'alt') ?? '').trim();
+        image = Semantics(
+          container: true,
+          label: alt.isEmpty ? null : alt,
+          link: true,
+          onTap: linkRecognizer.onTap,
+          child: GestureDetector(
+            excludeFromSemantics: true,
+            behavior: HitTestBehavior.opaque,
+            onTap: linkRecognizer.onTap,
+            child: image,
+          ),
+        );
+      }
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: image,
+      );
+    }
+    if (tag == 'svg' || tag == 'math') {
+      Widget object = _unsupportedInlineObject(tag);
+      if (linkRecognizer != null) {
+        object = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: linkRecognizer.onTap,
+          child: object,
+        );
+      }
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: object,
+      );
+    }
+
+    final children = <InlineSpan>[];
+    for (final child in element.children) {
+      if (child is XmlText) {
+        final prepared = _prepareText(
+          child,
+          style['white-space'],
+          style['text-transform'],
+          overflowWrap: style['overflow-wrap'],
+          wordBreak: style['word-break'],
+        );
+        children.addAll(_sourceTextSpans(
+          child,
+          prepared,
+          sourceSpans,
+          recognizer: linkRecognizer,
+        ));
+      } else if (child is XmlElement) {
+        final childTag = child.name.local.toLowerCase();
+        final childStyle = _computedStyle(child, cascade, style);
+        if (_isNonVisualTag(childTag) ||
+            childStyle['display'] == 'none' ||
+            childStyle['visibility'] == 'hidden') {
+          continue;
+        }
+        children.add(_inlineSpan(
+          child,
+          childStyle,
+          cascade,
+          sourceSpans,
+          linkRecognizer: linkRecognizer,
+        ));
+      }
+    }
+
+    var textStyle = _textStyle(style);
+    if (tag == 'a') {
       textStyle = textStyle.copyWith(
         color: widget.linkColor,
         decoration: TextDecoration.underline,
       );
-      if (onTap != null) {
-        final linkLabelParts = <String>[
-          element.innerText.trim(),
-          for (final descendant
-              in element.descendants.whereType<XmlElement>())
-            if (descendant.name.local.toLowerCase() == 'img')
-              (_attribute(descendant, 'alt') ?? '').trim(),
-        ].where((part) => part.isNotEmpty);
-        final linkLabel = linkLabelParts.join(' ');
-        return WidgetSpan(
-          alignment: PlaceholderAlignment.baseline,
-          baseline: TextBaseline.alphabetic,
-          child: Semantics(
-            container: true,
-            explicitChildNodes: true,
-            label: linkLabel,
-            link: true,
-            onTap: onTap,
-            child: GestureDetector(
-              excludeFromSemantics: true,
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Text.rich(
-                TextSpan(style: textStyle, children: children),
-                softWrap: false,
-              ),
-            ),
-          ),
-        );
-      }
     } else if (tag == 'mark') {
       textStyle = textStyle.copyWith(
         backgroundColor: const Color(0x66D8B45B),

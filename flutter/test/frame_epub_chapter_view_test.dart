@@ -684,6 +684,129 @@ void main() {
     }
   });
 
+  testWidgets(
+      'keeps inline EPUB links selectable and copyable with surrounding text',
+      (tester) async {
+    const paragraph = '連結前文字 <a href="chapter.xhtml#inside">連結文字</a> 連結後文字';
+    final bytes = _fixture(
+      additionalParagraphMarkup: '<p>$paragraph</p>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-inline-link-selection-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/inline-link-selection.epub',
+      'fileName': 'inline-link-selection.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final clipboardWrites = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          final arguments = call.arguments as Map<Object?, Object?>;
+          clipboardWrites.add(arguments['text'] as String);
+        }
+        return null;
+      },
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+      FrameEpubTextSelection? mappedSelection;
+      String? followedHref;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            contentMaxWidth: 300,
+            onTextSelection: (selection) {
+              mappedSelection = selection;
+            },
+            onInternalLink: (href) => followedHref = href,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final selectableFinder = find.byWidgetPredicate(
+        (candidate) =>
+            candidate is SelectableText &&
+            (candidate.textSpan?.toPlainText().contains('連結前文字') ?? false) &&
+            (candidate.textSpan?.toPlainText().contains('連結後文字') ?? false),
+      );
+      expect(selectableFinder, findsOneWidget);
+      final selectable = tester.widget<SelectableText>(selectableFinder);
+      final displayedText = selectable.textSpan!.toPlainText();
+      expect(displayedText, '連結前文字 連結文字 連結後文字');
+
+      final linkSpans = <TextSpan>[];
+      void collectLinkSpans(InlineSpan span) {
+        if (span is! TextSpan) return;
+        if (span.recognizer != null) linkSpans.add(span);
+        for (final child in span.children ?? const <InlineSpan>[]) {
+          collectLinkSpans(child);
+        }
+      }
+
+      collectLinkSpans(selectable.textSpan!);
+      expect(linkSpans, isNotEmpty);
+      expect(
+        selectable.textSpan!.children!.whereType<WidgetSpan>(),
+        isEmpty,
+        reason: 'Text links must not be replaced by isolated WidgetSpan text.',
+      );
+
+      final editableFinder = find.descendant(
+        of: selectableFinder,
+        matching: find.byType(EditableText),
+      );
+      final editable = tester.state<EditableTextState>(editableFinder);
+      final selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: displayedText.length,
+      );
+      editable.userUpdateTextEditingValue(
+        TextEditingValue(text: displayedText, selection: selection),
+        SelectionChangedCause.longPress,
+      );
+      await tester.pump();
+
+      expect(editable.textEditingValue.selection, selection);
+      expect(mappedSelection, isNotNull);
+      expect(mappedSelection!.quote, '連結前文字 連結文字 連結後文字');
+      expect(mappedSelection!.startNode.value, '連結前文字 ');
+      expect(mappedSelection!.endNode.value, ' 連結後文字');
+
+      Actions.invoke(
+        tester.element(selectableFinder),
+        CopySelectionTextIntent.copy,
+      );
+      await tester.pump();
+      expect(clipboardWrites, ['連結前文字 連結文字 連結後文字']);
+
+      await tester.tap(find.text('連結文字'));
+      await tester.pumpAndSettle();
+      expect(followedHref, 'chapter.xhtml#inside');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      await archive.close();
+    }
+  });
+
   testWidgets('renders XHTML text and forwards internal links', (tester) async {
     final bytes = _fixture(
       additionalParagraphMarkup:
@@ -1858,12 +1981,7 @@ void main() {
         final dataCell = tester.getSemantics(dataCellFinder).getSemanticsData();
         expect(dataCell.flagsCollection.isHeader, isFalse);
 
-        final linkFinder = find
-            .byWidgetPredicate(
-              (widget) =>
-                  widget is Semantics && widget.properties.label == '作者甲',
-            )
-            .first;
+        final linkFinder = find.bySemanticsLabel('作者甲');
         expect(linkFinder, findsOneWidget);
         final linkData = tester.getSemantics(linkFinder).getSemanticsData();
         expect(linkData.flagsCollection.isLink, isTrue);
