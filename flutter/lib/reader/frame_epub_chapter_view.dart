@@ -1528,6 +1528,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final widgets = <Widget>[];
     final inlineSpans = <InlineSpan>[];
     final sourceSpans = HashMap<TextSpan, _TextSpanSource>.identity();
+    var requiresHorizontalNoWrap = false;
 
     var paragraphIndentInserted = false;
     void ensureParagraphIndent() {
@@ -1552,6 +1553,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       Map<String, String> style, {
       bool skipLeadingWhitespace = false,
     }) {
+      final whiteSpaceMode =
+          style['white-space']?.trim().toLowerCase() ?? 'normal';
+      if (whiteSpaceMode == 'nowrap' || whiteSpaceMode == 'pre') {
+        requiresHorizontalNoWrap = true;
+      }
       final prepared = _prepareText(
         node,
         style['white-space'],
@@ -1568,7 +1574,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
 
     void flushInline() {
-      if (inlineSpans.isEmpty) return;
+      if (inlineSpans.isEmpty) {
+        requiresHorizontalNoWrap = false;
+        return;
+      }
+      final preserveHorizontalOverflow = requiresHorizontalNoWrap;
+      requiresHorizontalNoWrap = false;
       final spans = List<InlineSpan>.unmodifiable(inlineSpans);
       inlineSpans.clear();
       final root = TextSpan(
@@ -1595,7 +1606,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       final displayedText = plainText.toString();
       final textAlign = _textAlign(parentStyle['text-align']);
       final textDirection = _textDirection(parentStyle['direction']);
-      final ranges = paginationWidth != null && paginationMaxHeight != null
+      // CSS white-space: nowrap/pre keeps the full inline run together. The
+      // horizontal viewport supplies overflow scrolling instead of wrapping
+      // or splitting the run into pagination fragments.
+      final ranges = !preserveHorizontalOverflow &&
+              paginationWidth != null &&
+              paginationMaxHeight != null
           ? FrameEpubTextPaginator.paginate(
               text: root,
               maxWidth: paginationWidth,
@@ -1639,10 +1655,16 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             ));
           },
         );
+        final renderedText = preserveHorizontalOverflow
+            ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: selectable,
+              )
+            : selectable;
         widgets.add(
           fragmentKey == null
-              ? selectable
-              : KeyedSubtree(key: fragmentKey, child: selectable),
+              ? renderedText
+              : KeyedSubtree(key: fragmentKey, child: renderedText),
         );
       }
       sourceSpans.clear();
@@ -1742,6 +1764,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     final collapseAllWhitespace =
         whiteSpaceMode == 'normal' || whiteSpaceMode == 'nowrap';
     final collapseHorizontalWhitespace = whiteSpaceMode == 'pre-line';
+    final preserveLineBreaks =
+        whiteSpaceMode == 'pre' || whiteSpaceMode == 'pre-wrap';
     final output = StringBuffer();
     final sourceOffsets = <int>[0];
     var index = 0;
@@ -1787,7 +1811,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           end++;
         }
         rendered = ' ';
-      } else if (collapseHorizontalWhitespace && isLineBreak(rune)) {
+      } else if ((collapseHorizontalWhitespace || preserveLineBreaks) &&
+          isLineBreak(rune)) {
         if (rune == 0x0D &&
             end < source.length &&
             source.codeUnitAt(end) == 0x0A) {

@@ -1217,6 +1217,8 @@ void main() {
             <td>預設垂直置中</td>
             <td style="white-space:pre-line">甲   乙
   丙</td>
+            <td style="white-space:nowrap">不折行文字 https://example.com/abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</td>
+            <td style="white-space:pre">前綴  保留空格\r\n第二行  尾端</td>
             <td>較高的第一段<p>較高的第二段</p><p>較高的第三段</p></td>
           </tr>
         </tbody>
@@ -1267,6 +1269,30 @@ void main() {
       expect(findSelectable('底部置中的內容').textAlign, TextAlign.center);
       final preLine = findSelectable('甲 乙');
       expect(preLine.textSpan?.toPlainText(), '甲 乙\n 丙');
+
+      final noWrapText = findSelectable('不折行文字');
+      expect(
+        noWrapText.textSpan?.toPlainText(),
+        '不折行文字 https://example.com/abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      );
+      final noWrapScrolls = tester
+          .widgetList<SingleChildScrollView>(
+            find.byType(SingleChildScrollView),
+          )
+          .where(
+            (scroll) =>
+                scroll.scrollDirection == Axis.horizontal &&
+                scroll.child is SelectableText,
+          )
+          .toList(growable: false);
+      expect(noWrapScrolls, hasLength(2),
+          reason: 'nowrap and pre content must each have a horizontal viewport.');
+
+      final preformatted = findSelectable('前綴');
+      expect(
+        preformatted.textSpan?.toPlainText(),
+        '前綴  保留空格\n第二行  尾端',
+      );
 
       final alignments = tester
           .widgetList<Align>(find.byType(Align))
