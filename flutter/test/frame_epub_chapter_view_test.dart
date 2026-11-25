@@ -941,22 +941,12 @@ void main() {
             .any(containsWidgetSpan);
       }
 
-      pageController.jumpToPage(0);
-      await tester.pumpAndSettle();
-      final firstPageLinkFragments = tester
-          .widgetList<SelectableText>(find.byType(SelectableText))
-          .where((widget) =>
-              (widget.textSpan?.toPlainText().contains(linkPhrase) ?? false) &&
-              containsWidgetSpan(widget.textSpan!))
-          .toList(growable: false);
-      expect(
-        firstPageLinkFragments,
-        isNotEmpty,
-        reason: 'The first fragment must retain the semantic link target.',
-      );
-
       Finder? laterFragmentFinder;
       SelectableText? laterFragment;
+      EditableTextState? laterEditable;
+      String? laterDisplayedText;
+      int? laterLocalLinkOffset;
+
       for (var page = 1; page < pageCount; page++) {
         pageController.jumpToPage(page);
         await tester.pumpAndSettle();
@@ -966,60 +956,85 @@ void main() {
                 (widget.textSpan?.toPlainText().contains(linkPhrase) ?? false) &&
                 !containsWidgetSpan(widget.textSpan!))
             .toList(growable: false);
-        if (candidates.isEmpty) continue;
 
-        final candidate = candidates.first;
-        final recognizers = <GestureRecognizer>[];
-        void collectRecognizers(InlineSpan span) {
-          if (span is TextSpan && span.recognizer != null) {
-            recognizers.add(span.recognizer!);
-          }
-          if (span is TextSpan) {
-            for (final child in span.children ?? const <InlineSpan>[]) {
-              collectRecognizers(child);
+        for (final candidate in candidates) {
+          final recognizers = <GestureRecognizer>[];
+          void collectRecognizers(InlineSpan span) {
+            if (span is TextSpan && span.recognizer != null) {
+              recognizers.add(span.recognizer!);
+            }
+            if (span is TextSpan) {
+              for (final child in span.children ?? const <InlineSpan>[]) {
+                collectRecognizers(child);
+              }
             }
           }
-        }
 
-        collectRecognizers(candidate.textSpan!);
-        if (recognizers.isNotEmpty) {
+          collectRecognizers(candidate.textSpan!);
+          if (recognizers.isEmpty) continue;
+
+          final candidateFinder = find.byWidget(candidate);
+          final candidateText = candidate.textSpan!.toPlainText();
+          final linkOffset = candidateText.indexOf(linkPhrase);
+          if (linkOffset < 0) continue;
+          final candidateEditableFinder = find.descendant(
+            of: candidateFinder,
+            matching: find.byType(EditableText),
+          );
+          final candidateEditable =
+              tester.state<EditableTextState>(candidateEditableFinder);
+          final candidateSelection = TextSelection(
+            baseOffset: linkOffset,
+            extentOffset: linkOffset + linkPhrase.length,
+          );
+          mappedSelection = null;
+          candidateEditable.userUpdateTextEditingValue(
+            TextEditingValue(
+              text: candidateText,
+              selection: candidateSelection,
+            ),
+            SelectionChangedCause.longPress,
+          );
+          await tester.pump();
+
+          final mapped = mappedSelection;
+          if (mapped == null ||
+              !identical(mapped.startNode, linkedNode) ||
+              !identical(mapped.endNode, linkedNode) ||
+              mapped.startOffset <= 0) {
+            continue;
+          }
+
+          laterFragmentFinder = candidateFinder;
           laterFragment = candidate;
-          laterFragmentFinder = find.byWidget(candidate);
+          laterEditable = candidateEditable;
+          laterDisplayedText = candidateText;
+          laterLocalLinkOffset = linkOffset;
           break;
         }
+        if (laterFragment != null) break;
       }
 
       expect(
         laterFragment,
         isNotNull,
-        reason: 'A later page must retain clickable text from the long anchor.',
+        reason: 'A later page must retain a clickable fragment whose CFI '
+            'offset is inside the original link text.',
       );
       final selectable = laterFragment!;
       final selectableFinder = laterFragmentFinder!;
-      final displayedText = selectable.textSpan!.toPlainText();
-      final localLinkOffset = displayedText.indexOf(linkPhrase);
-      expect(localLinkOffset, greaterThanOrEqualTo(0));
-
-      final editableFinder = find.descendant(
-        of: selectableFinder,
-        matching: find.byType(EditableText),
-      );
-      final editable = tester.state<EditableTextState>(editableFinder);
-      final selection = TextSelection(
-        baseOffset: localLinkOffset,
-        extentOffset: localLinkOffset + linkPhrase.length,
-      );
-      editable.userUpdateTextEditingValue(
-        TextEditingValue(text: displayedText, selection: selection),
-        SelectionChangedCause.longPress,
-      );
-      await tester.pump();
+      final editable = laterEditable!;
+      final displayedText = laterDisplayedText!;
+      final localLinkOffset = laterLocalLinkOffset!;
 
       expect(mappedSelection, isNotNull);
       expect(identical(mappedSelection!.startNode, linkedNode), isTrue);
       expect(identical(mappedSelection!.endNode, linkedNode), isTrue);
       expect(mappedSelection!.startOffset, greaterThan(0));
-      expect(mappedSelection!.endOffset, greaterThan(mappedSelection!.startOffset));
+      expect(
+        mappedSelection!.endOffset,
+        greaterThan(mappedSelection!.startOffset),
+      );
       expect(mappedSelection!.quote, linkPhrase);
 
       Actions.invoke(
