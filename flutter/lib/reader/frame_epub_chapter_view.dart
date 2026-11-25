@@ -2,7 +2,6 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 
-import 'package:characters/characters.dart';
 import 'package:flutter/painting.dart' show TextPainter;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
@@ -1847,12 +1846,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     String? wordBreak,
   }) {
     final source = node.value;
-    final graphemeEndOffsets = <int>{};
-    var graphemeOffset = 0;
-    for (final grapheme in source.characters) {
-      graphemeOffset += grapheme.length;
-      graphemeEndOffsets.add(graphemeOffset);
-    }
     final whiteSpaceMode = whiteSpace?.trim().toLowerCase() ?? 'normal';
     final overflowWrapMode = overflowWrap?.trim().toLowerCase();
     final wordBreakMode = wordBreak?.trim().toLowerCase();
@@ -1861,6 +1854,14 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         (overflowWrapMode == 'anywhere' ||
             overflowWrapMode == 'break-word' ||
             wordBreakMode == 'break-all');
+    final graphemeEndOffsets = <int>{};
+    if (breakAnywhere) {
+      var graphemeOffset = 0;
+      for (final grapheme in source.characters) {
+        graphemeOffset += grapheme.length;
+        graphemeEndOffsets.add(graphemeOffset);
+      }
+    }
     final collapseAllWhitespace =
         whiteSpaceMode == 'normal' || whiteSpaceMode == 'nowrap';
     final collapseHorizontalWhitespace = whiteSpaceMode == 'pre-line';

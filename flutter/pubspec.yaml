@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  characters: ^1.4.1
   http: ^1.5.0
   material_ui: ^1.11.1
   web: ^1.1.1
