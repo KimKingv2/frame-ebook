@@ -648,13 +648,31 @@ void main() {
       expect(editable.textEditingValue.selection, selection);
       expect(mappedSelection, same(annotationSelection));
 
+      final contextMenu = selectable.contextMenuBuilder!(
+        tester.element(selectableFinder),
+        editable,
+      );
+      expect(contextMenu, isA<AdaptiveTextSelectionToolbar>());
+      final toolbar = contextMenu as AdaptiveTextSelectionToolbar;
+      final copyItem = toolbar.buttonItems!.singleWhere(
+        (item) => item.type == ContextMenuButtonType.copy,
+      );
+      expect(copyItem.onPressed, isNotNull);
+      copyItem.onPressed!.call();
+      await tester.pump();
+
+      expect(clipboardWrites, [sourceText, sourceText]);
+      expect(editable.textEditingValue.text, displayedText);
+      expect(editable.textEditingValue.selection, selection);
+      expect(mappedSelection, same(annotationSelection));
+
       Actions.invoke(
         tester.element(selectableFinder),
         CopySelectionTextIntent.cut(SelectionChangedCause.keyboard),
       );
       await tester.pump();
 
-      expect(clipboardWrites, [sourceText]);
+      expect(clipboardWrites, [sourceText, sourceText]);
       expect(editable.textEditingValue.text, displayedText);
       expect(editable.textEditingValue.selection, selection);
       expect(mappedSelection, same(annotationSelection));
