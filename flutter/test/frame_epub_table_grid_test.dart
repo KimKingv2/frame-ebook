@@ -107,7 +107,6 @@ void main() {
   testWidgets('includes separate border spacing between table tracks',
       (tester) async {
     const firstKey = ValueKey('separate-first-cell');
-    const secondKey = ValueKey('separate-second-cell');
     const nextRowKey = ValueKey('separate-next-row-cell');
     const spanKey = ValueKey('separate-spanning-cell');
 
