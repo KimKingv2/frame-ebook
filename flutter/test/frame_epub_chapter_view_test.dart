@@ -253,6 +253,33 @@ void _write32(List<int> output, int value) {
     ..add((value >> 24) & 0xff);
 }
 
+Future<void> _tapInlineLink(
+  WidgetTester tester, {
+  required String paragraphContains,
+  required String linkText,
+}) async {
+  final selectableFinder = find.byWidgetPredicate(
+    (candidate) =>
+        candidate is SelectableText &&
+        (candidate.textSpan?.toPlainText().contains(paragraphContains) ??
+            false),
+  );
+  expect(selectableFinder, findsOneWidget);
+  final selectable = tester.widget<SelectableText>(selectableFinder);
+  final displayedText = selectable.textSpan!.toPlainText();
+  final linkOffset = displayedText.indexOf(linkText);
+  expect(linkOffset, greaterThanOrEqualTo(0));
+  final editableFinder = find.descendant(
+    of: selectableFinder,
+    matching: find.byType(EditableText),
+  );
+  final editable = tester.state<EditableTextState>(editableFinder);
+  final caret = editable.renderEditable.getLocalRectForCaret(
+    TextPosition(offset: linkOffset + linkText.length ~/ 2),
+  );
+  await tester.tapAt(editable.renderEditable.localToGlobal(caret.center));
+}
+
 void main() {
   test('computes UTF-16 grapheme boundaries for combining and emoji clusters', () {
     const sample = 'e\u0301|👩‍👩‍👧‍👦|🇹🇼|1️⃣|👍🏽';
@@ -749,7 +776,10 @@ void main() {
       expect(selectableFinder, findsOneWidget);
       final selectable = tester.widget<SelectableText>(selectableFinder);
       final displayedText = selectable.textSpan!.toPlainText();
-      expect(displayedText, '連結前文字 連結文字 連結後文字');
+      expect(
+        displayedText.replaceAll('\uFFFC', ''),
+        '連結前文字 連結文字 連結後文字',
+      );
 
       final linkSpans = <TextSpan>[];
       void collectLinkSpans(InlineSpan span) {
@@ -762,11 +792,20 @@ void main() {
 
       collectLinkSpans(selectable.textSpan!);
       expect(linkSpans, isNotEmpty);
-      expect(
-        selectable.textSpan!.children!.whereType<WidgetSpan>(),
-        isEmpty,
-        reason: 'Text links must not be replaced by isolated WidgetSpan text.',
-      );
+      final linkPlaceholders = <WidgetSpan>[];
+      void collectLinkPlaceholders(InlineSpan span) {
+        if (span is TextSpan) {
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collectLinkPlaceholders(child);
+          }
+        } else if (span is WidgetSpan) {
+          linkPlaceholders.add(span);
+        }
+      }
+
+      collectLinkPlaceholders(selectable.textSpan!);
+      expect(linkPlaceholders, hasLength(1));
+      expect(linkPlaceholders.single.child, isA<Semantics>());
 
       final editableFinder = find.descendant(
         of: selectableFinder,
@@ -796,7 +835,11 @@ void main() {
       await tester.pump();
       expect(clipboardWrites, ['連結前文字 連結文字 連結後文字']);
 
-      await tester.tap(find.text('連結文字'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '連結前文字',
+        linkText: '連結文字',
+      );
       await tester.pumpAndSettle();
       expect(followedHref, 'chapter.xhtml#inside');
       expect(tester.takeException(), isNull);
@@ -926,26 +969,42 @@ void main() {
         isTrue,
       );
 
-      await tester.tap(find.text('[1]'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '句尾註腳',
+        linkText: '[1]',
+      );
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '註腳');
       expect(openedFootnote?.content, '這是註腳的內文。');
       expect(followedHref, isNull);
       expect(find.text('這是註腳的內文。'), findsNothing);
 
-      await tester.tap(find.text('[2]'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '跨文件尾註',
+        linkText: '[2]',
+      );
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '尾註');
       expect(openedFootnote?.content, '這是跨文件尾註。');
       expect(followedHref, isNull);
 
-      await tester.tap(find.text('[3]'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '舊版註腳',
+        linkText: '[3]',
+      );
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '註腳');
       expect(openedFootnote?.content, '這是 EPUB 2 註腳。');
       expect(followedHref, isNull);
 
-      await tester.tap(find.text('章內連結'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '章內連結',
+        linkText: '章內連結',
+      );
       expect(followedHref, 'chapter.xhtml#inside');
     } finally {
       await archive.close();
@@ -1983,7 +2042,8 @@ void main() {
 
         final linkFinder = find.bySemanticsLabel('作者甲');
         expect(linkFinder, findsOneWidget);
-        final linkData = tester.getSemantics(linkFinder).getSemanticsData();
+        final linkNode = tester.getSemantics(linkFinder);
+        final linkData = linkNode.getSemanticsData();
         expect(linkData.flagsCollection.isLink, isTrue);
         expect(linkData.hasAction(SemanticsAction.tap), isTrue);
         expect(
@@ -1993,7 +2053,10 @@ void main() {
           isTrue,
         );
 
-        await tester.tap(linkFinder);
+        tester.binding.pipelineOwner.semanticsOwner!.performAction(
+          linkNode.id,
+          SemanticsAction.tap,
+        );
         await tester.pumpAndSettle();
         expect(openedLink, 'chapter.xhtml#inside');
       } finally {
@@ -2361,7 +2424,11 @@ void main() {
       expect(spanningRect.height, greaterThan(firstRowRect.height));
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.text('[表格註腳]'));
+      await _tapInlineLink(
+        tester,
+        paragraphContains: '[表格註腳]',
+        linkText: '[表格註腳]',
+      );
       await tester.pumpAndSettle();
       expect(openedFootnote?.title, '註腳');
       expect(openedFootnote?.content, '這是註腳的內文。');

@@ -252,10 +252,16 @@ class FrameEpubTextSelectionMapper {
       return false;
     }
 
+    bool isSourceText(int displayOffset) => sources.any(
+          (source) =>
+              displayOffset >= source.start && displayOffset < source.end,
+        );
+
     final selectedText = StringBuffer();
     for (var offset = selection.start; offset < selection.end; offset++) {
       final codeUnit = displayedText.codeUnitAt(offset);
       if (codeUnit == 0x200B && isSyntheticSoftBreak(offset)) continue;
+      if (codeUnit == 0xFFFC && !isSourceText(offset)) continue;
       selectedText.writeCharCode(codeUnit);
     }
     return selectedText.toString();
@@ -2657,6 +2663,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       return _rubyInlineSpan(element, style, cascade, sourceSpans);
     }
     if (tag == 'br') return const TextSpan(text: '\n');
+    VoidCallback? linkOnTap;
     if (tag == 'a') {
       final href = _attribute(element, 'href') ?? '';
       VoidCallback? onTap;
@@ -2673,23 +2680,17 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           if (uri != null) onTap = () => widget.onExternalLink!(uri);
         }
       }
+      linkOnTap = onTap;
       linkRecognizer = onTap == null ? null : _linkRecognizer(element, onTap);
     }
     if (tag == 'img') {
       Widget image = _buildImage(element, style);
       if (linkRecognizer != null) {
-        final alt = (_attribute(element, 'alt') ?? '').trim();
-        image = Semantics(
-          container: true,
-          label: alt.isEmpty ? null : alt,
-          link: true,
+        image = GestureDetector(
+          excludeFromSemantics: true,
+          behavior: HitTestBehavior.opaque,
           onTap: linkRecognizer.onTap,
-          child: GestureDetector(
-            excludeFromSemantics: true,
-            behavior: HitTestBehavior.opaque,
-            onTap: linkRecognizer.onTap,
-            child: image,
-          ),
+          child: image,
         );
       }
       return WidgetSpan(
@@ -2752,6 +2753,31 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         color: widget.linkColor,
         decoration: TextDecoration.underline,
       );
+      if (linkOnTap != null) {
+        final linkLabelParts = <String>[
+          element.innerText.trim(),
+          for (final descendant
+              in element.descendants.whereType<XmlElement>())
+            if (descendant.name.local.toLowerCase() == 'img')
+              (_attribute(descendant, 'alt') ?? '').trim(),
+        ].where((part) => part.isNotEmpty);
+        final linkLabel = linkLabelParts.join(' ');
+        children.insert(
+          0,
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Semantics(
+              container: true,
+              explicitChildNodes: true,
+              label: linkLabel,
+              link: true,
+              onTap: linkOnTap,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        );
+      }
     } else if (tag == 'mark') {
       textStyle = textStyle.copyWith(
         backgroundColor: const Color(0x66D8B45B),
