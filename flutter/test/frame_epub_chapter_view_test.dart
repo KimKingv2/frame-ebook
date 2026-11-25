@@ -508,6 +508,7 @@ void main() {
       source: _MemoryFileSource(bytes),
       book: book,
     );
+    final scrollController = ScrollController();
     try {
       final epub = await const FrameEpubParser().parse(archive);
       final loader = FrameEpubResourceLoader(archive: archive, book: epub);
@@ -521,10 +522,14 @@ void main() {
           body: FrameEpubChapterView(
             chapter: chapter,
             resourceLoader: loader,
+            scrollController: scrollController,
             contentMaxWidth: 300,
           ),
         ),
       ));
+      await tester.pumpAndSettle();
+      expect(scrollController.hasClients, isTrue);
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
       await tester.pumpAndSettle();
 
       final paragraph = tester
@@ -555,6 +560,7 @@ void main() {
     } finally {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
+      scrollController.dispose();
       await archive.close();
     }
   });
