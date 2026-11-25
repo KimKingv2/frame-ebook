@@ -2713,6 +2713,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     }
 
+    String? linkLabel;
     final children = <InlineSpan>[];
     for (final child in element.children) {
       if (child is XmlText) {
@@ -2761,22 +2762,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             if (descendant.name.local.toLowerCase() == 'img')
               (_attribute(descendant, 'alt') ?? '').trim(),
         ].where((part) => part.isNotEmpty);
-        final linkLabel = linkLabelParts.join(' ');
-        children.insert(
-          0,
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: Semantics(
-              container: true,
-              explicitChildNodes: true,
-              label: linkLabel,
-              link: true,
-              onTap: linkOnTap,
-              child: const SizedBox.shrink(),
-            ),
-          ),
-        );
+        linkLabel = linkLabelParts.join(' ');
       }
     } else if (tag == 'mark') {
       textStyle = textStyle.copyWith(
@@ -2785,6 +2771,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
     return TextSpan(
       style: textStyle,
+      recognizer: linkOnTap == null ? null : linkRecognizer,
+      semanticsLabel: linkLabel,
       children: children,
     );
   }

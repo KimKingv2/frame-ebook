@@ -792,20 +792,11 @@ void main() {
 
       collectLinkSpans(selectable.textSpan!);
       expect(linkSpans, isNotEmpty);
-      final linkPlaceholders = <WidgetSpan>[];
-      void collectLinkPlaceholders(InlineSpan span) {
-        if (span is TextSpan) {
-          for (final child in span.children ?? const <InlineSpan>[]) {
-            collectLinkPlaceholders(child);
-          }
-        } else if (span is WidgetSpan) {
-          linkPlaceholders.add(span);
-        }
-      }
-
-      collectLinkPlaceholders(selectable.textSpan!);
-      expect(linkPlaceholders, hasLength(1));
-      expect(linkPlaceholders.single.child, isA<Semantics>());
+      expect(
+        selectable.textSpan!.children!.whereType<WidgetSpan>(),
+        isEmpty,
+        reason: 'Plain inline links must remain in the paragraph text flow.',
+      );
 
       final editableFinder = find.descendant(
         of: selectableFinder,
@@ -2053,10 +2044,7 @@ void main() {
           isTrue,
         );
 
-        tester.binding.pipelineOwner.semanticsOwner!.performAction(
-          linkNode.id,
-          SemanticsAction.tap,
-        );
+        await tester.tap(linkFinder);
         await tester.pumpAndSettle();
         expect(openedLink, 'chapter.xhtml#inside');
       } finally {
