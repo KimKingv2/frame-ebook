@@ -529,14 +529,18 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(scrollController.hasClients, isTrue);
-      scrollController.jumpTo(scrollController.position.maxScrollExtent);
-      await tester.pumpAndSettle();
+      final graphemeParagraphFinder = find.byWidgetPredicate(
+        (candidate) =>
+            candidate is SelectableText &&
+            (candidate.textSpan?.toPlainText().contains('Graphemes:') ?? false),
+      );
+      await tester.scrollUntilVisible(
+        graphemeParagraphFinder,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
 
-      final paragraph = tester
-          .widgetList<SelectableText>(find.byType(SelectableText))
-          .singleWhere(
-            (item) => item.textSpan?.toPlainText().contains('Graphemes:') ?? false,
-          );
+      final paragraph = tester.widget<SelectableText>(graphemeParagraphFinder);
       final rendered = paragraph.textSpan!.toPlainText();
       expect(
         rendered.replaceAll('\u200B', ''),
