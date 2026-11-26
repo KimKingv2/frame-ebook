@@ -25334,8 +25334,8 @@ if(r===32||r===9||r===10||r===12||r===13)++b
 else{q=b+1
 if(q<s&&a.charCodeAt(b)===47&&a.charCodeAt(q)===42){p=B.d.eV(a,"*/",b+2)
 b=p<0?s:p+2}else break}}return b},
-aUk(a){var s,r,q,p,o,n,m,l,k,j=new A.c0("")
-for(s=a.length,r=0;r<s;){if(a.charCodeAt(r)!==92||r+1>=s){j.a+=a[r];++r
+aUk(a){var s,r,q,p,o,n,m,l,k,j,i=new A.c0("")
+for(s=a.length,r=0;r<s;){if(a.charCodeAt(r)!==92||r+1>=s){i.a+=a[r];++r
 continue}++r
 q=a.charCodeAt(r)
 if(q===10||q===13||q===12){if(q===13){p=r+1
@@ -25350,11 +25350,16 @@ else n=m
 else n=m}else n=!1
 else n=!1
 if(!n)break;++o}if(o>r){l=A.eH(B.d.R(a,r,o),16)
-n=A.dH(l===0||l>1114111?65533:l)
-j.a+=n
-if(p){k=a.charCodeAt(o)
-r=k===32||k===9||k===10||k===12||k===13?o+1:o}else r=o}else{j.a+=a[o]
-r=o+1}}s=j.a
+k=l>=55296&&l<=57343
+n=A.dH(l===0||k||l>1114111?65533:l)
+i.a+=n
+if(p){j=a.charCodeAt(o)
+p=j===13
+if(p){n=o+1
+n=n<s&&a.charCodeAt(n)===10}else n=!1
+if(n)r=o+2
+else r=j===32||j===9||j===10||j===12||p?o+1:o}else r=o}else{i.a+=a[o]
+r=o+1}}s=i.a
 return s.charCodeAt(0)==0?s:s},
 aUx(a,b,c){if(b<0||b+c.length>a.length)return!1
 return B.d.R(a,b,b+c.length).toLowerCase()===c.toLowerCase()},
