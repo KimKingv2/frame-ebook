@@ -1,70 +1,108 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="/flutter-preview/">
-
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#12101a">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="FRAME Reader，專屬的雲端電子書與漫畫閱讀空間。">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
 
-  <!--
-    Uncomment the tag below to lay the app out underneath the parts of the
-    screen that the device obstructs, such as a display cutout, the rounded
-    corners of the screen, or a home indicator.
-
-    Without it, the browser keeps the app clear of them, and `SafeArea` and
-    `MediaQuery.paddingOf` report no padding. With it, the app covers the whole
-    screen, and it is up to the app to keep its own content out of the way,
-    which is what `SafeArea` is for.
-  -->
-  <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> -->
-
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="frame_ebook">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FRAME Reader">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>frame_ebook</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
-<style>
-html, body { margin: 0; min-height: 100%; background: #12101a; }
-#frame-boot-message {
-  position: fixed; inset: 0; z-index: 99999; display: flex;
-  align-items: center; justify-content: center; padding: 24px;
-  box-sizing: border-box; background: #12101a; color: #c5adff;
-  font: 14px/1.7 -apple-system, BlinkMacSystemFont, sans-serif;
-  text-align: center;
-}
-</style>
+
+  <title>FRAME Reader</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #12101a;
+    }
+    #frame-boot-message {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: max(24px, env(safe-area-inset-top)) 24px
+        max(24px, env(safe-area-inset-bottom));
+      background: #12101a;
+      color: #c5adff;
+      font: 14px/1.7 -apple-system, BlinkMacSystemFont, "PingFang TC",
+        "Microsoft JhengHei", sans-serif;
+      text-align: center;
+    }
+    .frame-boot-content { max-width: 360px; }
+    .frame-boot-mark {
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 18px;
+      border: 1px solid rgba(197, 173, 255, .38);
+      border-radius: 16px;
+      color: #eee5ff;
+      font: 600 28px/1 Georgia, serif;
+      box-shadow: 0 0 42px rgba(160, 120, 255, .12);
+    }
+    .frame-boot-title {
+      margin: 0;
+      color: #eee9f7;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .18em;
+    }
+    .frame-boot-copy {
+      margin: 12px 0 0;
+      color: #b5a8d0;
+    }
+    #frame-boot-hint {
+      margin: 18px 0 0;
+      color: #a99bbf;
+      font-size: 13px;
+    }
+    #frame-boot-retry {
+      margin-top: 16px;
+      padding: 9px 18px;
+      border: 1px solid rgba(197, 173, 255, .42);
+      border-radius: 999px;
+      background: rgba(197, 173, 255, .1);
+      color: #eee5ff;
+      font: inherit;
+      cursor: pointer;
+    }
+    #frame-boot-retry:focus-visible {
+      outline: 2px solid #c5adff;
+      outline-offset: 3px;
+    }
+  </style>
 </head>
 <body>
-<div id="frame-boot-message">FRAME Ebook 正在啟動……</div>
-<script src="frame-boot.js"></script>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div id="frame-boot-message" role="status" aria-live="polite">
+    <div class="frame-boot-content">
+      <div class="frame-boot-mark" aria-hidden="true">F</div>
+      <p class="frame-boot-title">FRAME READER</p>
+      <p class="frame-boot-copy">正在開啟你的閱讀空間……</p>
+      <p id="frame-boot-hint" hidden>
+        啟動時間比預期長。請確認網路連線，或重新載入頁面。
+      </p>
+      <button id="frame-boot-retry" type="button" hidden>重新載入</button>
+    </div>
+  </div>
+  <script src="frame-boot.js?v=20261126-boot-r1"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
