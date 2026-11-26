@@ -979,13 +979,25 @@ String _decodeCssEscapes(String value) {
     }
     if (index > hexStart) {
       final codePoint = int.parse(value.substring(hexStart, index), radix: 16);
+      final isSurrogate = codePoint >= 0xd800 && codePoint <= 0xdfff;
       output.writeCharCode(
-        codePoint == 0 || codePoint > 0x10ffff ? 0xfffd : codePoint,
+        codePoint == 0 ||
+                isSurrogate ||
+                codePoint > 0x10ffff
+            ? 0xfffd
+            : codePoint,
       );
       if (index < value.length) {
         final next = value.codeUnitAt(index);
-        if (next == 0x20 || next == 0x09 || next == 0x0a ||
-            next == 0x0c || next == 0x0d) {
+        if (next == 0x0d &&
+            index + 1 < value.length &&
+            value.codeUnitAt(index + 1) == 0x0a) {
+          index += 2;
+        } else if (next == 0x20 ||
+            next == 0x09 ||
+            next == 0x0a ||
+            next == 0x0c ||
+            next == 0x0d) {
           index++;
         }
       }

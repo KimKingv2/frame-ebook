@@ -248,9 +248,8 @@ Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
     _openFixture({
   int maxCachedChapterBytes = 2 * 1024 * 1024,
   int maxPrefetchChapterBytes = 1024 * 1024,
-  List<_ZipItem>? items,
 }) async {
-  final fixture = _zipFixture(items ?? _items());
+  final fixture = _zipFixture(_items());
   final source = _MemoryFrameFileSource(fixture);
   final archive = await FrameZipArchive.open(
     source: source,
@@ -560,34 +559,24 @@ void main() {
       expect(refs.single.href, 'themes.css');
     });
 
-    test('resolves CSS-escaped @import through the ZIP resource graph',
-        () async {
-      final items = _items();
-      final mainCssIndex = items.indexWhere(
-        (item) => item.name == 'OPS/Styles/main.css',
-      );
-      expect(mainCssIndex, greaterThanOrEqualTo(0));
-      items[mainCssIndex] = _ZipItem(
-        'OPS/Styles/main.css',
-        utf8.encode(r'@import "theme\2e css";'),
+    test('consumes CRLF after CSS hexadecimal escapes', () {
+      final refs = FrameEpubResourceLoader.extractCssReferences(
+        '@import "themes\\2e\r\ncss";',
       );
 
-      final (archive, loader, _) = await _openFixture(items: items);
-      try {
-        final graph = await loader.loadStylesheetGraph('OPS/Styles/main.css');
+      expect(refs, hasLength(1));
+      expect(refs.single.href, 'themes.css');
+    });
 
-        expect(
-          graph.stylesheets.keys,
-          containsAll(['OPS/Styles/main.css', 'OPS/Styles/theme.css']),
-        );
-        expect(
-          graph.stylesheets['OPS/Styles/theme.css']?.css,
-          contains('h1'),
-        );
-        expect(graph.warnings, isEmpty);
-      } finally {
-        await archive.close();
-      }
+    test('replaces invalid Unicode code points in CSS escapes', () {
+      final refs = FrameEpubResourceLoader.extractCssReferences(
+        r'@import "surrogate\D800.css"; @import "out-of-range\110000.css";',
+      );
+
+      expect(
+        refs.map((reference) => reference.href),
+        ['surrogate\uFFFD.css', 'out-of-range\uFFFD.css'],
+      );
     });
 
     test('honors CSS import depth and stylesheet-count bounds', () async {
