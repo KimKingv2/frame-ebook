@@ -2798,6 +2798,141 @@ void main() {
 
 
   testWidgets(
+      're-paginates a rowspan cell when its embedded image finishes loading',
+      (tester) async {
+    const table = '''
+      <table border="1" style="width:100%">
+        <tbody>
+          <tr>
+            <td rowspan="2">
+              <p>圖片儲存格上方</p>
+              <img src="../Images/tall.png" alt="跨列插圖"
+                width="60" style="display:block"/>
+              <p>圖片儲存格下方</p>
+            </td>
+            <td><p>圖片列第一格</p></td>
+          </tr>
+          <tr>
+            <td><p>圖片列第二格</p></td>
+          </tr>
+        </tbody>
+      </table>
+    ''';
+    final trailingParagraphs = List.generate(
+      36,
+      (index) =>
+          '<p>分頁重測段落 ${index + 1}：圖片載入後，後續內容仍須保持正確分頁。</p>',
+    ).join();
+    final bytes = _fixture(
+      additionalTableMarkup: table,
+      additionalParagraphMarkup: trailingParagraphs,
+      includeInlineImage: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-table-rowspan-image-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/table-rowspan-image.epub',
+      'fileName': 'table-rowspan-image.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(640, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(PageView), findsOneWidget);
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.position.maxScrollExtent,
+        greaterThan(0),
+        reason: 'The fixture must span multiple paginated reader pages.',
+      );
+
+      final imageFinder = find.byWidgetPredicate(
+        (widget) => widget is Image && widget.semanticLabel == '跨列插圖',
+      );
+      expect(imageFinder, findsOneWidget);
+      final imageWidget = tester.widget<Image>(imageFinder);
+      final initialLayoutRevision =
+          tester.widget<FrameEpubTableGrid>(find.byType(FrameEpubTableGrid))
+              .layoutRevision;
+      await tester.runAsync(() async {
+        await precacheImage(
+          imageWidget.image,
+          tester.element(imageFinder),
+        );
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(PageView), findsOneWidget);
+      expect(
+        tester.widget<FrameEpubTableGrid>(find.byType(FrameEpubTableGrid))
+            .layoutRevision,
+        greaterThan(initialLayoutRevision),
+        reason: 'Decoded image frames must invalidate rowspan row heights.',
+      );
+      expect(imageWidget.width, closeTo(60, 0.01));
+      final imageRect = tester.getRect(imageFinder);
+      expect(imageRect.width, closeTo(60, 1));
+      expect(imageRect.height, closeTo(140, 1));
+      final spanningCell = find.ancestor(
+        of: find.text('圖片儲存格上方'),
+        matching: find.byType(DecoratedBox),
+      );
+      final firstRowCell = find.ancestor(
+        of: find.text('圖片列第一格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final secondRowCell = find.ancestor(
+        of: find.text('圖片列第二格'),
+        matching: find.byType(DecoratedBox),
+      );
+      final spanningRect = tester.getRect(spanningCell);
+      final firstRowRect = tester.getRect(firstRowCell);
+      final secondRowRect = tester.getRect(secondRowCell);
+
+      expect(spanningRect.top, closeTo(firstRowRect.top, 0.6));
+      expect(secondRowRect.top, closeTo(firstRowRect.bottom, 0.6));
+      expect(spanningRect.bottom, closeTo(secondRowRect.bottom, 0.6));
+      expect(spanningRect.height, greaterThan(imageRect.height));
+      expect(imageRect.top, greaterThan(spanningRect.top));
+      expect(imageRect.bottom, lessThan(spanningRect.bottom));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+
+  testWidgets(
       'reflows mixed rowspan content with multiple images and a corrupt image',
       (tester) async {
     final longText = List.filled(
