@@ -384,7 +384,7 @@ class FrameEpubResourceLoader {
               break;
             }
           }
-          if (!rel.split(RegExp(r'\s+')).contains('stylesheet')) continue;
+          if (!rel.toLowerCase().split(RegExp(r'\s+')).contains('stylesheet')) continue;
         }
         final role = _documentAttributeRole(name, attributeName);
         if (role == null) continue;
