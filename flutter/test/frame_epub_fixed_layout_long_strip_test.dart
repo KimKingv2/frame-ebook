@@ -77,4 +77,39 @@ void main() {
     expect(visited.length, lessThan(8));
     expect(visited, contains(17));
   });
+
+  testWidgets('preserves the visible comic page when viewport height changes',
+      (tester) async {
+    final reported = <int>[];
+
+    tester.view.physicalSize = const Size(420, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FrameEpubFixedLayoutLongStrip(
+            pageCount: 30,
+            currentPageIndex: 17,
+            onPageChanged: reported.add,
+            pageBuilder: (context, index) =>
+                Center(child: Text('漫畫頁 ' + (index + 1).toString())),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('漫畫頁 18'), findsOneWidget);
+    expect(reported, contains(17));
+
+    tester.view.physicalSize = const Size(420, 480);
+    await tester.pumpAndSettle();
+
+    expect(find.text('漫畫頁 18'), findsOneWidget);
+    expect(reported.last, 17);
+    expect(reported, isNot(contains(24)));
+  });
 }
