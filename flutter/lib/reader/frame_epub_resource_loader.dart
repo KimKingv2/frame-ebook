@@ -866,8 +866,10 @@ int _skipQuoted(String value, int index) {
   final quote = css.codeUnitAt(index);
   if (quote == 0x22 || quote == 0x27) {
     final parsed = _readCssString(css, index);
-    if (parsed == null || parsed.$1.isEmpty) return null;
-    return (parsed.$1, parsed.$2);
+    if (parsed == null) return null;
+    final href = _decodeCssEscapes(parsed.$1);
+    if (href.isEmpty) return null;
+    return (href, parsed.$2);
   }
   if (_matchesAsciiIgnoreCase(css, index, 'url') &&
       !_isCssIdentifierCharacter(_charAt(css, index - 1)) &&

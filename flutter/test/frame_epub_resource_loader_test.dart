@@ -549,6 +549,16 @@ void main() {
       );
     });
 
+    test('decodes CSS escapes in quoted @import paths', () {
+      final refs = FrameEpubResourceLoader.extractCssReferences(
+        r'@import "themes\2e css";',
+      );
+
+      expect(refs, hasLength(1));
+      expect(refs.single.kind, FrameEpubCssReferenceKind.import);
+      expect(refs.single.href, 'themes.css');
+    });
+
     test('honors CSS import depth and stylesheet-count bounds', () async {
       final (archive, loader, _) = await _openFixture();
       try {
