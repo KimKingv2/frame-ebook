@@ -157,6 +157,8 @@ Uint8List _zipFixture({
   bool fixedLayout = false,
   bool tocPathCaseMismatch = false,
   bool includeNonSpineTocEntry = false,
+  bool includeNonLinearSpineItem = false,
+  bool firstSpineItemLinear = true,
 }) {
   const container = '''
 <container>
@@ -177,6 +179,16 @@ Uint8List _zipFixture({
       ? '<li><a href="Text/supplement.xhtml">附錄索引</a>'
           '<ol><li><a href="Text/chapter-one.xhtml#start">附錄章節</a></li></ol></li>'
       : '';
+  final nonLinearManifest = includeNonLinearSpineItem
+      ? '<item id="appendix" href="Text/appendix.xhtml" '
+          'media-type="application/xhtml+xml"/>'
+      : '';
+  final nonLinearNavigation = includeNonLinearSpineItem
+      ? '<li><a href="Text/appendix.xhtml#appendix">附錄（非線性）</a></li>'
+      : '';
+  final nonLinearSpineItem = includeNonLinearSpineItem
+      ? '<itemref id="ref-appendix" idref="appendix" linear="no"/>'
+      : '';
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
@@ -195,9 +207,12 @@ Uint8List _zipFixture({
     <item id="two" href="Text/chapter-two.xhtml"
       media-type="application/xhtml+xml"/>
     $supplementManifest
+    $nonLinearManifest
   </manifest>
   <spine>
-    <itemref id="ref-one" idref="one"/>
+    <itemref id="ref-one" idref="one"
+      linear="${firstSpineItemLinear ? 'yes' : 'no'}"/>
+    $nonLinearSpineItem
     <itemref id="ref-two" idref="two"/>
   </spine>
 </package>
@@ -216,6 +231,7 @@ Uint8List _zipFixture({
       <ol>
         <li><a href="$chapterOneHref">第一章</a></li>
         <li><a href="$chapterTwoHref">第二章</a></li>
+        $nonLinearNavigation
         $supplementNavigation
       </ol>
     </nav>
@@ -244,6 +260,14 @@ Uint8List _zipFixture({
       _ZipItem(
         'OPS/Text/supplement.xhtml',
         utf8.encode('<html><body>不在閱讀順序中的附錄索引</body></html>'),
+      ),
+    if (includeNonLinearSpineItem)
+      _ZipItem(
+        'OPS/Text/appendix.xhtml',
+        utf8.encode(
+          '<html xmlns="http://www.w3.org/1999/xhtml">'
+          '<body><h1 id="appendix">可由目錄開啟的非線性附錄。</h1></body></html>',
+        ),
       ),
     // Keep the archive larger than its ZIP tail metadata window so the test
     // can prove that opening never requests the complete small fixture.
@@ -576,6 +600,71 @@ void main() {
       await olderRefresh;
 
       expect(session.annotations.map((item) => item.id), ['newest-note']);
+      await session.close();
+    });
+
+    test('skips linear=no spine items in normal reading order', () async {
+      final fixture = _zipFixture(includeNonLinearSpineItem: true);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.currentSpineIndex, 0);
+      expect(session.canGoPrevious, isFalse);
+      expect(session.canGoNext, isTrue);
+      expect(session.chapterProgressPercent, 0);
+
+      expect(await session.goToNextChapter(), isTrue);
+      expect(session.currentSpineIndex, 2);
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/chapter-two.xhtml',
+      );
+      expect(session.chapterProgressPercent, 50);
+      expect(session.canGoPrevious, isTrue);
+      expect(session.canGoNext, isFalse);
+
+      expect(await session.goToPreviousChapter(), isTrue);
+      expect(session.currentSpineIndex, 0);
+
+      // The non-linear appendix remains directly reachable from the TOC.
+      final appendixEntry = session.toc[2];
+      expect(session.canNavigateTocEntry(appendixEntry), isTrue);
+      expect(await session.goToTocEntry(appendixEntry), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/appendix.xhtml',
+      );
+      expect(session.chapterProgressPercent, 50);
+      expect(session.canGoPrevious, isTrue);
+      expect(session.canGoNext, isTrue);
+
+      expect(await session.goToNextChapter(), isTrue);
+      expect(session.currentSpineIndex, 2);
+      await session.close();
+    });
+
+    test('starts at the first linear spine item when the first item is non-linear',
+        () async {
+      final fixture = _zipFixture(firstSpineItemLinear: false);
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.currentSpineIndex, 1);
+      expect(
+        session.currentChapter?.resource.path,
+        'OPS/Text/chapter-two.xhtml',
+      );
+      expect(session.canGoPrevious, isFalse);
+      expect(session.canGoNext, isFalse);
       await session.close();
     });
 
