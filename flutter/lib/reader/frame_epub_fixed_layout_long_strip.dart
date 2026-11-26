@@ -35,6 +35,7 @@ class _FrameEpubFixedLayoutLongStripState
   late final ScrollController _scrollController;
   int? _lastReportedIndex;
   bool _initialPositionApplied = false;
+  bool _resizeJumpPending = false;
   double _pageExtent = 0;
 
   @override
@@ -72,7 +73,11 @@ class _FrameEpubFixedLayoutLongStripState
   }
 
   void _handleScrollChanged() {
-    if (!_scrollController.hasClients || _pageExtent <= 0) return;
+    if (_resizeJumpPending ||
+        !_scrollController.hasClients ||
+        _pageExtent <= 0) {
+      return;
+    }
     final position = _scrollController.position;
     final index = (position.pixels / _pageExtent)
         .floor()
@@ -96,7 +101,40 @@ class _FrameEpubFixedLayoutLongStripState
         builder: (context, constraints) {
           final extent = constraints.maxHeight;
           if (extent.isFinite && extent > 0) {
-            _pageExtent = extent;
+            final previousExtent = _pageExtent;
+            if (_initialPositionApplied &&
+                previousExtent > 0 &&
+                (extent - previousExtent).abs() > 0.5) {
+              final visiblePageIndex = _scrollController.hasClients
+                  ? (_scrollController.position.pixels / previousExtent)
+                      .floor()
+                      .clamp(0, widget.pageCount - 1)
+                      .toInt()
+                  : widget.currentPageIndex
+                      .clamp(0, widget.pageCount - 1)
+                      .toInt();
+              _resizeJumpPending = true;
+              _pageExtent = extent;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted ||
+                    !_scrollController.hasClients ||
+                    _pageExtent != extent) {
+                  return;
+                }
+                final position = _scrollController.position;
+                final target = (visiblePageIndex * extent).clamp(
+                  position.minScrollExtent,
+                  position.maxScrollExtent,
+                );
+                if ((position.pixels - target).abs() > 0.5) {
+                  _scrollController.jumpTo(target.toDouble());
+                }
+                _resizeJumpPending = false;
+                _handleScrollChanged();
+              });
+            } else {
+              _pageExtent = extent;
+            }
           }
           if (!_initialPositionApplied && _pageExtent > 0) {
             _initialPositionApplied = true;
