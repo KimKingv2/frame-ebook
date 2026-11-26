@@ -58,24 +58,51 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Test FRAME Reader Web startup scaffold
+        working-directory: flutter
+        run: python3 tool/test_prepare_platforms.py
       - name: Generate platform scaffolding
         working-directory: flutter
         run: flutter create --platforms=web,macos,android --org com.kimkingv2 --project-name frame_ebook .
       - name: Configure release network permissions
         working-directory: flutter
         run: python3 tool/prepare_platforms.py
-      - name: Verify synchronous Flutter first-frame listener
+      - name: Verify FRAME Reader Web startup shell
         working-directory: flutter
         run: |
           python3 - <<'PY'
+          import json
           from pathlib import Path
+
           html = Path("web/index.html").read_text(encoding="utf-8")
-          expected = '<script src="frame-boot.js"></script>'
-          if expected not in html:
-              raise SystemExit("The Flutter first-frame listener must load synchronously before Flutter bootstrap.")
+          boot = Path("web/frame-boot.js").read_text(encoding="utf-8")
+          manifest = json.loads(Path("web/manifest.json").read_text(encoding="utf-8"))
+          expected_script = '<script src="frame-boot.js"></script>'
+          if expected_script not in html:
+              raise SystemExit("The first-frame listener must load synchronously before Flutter bootstrap.")
           if '<script src="frame-boot.js" defer></script>' in html:
-              raise SystemExit("A deferred first-frame listener can miss Flutter's first-frame event.")
-          print("Verified synchronous first-frame listener.")
+              raise SystemExit("A deferred listener can miss Flutter's first-frame event.")
+          required_html = (
+              '<html lang="zh-Hant">',
+              '<title>FRAME Reader</title>',
+              'name="theme-color" content="#12101a"',
+              'name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"',
+              'id="frame-boot-hint"',
+              'id="frame-boot-retry"',
+          )
+          for item in required_html:
+              if item not in html:
+                  raise SystemExit(f"FRAME Reader Web shell is missing: {item}")
+          if html.index(expected_script) > html.index('<script src="flutter_bootstrap.js"'):
+              raise SystemExit("The first-frame listener must precede Flutter bootstrap.")
+          for item in ("18000", "flutter-first-frame", "window.location.reload()"):
+              if item not in boot:
+                  raise SystemExit(f"FRAME Reader startup recovery is missing: {item}")
+          if manifest.get("name") != "FRAME Reader" or manifest.get("short_name") != "FRAME":
+              raise SystemExit("FRAME Reader PWA manifest branding is missing.")
+          if manifest.get("theme_color") != "#12101a":
+              raise SystemExit("FRAME Reader PWA theme color is missing.")
+          print("Verified FRAME Reader branding, synchronous first-frame listener, and startup recovery.")
           PY
       - name: Prepare bundled Traditional Chinese font
         working-directory: flutter
