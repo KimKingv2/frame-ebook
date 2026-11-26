@@ -40,6 +40,59 @@ void main() {
     );
   });
 
+
+  test('does not leave one-line fragments under widow and orphan rules', () {
+    const plainText = '第一行第二行第三行第四行第五行第六行第七行';
+    const style = TextStyle(fontSize: 14, height: 1);
+    const width = 42.0;
+    final text = TextSpan(style: style, text: plainText);
+    final measure = TextPainter(
+      text: text,
+      textDirection: TextDirection.ltr,
+      textScaler: TextScaler.noScaling,
+    )..layout(maxWidth: width);
+    final metrics = measure.computeLineMetrics();
+    expect(metrics.length, greaterThan(3));
+    final maxHeight = metrics.take(3).fold<double>(
+          0,
+          (height, line) => height + line.height,
+        ) +
+        0.1;
+    measure.dispose();
+
+    final ranges = FrameEpubTextPaginator.paginate(
+      text: text,
+      maxWidth: width,
+      maxHeight: maxHeight,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      textScaler: TextScaler.noScaling,
+    );
+
+    expect(ranges.first.start, 0);
+    expect(ranges.last.end, plainText.length);
+    for (var index = 0; index < ranges.length; index++) {
+      final range = ranges[index];
+      final fragmentPainter = TextPainter(
+        text: TextSpan(style: style, text: plainText.substring(
+          range.start,
+          range.end,
+        )),
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.noScaling,
+      )..layout(maxWidth: width);
+      final fragmentLines = fragmentPainter.computeLineMetrics().length;
+      fragmentPainter.dispose();
+      if (ranges.length > 1) {
+        expect(
+          fragmentLines,
+          greaterThanOrEqualTo(2),
+          reason: 'Fragment $index must not leave a one-line widow/orphan.',
+        );
+      }
+    }
+  });
+
   test('paginates ruby placeholders while keeping their annotation run intact',
       () {
     final marker = FrameEpubRubyAnnotation(

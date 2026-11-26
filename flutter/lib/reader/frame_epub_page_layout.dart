@@ -36,6 +36,8 @@ class FrameEpubPageLayout {
   static List<FrameEpubPage> paginate({
     required List<double> itemHeights,
     required double availableHeight,
+    Set<int> breakBeforeIndices = const {},
+    Set<int> breakAfterIndices = const {},
   }) {
     if (!availableHeight.isFinite || availableHeight <= 0) {
       throw ArgumentError.value(
@@ -59,6 +61,8 @@ class FrameEpubPageLayout {
     }
 
     for (var index = 0; index < itemHeights.length; index++) {
+      if (breakBeforeIndices.contains(index)) flush();
+
       final rawHeight = itemHeights[index];
       final height = rawHeight.isFinite && rawHeight > 0 ? rawHeight : 0.0;
 
@@ -76,6 +80,8 @@ class FrameEpubPageLayout {
       }
       current.add(index);
       currentHeight += height;
+
+      if (breakAfterIndices.contains(index)) flush();
     }
 
     flush();

@@ -27,3 +27,12 @@ These dependencies are included for static Cloudflare Pages deployment. Their li
 - Used by the Flutter reading statistics screen to save in-memory JSON and CSV bytes using the platform save-file dialog on Android and macOS, with a browser download fallback on Web.
 - The app does not create an intermediate export file. The save operation is initiated only after the user selects the export action.
 - The macOS app sandbox grants only user-selected file read/write access for the save panel; it does not receive broad Downloads-folder access.
+
+## flutter_svg
+
+- Project: https://pub.dev/packages/flutter_svg
+- Version: 2.5.0
+- License: MIT
+- Used to render static, in-memory SVG markup from XHTML and SVG entries already contained in the active EPUB archive.
+- SVG entries use the existing 8 MiB per-resource read limit; inline XHTML SVG is limited to 1 MiB. Scripts, event-handler attributes, embedded HTML, external href/src references and external CSS URL references are removed before rendering.
+- The Reader does not use an SVG network loader and does not fetch linked SVG resources outside the EPUB archive.

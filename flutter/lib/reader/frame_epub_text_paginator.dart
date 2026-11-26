@@ -61,6 +61,8 @@ class FrameEpubTextPaginator {
     required TextDirection textDirection,
     required TextAlign textAlign,
     required TextScaler textScaler,
+    int orphans = 2,
+    int widows = 2,
   }) {
     final plainText = text.toPlainText(
       includeSemanticsLabels: false,
@@ -112,29 +114,75 @@ class FrameEpubTextPaginator {
       // the rendered text (for example, unusual bidi/paragraph boundaries).
       if (cursor != plainText.length || lines.isEmpty) return [whole];
 
-      final fragments = <TextRange>[];
-      var fragmentStart = 0;
-      var fragmentHeight = 0.0;
+      final lineGroups =
+          <List<({TextRange range, double height})>>[];
+      var currentLines = <({TextRange range, double height})>[];
+      var currentHeight = 0.0;
       for (final line in lines) {
         if (!line.height.isFinite || line.height > maxHeight) return [whole];
-        if (fragmentHeight > 0 &&
-            fragmentHeight + line.height > maxHeight + 0.5) {
-          fragments.add(TextRange(
-            start: fragmentStart,
-            end: line.range.start,
-          ));
-          fragmentStart = line.range.start;
-          fragmentHeight = 0;
+        if (currentLines.isNotEmpty &&
+            currentHeight + line.height > maxHeight + 0.5) {
+          lineGroups.add(currentLines);
+          currentLines = <({TextRange range, double height})>[];
+          currentHeight = 0;
         }
-        fragmentHeight += line.height;
+        currentLines.add(line);
+        currentHeight += line.height;
       }
-      if (fragmentStart < plainText.length) {
-        fragments.add(TextRange(
-          start: fragmentStart,
-          end: plainText.length,
-        ));
+      if (currentLines.isNotEmpty) lineGroups.add(currentLines);
+      if (lineGroups.length <= 1) return [whole];
+
+      final minimumOrphans = orphans.clamp(1, 50).toInt();
+      final minimumWidows = widows.clamp(1, 50).toInt();
+      int minimumLinesForGroup(int index) {
+        if (index == 0) return minimumOrphans;
+        if (index == lineGroups.length - 1) return minimumWidows;
+        return minimumOrphans > minimumWidows
+            ? minimumOrphans
+            : minimumWidows;
       }
-      if (fragments.length <= 1) return [whole];
+
+      double groupHeight(
+        List<({TextRange range, double height})> group,
+      ) =>
+          group.fold<double>(0, (total, line) => total + line.height);
+
+      for (var index = 0; index < lineGroups.length; index++) {
+        final group = lineGroups[index];
+        var deficit = minimumLinesForGroup(index) - group.length;
+        while (deficit > 0) {
+          if (index > 0) {
+            final previous = lineGroups[index - 1];
+            final previousMinimum = minimumLinesForGroup(index - 1);
+            while (deficit > 0 &&
+                previous.length > previousMinimum &&
+                groupHeight(group) + previous.last.height <= maxHeight + 0.5) {
+              group.insert(0, previous.removeLast());
+              deficit--;
+            }
+          }
+
+          if (deficit > 0 && index + 1 < lineGroups.length) {
+            final next = lineGroups[index + 1];
+            final nextMinimum = minimumLinesForGroup(index + 1);
+            while (deficit > 0 &&
+                next.length > nextMinimum &&
+                groupHeight(group) + next.first.height <= maxHeight + 0.5) {
+              group.add(next.removeAt(0));
+              deficit--;
+            }
+          }
+          if (deficit > 0) return [whole];
+        }
+      }
+
+      final fragments = <TextRange>[
+        for (final group in lineGroups)
+          TextRange(
+            start: group.first.range.start,
+            end: group.last.range.end,
+          ),
+      ];
 
       var expectedStart = 0;
       for (final fragment in fragments) {

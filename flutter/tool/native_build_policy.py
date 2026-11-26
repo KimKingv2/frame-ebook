@@ -42,6 +42,15 @@ DART_ONLY_DEPENDENCIES = {
     "xml",
     "web",
     "crypto",
+    "flutter_svg",
+    "vector_graphics",
+    "vector_graphics_codec",
+    "vector_graphics_compiler",
+    "vector_math",
+    "path_parsing",
+    "path",
+    "cli_util",
+    "meta",
 }
 PUBSPEC_SECTIONS = {"dependencies", "dev_dependencies", "dependency_overrides"}
 

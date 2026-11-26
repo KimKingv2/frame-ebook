@@ -1,5 +1,12 @@
 import 'package:xml/xml.dart';
 
+/// Synthetic style-map key carrying the archive path of the winning CSS
+/// background-image declaration. Consumed only by the EPUB renderer.
+const frameEpubBackgroundImageBasePath =
+    '__frame_epub_background_image_base_path';
+const frameEpubBackgroundImageCssValue =
+    '__frame_epub_background_image_css_value';
+
 /// A bounded CSS cascade for EPUB XHTML.
 ///
 /// This is deliberately a reader-oriented subset rather than a browser CSS
@@ -7,14 +14,33 @@ import 'package:xml/xml.dart';
 /// descendant and child combinators, the common inheritance properties and
 /// declarations used by book typography. Unsupported at-rules and pseudo
 /// classes are ignored instead of being interpreted unpredictably.
+class FrameEpubCssStylesheet {
+  const FrameEpubCssStylesheet({required this.path, required this.css});
+
+  final String path;
+  final String css;
+}
+
 class FrameEpubCssCascade {
   FrameEpubCssCascade._(this.rules);
 
-  factory FrameEpubCssCascade.fromStylesheets(Iterable<String> stylesheets) {
+  factory FrameEpubCssCascade.fromStylesheets(Iterable<String> stylesheets) =>
+      FrameEpubCssCascade.fromStylesheetSources([
+        for (final css in stylesheets)
+          FrameEpubCssStylesheet(path: '', css: css),
+      ]);
+
+  factory FrameEpubCssCascade.fromStylesheetSources(
+    Iterable<FrameEpubCssStylesheet> stylesheets,
+  ) {
     final rules = <_CssRule>[];
     var order = 0;
-    for (final css in stylesheets) {
-      final parsed = _parseStylesheet(css, startOrder: order);
+    for (final stylesheet in stylesheets) {
+      final parsed = _parseStylesheet(
+        stylesheet.css,
+        startOrder: order,
+        sourcePath: stylesheet.path,
+      );
       rules.addAll(parsed.rules);
       order = parsed.nextOrder;
     }
@@ -57,6 +83,7 @@ class FrameEpubCssCascade {
     XmlElement element, {
     Map<String, String> parentStyle = const {},
     String? inlineStyle,
+    String? inlineStyleBasePath,
   }) {
     final values = <String, _CssCandidate>{};
     final defaults = _defaultDeclarations(element.name.local.toLowerCase());
@@ -69,6 +96,7 @@ class FrameEpubCssCascade {
           important: false,
           specificity: const _CssSpecificity(0, 0, 0),
           order: -2,
+          sourcePath: null,
         );
       }
     }
@@ -79,6 +107,7 @@ class FrameEpubCssCascade {
         important: false,
         specificity: const _CssSpecificity(0, 0, 0),
         order: -1,
+        sourcePath: null,
       );
     }
 
@@ -91,6 +120,7 @@ class FrameEpubCssCascade {
             important: declaration.important,
             specificity: selector.specificity,
             order: declaration.order,
+            sourcePath: rule.sourcePath,
           );
           final current = values[declaration.property];
           if (current == null || candidate.compareTo(current) >= 0) {
@@ -108,6 +138,7 @@ class FrameEpubCssCascade {
           important: declaration.important,
           specificity: const _CssSpecificity(1, 0, 0),
           order: declaration.order,
+          sourcePath: inlineStyleBasePath,
         );
         final current = values[declaration.property];
         if (current == null || candidate.compareTo(current) >= 0) {
@@ -116,9 +147,26 @@ class FrameEpubCssCascade {
       }
     }
 
-    return Map.unmodifiable({
+    final result = <String, String>{
       for (final entry in values.entries) entry.key: entry.value.value,
-    });
+    };
+    final explicitImage = values['background-image'];
+    final shorthand = values['background'];
+    final backgroundSource = explicitImage == null
+        ? shorthand
+        : shorthand == null
+            ? explicitImage
+            : (explicitImage.compareTo(shorthand) >= 0
+                ? explicitImage
+                : shorthand);
+    if (backgroundSource != null) {
+      result[frameEpubBackgroundImageCssValue] = backgroundSource.value;
+      final basePath = backgroundSource.sourcePath;
+      if (basePath != null && basePath.isNotEmpty) {
+        result[frameEpubBackgroundImageBasePath] = basePath;
+      }
+    }
+    return Map.unmodifiable(result);
   }
 
   static Map<String, String> _defaultDeclarations(String tag) {
@@ -287,12 +335,14 @@ class _CssCandidate implements Comparable<_CssCandidate> {
     required this.important,
     required this.specificity,
     required this.order,
+    required this.sourcePath,
   });
 
   final String value;
   final bool important;
   final _CssSpecificity specificity;
   final int order;
+  final String? sourcePath;
 
   @override
   int compareTo(_CssCandidate other) {
@@ -321,10 +371,11 @@ class _CssDeclaration {
 }
 
 class _CssRule {
-  const _CssRule(this.selectors, this.declarations);
+  const _CssRule(this.selectors, this.declarations, this.sourcePath);
 
   final List<_CssSelector> selectors;
   final List<_CssDeclaration> declarations;
+  final String? sourcePath;
 }
 
 class _ParsedStylesheet {
@@ -555,7 +606,11 @@ int _findClosing(String value, int start, String open, String close) {
   return -1;
 }
 
-_ParsedStylesheet _parseStylesheet(String css, {required int startOrder}) {
+_ParsedStylesheet _parseStylesheet(
+  String css, {
+  required int startOrder,
+  required String? sourcePath,
+}) {
   final clean = _removeCssComments(css);
   final rules = <_CssRule>[];
   var index = 0;
@@ -586,7 +641,11 @@ _ParsedStylesheet _parseStylesheet(String css, {required int startOrder}) {
         // applicable as a conservative baseline until viewport evaluation is
         // implemented.
         if (!condition.contains('print') && !condition.contains('speech')) {
-          final nested = _parseStylesheet(body, startOrder: order);
+          final nested = _parseStylesheet(
+            body,
+            startOrder: order,
+            sourcePath: sourcePath,
+          );
           rules.addAll(nested.rules);
           order = nested.nextOrder;
         }
@@ -604,7 +663,7 @@ _ParsedStylesheet _parseStylesheet(String css, {required int startOrder}) {
       if (selector != null) selectors.add(selector);
     }
     if (selectors.isNotEmpty) {
-      rules.add(_CssRule(List.unmodifiable(selectors), declarations));
+      rules.add(_CssRule(List.unmodifiable(selectors), declarations, sourcePath));
     }
   }
 
