@@ -98546,27 +98546,27 @@ if(r==null)r=A.b5q(b.h(0,"background"))
 s=this.Wo(b)
 if(r==null&&s==null)return a
 return new A.LQ(this.a.d,s,16777216,r,A.bla(b.h(0,"background-size")),A.blb(b.h(0,"background-repeat")),A.bl9(b.h(0,"background-position")),a,null)},
-Wo(a){var s,r,q,p,o,n,m,l=null,k=a.h(0,"background-image")
+Wo(a){var s,r,q,p,o,n,m=null,l=a.h(0,"__frame_epub_background_image_css_value"),k=l==null?a.h(0,"background-image"):l
 if(k==null)k=a.h(0,"background")
-if(k!=null){s=B.c.a_(k)
-s=s.length===0||s.toLowerCase()==="none"}else s=!0
-if(s)return l
-r=A.aq("url\\(\\s*(?:([\"'])(.*?)\\1|([^)]*?))\\s*\\)",!1,!1,!1).en(k)
-if(r==null)return l
-s=r.b
-q=s[2]
-s=q==null?s[3]:q
-p=B.c.a_(s==null?"":s)
-if(p.length===0)return l
-o=a.h(0,"__frame_epub_background_image_base_path")
-if(o==null)o=this.a.c.a.a
-n=this.a.d.mX(p,o)
-m=n.f
-s=!0
-if(!n.e&&n.b!=null)if(m!=null)if(A.he(m.b,m.a)===B.fl){q=m.c
-if(q>0){this.a.toString
-s=q>16777216}}if(s)return l
-return m},
+if(k!=null){l=B.c.a_(k)
+l=l.length===0||l.toLowerCase()==="none"}else l=!0
+if(l)return m
+s=A.aq("url\\(\\s*(?:([\"'])(.*?)\\1|([^)]*?))\\s*\\)",!1,!1,!1).en(k)
+if(s==null)return m
+l=s.b
+r=l[2]
+l=r==null?l[3]:r
+q=B.c.a_(l==null?"":l)
+if(q.length===0)return m
+p=a.h(0,"__frame_epub_background_image_base_path")
+if(p==null)p=this.a.c.a.a
+o=this.a.d.mX(q,p)
+n=o.f
+l=!0
+if(!o.e&&o.b!=null)if(n!=null)if(A.he(n.b,n.a)===B.fl){r=n.c
+if(r>0){this.a.toString
+l=r>16777216}}if(l)return m
+return n},
 akD(f6,f7,f8,f9,g0,g1){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,e0,e1,e2,e3,e4,e5,e6,e7,e8,e9,f0=this,f1=null,f2="border-collapse",f3="background-color",f4={},f5=A.b([],t.lM)
 f4.a=0
 new A.aHB(f4,f5).$1(f6)
