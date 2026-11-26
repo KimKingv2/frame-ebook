@@ -273,59 +273,60 @@ void main() {
     test(
       'loads a chapter and resolves XHTML resources with case-insensitive stylesheet rel',
       () async {
-      final (archive, loader, source) = await _openFixture();
-      try {
-        final chapter = await loader.loadChapter(loader.book.spine.single);
-        expect(chapter.document.rootElement.name.local, 'html');
+        final (archive, loader, source) = await _openFixture();
+        try {
+          final chapter = await loader.loadChapter(loader.book.spine.single);
+          expect(chapter.document.rootElement.name.local, 'html');
 
-        final image = chapter.references.firstWhere(
-          (reference) =>
-              reference.elementName == 'img' &&
-              reference.reference.path == 'OPS/Images/page one.png',
-        );
-        expect(image.kind, FrameEpubResourceKind.image);
-        expect(image.reference.resource?.mediaType, 'image/png');
+          final image = chapter.references.firstWhere(
+            (reference) =>
+                reference.elementName == 'img' &&
+                reference.reference.path == 'OPS/Images/page one.png',
+          );
+          expect(image.kind, FrameEpubResourceKind.image);
+          expect(image.reference.resource?.mediaType, 'image/png');
 
-        final stylesheet = chapter.stylesheets.single;
-        expect(stylesheet.reference.path, 'OPS/Styles/main.css');
+          final stylesheet = chapter.stylesheets.single;
+          expect(stylesheet.reference.path, 'OPS/Styles/main.css');
 
-        final inlineSvg = chapter.references.firstWhere(
-          (reference) => reference.reference.path == 'OPS/Images/inline.svg',
-        );
-        expect(inlineSvg.kind, FrameEpubResourceKind.svg);
-        final svgResource = loader.resource('OPS/Images/inline.svg')!;
-        expect(await loader.readText(svgResource), '<svg/>');
+          final inlineSvg = chapter.references.firstWhere(
+            (reference) => reference.reference.path == 'OPS/Images/inline.svg',
+          );
+          expect(inlineSvg.kind, FrameEpubResourceKind.svg);
+          final svgResource = loader.resource('OPS/Images/inline.svg')!;
+          expect(await loader.readText(svgResource), '<svg/>');
 
-        final sameChapterLink = chapter.references.firstWhere(
-          (reference) =>
-              reference.elementName == 'a' &&
-              reference.reference.fragment == 'inside',
-        );
-        expect(sameChapterLink.reference.path, 'OPS/Text/chapter.xhtml');
-        expect(sameChapterLink.reference.resource?.kind,
-            FrameEpubResourceKind.document);
+          final sameChapterLink = chapter.references.firstWhere(
+            (reference) =>
+                reference.elementName == 'a' &&
+                reference.reference.fragment == 'inside',
+          );
+          expect(sameChapterLink.reference.path, 'OPS/Text/chapter.xhtml');
+          expect(sameChapterLink.reference.resource?.kind,
+              FrameEpubResourceKind.document);
 
-        final externalLink = chapter.references.firstWhere(
-          (reference) =>
-              reference.elementName == 'a' &&
-              reference.reference.isExternal,
-        );
-        expect(externalLink.reference.resource, isNull);
+          final externalLink = chapter.references.firstWhere(
+            (reference) =>
+                reference.elementName == 'a' &&
+                reference.reference.isExternal,
+          );
+          expect(externalLink.reference.resource, isNull);
 
-        expect(chapter.warnings, hasLength(1));
-        expect(chapter.warnings.single, contains('missing.png'));
+          expect(chapter.warnings, hasLength(1));
+          expect(chapter.warnings.single, contains('missing.png'));
 
-        final pngBytes = await loader.readBytes(image.reference.resource!);
-        expect(pngBytes, [0x89, 0x50, 0x4e, 0x47]);
-        expect(
-          source.requests.any((range) => range.length == 100000),
-          isFalse,
-          reason: 'Chapter parsing must not read unrelated archive entries.',
-        );
-      } finally {
-        await archive.close();
-      }
-    });
+          final pngBytes = await loader.readBytes(image.reference.resource!);
+          expect(pngBytes, [0x89, 0x50, 0x4e, 0x47]);
+          expect(
+            source.requests.any((range) => range.length == 100000),
+            isFalse,
+            reason: 'Chapter parsing must not read unrelated archive entries.',
+          );
+        } finally {
+          await archive.close();
+        }
+      },
+    );
 
     test('caches parsed chapters in bounded memory and reuses range reads',
         () async {
