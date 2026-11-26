@@ -189,7 +189,7 @@ const _chapter = '''
       xmlns:svg="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink">
   <head>
-    <link rel="stylesheet" href="../Styles/main.css"/>
+    <link rel="StyleSheet" href="../Styles/main.css"/>
     <title>章節測試</title>
   </head>
   <body>
@@ -270,7 +270,7 @@ Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
 
 void main() {
   group('FrameEpubResourceLoader', () {
-    test('loads a chapter and resolves relative XHTML resources', () async {
+    test('loads a chapter and resolves XHTML resources with case-insensitive stylesheet rel', () async {
       final (archive, loader, source) = await _openFixture();
       try {
         final chapter = await loader.loadChapter(loader.book.spine.single);
