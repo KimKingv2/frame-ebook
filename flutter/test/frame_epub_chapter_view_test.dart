@@ -737,6 +737,7 @@ void main() {
     );
     final clipboardWrites = <String>[];
     final messenger = tester.binding.defaultBinaryMessenger;
+    final semanticsHandle = tester.ensureSemantics();
     messenger.setMockMethodCallHandler(
       SystemChannels.platform,
       (call) async {
@@ -814,6 +815,11 @@ void main() {
       final semanticLink =
           linkPlaceholders.single.child as FrameEpubLinkSemanticsPlaceholder;
       expect(semanticLink.label, '連結文字');
+      final semanticsData = tester
+          .getSemantics(find.bySemanticsLabel('連結文字'))
+          .getSemanticsData();
+      expect(semanticsData.flagsCollection.isLink, isTrue);
+      expect(semanticsData.hasAction(SemanticsAction.tap), isTrue);
 
       final editableFinder = find.descendant(
         of: selectableFinder,
@@ -853,6 +859,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
+      semanticsHandle.dispose();
       messenger.setMockMethodCallHandler(SystemChannels.platform, null);
       await archive.close();
     }
