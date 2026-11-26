@@ -3809,10 +3809,22 @@ void main() {
         ),
       );
       expect(rtlSpread, findsOneWidget);
+      final spreadRow = tester.widget<Row>(rtlSpread);
       expect(
-        tester.widget<Row>(rtlSpread).children.length,
+        spreadRow.children.length,
         3,
         reason: 'An active two-page spread contains page, gutter and page.',
+      );
+      final firstPageRect = tester.getRect(
+        find.byWidget(spreadRow.children.first),
+      );
+      final secondPageRect = tester.getRect(
+        find.byWidget(spreadRow.children.last),
+      );
+      expect(
+        firstPageRect.center.dx,
+        greaterThan(secondPageRect.center.dx),
+        reason: 'The earlier reading page must be placed on the right in RTL mode.',
       );
       expect(tester.takeException(), isNull);
 
