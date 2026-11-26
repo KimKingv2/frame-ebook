@@ -270,7 +270,9 @@ Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
 
 void main() {
   group('FrameEpubResourceLoader', () {
-    test('loads a chapter and resolves XHTML resources with case-insensitive stylesheet rel', () async {
+    test(
+      'loads a chapter and resolves XHTML resources with case-insensitive stylesheet rel',
+      () async {
       final (archive, loader, source) = await _openFixture();
       try {
         final chapter = await loader.loadChapter(loader.book.spine.single);
