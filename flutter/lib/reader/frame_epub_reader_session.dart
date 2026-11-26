@@ -106,22 +106,33 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
   bool get isFixedLayout => _epub?.isFixedLayout ?? false;
 
-  bool get canGoPrevious =>
-      _currentSpineIndex != null && _currentSpineIndex! > 0;
+  bool get canGoPrevious {
+    final index = _currentSpineIndex;
+    return index != null && _previousLinearSpineIndex(index) != null;
+  }
 
   bool get canGoNext {
     final index = _currentSpineIndex;
-    final count = _epub?.spine.length ?? 0;
-    return index != null && index + 1 < count;
+    return index != null && _nextLinearSpineIndex(index) != null;
   }
 
   /// Chapter-based estimate only. Fine-grained progress is supplied later by
   /// the renderer through [saveReadingPosition].
   int get chapterProgressPercent {
     final index = _currentSpineIndex;
-    final count = _epub?.spine.length ?? 0;
-    if (index == null || count <= 0) return 0;
-    return ((index * 100) ~/ count).clamp(0, 99).toInt();
+    final spine = _epub?.spine;
+    if (index == null || spine == null || spine.isEmpty) return 0;
+
+    var linearCount = 0;
+    var completedLinearItems = 0;
+    for (var spineIndex = 0; spineIndex < spine.length; spineIndex++) {
+      if (!spine[spineIndex].linear) continue;
+      linearCount++;
+      if (spineIndex < index) completedLinearItems++;
+    }
+    final total = linearCount == 0 ? spine.length : linearCount;
+    final completed = linearCount == 0 ? index : completedLinearItems;
+    return ((completed * 100) ~/ total).clamp(0, 99).toInt();
   }
 
   String get currentChapterLabel {
@@ -188,9 +199,11 @@ class FrameEpubReaderSession extends ChangeNotifier {
       final cfiIndex = savedCfi.isEmpty
           ? null
           : FrameEpubCfi.spineIndexFromCfi(epub, savedCfi);
+      final firstLinearIndex = epub.spine.indexWhere((item) => item.linear);
+      final defaultIndex = firstLinearIndex >= 0 ? firstLinearIndex : 0;
       final initialIndex = cfiIndex ??
           (savedIndex == null
-              ? 0
+              ? defaultIndex
               : savedIndex.clamp(0, epub.spine.length - 1).toInt());
       final chapter = await loader.loadChapter(epub.spine[initialIndex]);
 
@@ -286,15 +299,36 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
   Future<bool> goToPreviousChapter() {
     final index = _currentSpineIndex;
-    if (index == null || index <= 0) return Future.value(false);
-    return goToSpineIndex(index - 1);
+    if (index == null) return Future.value(false);
+    final target = _previousLinearSpineIndex(index);
+    if (target == null) return Future.value(false);
+    return goToSpineIndex(target);
   }
 
   Future<bool> goToNextChapter() {
     final index = _currentSpineIndex;
-    final count = _epub?.spine.length ?? 0;
-    if (index == null || index + 1 >= count) return Future.value(false);
-    return goToSpineIndex(index + 1);
+    if (index == null) return Future.value(false);
+    final target = _nextLinearSpineIndex(index);
+    if (target == null) return Future.value(false);
+    return goToSpineIndex(target);
+  }
+
+  int? _previousLinearSpineIndex(int index) {
+    final spine = _epub?.spine;
+    if (spine == null) return null;
+    for (var candidate = index - 1; candidate >= 0; candidate--) {
+      if (spine[candidate].linear) return candidate;
+    }
+    return null;
+  }
+
+  int? _nextLinearSpineIndex(int index) {
+    final spine = _epub?.spine;
+    if (spine == null) return null;
+    for (var candidate = index + 1; candidate < spine.length; candidate++) {
+      if (spine[candidate].linear) return candidate;
+    }
+    return null;
   }
 
   /// Returns whether a TOC entry points to a document in the reading order.
@@ -478,15 +512,13 @@ class FrameEpubReaderSession extends ChangeNotifier {
     final epub = _epub;
     final loader = _loader;
     final index = _currentSpineIndex;
-    if (_closed ||
-        epub == null ||
-        loader == null ||
-        index == null ||
-        index + 1 >= epub.spine.length) {
+    if (_closed || epub == null || loader == null || index == null) {
       return;
     }
 
-    final nextChapter = epub.spine[index + 1];
+    final nextIndex = _nextLinearSpineIndex(index);
+    if (nextIndex == null) return;
+    final nextChapter = epub.spine[nextIndex];
     if (nextChapter.item.path == null) return;
     final revision = _navigationRevision;
     _chapterPreloadTimer = Timer(chapterPreloadDelay, () {
