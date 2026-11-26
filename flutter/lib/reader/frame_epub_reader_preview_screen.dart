@@ -20,6 +20,7 @@ import '../transport/frame_local_openlist_file_source.dart';
 import 'frame_epub_footnote.dart';
 import 'frame_epub_fixed_layout_long_strip.dart';
 import 'frame_epub_resource_loader.dart';
+import 'frame_epub_spread_policy.dart';
 import 'frame_epub_cfi.dart';
 import 'frame_epub_chapter_view.dart';
 import 'frame_epub_appearance_preferences.dart';
@@ -557,7 +558,10 @@ class _FrameEpubReaderPreviewScreenState
       session.isFixedLayout &&
       _comicReadingMode == 'paginated' &&
       _comicPageLayout == '2' &&
-      session.epub?.spread.toLowerCase() != 'none' &&
+      FrameEpubSpreadPolicy.allowsSyntheticSpread(
+        renditionSpread: session.epub?.spread,
+        isLandscape: MediaQuery.orientationOf(context) == Orientation.landscape,
+      ) &&
       MediaQuery.sizeOf(context).width >= 760;
 
   int _comicPageStep(BuildContext context, FrameEpubReaderSession session) =>
