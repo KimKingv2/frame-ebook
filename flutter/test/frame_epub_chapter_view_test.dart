@@ -3744,6 +3744,99 @@ void main() {
     }
   });
 
+  testWidgets('uses RTL order for paginated two-page spreads', (tester) async {
+    final paragraphs = List.generate(
+      48,
+      (index) =>
+          '<p>RTL-MARKER-${index.toString().padLeft(2, '0')}：這段文字用來建立足夠多的閱讀頁面，確認右至左雙頁版面。</p>',
+    ).join();
+    final bytes = _fixture(additionalParagraphMarkup: paragraphs);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-rtl-spread-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/rtl-spread.epub',
+      'fileName': 'rtl-spread.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            doublePageSpread: true,
+            isRightToLeft: true,
+            pageController: pageController,
+            contentMaxWidth: 600,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final pageViewFinder = find.byType(PageView);
+      expect(pageViewFinder, findsOneWidget);
+      final pageView = tester.widget<PageView>(pageViewFinder);
+      expect(pageView.reverse, isTrue);
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.position.maxScrollExtent,
+        greaterThan(0),
+        reason: 'The fixture must contain more than one page spread.',
+      );
+
+      final rtlSpread = find.descendant(
+        of: pageViewFinder,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Row && widget.textDirection == TextDirection.rtl,
+        ),
+      );
+      expect(rtlSpread, findsOneWidget);
+      final spreadRow = tester.widget<Row>(rtlSpread);
+      expect(
+        spreadRow.children.length,
+        3,
+        reason: 'An active two-page spread contains page, gutter and page.',
+      );
+      final firstPageRect = tester.getRect(
+        find.byWidget(spreadRow.children.first),
+      );
+      final secondPageRect = tester.getRect(
+        find.byWidget(spreadRow.children.last),
+      );
+      expect(
+        firstPageRect.center.dx,
+        greaterThan(secondPageRect.center.dx),
+        reason: 'The earlier reading page must be placed on the right in RTL mode.',
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets('restores the current CFI when the viewport grows taller',
       (tester) async {
     final longText = List.filled(
