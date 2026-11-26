@@ -35,6 +35,8 @@ class FrameEpubResource {
   final FrameEpubManifestItem? manifestItem;
   final FrameZipArchiveEntry _entry;
 
+  int? get crc32 => _entry.crc32;
+
   FrameEpubResourceKind get kind => _resourceKind(mediaType, path);
 }
 

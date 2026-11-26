@@ -28,6 +28,42 @@ void main() {
     expect(pages[2].requiresVerticalScroll, isFalse);
   });
 
+
+  test('honors forced page breaks before and after flow items', () {
+    final before = FrameEpubPageLayout.paginate(
+      itemHeights: [20, 20, 20, 20],
+      availableHeight: 100,
+      breakBeforeIndices: {2},
+    );
+    expect(before.map((page) => page.itemIndices).toList(), [
+      [0, 1],
+      [2, 3],
+    ]);
+
+    final after = FrameEpubPageLayout.paginate(
+      itemHeights: [20, 20, 20, 20],
+      availableHeight: 100,
+      breakAfterIndices: {1},
+    );
+    expect(after.map((page) => page.itemIndices).toList(), [
+      [0, 1],
+      [2, 3],
+    ]);
+  });
+
+  test('keeps zero-height break markers with the following page content', () {
+    final pages = FrameEpubPageLayout.paginate(
+      itemHeights: [35, 0, 35],
+      availableHeight: 100,
+      breakBeforeIndices: {1},
+    );
+
+    expect(pages.map((page) => page.itemIndices).toList(), [
+      [0],
+      [1, 2],
+    ]);
+  });
+
   test('groups pages into two-page spreads and preserves the final page', () {
     expect(
       FrameEpubPageLayout.groupIntoSpreads(5),

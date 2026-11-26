@@ -5,12 +5,14 @@ import 'dart:typed_data';
 import 'package:flutter/gestures.dart' show GestureRecognizer;
 import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter/services.dart' show SystemChannels;
+import 'package:flutter_svg/svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/library/frame_reader_repository.dart';
 import 'package:frame_ebook/reader/frame_epub_chapter_view.dart';
 import 'package:frame_ebook/reader/frame_epub_cfi.dart';
 import 'package:frame_ebook/reader/frame_epub_footnote.dart';
+import 'package:frame_ebook/reader/frame_epub_mathml.dart';
 import 'package:frame_ebook/reader/frame_epub_table_grid.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
@@ -59,11 +61,16 @@ class _MemoryFileSource implements FrameFileSource {
 Uint8List _fixture({
   String additionalIntroText = '',
   String additionalTableMarkup = '',
+  String additionalSvgMarkup = '',
   String additionalParagraphMarkup = '',
+  String additionalHeadMarkup = '',
+  String additionalStylesheetContent = '',
+  bool includeExternalSvg = false,
   bool fixedLayout = false,
   bool includeInlineImage = false,
   bool includeSecondaryInlineImage = false,
   bool includeCorruptInlineImage = false,
+  bool includeBackgroundImage = false,
 }) {
   const container = '''
 <container><rootfiles>
@@ -83,6 +90,12 @@ Uint8List _fixture({
       '<item id="inline-image-small" href="Images/small.png" media-type="image/png"/>',
     if (includeCorruptInlineImage)
       '<item id="corrupt-inline-image" href="Images/corrupt.png" media-type="image/png"/>',
+    if (includeBackgroundImage)
+      '<item id="background-image" href="Images/background.png" media-type="image/png"/>',
+    if (additionalStylesheetContent.isNotEmpty)
+      '<item id="background-css" href="Styles/background.css" media-type="text/css"/>',
+    if (includeExternalSvg)
+      '<item id="diagram" href="Images/diagram.svg" media-type="image/svg+xml"/>',
   ].join();
   final package = '''
 <package xmlns="http://www.idpf.org/2007/opf"
@@ -110,6 +123,8 @@ Uint8List _fixture({
     <h1>閱讀畫面測試</h1>
     <p class="intro">這是一段 <strong>EPUB</strong> 文字。$additionalIntroText</p>
     $additionalTableMarkup
+    $additionalSvgMarkup
+    ${includeExternalSvg ? '<img src="../Images/diagram.svg" alt="外部 SVG 圖形"/>' : ''}
     $additionalParagraphMarkup
     <p><a href="chapter.xhtml#inside">章內連結</a></p>
     <p>句尾註腳 <a id="note-ref-1" epub:type="noteref" href="#footnote-1">[1]</a></p>
@@ -125,7 +140,7 @@ Uint8List _fixture({
   final chapter = '''
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:epub="http://www.idpf.org/2007/ops">
-  <head><title>Widget fixture</title></head>
+  <head><title>Widget fixture</title>$additionalHeadMarkup</head>
   <body>$chapterBody</body>
 </html>
 ''';
@@ -170,6 +185,25 @@ Uint8List _fixture({
       _ZipItem(
         'OPS/Images/corrupt.png',
         utf8.encode('This file is deliberately not a PNG image.'),
+      ),
+    if (includeBackgroundImage)
+      _ZipItem(
+        'OPS/Images/background.png',
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      ),
+    if (additionalStylesheetContent.isNotEmpty)
+      _ZipItem(
+        'OPS/Styles/background.css',
+        utf8.encode(additionalStylesheetContent),
+      ),
+    if (includeExternalSvg)
+      _ZipItem(
+        'OPS/Images/diagram.svg',
+        utf8.encode(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48"><rect width="96" height="48" rx="6" fill="#7654B9"/><circle cx="48" cy="24" r="12" fill="#FFFFFF"/></svg>',
+        ),
       ),
   ]);
 }
@@ -3384,6 +3418,148 @@ void main() {
   });
 
 
+
+  testWidgets('honors EPUB forced page breaks and legacy aliases',
+      (tester) async {
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <p>強制換頁之前</p>
+        <p style="break-before: page">新 CSS 換頁之後</p>
+        <p style="page-break-after: always">舊版 CSS 換頁之前</p>
+        <p>舊版 CSS 換頁之後</p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-css-page-break-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/css-page-break.epub',
+      'fileName': 'css-page-break.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    FrameEpubResourceLoader? loader;
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PageView), findsOneWidget);
+      expect(pageController.hasClients, isTrue);
+      expect(
+        pageController.position.maxScrollExtent,
+        greaterThanOrEqualTo(
+          pageController.position.viewportDimension * 2 - 1,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      loader?.dispose();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
+  testWidgets('keeps break-inside avoid EPUB paragraphs as one text fragment',
+      (tester) async {
+    final longText = List.filled(90, '這段文字應完整保留在同一個區塊。').join();
+    final bytes = _fixture(
+      additionalParagraphMarkup: '''
+        <p style="break-inside: avoid">$longText</p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-css-break-inside-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/css-break-inside.epub',
+      'fileName': 'css-break-inside.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    final pageController = PageController();
+    FrameEpubResourceLoader? loader;
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      tester.view.physicalSize = const Size(320, 220);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+            paginated: true,
+            pageController: pageController,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final lastPage = (pageController.position.maxScrollExtent /
+              pageController.position.viewportDimension)
+          .round();
+      var matching = <SelectableText>[];
+      for (var page = 0; page <= lastPage; page++) {
+        pageController.jumpToPage(page);
+        await tester.pumpAndSettle();
+        matching = tester
+            .widgetList<SelectableText>(find.byType(SelectableText))
+            .where((item) =>
+                item.textSpan?.toPlainText().replaceAll('\u200B', '')
+                    .contains(longText) ??
+                false)
+            .toList();
+        if (matching.isNotEmpty) break;
+      }
+      expect(matching, hasLength(1));
+      expect(
+        matching.single.textSpan!.toPlainText().replaceAll('\u200B', ''),
+        longText,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      loader?.dispose();
+      pageController.dispose();
+      await archive.close();
+    }
+  });
+
   testWidgets(
       'does not snap back when a live anchor changes after turning a page',
       (tester) async {
@@ -4027,6 +4203,356 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
       pageController.dispose();
+      await archive.close();
+    }
+  });
+
+
+  testWidgets('renders inline and archive SVG resources without external fetches',
+      (tester) async {
+    const inlineSvg = '''
+      <svg width="120" height="60" viewBox="0 0 120 60"
+          onload="javascript:alert(1)">
+        <title>Inline diagram</title>
+        <rect x="2" y="2" width="116" height="56" rx="6" fill="#7654B9"/>
+        <circle cx="60" cy="30" r="12" fill="#FFFFFF"/>
+        <image href="https://example.invalid/remote.png" width="1" height="1"/>
+        <script>window.location = 'https://example.invalid/';</script>
+      </svg>
+    ''';
+    final bytes = _fixture(
+      additionalSvgMarkup: inlineSvg,
+      includeExternalSvg: true,
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-svg-render-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/svg.epub',
+      'fileName': 'svg.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      expect(
+        loader.resource('OPS/Images/diagram.svg')?.kind,
+        FrameEpubResourceKind.svg,
+      );
+      expect(
+        loader.resource('OPS/Images/diagram.svg')?.size,
+        lessThanOrEqualTo(loader.maxSvgBytes),
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+              contentMaxWidth: 480,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SvgPicture), findsNWidgets(2));
+      expect(find.text('SVG 圖形暫未支援'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      await archive.close();
+    }
+  });
+
+
+
+  testWidgets('paints internal CSS background images using source paths and fit rules',
+      (tester) async {
+    final bytes = _fixture(
+      includeBackgroundImage: true,
+      additionalHeadMarkup:
+          '<link rel="stylesheet" href="../Styles/background.css"/>',
+      additionalStylesheetContent: '''
+        .background-test {
+          background-image: url("../Images/background.png");
+          background-color: #123456;
+          background-repeat: no-repeat;
+          background-position: right bottom;
+          background-size: cover;
+          padding: 12px;
+        }
+      ''',
+      additionalParagraphMarkup:
+          '<div class="background-test">背景圖片測試</div>',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-css-background-image-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/css-background.epub',
+      'fileName': 'css-background.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final backgroundBoxes = tester.widgetList<DecoratedBox>(
+        find.byWidgetPredicate(
+          (candidate) =>
+              candidate is DecoratedBox &&
+              candidate.decoration is BoxDecoration &&
+              (candidate.decoration as BoxDecoration).image != null,
+        ),
+      );
+      expect(backgroundBoxes, isNotEmpty);
+      final decoration = backgroundBoxes
+          .map((box) => box.decoration)
+          .whereType<BoxDecoration>()
+          .firstWhere((box) => box.color == const Color(0xFF123456));
+      expect(decoration.image?.fit, BoxFit.cover);
+      expect(decoration.image?.repeat, ImageRepeat.noRepeat);
+      expect(decoration.image?.alignment, Alignment.bottomRight);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      await archive.close();
+    }
+  });
+
+
+  testWidgets('applies EPUB image object-fit, object-position and size limits',
+      (tester) async {
+    final bytes = _fixture(
+      includeInlineImage: true,
+      additionalParagraphMarkup: '''
+        <p>
+          <img
+            src="../Images/tall.png"
+            alt="Object fit probe"
+            style="
+              width: 240px;
+              height: 160px;
+              max-width: 180px;
+              max-height: 120px;
+              object-fit: cover;
+              object-position: right bottom;
+            "
+          />
+        </p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-object-fit-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/object-fit.epub',
+      'fileName': 'object-fit.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox.expand(
+            child: FrameEpubChapterView(
+              chapter: chapter,
+              resourceLoader: loader,
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final image = tester.widget<Image>(find.byType(Image).first);
+      expect(image.fit, BoxFit.cover);
+      expect(image.alignment, Alignment.bottomRight);
+      expect(tester.getSize(find.byType(Image).first).width, lessThanOrEqualTo(180));
+      expect(tester.getSize(find.byType(Image).first).height, lessThanOrEqualTo(120));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      loader.dispose();
+    } finally {
+      await archive.close();
+    }
+  });
+
+
+  testWidgets('honors CSS vertical-align for inline EPUB images',
+      (tester) async {
+    final bytes = _fixture(
+      includeInlineImage: true,
+      includeSecondaryInlineImage: true,
+      additionalParagraphMarkup: '''
+        <p>行內對齊測試：
+          <img src="../Images/tall.png" alt="below baseline"
+            style="width: 12px; height: 12px; vertical-align: text-bottom"/>
+          <img src="../Images/small.png" alt="above baseline"
+            style="width: 12px; height: 12px; vertical-align: super"/>
+        </p>
+      ''',
+    );
+    final book = FrameBook.fromJson({
+      'id': 'chapter-inline-vertical-align-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/inline-vertical-align.epub',
+      'fileName': 'inline-vertical-align.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    FrameEpubResourceLoader? loader;
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final paragraph = tester.widget<SelectableText>(
+        find.byWidgetPredicate(
+          (candidate) =>
+              candidate is SelectableText &&
+              (candidate.textSpan?.toPlainText().contains('行內對齊測試') ??
+                  false),
+        ),
+      );
+      final placeholders = <WidgetSpan>[];
+      void collect(InlineSpan span) {
+        if (span is TextSpan) {
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            collect(child);
+          }
+        } else if (span is WidgetSpan) {
+          placeholders.add(span);
+        }
+      }
+
+      collect(paragraph.textSpan!);
+      expect(placeholders, hasLength(2));
+      expect(
+        placeholders.map((span) => span.alignment),
+        containsAll([
+          PlaceholderAlignment.belowBaseline,
+          PlaceholderAlignment.aboveBaseline,
+        ]),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      loader?.dispose();
+      await archive.close();
+    }
+  });
+
+  testWidgets('renders MathML formulas inside an EPUB chapter', (tester) async {
+    const markup = '''
+      <p>方程式：
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <mrow>
+            <msup><mi>x</mi><mn>2</mn></msup>
+            <mo>+</mo>
+            <mfrac><mn>1</mn><mn>2</mn></mfrac>
+            <mo>=</mo>
+            <msqrt><mn>9</mn></msqrt>
+          </mrow>
+        </math>
+      </p>
+    ''';
+    final bytes = _fixture(additionalParagraphMarkup: markup);
+    final book = FrameBook.fromJson({
+      'id': 'chapter-mathml-render-test',
+      'provider': 'vps',
+      'library': 'books',
+      'rootPath': '/Books',
+      'path': '/Books/mathml.epub',
+      'fileName': 'mathml.epub',
+      'format': 'EPUB',
+      'shelf': 'books',
+      'size': bytes.length,
+    });
+    final archive = await FrameZipArchive.open(
+      source: _MemoryFileSource(bytes),
+      book: book,
+    );
+    try {
+      final epub = await const FrameEpubParser().parse(archive);
+      final loader = FrameEpubResourceLoader(archive: archive, book: epub);
+      final chapter = await loader.loadChapter(epub.spine.single);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: FrameEpubChapterView(
+            chapter: chapter,
+            resourceLoader: loader,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FrameEpubMathMl), findsOneWidget);
+      for (final token in ['x', '2', '+', '1', '2', '=', '√', '9']) {
+        expect(find.text(token), findsWidgets, reason: 'Missing token: $token');
+      }
+      expect(find.text('數學公式暫未支援'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
       await archive.close();
     }
   });

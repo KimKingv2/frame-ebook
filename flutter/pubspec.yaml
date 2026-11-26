@@ -19,9 +19,10 @@ dependencies:
   koni_archive_core: ^0.9.0
   koni_zip: ^0.9.0
   flutter_fullscreen: ^1.2.0
-  xml: ^7.1.0
+  xml: ^7.0.1
   crypto: ^3.0.6
   file_picker: ^13.4.0
+  flutter_svg: ^2.5.0
 
 dev_dependencies:
   flutter_test:

@@ -105,6 +105,22 @@ class NativeBuildPolicyTests(unittest.TestCase):
         )
         self.assertTrue(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
 
+    def test_svg_renderer_dependency_is_dart_only(self) -> None:
+        after = BASE_PUBSPEC.replace(
+            "  web: ^1.1.1\\n",
+            "  web: ^1.1.1\\n"
+            "  xml: ^7.0.1\\n"
+            "  flutter_svg: ^2.5.0\\n",
+        )
+        self.assertTrue(pubspec_change_is_dart_only(BASE_PUBSPEC, after))
+        self.assertEqual(
+            native_targets(
+                ["flutter/pubspec.yaml"],
+                dart_only_dependency_manifests=True,
+            ),
+            (False, False),
+        )
+
     def test_xml_parser_dependency_is_dart_only(self) -> None:
         after = BASE_PUBSPEC.replace(
             "  web: ^1.1.1\n",

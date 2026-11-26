@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frame_ebook/library/frame_book.dart';
 import 'package:frame_ebook/reader/frame_epub_parser.dart';
+import 'package:frame_ebook/reader/frame_epub_fonts.dart';
 import 'package:frame_ebook/reader/frame_epub_resource_loader.dart';
 import 'package:frame_ebook/reader/frame_zip_archive.dart';
 import 'package:frame_ebook/transport/frame_file_source.dart';
@@ -178,6 +181,8 @@ const _package = '''
     <item id="body" href="Images/body.png" media-type="image/png"/>
     <item id="svg" href="Images/inline.svg" media-type="image/svg+xml"/>
     <item id="font" href="Fonts/font.woff2" media-type="font/woff2"/>
+    <item id="font-bold" href="Fonts/font-bold.ttf" media-type="font/ttf"/>
+    <item id="font-italic" href="Fonts/font-italic.ttf" media-type="font/ttf"/>
   </manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
@@ -225,6 +230,21 @@ const _themeCss = '''
 h1 { background: url("../Images/body.png"); }
 ''';
 
+Uint8List _plainTestFont({int seed = 0}) => Uint8List.fromList([
+      0x00, 0x01, 0x00, 0x00, 0, 0, 0, 0, 0, 0, 0, 0,
+      ...List<int>.generate(40, (index) => (index + seed) % 256),
+    ]);
+
+Uint8List _obfuscateTestFont() {
+  const identifier = 'urn:uuid:resource-loader';
+  final bytes = _plainTestFont();
+  final key = sha1.convert(utf8.encode(identifier)).bytes;
+  for (var index = 0; index < bytes.length && index < 1040; index++) {
+    bytes[index] ^= key[index % key.length];
+  }
+  return bytes;
+}
+
 List<_ZipItem> _items() => [
       _ZipItem('mimetype', utf8.encode('application/epub+zip')),
       _ZipItem('META-INF/container.xml', utf8.encode(_container)),
@@ -238,6 +258,29 @@ List<_ZipItem> _items() => [
       _ZipItem('OPS/Images/body.png', [4, 5, 6]),
       _ZipItem('OPS/Images/inline.svg', utf8.encode('<svg/>')),
       _ZipItem('OPS/Fonts/font.woff2', [7, 8, 9]),
+      _ZipItem(
+        'OPS/Fonts/test.ttf',
+        _obfuscateTestFont(),
+      ),
+      _ZipItem(
+        'OPS/Fonts/font-bold.ttf',
+        _plainTestFont(seed: 31),
+      ),
+      _ZipItem(
+        'OPS/Fonts/font-italic.ttf',
+        _plainTestFont(seed: 63),
+      ),
+      _ZipItem(
+        'META-INF/encryption.xml',
+        utf8.encode('''
+          <encryption>
+            <EncryptedData>
+              <EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/>
+              <CipherData><CipherReference URI="OPS/Fonts/test.ttf"/></CipherData>
+            </EncryptedData>
+          </encryption>
+        '''),
+      ),
       _ZipItem(
         'OPS/Media/unopened-large-resource.bin',
         List<int>.filled(100000, 0x78),
@@ -270,63 +313,60 @@ Future<(FrameZipArchive, FrameEpubResourceLoader, _MemoryFrameFileSource)>
 
 void main() {
   group('FrameEpubResourceLoader', () {
-    test(
-      'loads a chapter and resolves XHTML resources with case-insensitive stylesheet rel',
-      () async {
-        final (archive, loader, source) = await _openFixture();
-        try {
-          final chapter = await loader.loadChapter(loader.book.spine.single);
-          expect(chapter.document.rootElement.name.local, 'html');
+    test('loads a chapter and resolves relative XHTML resources', () async {
+      final (archive, loader, source) = await _openFixture();
+      try {
+        final chapter = await loader.loadChapter(loader.book.spine.single);
+        expect(chapter.document.rootElement.name.local, 'html');
 
-          final image = chapter.references.firstWhere(
-            (reference) =>
-                reference.elementName == 'img' &&
-                reference.reference.path == 'OPS/Images/page one.png',
-          );
-          expect(image.kind, FrameEpubResourceKind.image);
-          expect(image.reference.resource?.mediaType, 'image/png');
+        final image = chapter.references.firstWhere(
+          (reference) =>
+              reference.elementName == 'img' &&
+              reference.reference.path == 'OPS/Images/page one.png',
+        );
+        expect(image.kind, FrameEpubResourceKind.image);
+        expect(image.reference.resource?.mediaType, 'image/png');
 
-          final stylesheet = chapter.stylesheets.single;
-          expect(stylesheet.reference.path, 'OPS/Styles/main.css');
+        final stylesheet = chapter.stylesheets.single;
+        expect(stylesheet.reference.path, 'OPS/Styles/main.css');
 
-          final inlineSvg = chapter.references.firstWhere(
-            (reference) => reference.reference.path == 'OPS/Images/inline.svg',
-          );
-          expect(inlineSvg.kind, FrameEpubResourceKind.svg);
-          final svgResource = loader.resource('OPS/Images/inline.svg')!;
-          expect(await loader.readText(svgResource), '<svg/>');
+        final inlineSvg = chapter.references.firstWhere(
+          (reference) => reference.reference.path == 'OPS/Images/inline.svg',
+        );
+        expect(inlineSvg.kind, FrameEpubResourceKind.svg);
+        final svgResource = loader.resource('OPS/Images/inline.svg')!;
+        expect(await loader.readText(svgResource), '<svg/>');
 
-          final sameChapterLink = chapter.references.firstWhere(
-            (reference) =>
-                reference.elementName == 'a' &&
-                reference.reference.fragment == 'inside',
-          );
-          expect(sameChapterLink.reference.path, 'OPS/Text/chapter.xhtml');
-          expect(sameChapterLink.reference.resource?.kind,
-              FrameEpubResourceKind.document);
+        final sameChapterLink = chapter.references.firstWhere(
+          (reference) =>
+              reference.elementName == 'a' &&
+              reference.reference.fragment == 'inside',
+        );
+        expect(sameChapterLink.reference.path, 'OPS/Text/chapter.xhtml');
+        expect(sameChapterLink.reference.resource?.kind,
+            FrameEpubResourceKind.document);
 
-          final externalLink = chapter.references.firstWhere(
-            (reference) =>
-                reference.elementName == 'a' &&
-                reference.reference.isExternal,
-          );
-          expect(externalLink.reference.resource, isNull);
+        final externalLink = chapter.references.firstWhere(
+          (reference) =>
+              reference.elementName == 'a' &&
+              reference.reference.isExternal,
+        );
+        expect(externalLink.reference.resource, isNull);
 
-          expect(chapter.warnings, hasLength(1));
-          expect(chapter.warnings.single, contains('missing.png'));
+        expect(chapter.warnings, hasLength(1));
+        expect(chapter.warnings.single, contains('missing.png'));
 
-          final pngBytes = await loader.readBytes(image.reference.resource!);
-          expect(pngBytes, [0x89, 0x50, 0x4e, 0x47]);
-          expect(
-            source.requests.any((range) => range.length == 100000),
-            isFalse,
-            reason: 'Chapter parsing must not read unrelated archive entries.',
-          );
-        } finally {
-          await archive.close();
-        }
-      },
-    );
+        final pngBytes = await loader.readBytes(image.reference.resource!);
+        expect(pngBytes, [0x89, 0x50, 0x4e, 0x47]);
+        expect(
+          source.requests.any((range) => range.length == 100000),
+          isFalse,
+          reason: 'Chapter parsing must not read unrelated archive entries.',
+        );
+      } finally {
+        await archive.close();
+      }
+    });
 
     test('caches parsed chapters in bounded memory and reuses range reads',
         () async {
@@ -442,6 +482,121 @@ void main() {
         expect(identical(limited, cached), isFalse);
         expect(limited.stylesheets, hasLength(1));
         expect(source.requests.length, greaterThan(requestsAfterFirstLoad));
+      } finally {
+        loader.dispose();
+        await archive.close();
+      }
+    });
+
+    test('loads separate regular, bold and italic EPUB font faces in memory',
+        () async {
+      final (archive, loader, source) = await _openFixture();
+      final registered = <String, List<Uint8List>>{};
+      var registrationCount = 0;
+      final fontLoader = FrameEpubEmbeddedFontLoader(
+        registrar: (family, fonts) async {
+          registrationCount++;
+          registered[family] = fonts;
+        },
+      );
+
+      const stylesheet = FrameEpubFontStylesheet(
+        path: 'OPS/Styles/main.css',
+        css: '''
+          @font-face {
+            font-family: "Integration Serif";
+            font-style: normal;
+            font-weight: 400;
+            src: url("../Fonts/test.ttf") format("truetype");
+          }
+          @font-face {
+            font-family: "Integration Serif";
+            font-style: normal;
+            font-weight: 700;
+            src: url("../Fonts/font-bold.ttf") format("truetype");
+          }
+          @font-face {
+            font-family: "Integration Serif";
+            font-style: italic;
+            font-weight: 400;
+            src: url("../Fonts/font-italic.ttf") format("truetype");
+          }
+        ''',
+      );
+
+      try {
+        final first = await fontLoader.load(
+          book: loader.book,
+          resourceLoader: loader,
+          stylesheets: const [stylesheet],
+        );
+        final regularKey = FrameEpubEmbeddedFontLoader.fontFaceAliasKey(
+          'Integration Serif',
+          '400',
+          'normal',
+        );
+        final boldKey = FrameEpubEmbeddedFontLoader.fontFaceAliasKey(
+          'Integration Serif',
+          '700',
+          'normal',
+        );
+        final italicKey = FrameEpubEmbeddedFontLoader.fontFaceAliasKey(
+          'Integration Serif',
+          '400',
+          'italic',
+        );
+
+        expect(
+          first.familyAliases.keys,
+          containsAll([regularKey, boldKey, italicKey]),
+        );
+        expect(first.warnings, isEmpty);
+        expect(registrationCount, 3);
+
+        final regularFamily = first.familyAliases[regularKey]!;
+        final boldFamily = first.familyAliases[boldKey]!;
+        final italicFamily = first.familyAliases[italicKey]!;
+        expect({regularFamily, boldFamily, italicFamily}, hasLength(3));
+        expect(registered[regularFamily]!.single, _plainTestFont());
+        expect(
+          registered[boldFamily]!.single,
+          _plainTestFont(seed: 31),
+        );
+        expect(
+          registered[italicFamily]!.single,
+          _plainTestFont(seed: 63),
+        );
+
+        expect(
+          first.aliasFor(
+            family: 'integration serif',
+            weight: '700',
+          ),
+          boldFamily,
+        );
+        expect(
+          first.aliasFor(
+            family: 'integration serif',
+            style: 'italic',
+          ),
+          italicFamily,
+        );
+
+        final requestCount = source.requests.length;
+        final second = await fontLoader.load(
+          book: loader.book,
+          resourceLoader: loader,
+          stylesheets: const [stylesheet],
+        );
+        expect(second.familyAliases[regularKey], regularFamily);
+        expect(second.familyAliases[boldKey], boldFamily);
+        expect(second.familyAliases[italicKey], italicFamily);
+        expect(registrationCount, 3);
+        expect(
+          source.requests.length,
+          requestCount,
+          reason: 'Registered font faces must not be re-read for every chapter.',
+        );
       } finally {
         loader.dispose();
         await archive.close();

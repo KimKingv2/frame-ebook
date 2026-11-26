@@ -246,6 +246,85 @@ void main() {
       expect(paragraphStyle['list-style-type'], 'upper-alpha');
     });
 
+
+    test('retains stylesheet and inline origins for background image URLs', () {
+      final cascade = FrameEpubCssCascade.fromStylesheetSources([
+        const FrameEpubCssStylesheet(
+          path: 'OPS/Styles/theme/main.css',
+          css: '.cover { background-image: url("../../Images/cover.png"); }',
+        ),
+      ]);
+      final document = XmlDocument.parse(
+        '<body><div class="cover" '
+        'style="background-repeat: no-repeat">cover</div></body>',
+      );
+      final cover = document.descendants
+          .whereType<XmlElement>()
+          .firstWhere((element) => element.name.local == 'div');
+      final stylesheetStyle = cascade.resolve(cover);
+
+      expect(
+        stylesheetStyle[frameEpubBackgroundImageBasePath],
+        'OPS/Styles/theme/main.css',
+      );
+
+      final inlineStyle = cascade.resolve(
+        cover,
+        inlineStyle: 'background-image: url("../Images/inline.png")',
+        inlineStyleBasePath: 'OPS/Text/chapter.xhtml',
+      );
+      expect(
+        inlineStyle[frameEpubBackgroundImageBasePath],
+        'OPS/Text/chapter.xhtml',
+      );
+    });
+
+
+    test('background shorthand and image declarations obey cascade order', () {
+      final cascade = FrameEpubCssCascade.fromStylesheetSources([
+        const FrameEpubCssStylesheet(
+          path: 'OPS/Styles/first.css',
+          css: '.target { background-image: url("first.png"); }',
+        ),
+        const FrameEpubCssStylesheet(
+          path: 'OPS/Styles/second.css',
+          css: '.target { background: url("second.png") no-repeat #fff; }',
+        ),
+      ]);
+      final element = XmlDocument.parse(
+        '<div class="target">background</div>',
+      ).rootElement;
+      final shorthandWins = cascade.resolve(element);
+      expect(
+        shorthandWins[frameEpubBackgroundImageCssValue],
+        'url("second.png") no-repeat #fff',
+      );
+      expect(
+        shorthandWins[frameEpubBackgroundImageBasePath],
+        'OPS/Styles/second.css',
+      );
+
+      final reverseCascade = FrameEpubCssCascade.fromStylesheetSources([
+        const FrameEpubCssStylesheet(
+          path: 'OPS/Styles/first.css',
+          css: '.target { background: url("first.png") no-repeat #fff; }',
+        ),
+        const FrameEpubCssStylesheet(
+          path: 'OPS/Styles/second.css',
+          css: '.target { background-image: url("second.png"); }',
+        ),
+      ]);
+      final imageWins = reverseCascade.resolve(element);
+      expect(
+        imageWins[frameEpubBackgroundImageCssValue],
+        'url("second.png")',
+      );
+      expect(
+        imageWins[frameEpubBackgroundImageBasePath],
+        'OPS/Styles/second.css',
+      );
+    });
+
     test('keeps unsupported selectors from matching arbitrary elements', () {
       final cascade = FrameEpubCssCascade.fromStylesheets([
         'p:unsupported-state { color: red; }',

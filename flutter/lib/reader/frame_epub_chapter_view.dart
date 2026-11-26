@@ -5,15 +5,18 @@ import 'dart:ui' show FontFeature;
 import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/painting.dart' show TextPainter;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter_svg/svg.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:xml/xml.dart';
 
 import '../library/frame_reader_repository.dart';
 import 'frame_epub_cfi.dart';
+import 'frame_epub_fonts.dart';
 import 'frame_epub_footnote.dart';
 import 'frame_epub_css.dart';
 import 'frame_epub_resource_loader.dart';
 import 'frame_epub_page_layout.dart';
+import 'frame_epub_mathml.dart';
 import 'frame_epub_ruby_annotation.dart';
 import 'frame_epub_text_paginator.dart';
 import 'frame_epub_table_layout.dart';
@@ -43,6 +46,21 @@ class _PreparedEpubText {
 
   final String text;
   final List<int> sourceOffsets;
+}
+
+enum _EpubPageBreakKind { before, after }
+
+class _EpubPageBreakMarker extends StatelessWidget {
+  const _EpubPageBreakMarker.before()
+      : kind = _EpubPageBreakKind.before;
+
+  const _EpubPageBreakMarker.after()
+      : kind = _EpubPageBreakKind.after;
+
+  final _EpubPageBreakKind kind;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 /// UTF-16 offsets immediately after each extended Unicode grapheme cluster.
@@ -370,13 +388,19 @@ class FrameEpubChapterView extends StatefulWidget {
 }
 
 class _EpubStylesheetBundle {
-  const _EpubStylesheetBundle(this.cascade, this.warnings);
+  const _EpubStylesheetBundle(
+    this.cascade,
+    this.warnings,
+    this.fontFamilyAliases,
+  );
   final FrameEpubCssCascade cascade;
   final List<String> warnings;
+  final Map<String, String> fontFamilyAliases;
 }
 
 class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   late Future<_EpubStylesheetBundle> _stylesFuture;
+  Map<String, String> _embeddedFontFamilyAliases = const {};
   final GlobalKey _viewportKey = GlobalKey();
   final Map<XmlElement, GlobalKey> _elementKeys = HashMap.identity();
   Map<XmlText, List<_ResolvedTextAnnotation>> _annotationRangesByNode =
@@ -496,7 +520,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
   }
 
   Future<_EpubStylesheetBundle> _loadStylesheets() async {
-    final stylesheets = <String>[];
+    final cascadeStylesheets = <FrameEpubCssStylesheet>[];
+    final fontStylesheets = <FrameEpubFontStylesheet>[];
     final warnings = <String>[];
     final visited = <String>{};
     final loader = widget.resourceLoader;
@@ -517,7 +542,12 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             await appendNode(importedPath);
           }
         }
-        stylesheets.add(sheet.css);
+        cascadeStylesheets.add(
+          FrameEpubCssStylesheet(path: sheet.resource.path, css: sheet.css),
+        );
+        fontStylesheets.add(
+          FrameEpubFontStylesheet(path: sheet.resource.path, css: sheet.css),
+        );
       }
 
       await appendNode(path);
@@ -527,7 +557,18 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         in widget.chapter.document.descendants.whereType<XmlElement>()) {
       final tag = element.name.local.toLowerCase();
       if (tag == 'style') {
-        stylesheets.add(element.innerText);
+        cascadeStylesheets.add(
+          FrameEpubCssStylesheet(
+            path: widget.chapter.resource.path,
+            css: element.innerText,
+          ),
+        );
+        fontStylesheets.add(
+          FrameEpubFontStylesheet(
+            path: widget.chapter.resource.path,
+            css: element.innerText,
+          ),
+        );
         continue;
       }
       if (tag != 'link') continue;
@@ -558,9 +599,17 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       }
     }
 
+    final embeddedFonts = await FrameEpubEmbeddedFontLoader().load(
+      book: loader.book,
+      resourceLoader: loader,
+      stylesheets: fontStylesheets,
+    );
+    warnings.addAll(embeddedFonts.warnings);
+
     return _EpubStylesheetBundle(
-      FrameEpubCssCascade.fromStylesheets(stylesheets),
+      FrameEpubCssCascade.fromStylesheetSources(cascadeStylesheets),
       List.unmodifiable(warnings),
+      embeddedFonts.familyAliases,
     );
   }
 
@@ -578,6 +627,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           );
         }
 
+        _embeddedFontFamilyAliases = snapshot.data!.fontFamilyAliases;
         final body = _bodyElement(widget.chapter.document);
         if (body == null) return _message('EPUB 章節沒有可顯示的 body 內容。');
         _annotationRangesByNode = _resolveAnnotationRanges();
@@ -606,10 +656,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                     constraints.maxHeight.isFinite) {
                   _fixedLayoutViewportSize = constraints.biggest;
                 }
-                final page = _buildFlow(
-                  body,
+                final page = _decorateBlockBackground(
+                  _buildFlow(
+                    body,
+                    bodyStyle,
+                    snapshot.data!.cascade,
+                  ),
                   bodyStyle,
-                  snapshot.data!.cascade,
                 );
                 if (widget.fixedLayoutImageFit == 'fit-width') {
                   return SingleChildScrollView(
@@ -654,12 +707,15 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
           return ColoredBox(
             color: widget.backgroundColor,
             child: LayoutBuilder(
-              builder: (context, constraints) => _buildPaginatedLayout(
-                context: context,
-                body: body,
-                bodyStyle: bodyStyle,
-                cascade: snapshot.data!.cascade,
-                constraints: constraints,
+              builder: (context, constraints) => _decorateBlockBackground(
+                _buildPaginatedLayout(
+                  context: context,
+                  body: body,
+                  bodyStyle: bodyStyle,
+                  cascade: snapshot.data!.cascade,
+                  constraints: constraints,
+                ),
+                bodyStyle,
               ),
             ),
           );
@@ -678,18 +734,21 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
                   }
                   return false;
                 },
-                child: ListView(
-                  key: _viewportKey,
-                  controller: widget.scrollController,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.horizontalPadding,
-                    vertical: widget.verticalMargin.clamp(8, 64),
+                child: _decorateBlockBackground(
+                  ListView(
+                    key: _viewportKey,
+                    controller: widget.scrollController,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: widget.horizontalPadding,
+                      vertical: widget.verticalMargin.clamp(8, 64),
+                    ),
+                    children: _flowChildren(
+                      body,
+                      bodyStyle,
+                      snapshot.data!.cascade,
+                    ),
                   ),
-                  children: _flowChildren(
-                    body,
-                    bodyStyle,
-                    snapshot.data!.cascade,
-                  ),
+                  bodyStyle,
                 ),
               ),
             ),
@@ -916,6 +975,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         pageWidth: layoutPageWidth,
         availableHeight:
             layoutAvailableHeight > 1 ? layoutAvailableHeight : 1,
+        items: items,
       );
       return Stack(
         children: [
@@ -1039,6 +1099,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     required Size viewportSize,
     required double pageWidth,
     required double availableHeight,
+    required List<Widget> items,
   }) {
     if (_paginationMeasurementScheduled) return;
     _paginationMeasurementScheduled = true;
@@ -1053,9 +1114,22 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         );
       }
 
+      final breakBeforeIndices = <int>{};
+      final breakAfterIndices = <int>{};
+      for (var index = 0; index < items.length; index++) {
+        final item = items[index];
+        if (item is! _EpubPageBreakMarker) continue;
+        if (item.kind == _EpubPageBreakKind.before) {
+          breakBeforeIndices.add(index);
+        } else {
+          breakAfterIndices.add(index);
+        }
+      }
       final pages = FrameEpubPageLayout.paginate(
         itemHeights: heights,
         availableHeight: availableHeight,
+        breakBeforeIndices: breakBeforeIndices,
+        breakAfterIndices: breakAfterIndices,
       );
       _initialPageForRestore = _measureInitialAnchorPage(pages);
       if (!mounted || revision != _paginationRevision) return;
@@ -1715,6 +1789,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               textDirection: textDirection,
               textAlign: textAlign,
               textScaler: paginationTextScaler ?? TextScaler.noScaling,
+              orphans: _cssLineCount(parentStyle['orphans']),
+              widows: _cssLineCount(parentStyle['widows']),
             )
           : [TextRange(start: 0, end: displayedText.length)];
 
@@ -1827,6 +1903,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       } else if (_isBlockElement(tag, childStyle) ||
           (widget.fixedLayout && tag == 'img')) {
         flushInline();
+        if (paginationWidth != null &&
+            _requiresForcedPageBreak(childStyle, before: true)) {
+          widgets.add(const _EpubPageBreakMarker.before());
+        }
         if (flattenBlockContainers &&
             _canFlattenFlowContainer(child, childStyle)) {
           // Keep a zero-size anchor for fragment links and CFI restoration.
@@ -1876,6 +1956,10 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
             paginationMaxHeight: paginationMaxHeight,
             paginationTextScaler: paginationTextScaler,
           ));
+        }
+        if (paginationWidth != null &&
+            _requiresForcedPageBreak(childStyle, before: false)) {
+          widgets.add(const _EpubPageBreakMarker.after());
         }
       } else {
         ensureParagraphIndent();
@@ -2018,9 +2102,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     if (!transparentContainers.contains(element.name.local.toLowerCase())) {
       return false;
     }
-    if (_boxInsets(style, 'padding', widget.fontSize) != EdgeInsets.zero ||
+    if (_avoidPageBreaks(style) ||
+        _boxInsets(style, 'padding', widget.fontSize) != EdgeInsets.zero ||
         _cssColor(style['background-color']) != null ||
-        _backgroundFromShorthand(style['background']) != null) {
+        _backgroundFromShorthand(style['background']) != null ||
+        _backgroundImageResource(style) != null) {
       return false;
     }
     return true;
@@ -2042,6 +2128,8 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         : (paginationWidth - blockPadding.horizontal - blockMargin.horizontal)
             .clamp(1.0, paginationWidth)
             .toDouble();
+    final contentPaginationMaxHeight =
+        _avoidPageBreaks(style) ? null : paginationMaxHeight;
     Widget child;
     if (tag == 'hr') {
       child = const Divider(color: Color(0x664D455B), height: 24);
@@ -2051,9 +2139,11 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         style,
         cascade,
         paginationWidth: innerWidth,
-        paginationMaxHeight: paginationMaxHeight,
+        paginationMaxHeight: contentPaginationMaxHeight,
         paginationTextScaler: paginationTextScaler,
       );
+    } else if (tag == 'svg') {
+      child = _buildSvgElement(element, style, block: true);
     } else if (tag == 'img') {
       child = _buildImage(element, style, block: true);
     } else if (tag == 'table') {
@@ -2062,7 +2152,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         style,
         cascade,
         paginationWidth: innerWidth,
-        paginationMaxHeight: paginationMaxHeight,
+        paginationMaxHeight: contentPaginationMaxHeight,
         paginationTextScaler: paginationTextScaler,
       );
     } else if (tag == 'pre') {
@@ -2097,7 +2187,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
               innerWidth == null
                   ? null
                   : (innerWidth - 19).clamp(1.0, innerWidth).toDouble(),
-          paginationMaxHeight: paginationMaxHeight,
+          paginationMaxHeight: contentPaginationMaxHeight,
           paginationTextScaler: paginationTextScaler,
         ),
       );
@@ -2107,28 +2197,154 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         style,
         cascade,
         paginationWidth: innerWidth,
-        paginationMaxHeight: paginationMaxHeight,
+        paginationMaxHeight: contentPaginationMaxHeight,
         paginationTextScaler: paginationTextScaler,
       );
     }
 
     final padding = blockPadding;
     final margin = blockMargin;
-    final background = _cssColor(style['background-color']) ??
-        _backgroundFromShorthand(style['background']);
     if (padding != EdgeInsets.zero) {
       child = Padding(padding: padding, child: child);
     }
-    if (background != null) {
-      child = DecoratedBox(
-        decoration: BoxDecoration(color: background),
-        child: child,
-      );
-    }
+    child = _decorateBlockBackground(child, style);
     if (margin != EdgeInsets.zero) {
       child = Padding(padding: margin, child: child);
     }
     return KeyedSubtree(key: _elementKey(element), child: child);
+  }
+
+  Widget _decorateBlockBackground(
+    Widget child,
+    Map<String, String> style,
+  ) {
+    final color = _cssColor(style['background-color']) ??
+        _backgroundFromShorthand(style['background']);
+    final resource = _backgroundImageResource(style);
+    if (color == null && resource == null) return child;
+    return _FrameEpubBackground(
+      loader: widget.resourceLoader,
+      resource: resource,
+      maxBytes: widget.maxImageBytes,
+      color: color,
+      fit: _backgroundFit(style['background-size']),
+      repeat: _backgroundRepeat(style['background-repeat']),
+      alignment: _backgroundAlignment(style['background-position']),
+      child: child,
+    );
+  }
+
+  FrameEpubResource? _backgroundImageResource(Map<String, String> style) {
+    final css = style[frameEpubBackgroundImageCssValue] ??
+        style['background-image'] ??
+        style['background'];
+    if (css == null ||
+        css.trim().isEmpty ||
+        css.trim().toLowerCase() == 'none') {
+      return null;
+    }
+    final match = RegExp(
+      r'''url\(\s*(?:(["'])(.*?)\1|([^)]*?))\s*\)''',
+      caseSensitive: false,
+    ).firstMatch(css);
+    if (match == null) return null;
+    final href = (match.group(2) ?? match.group(3) ?? '').trim();
+    if (href.isEmpty) return null;
+    final basePath =
+        style[frameEpubBackgroundImageBasePath] ??
+        widget.chapter.resource.path;
+    final reference = widget.resourceLoader.resolve(
+      href,
+      fromPath: basePath,
+    );
+    final resource = reference.resource;
+    if (!reference.isInternal ||
+        resource == null ||
+        resource.kind != FrameEpubResourceKind.image ||
+        resource.size <= 0 ||
+        resource.size > widget.maxImageBytes) {
+      return null;
+    }
+    return resource;
+  }
+
+  static BoxFit? _backgroundFit(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'cover':
+        return BoxFit.cover;
+      case 'contain':
+        return BoxFit.contain;
+      case '100% 100%':
+        return BoxFit.fill;
+      default:
+        return null;
+    }
+  }
+
+  static ImageRepeat _backgroundRepeat(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'no-repeat':
+        return ImageRepeat.noRepeat;
+      case 'repeat-x':
+        return ImageRepeat.repeatX;
+      case 'repeat-y':
+        return ImageRepeat.repeatY;
+      default:
+        return ImageRepeat.repeat;
+    }
+  }
+
+  static Alignment _backgroundAlignment(String? value) {
+    if (value == null || value.trim().isEmpty) return Alignment.topLeft;
+    final tokens = value.trim().toLowerCase().split(RegExp(r'\s+'));
+    var x = 'center';
+    var y = 'center';
+    if (tokens.length == 1) {
+      final token = tokens.single;
+      if (token == 'top' || token == 'bottom') {
+        y = token;
+      } else {
+        x = token;
+      }
+    } else {
+      for (final token in tokens.take(2)) {
+        if (token == 'left' || token == 'right') {
+          x = token;
+        } else if (token == 'top' || token == 'bottom') {
+          y = token;
+        } else if (x == 'center') {
+          x = token;
+        } else {
+          y = token;
+        }
+      }
+    }
+
+    double axis(String token) {
+      switch (token) {
+        case 'left':
+        case 'top':
+          return -1;
+        case 'right':
+        case 'bottom':
+          return 1;
+        case 'center':
+          return 0;
+      }
+      if (token.endsWith('%')) {
+        final percentage =
+            double.tryParse(token.substring(0, token.length - 1));
+        if (percentage != null) {
+          return (percentage.clamp(0, 100) / 50) - 1;
+        }
+      }
+      return 0;
+    }
+
+    return Alignment(
+      axis(x).clamp(-1, 1).toDouble(),
+      axis(y).clamp(-1, 1).toDouble(),
+    );
   }
 
   Widget _buildTable(
@@ -2705,12 +2921,13 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         );
       }
       return WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
+        alignment: _inlinePlaceholderAlignment(style['vertical-align']),
+        baseline: TextBaseline.alphabetic,
         child: image,
       );
     }
-    if (tag == 'svg' || tag == 'math') {
-      Widget object = _unsupportedInlineObject(tag);
+    if (tag == 'svg') {
+      Widget object = _buildSvgElement(element, style);
       if (linkRecognizer != null) {
         object = GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -2719,7 +2936,26 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         );
       }
       return WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
+        alignment: _inlinePlaceholderAlignment(style['vertical-align']),
+        baseline: TextBaseline.alphabetic,
+        child: object,
+      );
+    }
+    if (tag == 'math') {
+      Widget object = FrameEpubMathMl(
+        element: element,
+        textStyle: _textStyle(style),
+      );
+      if (linkRecognizer != null) {
+        object = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: linkRecognizer.onTap,
+          child: object,
+        );
+      }
+      return WidgetSpan(
+        alignment: _inlinePlaceholderAlignment(style['vertical-align']),
+        baseline: TextBaseline.alphabetic,
         child: object,
       );
     }
@@ -3081,9 +3317,25 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       fromPath: widget.chapter.resource.path,
     );
     final resource = reference.resource;
-    if (!reference.isInternal ||
-        resource == null ||
-        resource.kind != FrameEpubResourceKind.image) {
+    if (!reference.isInternal || resource == null) {
+      return _imagePlaceholder(alt);
+    }
+    if (resource.kind == FrameEpubResourceKind.svg) {
+      if (resource.size > widget.resourceLoader.maxSvgBytes) {
+        return _imagePlaceholder('$alt（SVG 超過 8 MiB 讀取上限）');
+      }
+      final svgSize = _svgWidgetSize(style, element, block: block);
+      return _FrameEpubSvg(
+        loader: widget.resourceLoader,
+        resource: resource,
+        maxBytes: widget.resourceLoader.maxSvgBytes,
+        width: svgSize.width,
+        height: svgSize.height,
+        alt: alt,
+        onLayoutChanged: _handleImageLayoutChanged,
+      );
+    }
+    if (resource.kind != FrameEpubResourceKind.image) {
       return _imagePlaceholder(alt);
     }
     if (resource.size > widget.maxImageBytes) {
@@ -3094,37 +3346,70 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ? (widget.fixedLayoutImageFit == 'fit-width'
             ? BoxFit.fitWidth
             : BoxFit.contain)
-        : BoxFit.scaleDown;
-    double? fixedDimension(String? value) {
+        : (_objectFit(style['object-fit']) ?? BoxFit.scaleDown);
+    final imageAlignment = _objectPosition(style['object-position']);
+    final pageSize = _fixedLayoutViewportSize;
+    final defaultMaxWidth = widget.fixedLayout
+        ? pageSize?.width ?? double.infinity
+        : (block ? double.infinity : 320.0);
+    final defaultMaxHeight = widget.fixedLayout
+        ? (widget.fixedLayoutImageFit == 'fit-page'
+            ? pageSize?.height ?? double.infinity
+            : double.infinity)
+        : 680.0;
+    double? fixedDimension(String? value, {required double reference}) {
       if (widget.fixedLayout && value?.trim().endsWith('%') == true) {
         return null;
       }
-      return _cssDimension(value, widget.fontSize);
+      return _cssDimension(value, reference);
     }
 
-    final pageSize = _fixedLayoutViewportSize;
-    final explicitWidth = fixedDimension(style['width']) ??
-        fixedDimension(_attribute(element, 'width'));
-    final explicitHeight = fixedDimension(style['height']) ??
-        fixedDimension(_attribute(element, 'height'));
+    final widthReference = widget.fixedLayout
+        ? pageSize?.width ?? widget.contentMaxWidth
+        : (block ? widget.contentMaxWidth : 320.0);
+    final heightReference =
+        widget.fixedLayout ? pageSize?.height ?? 680.0 : 680.0;
+    final explicitWidth = fixedDimension(
+          style['width'],
+          reference: widthReference,
+        ) ??
+        fixedDimension(
+          _attribute(element, 'width'),
+          reference: widthReference,
+        );
+    final explicitHeight = fixedDimension(
+          style['height'],
+          reference: heightReference,
+        ) ??
+        fixedDimension(
+          _attribute(element, 'height'),
+          reference: heightReference,
+        );
+    final cssMaxWidth = fixedDimension(
+      style['max-width'],
+      reference: widthReference,
+    );
+    final cssMaxHeight = fixedDimension(
+      style['max-height'],
+      reference: heightReference,
+    );
+    double bound(double fallback, double? requested) {
+      if (requested == null || requested <= 0) return fallback;
+      if (!fallback.isFinite) return requested;
+      return requested < fallback ? requested : fallback;
+    }
+
     final image = _FrameEpubImage(
       loader: widget.resourceLoader,
       resource: resource,
       maxBytes: widget.maxImageBytes,
       fit: imageFit,
+      alignment: imageAlignment,
       width: explicitWidth,
       height: explicitHeight,
       useViewportBounds: widget.fixedLayout,
-      maxWidth: explicitWidth ??
-          (widget.fixedLayout
-              ? pageSize?.width ?? double.infinity
-              : (block ? double.infinity : 320)),
-      maxHeight: explicitHeight ??
-          (widget.fixedLayout
-              ? (widget.fixedLayoutImageFit == 'fit-page'
-                  ? pageSize?.height ?? double.infinity
-                  : double.infinity)
-              : 680),
+      maxWidth: bound(explicitWidth ?? defaultMaxWidth, cssMaxWidth),
+      maxHeight: bound(explicitHeight ?? defaultMaxHeight, cssMaxHeight),
       alt: alt,
       onLayoutChanged: _handleImageLayoutChanged,
     );
@@ -3138,6 +3423,151 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       );
     }
     return image;
+  }
+
+  ({double width, double height}) _svgWidgetSize(
+    Map<String, String> style,
+    XmlElement element, {
+    bool block = false,
+  }) {
+    double? dimension(String? value) {
+      if (widget.fixedLayout && value?.trim().endsWith('%') == true) {
+        return null;
+      }
+      return _cssDimension(value, widget.fontSize);
+    }
+
+    final pageSize = _fixedLayoutViewportSize;
+    final width = dimension(style['width']) ??
+        dimension(_attribute(element, 'width')) ??
+        (widget.fixedLayout
+            ? pageSize?.width ?? widget.contentMaxWidth
+            : (block ? widget.contentMaxWidth : widget.fontSize * 2.4));
+    final height = dimension(style['height']) ??
+        dimension(_attribute(element, 'height')) ??
+        (widget.fixedLayout
+            ? pageSize?.height ?? width * 0.65
+            : (block ? width * 0.65 : widget.fontSize * 1.6));
+    return (width: width, height: height);
+  }
+
+  static BoxFit? _objectFit(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'fill':
+        return BoxFit.fill;
+      case 'contain':
+        return BoxFit.contain;
+      case 'cover':
+        return BoxFit.cover;
+      case 'none':
+        return BoxFit.none;
+      case 'scale-down':
+        return BoxFit.scaleDown;
+      default:
+        return null;
+    }
+  }
+
+  static Alignment _objectPosition(String? value) {
+    if (value == null || value.trim().isEmpty) return Alignment.center;
+    final tokens = value.trim().toLowerCase().split(RegExp(r'\s+'));
+    var x = 'center';
+    var y = 'center';
+    if (tokens.length == 1) {
+      final token = tokens.single;
+      if (token == 'top' || token == 'bottom') {
+        y = token;
+      } else {
+        x = token;
+      }
+    } else {
+      for (final token in tokens.take(2)) {
+        if (token == 'left' || token == 'right') {
+          x = token;
+        } else if (token == 'top' || token == 'bottom') {
+          y = token;
+        } else if (x == 'center') {
+          x = token;
+        } else {
+          y = token;
+        }
+      }
+    }
+
+    double axis(String token) {
+      switch (token) {
+        case 'left':
+        case 'top':
+          return -1;
+        case 'right':
+        case 'bottom':
+          return 1;
+        case 'center':
+          return 0;
+      }
+      if (token.endsWith('%')) {
+        final percentage =
+            double.tryParse(token.substring(0, token.length - 1));
+        if (percentage != null) {
+          return (percentage.clamp(0, 100) / 50) - 1;
+        }
+      }
+      return 0;
+    }
+
+    return Alignment(
+      axis(x).clamp(-1, 1).toDouble(),
+      axis(y).clamp(-1, 1).toDouble(),
+    );
+  }
+
+  String? _inlineSvgMarkup(XmlElement element) {
+    var markup = element.toXmlString();
+    if (markup.length > 1024 * 1024) return null;
+
+    // A standalone serialization can lose the inherited XHTML namespace.
+    // Normalize the SVG root before parsing so it is always SVG, not XHTML.
+    final rootPattern = RegExp(r'^<svg\b[^>]*>');
+    final root = rootPattern.firstMatch(markup);
+    if (root == null) return null;
+    var opening = root.group(0)!;
+    final xmlnsPattern = RegExp(r'\sxmlns="[^"]*"');
+    if (xmlnsPattern.hasMatch(opening)) {
+      opening = opening.replaceFirst(
+        xmlnsPattern,
+        ' xmlns="http://www.w3.org/2000/svg"',
+      );
+    } else {
+      opening = opening.replaceFirst(
+        RegExp(r'^<svg\b'),
+        '<svg xmlns="http://www.w3.org/2000/svg"',
+      );
+    }
+    markup = opening + markup.substring(root.end);
+    return _sanitizeEpubSvgMarkup(markup, maxLength: 1024 * 1024);
+  }
+
+  Widget _buildSvgElement(
+    XmlElement element,
+    Map<String, String> style, {
+    bool block = false,
+  }) {
+    final markup = _inlineSvgMarkup(element);
+    if (markup == null) {
+      return _imagePlaceholder('SVG 圖形過大或根節點格式不支援');
+    }
+    final size = _svgWidgetSize(style, element, block: block);
+    final titles = element.findElements('title');
+    final title = titles.isEmpty ? null : titles.first.innerText;
+    return SvgPicture.string(
+      markup,
+      width: size.width,
+      height: size.height,
+      fit: BoxFit.contain,
+      alignment: Alignment.center,
+      clipBehavior: Clip.hardEdge,
+      semanticsLabel: title?.isNotEmpty == true ? title : 'EPUB SVG 圖形',
+    );
   }
 
   Widget _imagePlaceholder(String label) => Container(
@@ -3165,18 +3595,6 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         ),
       );
 
-  Widget _unsupportedInlineObject(String tag) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF211D2B),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          tag == 'svg' ? 'SVG 圖形暫未支援' : '數學公式暫未支援',
-          style: const TextStyle(color: Color(0xFFAAA2B8), fontSize: 11),
-        ),
-      );
-
   Map<String, String> _computedStyle(
     XmlElement element,
     FrameEpubCssCascade cascade,
@@ -3187,6 +3605,7 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         element,
         parentStyle: parent,
         inlineStyle: _attribute(element, 'style'),
+        inlineStyleBasePath: widget.chapter.resource.path,
       ),
     );
     final parentSize = _length(parent['font-size'], widget.fontSize);
@@ -3259,20 +3678,66 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
 
   TextStyle _textStyle(Map<String, String> style) {
     final size = _length(style['font-size'], widget.fontSize);
+    final requestedFaceKey = _embeddedFontFaceKey(
+      style['font-family'],
+      weight: style['font-weight'] ?? '400',
+      style: style['font-style'] ?? 'normal',
+    );
+    final exactEmbeddedFace = requestedFaceKey != null &&
+        _embeddedFontFamilyAliases.containsKey(requestedFaceKey);
+    final embeddedFamily = requestedFaceKey == null
+        ? null
+        : _embeddedFontFamilyAliases[requestedFaceKey] ??
+            FrameEpubFontLoadResult.resolveAlias(
+              _embeddedFontFamilyAliases,
+              family: _fontFamilyName(style['font-family'])!,
+              weight: style['font-weight'] ?? '400',
+              style: style['font-style'] ?? 'normal',
+            );
     return TextStyle(
       color: _cssColor(style['color']) ?? widget.textColor,
-      fontFamily: _fontFamily(style['font-family'], widget.fontFamily),
+      fontFamily: embeddedFamily ??
+          _fontFamily(style['font-family'], widget.fontFamily),
       fontSize: size,
-      fontWeight: _fontWeight(style['font-weight']),
-      fontStyle: style['font-style'] == 'italic' ||
-              style['font-style'] == 'oblique'
-          ? FontStyle.italic
-          : FontStyle.normal,
+      // Exact embedded faces already contain their declared weight/style.
+      // When CSS matching falls back to a nearby face, keep TextStyle's
+      // requested weight/style so Flutter can synthesize the missing variant.
+      fontWeight: exactEmbeddedFace
+          ? FontWeight.normal
+          : _fontWeight(style['font-weight']),
+      fontStyle: exactEmbeddedFace
+          ? FontStyle.normal
+          : (style['font-style'] == 'italic' ||
+                  style['font-style']?.startsWith('oblique') == true
+              ? FontStyle.italic
+              : FontStyle.normal),
       fontFeatures: _positionFontFeatures(style),
       decoration: _textDecoration(style['text-decoration']),
       height: _lineHeight(style['line-height'], size),
       letterSpacing: _cssDimension(style['letter-spacing'], size),
     );
+  }
+
+  static PlaceholderAlignment _inlinePlaceholderAlignment(
+    String? value,
+  ) {
+    switch (value?.trim().toLowerCase()) {
+      case 'baseline':
+        return PlaceholderAlignment.baseline;
+      case 'sub':
+      case 'text-bottom':
+        return PlaceholderAlignment.belowBaseline;
+      case 'super':
+      case 'text-top':
+        return PlaceholderAlignment.aboveBaseline;
+      case 'top':
+        return PlaceholderAlignment.top;
+      case 'bottom':
+        return PlaceholderAlignment.bottom;
+      case 'middle':
+      default:
+        return PlaceholderAlignment.middle;
+    }
   }
 
   static List<FontFeature>? _positionFontFeatures(
@@ -3450,6 +3915,37 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
     }
   }
 
+  static bool _requiresForcedPageBreak(
+    Map<String, String> style, {
+    required bool before,
+  }) {
+    final modern = style[before ? 'break-before' : 'break-after']
+        ?.trim()
+        .toLowerCase();
+    final legacy = style[before ? 'page-break-before' : 'page-break-after']
+        ?.trim()
+        .toLowerCase();
+    final value = modern == null || modern.isEmpty || modern == 'auto'
+        ? legacy
+        : modern;
+    return const {'page', 'always', 'left', 'right'}.contains(value);
+  }
+
+  static bool _avoidPageBreaks(Map<String, String> style) {
+    final modern = style['break-inside']?.trim().toLowerCase();
+    final legacy = style['page-break-inside']?.trim().toLowerCase();
+    final value = modern == null || modern.isEmpty || modern == 'auto'
+        ? legacy
+        : modern;
+    return value == 'avoid' || value == 'avoid-page';
+  }
+
+  static int _cssLineCount(String? value) {
+    final parsed = int.tryParse(value?.trim() ?? '');
+    if (parsed == null) return 2;
+    return parsed.clamp(1, 50).toInt();
+  }
+
   static TextAlign _textAlign(String? value) {
     switch (value?.toLowerCase()) {
       case 'center':
@@ -3504,14 +4000,33 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
         : TextDecoration.combine(decorations);
   }
 
-  static String _fontFamily(String? value, String fallback) {
-    if (value == null || value.trim().isEmpty) return fallback;
-    final first = value
+  String? _fontFamilyName(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return value
         .split(',')
         .first
         .trim()
         .replaceAll('"', '')
         .replaceAll("'", '');
+  }
+
+  String? _embeddedFontFaceKey(
+    String? value, {
+    required String weight,
+    required String style,
+  }) {
+    final family = _fontFamilyName(value);
+    if (family == null) return null;
+    return FrameEpubEmbeddedFontLoader.fontFaceAliasKey(
+      family,
+      weight,
+      style,
+    );
+  }
+
+  String _fontFamily(String? value, String fallback) {
+    if (value == null || value.trim().isEmpty) return fallback;
+    final first = _fontFamilyName(value)!;
     if (const {'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'}
         .contains(first.toLowerCase())) {
       return switch (first.toLowerCase()) {
@@ -3696,12 +4211,290 @@ class _FrameEpubChapterViewState extends State<FrameEpubChapterView> {
       '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
 }
 
+String? _sanitizeEpubSvgMarkup(
+  String markup, {
+  required int maxLength,
+}) {
+  if (markup.length > maxLength) return null;
+  if (RegExp(r'<!DOCTYPE\b', caseSensitive: false).hasMatch(markup)) {
+    return null;
+  }
+
+  // EPUB SVG is rendered from an in-memory string only. Strip executable
+  // content and stylesheet instructions before it reaches the SVG parser.
+  markup = markup.replaceAll(
+    RegExp(
+      r'<(script|style|foreignObject|iframe|object|embed)\b[^>]*>.*?</\1\s*>',
+      caseSensitive: false,
+      dotAll: true,
+    ),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(
+      r'<(?:script|style|foreignObject|iframe|object|embed)\b[^>]*/\s*>',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(r'<\?xml-stylesheet\b[\s\S]*?\?>', caseSensitive: false),
+    '',
+  );
+  markup = markup.replaceAll(
+    RegExp(
+      r'''\s+on[a-z][a-z0-9_-]*\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)''',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  markup = markup.replaceAllMapped(
+    RegExp(
+      r'''\s+(?:href|xlink:href|src|xml:base)\s*=\s*("[^"]*"|'[^']*')''',
+      caseSensitive: false,
+    ),
+    (match) {
+      final attribute = match.group(0) ?? '';
+      final value = RegExp(r'''(["'])(.*?)\1''')
+          .firstMatch(attribute)
+          ?.group(2)
+          ?.trim();
+      return value?.startsWith('#') == true ? attribute : '';
+    },
+  );
+  // Preserve fragment-local paint servers such as url(#gradient), while
+  // dropping external/data URLs from SVG presentation attributes.
+  markup = markup.replaceAllMapped(
+    RegExp(
+      r'''\s+[a-zA-Z_:][a-zA-Z0-9_.:-]*\s*=\s*("[^"]*url\s*\([^"]*"|'[^']*url\s*\([^']*')''',
+      caseSensitive: false,
+    ),
+    (match) {
+      final attribute = match.group(0) ?? '';
+      final value = RegExp(r'''(["'])(.*?)\1''')
+              .firstMatch(attribute)
+              ?.group(2) ??
+          '';
+      final hasExternalUrl = RegExp(
+        r'''url\s*\(\s*(['"]?)(.*?)\1\s*\)''',
+        caseSensitive: false,
+      ).allMatches(value).any((url) {
+        final target = url.group(2)?.trim() ?? '';
+        return !target.startsWith('#');
+      });
+      return hasExternalUrl ? '' : attribute;
+    },
+  );
+
+  try {
+    final document = XmlDocument.parse(markup);
+    if (document.rootElement.name.local.toLowerCase() != 'svg') {
+      return null;
+    }
+  } on Exception {
+    return null;
+  }
+  return markup;
+}
+
+class _FrameEpubSvg extends StatefulWidget {
+  const _FrameEpubSvg({
+    required this.loader,
+    required this.resource,
+    required this.maxBytes,
+    required this.width,
+    required this.height,
+    required this.alt,
+    this.onLayoutChanged,
+  });
+
+  final FrameEpubResourceLoader loader;
+  final FrameEpubResource resource;
+  final int maxBytes;
+  final double width;
+  final double height;
+  final String alt;
+  final VoidCallback? onLayoutChanged;
+
+  @override
+  State<_FrameEpubSvg> createState() => _FrameEpubSvgState();
+}
+
+class _FrameEpubSvgState extends State<_FrameEpubSvg> {
+  late Future<String> _markup;
+  bool _layoutChangeReported = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _markup = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrameEpubSvg oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.resource, widget.resource) ||
+        !identical(oldWidget.loader, widget.loader) ||
+        oldWidget.maxBytes != widget.maxBytes) {
+      _markup = _load();
+      _layoutChangeReported = false;
+    }
+    if (oldWidget.onLayoutChanged != widget.onLayoutChanged) {
+      _layoutChangeReported = false;
+    }
+  }
+
+  Future<String> _load() async {
+    final markup = await widget.loader.readText(
+      widget.resource,
+      maxBytes: widget.maxBytes,
+    );
+    final sanitized = _sanitizeEpubSvgMarkup(
+      markup,
+      maxLength: widget.maxBytes,
+    );
+    if (sanitized == null) {
+      throw const FormatException('SVG 文件無效或超過讀取上限。');
+    }
+    return sanitized;
+  }
+
+  void _reportLayoutChanged() {
+    if (_layoutChangeReported || widget.onLayoutChanged == null) return;
+    _layoutChangeReported = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLayoutChanged?.call();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _markup,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Semantics(
+            label: widget.alt,
+            image: true,
+            child: SizedBox(
+              width: widget.width,
+              height: widget.height,
+              child: Center(
+                child: snapshot.hasError
+                    ? const Icon(
+                        Icons.broken_image_outlined,
+                        color: Color(0xFF8F829F),
+                      )
+                    : const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+              ),
+            ),
+          );
+        }
+        _reportLayoutChanged();
+        return SvgPicture.string(
+          snapshot.data!,
+          width: widget.width,
+          height: widget.height,
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          semanticsLabel: widget.alt,
+        );
+      },
+    );
+  }
+}
+
+class _FrameEpubBackground extends StatefulWidget {
+  const _FrameEpubBackground({
+    required this.loader,
+    required this.resource,
+    required this.maxBytes,
+    required this.color,
+    required this.fit,
+    required this.repeat,
+    required this.alignment,
+    required this.child,
+  });
+
+  final FrameEpubResourceLoader loader;
+  final FrameEpubResource? resource;
+  final int maxBytes;
+  final Color? color;
+  final BoxFit? fit;
+  final ImageRepeat repeat;
+  final Alignment alignment;
+  final Widget child;
+
+  @override
+  State<_FrameEpubBackground> createState() => _FrameEpubBackgroundState();
+}
+
+class _FrameEpubBackgroundState extends State<_FrameEpubBackground> {
+  Future<Uint8List>? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLoading();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrameEpubBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resource != widget.resource ||
+        oldWidget.loader != widget.loader ||
+        oldWidget.maxBytes != widget.maxBytes) {
+      _startLoading();
+    }
+  }
+
+  void _startLoading() {
+    final resource = widget.resource;
+    _bytes = resource == null
+        ? null
+        : widget.loader.readBytes(resource, maxBytes: widget.maxBytes);
+  }
+
+  Widget _paint(Uint8List? bytes) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: widget.color,
+          image: bytes == null
+              ? null
+              : DecorationImage(
+                  image: MemoryImage(bytes),
+                  fit: widget.fit,
+                  repeat: widget.repeat,
+                  alignment: widget.alignment,
+                  filterQuality: FilterQuality.medium,
+                ),
+        ),
+        child: widget.child,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _bytes;
+    if (future == null) return _paint(null);
+    return FutureBuilder<Uint8List>(
+      future: future,
+      builder: (context, snapshot) =>
+          _paint(snapshot.hasData ? snapshot.data : null),
+    );
+  }
+}
+
 class _FrameEpubImage extends StatefulWidget {
   const _FrameEpubImage({
     required this.loader,
     required this.resource,
     required this.maxBytes,
     required this.fit,
+    this.alignment = Alignment.center,
     required this.maxWidth,
     required this.maxHeight,
     this.width,
@@ -3715,6 +4508,7 @@ class _FrameEpubImage extends StatefulWidget {
   final FrameEpubResource resource;
   final int maxBytes;
   final BoxFit fit;
+  final Alignment alignment;
   final double maxWidth;
   final double maxHeight;
   final double? width;
@@ -3849,6 +4643,7 @@ class _FrameEpubImageState extends State<_FrameEpubImage> {
                       ? maxHeight
                       : null),
               fit: widget.fit,
+              alignment: widget.alignment,
               cacheWidth: cacheWidth,
               filterQuality: FilterQuality.medium,
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
