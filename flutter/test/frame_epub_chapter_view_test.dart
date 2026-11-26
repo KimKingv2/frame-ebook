@@ -738,7 +738,6 @@ void main() {
     final clipboardWrites = <String>[];
     final messenger = tester.binding.defaultBinaryMessenger;
     final semanticsHandle = tester.ensureSemantics();
-    addTearDown(semanticsHandle.dispose);
     messenger.setMockMethodCallHandler(
       SystemChannels.platform,
       (call) async {
@@ -860,6 +859,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {
+      semanticsHandle.dispose();
       messenger.setMockMethodCallHandler(SystemChannels.platform, null);
       await archive.close();
     }
