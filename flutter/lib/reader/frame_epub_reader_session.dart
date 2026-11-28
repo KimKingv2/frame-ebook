@@ -106,6 +106,77 @@ class FrameEpubReaderSession extends ChangeNotifier {
 
   bool get isFixedLayout => _epub?.isFixedLayout ?? false;
 
+  /// Spine indexes that participate in the publication's normal reading
+  /// order. Non-linear auxiliary pages remain directly navigable.
+  List<int> get linearSpineIndices {
+    final spine = _epub?.spine;
+    if (spine == null) return const [];
+    return List<int>.unmodifiable([
+      for (var index = 0; index < spine.length; index++)
+        if (spine[index].linear) index,
+    ]);
+  }
+
+  /// Reading order for the active reader surface.
+  ///
+  /// A non-linear item opened directly from the TOC or a hyperlink is included
+  /// for as long as it is the active page, so long-strip scroll restoration
+  /// can still represent that page without making it part of normal reading.
+  List<int> get readingOrderSpineIndices {
+    final spine = _epub?.spine;
+    if (spine == null) return const [];
+    final indices = linearSpineIndices.toList();
+    final activeIndex = _currentSpineIndex;
+    if (activeIndex == null ||
+        activeIndex < 0 ||
+        activeIndex >= spine.length ||
+        spine[activeIndex].linear) {
+      return List<int>.unmodifiable(indices);
+    }
+
+    final insertionIndex = indices.indexWhere(
+      (candidate) => candidate > activeIndex,
+    );
+    if (insertionIndex < 0) {
+      indices.add(activeIndex);
+    } else {
+      indices.insert(insertionIndex, activeIndex);
+    }
+    return List<int>.unmodifiable(indices);
+  }
+
+  /// Resolves a spine index by its relative position in normal reading order.
+  /// This also works when the active page was opened directly and is nonlinear.
+  int? spineIndexAtReadingOrderOffset(int spineIndex, int offset) {
+    final indices = readingOrderSpineIndices;
+    final currentPosition = indices.indexOf(spineIndex);
+    if (currentPosition < 0) return null;
+    final targetPosition = currentPosition + offset;
+    if (targetPosition < 0 || targetPosition >= indices.length) return null;
+    return indices[targetPosition];
+  }
+
+  /// Whole-book page progress for fixed-layout publications.
+  ///
+  /// Only linear pages contribute to the total. A directly opened non-linear
+  /// page is positioned between its surrounding linear pages without adding
+  /// an extra page to the publication's progress denominator.
+  int get fixedLayoutReadingProgressPercent {
+    final activeIndex = _currentSpineIndex;
+    final linearIndices = linearSpineIndices;
+    if (activeIndex == null) return 0;
+    if (linearIndices.isEmpty) return 100;
+
+    final activePosition = linearIndices.indexOf(activeIndex);
+    final completedPages = activePosition >= 0
+        ? activePosition + 1
+        : linearIndices.where((index) => index < activeIndex).length;
+    return ((completedPages * 100) / linearIndices.length)
+        .round()
+        .clamp(0, 100)
+        .toInt();
+  }
+
   bool get canGoPrevious {
     final index = _currentSpineIndex;
     return index != null && _previousLinearSpineIndex(index) != null;
@@ -481,7 +552,9 @@ class FrameEpubReaderSession extends ChangeNotifier {
         _saveNavigationProgress(
           index: index,
           label: currentChapterLabel,
-          percent: chapterProgressPercent,
+          percent: isFixedLayout
+              ? fixedLayoutReadingProgressPercent
+              : chapterProgressPercent,
         ),
       );
     }

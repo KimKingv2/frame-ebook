@@ -648,6 +648,46 @@ void main() {
       await session.close();
     });
 
+    test('uses linear reading order for fixed-layout comic pages', () async {
+      final fixture = _zipFixture(
+        fixedLayout: true,
+        includeNonLinearSpineItem: true,
+      );
+      final session = FrameEpubReaderSession(
+        book: _book(fixture.length),
+        fileSource: _MemoryFrameFileSource(fixture),
+        repository: FrameReaderRepository(_FakeApi()),
+      );
+
+      await session.open();
+      expect(session.isFixedLayout, isTrue);
+      expect(session.currentSpineIndex, 0);
+      expect(session.linearSpineIndices, [0, 2]);
+      expect(session.readingOrderSpineIndices, [0, 2]);
+      expect(session.spineIndexAtReadingOrderOffset(0, 1), 2);
+      expect(session.fixedLayoutReadingProgressPercent, 50);
+
+      expect(await session.goToNextChapter(), isTrue);
+      expect(session.currentSpineIndex, 2);
+      expect(session.fixedLayoutReadingProgressPercent, 100);
+      expect(session.spineIndexAtReadingOrderOffset(2, -1), 0);
+
+      // A TOC link can still open the non-linear page directly. It is
+      // temporarily represented in the active strip, but does not inflate
+      // the linear progress denominator or alter adjacent navigation.
+      final appendixEntry = session.toc[2];
+      expect(await session.goToTocEntry(appendixEntry), isTrue);
+      expect(session.currentSpineIndex, 1);
+      expect(session.readingOrderSpineIndices, [0, 1, 2]);
+      expect(session.spineIndexAtReadingOrderOffset(1, -1), 0);
+      expect(session.spineIndexAtReadingOrderOffset(1, 1), 2);
+      expect(session.fixedLayoutReadingProgressPercent, 50);
+      expect(await session.goToNextChapter(), isTrue);
+      expect(session.currentSpineIndex, 2);
+
+      await session.close();
+    });
+
     test('starts at the first linear spine item when the first item is non-linear',
         () async {
       final fixture = _zipFixture(firstSpineItemLinear: false);
