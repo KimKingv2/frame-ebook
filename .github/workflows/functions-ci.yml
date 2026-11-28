@@ -1,0 +1,27 @@
+name: FRAME Ebook Functions CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "functions/**"
+      - "migrations/**"
+      - ".github/workflows/functions-ci.yml"
+  pull_request:
+    paths:
+      - "functions/**"
+      - "migrations/**"
+      - ".github/workflows/functions-ci.yml"
+
+jobs:
+  functions:
+    name: Test Pages Functions helpers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run Functions unit tests
+        run: node --experimental-default-type=module --test functions/tests/*.test.js

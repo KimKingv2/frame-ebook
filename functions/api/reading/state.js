@@ -1,5 +1,6 @@
 import { json, isSameOrigin } from "../../_lib/common.js";
 import { getReaderContext, requestBookDescriptor } from "../../_lib/reader-data.js";
+import { mergeReaderBookState } from "../../_lib/reader-state.js";
 
 const APPEARANCE_KEYS = new Set([
   "fontScale","lineHeight","verticalMargin","horizontalMargin","fontFamily","fontWeight",
@@ -87,29 +88,51 @@ export async function onRequestPost({ request, env }) {
   try { patch = cleanState(body?.state); } catch (error) { return json({ error: error.message }, 400); }
   try {
     const previous = await readState(context);
-    const next = { ...previous, ...patch };
-    const now = Date.now();
+    const next = mergeReaderBookState(previous, patch);
     const stateJson = JSON.stringify(next);
-    if (stateJson.length > 24 * 1024) return json({ error: "單本書的閱讀狀態超過保存上限。" }, 413);
+    if (stateJson.length > 24 * 1024) {
+      return json({ error: "單本書的閱讀狀態超過保存上限。" }, 413);
+    }
+    const now = Date.now();
     const storedProvider = context.book.provider === "local" ? "vps" : context.book.provider;
+    const bookPayload = JSON.stringify({
+      id: context.book.bookId,
+      provider: storedProvider,
+      library: context.book.library,
+      rootPath: context.book.rootPath,
+      path: context.book.path
+    });
     await context.db.batch([
       context.db.prepare(
-        "INSERT INTO reader_book_state (user_id,book_id,provider,library,root_path,book_path,state_json,created_at,updated_at) " +
+        "INSERT INTO reader_book_state " +
+        "(user_id,book_id,provider,library,root_path,book_path,state_json,created_at,updated_at) " +
         "VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,book_id) DO UPDATE SET " +
-        "provider=excluded.provider,library=excluded.library,root_path=excluded.root_path,book_path=excluded.book_path," +
-        "state_json=excluded.state_json,updated_at=excluded.updated_at"
+        "provider=excluded.provider,library=excluded.library,root_path=excluded.root_path," +
+        "book_path=excluded.book_path," +
+        "state_json=json_patch(" +
+        "CASE WHEN json_valid(reader_book_state.state_json) " +
+        "THEN reader_book_state.state_json ELSE '{}' END,excluded.state_json)," +
+        "updated_at=excluded.updated_at"
       ).bind(
         context.userId, context.book.bookId, storedProvider, context.book.library,
-        context.book.rootPath, context.book.path, stateJson, now, now
+        context.book.rootPath, context.book.path, JSON.stringify(patch), now, now
       ),
       context.db.prepare(
-        "INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) VALUES (?,'state',?,'upsert',?,?)"
-      ).bind(context.userId,context.book.bookId,JSON.stringify({
-        book:{id:context.book.bookId,provider:storedProvider,library:context.book.library,rootPath:context.book.rootPath,path:context.book.path},
-        state:next
-      }),now)
+        "INSERT INTO reader_sync_changes " +
+        "(user_id,entity_type,entity_id,operation,payload_json,created_at) " +
+        "SELECT ?,'state',?,'upsert'," +
+        "json_object('book',json(?),'state',json(state_json)),? " +
+        "FROM reader_book_state WHERE user_id=? AND book_id=?"
+      ).bind(
+        context.userId, context.book.bookId, bookPayload, now,
+        context.userId, context.book.bookId
+      )
     ]);
-    return json({ ok: true, bookId: context.book.bookId, state: next, updatedAt: now });
+    const storedState = await readState(context);
+    return json({
+      ok: true, bookId: context.book.bookId,
+      state: storedState, updatedAt: now
+    });
   } catch (error) {
     return json({ error: "保存雲端閱讀狀態失敗：" + String(error?.message || error).slice(0, 160) }, 503);
   }
