@@ -1023,11 +1023,11 @@ class _FrameEpubReaderPreviewScreenState
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
-        constraints: const BoxConstraints(minHeight: 50),
+        constraints: const BoxConstraints(minHeight: 52),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: SizedBox(
-            height: 46,
+            height: 48,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1097,7 +1097,7 @@ class _FrameEpubReaderPreviewScreenState
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 260),
                       child: SizedBox(
-                        height: 46,
+                        height: 48,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: actionRow,

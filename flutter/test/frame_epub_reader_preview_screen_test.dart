@@ -190,8 +190,8 @@ void main() {
       expect(rect.center.dy, toolbarRect.center.dy);
     }
     expect(toolbarRect.bottom, frameForGap.top);
-    expect(toolbarRect.height, 50);
-    expect(frameForGap.top - toolbarRect.top, 50);
+    expect(toolbarRect.height, 52);
+    expect(frameForGap.top - toolbarRect.top, 52);
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
