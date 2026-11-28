@@ -25,3 +25,9 @@ jobs:
           node-version: 24
       - name: Run Functions unit tests
         run: node --test functions/tests/*.test.js
+      - name: Check Pages Function module syntax
+        run: |
+          node --check functions/api/device/sync/push.js
+          node --check functions/api/reading/state.js
+      - name: Verify D1 state merge and journal SQL
+        run: python3 functions/tests/reader_state_sql_test.py
