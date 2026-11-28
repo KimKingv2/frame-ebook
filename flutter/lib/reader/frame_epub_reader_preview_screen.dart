@@ -572,10 +572,15 @@ class _FrameEpubReaderPreviewScreenState
     int direction,
   ) async {
     final index = session.currentSpineIndex;
-    final count = session.epub?.spine.length ?? 0;
-    if (index == null || count <= 0) return false;
+    if (index == null) return false;
+    final readingOrder = session.readingOrderSpineIndices;
+    final currentPosition = readingOrder.indexOf(index);
+    if (currentPosition < 0 || readingOrder.isEmpty) return false;
     final step = _comicPageStep(context, session);
-    final target = (index + direction * step).clamp(0, count - 1).toInt();
+    final targetPosition = (currentPosition + direction * step)
+        .clamp(0, readingOrder.length - 1)
+        .toInt();
+    final target = readingOrder[targetPosition];
     if (target == index) return false;
     _comicSpineNavigationTimer?.cancel();
     return session.goToSpineIndex(target);
@@ -590,7 +595,11 @@ class _FrameEpubReaderPreviewScreenState
     _comicSpineNavigationTimer = Timer(
       const Duration(milliseconds: 140),
       () {
-        if (!mounted || session.currentSpineIndex == targetIndex) return;
+        if (!mounted ||
+            session.currentSpineIndex == targetIndex ||
+            !session.readingOrderSpineIndices.contains(targetIndex)) {
+          return;
+        }
         unawaited(session.goToSpineIndex(targetIndex));
       },
     );
@@ -632,9 +641,10 @@ class _FrameEpubReaderPreviewScreenState
     final index = session?.currentSpineIndex;
     final count = session?.epub?.spine.length ?? 0;
     if (index == null || count <= 0) return 0;
-    final completedUnits = session!.isFixedLayout
-        ? index + 1.0
-        : index + (chapterFraction ?? 0);
+    if (session!.isFixedLayout) {
+      return session.fixedLayoutReadingProgressPercent;
+    }
+    final completedUnits = index + (chapterFraction ?? 0);
     return ((completedUnits / count) * 100).round().clamp(0, 100).toInt();
   }
 
@@ -680,8 +690,14 @@ class _FrameEpubReaderPreviewScreenState
     if (index == null || count <= 0) return false;
 
     if (session.isFixedLayout) {
+      final readingOrder = session.readingOrderSpineIndices;
+      final currentPosition = readingOrder.indexOf(index);
+      if (currentPosition < 0 || readingOrder.isEmpty) return false;
       final step = _comicPageStep(context, session);
-      return forward ? index + step < count : index > 0;
+      final targetPosition = (currentPosition + (forward ? step : -step))
+          .clamp(0, readingOrder.length - 1)
+          .toInt();
+      return targetPosition != currentPosition;
     }
 
     final hasAdjacentChapter = forward ? index + 1 < count : index > 0;
@@ -1603,23 +1619,30 @@ class _FrameEpubReaderPreviewScreenState
 
     if (session.isFixedLayout) {
       if (_comicReadingMode == 'scrolled') {
+        final readingOrder = session.readingOrderSpineIndices;
+        final currentPagePosition = readingOrder.indexOf(spineIndex);
         return FrameEpubFixedLayoutLongStrip(
-          pageCount: epub.spine.length,
-          currentPageIndex: spineIndex,
+          pageCount: readingOrder.length,
+          currentPageIndex: currentPagePosition < 0 ? 0 : currentPagePosition,
           cachePages: 1,
-          onPageChanged: (index) =>
-              _scheduleComicSpineNavigation(session, index),
-          pageBuilder: (pageContext, index) => _FixedLayoutComicPage(
-            key: ValueKey(epub.spine[index].item.path),
+          onPageChanged: (position) {
+            if (position < 0 || position >= readingOrder.length) return;
+            _scheduleComicSpineNavigation(session, readingOrder[position]);
+          },
+          pageBuilder: (pageContext, position) {
+            final pageIndex = readingOrder[position];
+            return _FixedLayoutComicPage(
+            key: ValueKey(epub.spine[pageIndex].item.path),
             resourceLoader: loader,
-            spineItem: epub.spine[index],
+            spineItem: epub.spine[pageIndex],
             imageFit: 'fit-page',
             allowZoom: false,
             backgroundColor: _pageBackground,
             backdropDecoration: _comicBackdropDecoration,
             textColor: _pageText,
             linkColor: _pageLink,
-          ),
+          );
+          },
         );
       }
 
@@ -1641,8 +1664,13 @@ class _FrameEpubReaderPreviewScreenState
       );
       if (!_usesComicDoublePage(context, session)) return currentPage;
 
-      final nextIndex = spineIndex + 1;
-      final nextPage = nextIndex < epub.spine.length
+      final readingOrder = session.readingOrderSpineIndices;
+      final currentPagePosition = readingOrder.indexOf(spineIndex);
+      final nextIndex = currentPagePosition >= 0 &&
+              currentPagePosition + 1 < readingOrder.length
+          ? readingOrder[currentPagePosition + 1]
+          : null;
+      final nextPage = nextIndex != null
           ? _FixedLayoutComicPage(
               key: ValueKey(epub.spine[nextIndex].item.path),
               resourceLoader: loader,
