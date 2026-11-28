@@ -1,15 +1,19 @@
 import { json } from "../../../_lib/common.js";
 import { getDeviceContext, getConfiguredSourceMap } from "../../../_lib/device-sync.js";
 import { resolveReaderBook } from "../../../_lib/reader-data.js";
+import {
+  cleanReaderProgressPatch,
+  mergeReaderBookState
+} from "../../../_lib/reader-state.js";
 
 const TYPES=new Set(["highlight","note","bookmark"]);
 const PREFS=new Set(["activeProvider","activeLibrary","roots","goalMinutes","fontScale","lineHeight","verticalMargin","horizontalMargin","fontFamily","fontWeight","paragraphSpacing","textAlign","readingMode","pageLayout","comicReadingMode","comicPageLayout","comicImageFit","backdrop","theme"]);
 function cleanState(input){
   if(!input||typeof input!=="object"||Array.isArray(input))throw new Error("閱讀狀態格式無效。");
   const output={};
-  if(input.progress){const p=input.progress,percent=Number(p.percent),index=p.index==null?null:Number(p.index);
-    if(!Number.isFinite(percent)||percent<0||percent>100||(index!==null&&(!Number.isSafeInteger(index)||index<0)))throw new Error("閱讀進度數值無效。");
-    output.progress={percent:Math.round(percent),label:String(p.label||"").slice(0,160),cfi:String(p.cfi||"").slice(0,4000),index};}
+  if(Object.prototype.hasOwnProperty.call(input,"progress")){
+    output.progress=cleanReaderProgressPatch(input.progress);
+  }
   if(input.appearance){if(typeof input.appearance!=="object"||Array.isArray(input.appearance))throw new Error("閱讀外觀設定格式無效。");
     const appearance={};for(const [key,value] of Object.entries(input.appearance))if(PREFS.has(key))appearance[key]=typeof value==="string"?value.slice(0,64):value;output.appearance=appearance;}
   if(input.metadata){const m=input.metadata;output.metadata={title:String(m.title||"").slice(0,240),author:String(m.author||"").slice(0,240),shelf:["books","comics"].includes(m.shelf)?m.shelf:undefined,manualTitle:!!m.manualTitle,manualAuthor:!!m.manualAuthor,language:String(m.language||"").slice(0,64),pageCount:Math.max(0,Math.min(1000000,Number(m.pageCount)||0))};}
@@ -34,18 +38,59 @@ export async function onRequestPost({request,env}){
   const incoming=Array.isArray(body?.changes)?body.changes:[];if(!incoming.length)return json({ok:true,accepted:0});
   if(incoming.length>50)return json({error:"單次最多同步 50 筆變更。"},400);
   const sourceMap=await getConfiguredSourceMap(env),statements=[],now=Date.now();
+  const stateCache = new Map();
   try{
     for(const change of incoming){
       const type=String(change?.type||"");
       if(type==="state"){
         const book=await resolveDeviceBook(context.db,sourceMap,change.book),patch=cleanState(change.state||{});
-        const previous=await context.db.prepare("SELECT state_json AS stateJson FROM reader_book_state WHERE user_id=? AND book_id=?").bind(context.userId,book.bookId).first();
-        let prev={};try{prev=JSON.parse(previous?.stateJson||"{}");}catch(_){}
-        const next={...prev,...patch},stateJson=JSON.stringify(next);if(stateJson.length>24*1024)throw new Error("單本書的閱讀狀態超過 24 KiB。");
-        statements.push(context.db.prepare("INSERT INTO reader_book_state (user_id,book_id,provider,library,root_path,book_path,state_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,book_id) DO UPDATE SET provider=excluded.provider,library=excluded.library,root_path=excluded.root_path,book_path=excluded.book_path,state_json=excluded.state_json,updated_at=excluded.updated_at")
-          .bind(context.userId,book.bookId,book.provider,book.library,book.rootPath,book.path,stateJson,now,now));
-        statements.push(context.db.prepare("INSERT INTO reader_sync_changes (user_id,entity_type,entity_id,operation,payload_json,created_at) VALUES (?,'state',?,'upsert',?,?)")
-          .bind(context.userId,book.bookId,JSON.stringify({book:{id:book.bookId,sourceId:String(change.book.sourceId),library:book.library,rootPath:book.rootPath,path:book.path},state:next}),now));
+        let previousState = stateCache.get(book.bookId);
+        if (!previousState) {
+          const previous = await context.db.prepare(
+            "SELECT state_json AS stateJson FROM reader_book_state WHERE user_id=? AND book_id=?"
+          ).bind(context.userId, book.bookId).first();
+          try { previousState = JSON.parse(previous?.stateJson || "{}"); }
+          catch (_) { previousState = {}; }
+        }
+        const next = mergeReaderBookState(previousState, patch);
+        const stateJson = JSON.stringify(next);
+        if (stateJson.length > 24 * 1024) {
+          throw new Error("單本書的閱讀狀態超過 24 KiB。");
+        }
+        stateCache.set(book.bookId, next);
+        const patchJson = JSON.stringify(patch);
+        const bookPayload = JSON.stringify({
+          id: book.bookId,
+          sourceId: String(change.book.sourceId),
+          library: book.library,
+          rootPath: book.rootPath,
+          path: book.path
+        });
+        statements.push(context.db.prepare(
+          "INSERT INTO reader_book_state " +
+          "(user_id,book_id,provider,library,root_path,book_path,state_json,created_at,updated_at) " +
+          "VALUES (?,?,?,?,?,?,?,?,?) " +
+          "ON CONFLICT(user_id,book_id) DO UPDATE SET " +
+          "provider=excluded.provider,library=excluded.library,root_path=excluded.root_path," +
+          "book_path=excluded.book_path," +
+          "state_json=json_patch(" +
+          "CASE WHEN json_valid(reader_book_state.state_json) " +
+          "THEN reader_book_state.state_json ELSE '{}' END,excluded.state_json)," +
+          "updated_at=excluded.updated_at"
+        ).bind(
+          context.userId, book.bookId, book.provider, book.library,
+          book.rootPath, book.path, patchJson, now, now
+        ));
+        statements.push(context.db.prepare(
+          "INSERT INTO reader_sync_changes " +
+          "(user_id,entity_type,entity_id,operation,payload_json,created_at) " +
+          "SELECT ?,'state',?,'upsert'," +
+          "json_object('book',json(?),'state',json(state_json)),? " +
+          "FROM reader_book_state WHERE user_id=? AND book_id=?"
+        ).bind(
+          context.userId, book.bookId, bookPayload, now,
+          context.userId, book.bookId
+        ));
       }else if(type==="annotation"||type==="annotation_delete"){
         const book=await resolveDeviceBook(context.db,sourceMap,change.book),input=change.annotation||{},id=String(input.id||change.id||"").slice(0,120);
         if(!id)throw new Error("標註缺少識別碼。");
