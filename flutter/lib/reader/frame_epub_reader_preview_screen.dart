@@ -827,7 +827,7 @@ class _FrameEpubReaderPreviewScreenState
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.compact,
         constraints: BoxConstraints.tightFor(width: width, height: height),
-        icon: Icon(icon, size: 18, color: iconColor),
+        icon: Icon(icon, size: 24, color: iconColor),
       ),
     );
   }
