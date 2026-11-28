@@ -1632,16 +1632,16 @@ class _FrameEpubReaderPreviewScreenState
           pageBuilder: (pageContext, position) {
             final pageIndex = readingOrder[position];
             return _FixedLayoutComicPage(
-            key: ValueKey(epub.spine[pageIndex].item.path),
-            resourceLoader: loader,
-            spineItem: epub.spine[pageIndex],
-            imageFit: 'fit-page',
-            allowZoom: false,
-            backgroundColor: _pageBackground,
-            backdropDecoration: _comicBackdropDecoration,
-            textColor: _pageText,
-            linkColor: _pageLink,
-          );
+              key: ValueKey(epub.spine[pageIndex].item.path),
+              resourceLoader: loader,
+              spineItem: epub.spine[pageIndex],
+              imageFit: 'fit-page',
+              allowZoom: false,
+              backgroundColor: _pageBackground,
+              backdropDecoration: _comicBackdropDecoration,
+              textColor: _pageText,
+              linkColor: _pageLink,
+            );
           },
         );
       }
