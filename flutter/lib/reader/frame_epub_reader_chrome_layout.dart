@@ -2,16 +2,17 @@
 bool frameEpubUsesMobileQuickActions(double viewportWidth) =>
     viewportWidth <= 820;
 
-/// Normal-sized rectangular icon actions, matching the earlier reader style.
-/// The 560px breakpoint is used for the compact phone toolbar.
+/// Square, icon-only quick actions matching the final legacy Reading Room
+/// cascade: 48px on desktop and 44px through the mobile 820px breakpoint.
 double frameEpubReaderQuickActionWidth(double viewportWidth) =>
-    viewportWidth <= 560 ? 32 : 36;
+    viewportWidth <= 820 ? 44 : 48;
 
 double frameEpubReaderQuickActionHeight(double viewportWidth) =>
-    viewportWidth <= 560 ? 27 : 31;
+    viewportWidth <= 820 ? 44 : 48;
 
-/// The action row uses a small, consistent gap rather than a wide dock.
-double frameEpubReaderQuickActionGap(double viewportWidth) => 4;
+/// The final legacy cascade uses a 2px desktop gap and no mobile gap.
+double frameEpubReaderQuickActionGap(double viewportWidth) =>
+    viewportWidth <= 820 ? 0 : 2;
 
 /// Width of the four-button group, including the gaps between buttons.
 double frameEpubReaderQuickActionsWidth(double viewportWidth) {

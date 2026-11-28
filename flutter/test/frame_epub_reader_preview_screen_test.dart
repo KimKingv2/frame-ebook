@@ -136,17 +136,31 @@ void main() {
         .map((key) => tester.getRect(find.byKey(key)))
         .toList();
     for (final rect in actionRects) {
-      expect(rect.width, 36);
-      expect(rect.height, 31);
+      expect(rect.width, 48);
+      expect(rect.height, 48);
     }
-    expect(actionRects[1].left - actionRects[0].right, 4);
-    expect(actionRects[2].left - actionRects[1].right, 4);
-    expect(actionRects[3].left - actionRects[2].right, 4);
+    expect(actionRects[1].left - actionRects[0].right, 2);
+    expect(actionRects[2].left - actionRects[1].right, 2);
+    expect(actionRects[3].left - actionRects[2].right, 2);
+    for (final key in actionKeys) {
+      final icon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byKey(key),
+          matching: find.byType(Icon),
+        ),
+      );
+      expect(icon.size, 24);
+      final action = tester.widget<Container>(find.byKey(key));
+      final decoration = action.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.border, isNull);
+      expect(decoration.color, Colors.transparent);
+    }
 
     final actionRowRect = tester.getRect(
       find.byKey(const ValueKey('reader-quick-actions-row')),
     );
-    expect(actionRowRect.width, 156);
+    expect(actionRowRect.width, 198);
     final toolbarRect = tester.getRect(
       find.byKey(const ValueKey('reader-desktop-toolbar')),
     );
@@ -176,8 +190,8 @@ void main() {
       expect(rect.center.dy, toolbarRect.center.dy);
     }
     expect(toolbarRect.bottom, frameForGap.top);
-    expect(toolbarRect.height, 50);
-    expect(frameForGap.top - toolbarRect.top, 50);
+    expect(toolbarRect.height, 52);
+    expect(frameForGap.top - toolbarRect.top, 52);
 
     final frame = tester.widget<Container>(
       find.byKey(const ValueKey('reader-rounded-frame')),
@@ -221,7 +235,7 @@ void main() {
     expect((workspace.bottom - statusRect.bottom).abs(), lessThanOrEqualTo(1));
   });
 
-  testWidgets('restores the compact rectangular 32px action row',
+  testWidgets('matches the 44px mobile icon action row from legacy CSS',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -256,17 +270,31 @@ void main() {
         .map((key) => tester.getRect(find.byKey(key)))
         .toList();
     for (final rect in actionRects) {
-      expect(rect.width, 32);
-      expect(rect.height, 27);
+      expect(rect.width, 44);
+      expect(rect.height, 44);
     }
-    expect(actionRects[1].left - actionRects[0].right, 4);
-    expect(actionRects[2].left - actionRects[1].right, 4);
-    expect(actionRects[3].left - actionRects[2].right, 4);
+    expect(actionRects[1].left - actionRects[0].right, 0);
+    expect(actionRects[2].left - actionRects[1].right, 0);
+    expect(actionRects[3].left - actionRects[2].right, 0);
+    for (final key in actionKeys) {
+      final icon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byKey(key),
+          matching: find.byType(Icon),
+        ),
+      );
+      expect(icon.size, 24);
+      final action = tester.widget<Container>(find.byKey(key));
+      final decoration = action.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.border, isNull);
+      expect(decoration.color, Colors.transparent);
+    }
     expect(
       tester.getSize(
         find.byKey(const ValueKey('reader-quick-actions-row')),
       ).width,
-      140,
+      176,
     );
     final compactContentInset = tester.widget<Padding>(
       find.byKey(const ValueKey('reader-content-row-inset')),

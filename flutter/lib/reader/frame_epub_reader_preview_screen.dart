@@ -797,29 +797,30 @@ class _FrameEpubReaderPreviewScreenState
     required IconData icon,
     required VoidCallback? onPressed,
     required bool selected,
+    bool emphasized = false,
+    bool selectedBackground = false,
     required double width,
     required double height,
   }) {
     final iconColor = onPressed == null
         ? const Color(0xFF746C80)
-        : selected
-            ? _readerAccent
-            : const Color(0xFFDCD2ED);
+        : emphasized
+            ? const Color(0xFFEEE6FF)
+            : selectedBackground
+                ? const Color(0xFFFFFFFF)
+                : selected
+                    ? const Color(0xFFCBB6FB)
+                    : const Color(0xFFDCD2ED);
 
     return Container(
       key: key,
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: selected
-            ? const Color(0xFF30263F)
-            : const Color(0xFF2D253C),
-        border: Border.all(
-          color: selected
-              ? const Color(0x887F68AA)
-              : const Color(0x443F3552),
-        ),
-        borderRadius: BorderRadius.circular(7),
+        color: selectedBackground
+            ? const Color(0x33A78BFA)
+            : Colors.transparent,
+        shape: BoxShape.circle,
       ),
       child: IconButton(
         tooltip: tooltip,
@@ -827,7 +828,7 @@ class _FrameEpubReaderPreviewScreenState
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.compact,
         constraints: BoxConstraints.tightFor(width: width, height: height),
-        icon: Icon(icon, size: 18, color: iconColor),
+        icon: Icon(icon, size: 24, color: iconColor),
       ),
     );
   }
@@ -953,6 +954,7 @@ class _FrameEpubReaderPreviewScreenState
             ? Icons.bookmark_rounded
             : Icons.bookmark_add_outlined,
         selected: bookmarked,
+        selectedBackground: bookmarked,
         width: actionWidth,
         height: actionHeight,
         key: const ValueKey('reader-action-bookmark'),
@@ -963,7 +965,7 @@ class _FrameEpubReaderPreviewScreenState
             ? (_isSidebarVisible ? '隱藏閱讀導覽' : '顯示閱讀導覽')
             : '目錄、筆記與書籤',
         icon: Icons.menu_book_outlined,
-        selected: wide && _isSidebarVisible,
+        selected: wide && !_isSidebarVisible,
         width: actionWidth,
         height: actionHeight,
         key: const ValueKey('reader-action-sidebar'),
@@ -981,6 +983,7 @@ class _FrameEpubReaderPreviewScreenState
         tooltip: '閱讀設定',
         icon: Icons.tune_rounded,
         selected: false,
+        emphasized: true,
         width: actionWidth,
         height: actionHeight,
         key: const ValueKey('reader-action-appearance'),
@@ -1020,11 +1023,11 @@ class _FrameEpubReaderPreviewScreenState
           (viewportWidth * .32).clamp(180.0, 420.0).toDouble();
       return ConstrainedBox(
         key: const ValueKey('reader-desktop-toolbar'),
-        constraints: const BoxConstraints(minHeight: 50),
+        constraints: const BoxConstraints(minHeight: 52),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
           child: SizedBox(
-            height: 46,
+            height: 48,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1094,7 +1097,7 @@ class _FrameEpubReaderPreviewScreenState
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 260),
                       child: SizedBox(
-                        height: 46,
+                        height: 48,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: actionRow,

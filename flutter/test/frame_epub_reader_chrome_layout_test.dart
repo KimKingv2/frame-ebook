@@ -13,25 +13,26 @@ void main() {
   });
 
   group('Reader quick-action geometry', () {
-    test('uses normal 36px desktop and 32px compact widths', () {
-      expect(frameEpubReaderQuickActionWidth(1440), 36);
-      expect(frameEpubReaderQuickActionWidth(821), 36);
-      expect(frameEpubReaderQuickActionWidth(560), 32);
-      expect(frameEpubReaderQuickActionWidth(390), 32);
+    test('uses 48px circular actions on desktop', () {
+      expect(frameEpubReaderQuickActionWidth(1440), 48);
+      expect(frameEpubReaderQuickActionWidth(821), 48);
+      expect(frameEpubReaderQuickActionHeight(1440), 48);
+      expect(frameEpubReaderQuickActionHeight(821), 48);
+      expect(frameEpubReaderQuickActionGap(1440), 2);
+      expect(frameEpubReaderQuickActionsWidth(1440), 198);
     });
 
-    test('uses 31px desktop and 27px compact heights', () {
-      expect(frameEpubReaderQuickActionHeight(1440), 31);
-      expect(frameEpubReaderQuickActionHeight(821), 31);
-      expect(frameEpubReaderQuickActionHeight(560), 27);
-      expect(frameEpubReaderQuickActionHeight(390), 27);
-    });
-
-    test('keeps a small 4px gap and a compact four-button group', () {
-      expect(frameEpubReaderQuickActionGap(1440), 4);
-      expect(frameEpubReaderQuickActionGap(390), 4);
-      expect(frameEpubReaderQuickActionsWidth(1440), 156);
-      expect(frameEpubReaderQuickActionsWidth(390), 140);
+    test('switches to 44px edge-to-edge actions at the 820px breakpoint', () {
+      expect(frameEpubReaderQuickActionWidth(820), 44);
+      expect(frameEpubReaderQuickActionWidth(560), 44);
+      expect(frameEpubReaderQuickActionWidth(390), 44);
+      expect(frameEpubReaderQuickActionHeight(820), 44);
+      expect(frameEpubReaderQuickActionHeight(560), 44);
+      expect(frameEpubReaderQuickActionHeight(390), 44);
+      expect(frameEpubReaderQuickActionGap(820), 0);
+      expect(frameEpubReaderQuickActionGap(390), 0);
+      expect(frameEpubReaderQuickActionsWidth(820), 176);
+      expect(frameEpubReaderQuickActionsWidth(390), 176);
     });
   });
 
