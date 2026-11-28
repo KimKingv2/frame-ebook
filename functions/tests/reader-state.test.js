@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { mergeReaderBookState } from "../_lib/reader-state.js";
+import {
+  cleanReaderProgressPatch,
+  mergeReaderBookState
+} from "../_lib/reader-state.js";
 
 test("merges partial progress and appearance updates without losing sibling fields", () => {
   const previous = {
@@ -59,4 +62,18 @@ test("treats malformed previous state as an empty object", () => {
   assert.deepEqual(mergeReaderBookState(null, { progress: { percent: 1 } }), {
     progress: { percent: 1 }
   });
+});
+
+test("keeps omitted progress fields out of a partial patch", () => {
+  assert.deepEqual(cleanReaderProgressPatch({ percent: 24 }), { percent: 24 });
+  assert.deepEqual(
+    cleanReaderProgressPatch({ percent: 24, index: null, label: "Chapter 3" }),
+    { percent: 24, index: null, label: "Chapter 3" }
+  );
+});
+
+test("rejects invalid progress patches without changing existing data", () => {
+  assert.throws(() => cleanReaderProgressPatch({ index: 4 }), /百分比/);
+  assert.throws(() => cleanReaderProgressPatch({ percent: 120 }), /數值/);
+  assert.throws(() => cleanReaderProgressPatch({ percent: 10, index: -1 }), /索引/);
 });

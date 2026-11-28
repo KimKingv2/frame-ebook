@@ -1,6 +1,9 @@
 import { json, isSameOrigin } from "../../_lib/common.js";
 import { getReaderContext, requestBookDescriptor } from "../../_lib/reader-data.js";
-import { mergeReaderBookState } from "../../_lib/reader-state.js";
+import {
+  cleanReaderProgressPatch,
+  mergeReaderBookState
+} from "../../_lib/reader-state.js";
 
 const APPEARANCE_KEYS = new Set([
   "fontScale","lineHeight","verticalMargin","horizontalMargin","fontFamily","fontWeight",
@@ -16,16 +19,7 @@ function cleanState(input) {
   if (Object.prototype.hasOwnProperty.call(input, "progress")) {
     const p = input.progress;
     if (!p || typeof p !== "object" || Array.isArray(p)) throw new Error("閱讀進度格式無效。");
-    const percent = Number(p.percent);
-    const index = p.index == null ? null : Number(p.index);
-    if (!Number.isFinite(percent) || percent < 0 || percent > 100 ||
-        (index !== null && (!Number.isSafeInteger(index) || index < 0))) throw new Error("閱讀進度數值無效。");
-    output.progress = {
-      percent: Math.round(percent),
-      label: cleanText(p.label || "", 160),
-      cfi: cleanText(p.cfi || "", 4000),
-      index
-    };
+    output.progress = cleanReaderProgressPatch(p);
   }
   if (Object.prototype.hasOwnProperty.call(input, "appearance")) {
     const a = input.appearance;

@@ -1,16 +1,19 @@
 import { json } from "../../../_lib/common.js";
 import { getDeviceContext, getConfiguredSourceMap } from "../../../_lib/device-sync.js";
 import { resolveReaderBook } from "../../../_lib/reader-data.js";
-import { mergeReaderBookState } from "../../../_lib/reader-state.js";
+import {
+  cleanReaderProgressPatch,
+  mergeReaderBookState
+} from "../../../_lib/reader-state.js";
 
 const TYPES=new Set(["highlight","note","bookmark"]);
 const PREFS=new Set(["activeProvider","activeLibrary","roots","goalMinutes","fontScale","lineHeight","verticalMargin","horizontalMargin","fontFamily","fontWeight","paragraphSpacing","textAlign","readingMode","pageLayout","comicReadingMode","comicPageLayout","comicImageFit","backdrop","theme"]);
 function cleanState(input){
   if(!input||typeof input!=="object"||Array.isArray(input))throw new Error("閱讀狀態格式無效。");
   const output={};
-  if(input.progress){const p=input.progress,percent=Number(p.percent),index=p.index==null?null:Number(p.index);
-    if(!Number.isFinite(percent)||percent<0||percent>100||(index!==null&&(!Number.isSafeInteger(index)||index<0)))throw new Error("閱讀進度數值無效。");
-    output.progress={percent:Math.round(percent),label:String(p.label||"").slice(0,160),cfi:String(p.cfi||"").slice(0,4000),index};}
+  if(Object.prototype.hasOwnProperty.call(input,"progress")){
+    output.progress=cleanReaderProgressPatch(input.progress);
+  }
   if(input.appearance){if(typeof input.appearance!=="object"||Array.isArray(input.appearance))throw new Error("閱讀外觀設定格式無效。");
     const appearance={};for(const [key,value] of Object.entries(input.appearance))if(PREFS.has(key))appearance[key]=typeof value==="string"?value.slice(0,64):value;output.appearance=appearance;}
   if(input.metadata){const m=input.metadata;output.metadata={title:String(m.title||"").slice(0,240),author:String(m.author||"").slice(0,240),shelf:["books","comics"].includes(m.shelf)?m.shelf:undefined,manualTitle:!!m.manualTitle,manualAuthor:!!m.manualAuthor,language:String(m.language||"").slice(0,64),pageCount:Math.max(0,Math.min(1000000,Number(m.pageCount)||0))};}
