@@ -150,6 +150,11 @@ void main() {
         ),
       );
       expect(icon.size, 24);
+      final action = tester.widget<Container>(find.byKey(key));
+      final decoration = action.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.border, isNull);
+      expect(decoration.color, Colors.transparent);
     }
 
     final actionRowRect = tester.getRect(
@@ -279,6 +284,11 @@ void main() {
         ),
       );
       expect(icon.size, 24);
+      final action = tester.widget<Container>(find.byKey(key));
+      final decoration = action.decoration! as BoxDecoration;
+      expect(decoration.shape, BoxShape.circle);
+      expect(decoration.border, isNull);
+      expect(decoration.color, Colors.transparent);
     }
     expect(
       tester.getSize(
