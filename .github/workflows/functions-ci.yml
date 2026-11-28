@@ -24,4 +24,4 @@ jobs:
         with:
           node-version: 24
       - name: Run Functions unit tests
-        run: node --experimental-default-type=module --test functions/tests/*.test.js
+        run: node --test functions/tests/*.test.js
